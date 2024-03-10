@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import (
@@ -94,7 +94,6 @@ def test_alias_tables_not_found_table_unknown_error(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
     backend = create_autospec(StatementExecutionBackend)
-    backend.execute = MagicMock()
     backend.execute.side_effect = NotFound("unknown error")
 
     client.tables.list.return_value = [
@@ -227,7 +226,6 @@ def test_move_tables_get_grants_fails_because_table_removed(caplog):
     client.grants.get.side_effect = NotFound('TABLE_DOES_NOT_EXIST')
     client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
     client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
-    client.grants.update = MagicMock()
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
@@ -490,7 +488,6 @@ def test_move_apply_grants():
     client.grants.get.return_value = perm
     client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
     client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
-    client.grants.update = MagicMock()
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
@@ -529,7 +526,6 @@ def test_alias_apply_grants():
     client.grants.get.return_value = perm
     client.schemas.get.side_effect = [SchemaInfo(), SchemaInfo()]
     client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
-    client.grants.update = MagicMock()
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
     table_move.alias_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS")

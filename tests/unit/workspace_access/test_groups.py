@@ -1029,9 +1029,9 @@ def test_migration_state_with_filtered_group():
             ]
         }
     )
-    wsclient = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     grp_membership = GroupManager(
-        backend, wsclient, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
+        backend, ws, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
     ).get_migration_state()
 
     assert len(grp_membership.groups) == 1

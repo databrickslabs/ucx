@@ -19,9 +19,23 @@ class TestingChecker(BaseChecker):
             external clients suggests a need for refactoring, with experienced engineers recognizing the potential for 
             dependency inversion in such scenarios.""",
         ),
+        'R9002': (
+            "Obscure implicit test dependency with MagicMock(). Rewrite with create_autospec(ConcreteType).",
+            'obscure-mock',
+            """Using `MagicMock` to mock dependencies in unit tests can introduce implicit dependencies within a class,
+            making it unclear to other developers. create_autospec(ConcreteType) is a better alternative, as it
+            automatically creates a mock object with the same attributes and methods as the concrete class. This
+            approach ensures that the mock object behaves like the concrete class, allowing for more robust and
+            maintainable unit tests. Moreover, reliance on `MagicMock` for testing leads to issues during refactoring,
+            as updates to underlying implementations would necessitate changes across multiple unrelated unit tests.""",
+        ),
     }
 
     def visit_call(self, node: nodes.Call) -> None:
+        if node.as_string() == 'MagicMock()':
+            # here we can go and figure out the expected type of the object being mocked based on the arguments
+            # where it is being assigned to, but that is a bit too much for this check. Other people can add this later.
+            self.add_message('obscure-mock', node=node)
         if not node.args:
             return
         if node.func.as_string() in ('mocker.patch', 'patch'):

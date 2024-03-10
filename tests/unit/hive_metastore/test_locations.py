@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock, create_autospec
+from unittest.mock import Mock, create_autospec
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.locations import (
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
         MountInfo("mp_2", "path_2", "info_2"),
@@ -35,7 +35,7 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
 
 
 def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_type():
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("mp_1", "path_1", "info_1"),
         MountInfo("mp_2", "path_2", "info_2"),
@@ -54,7 +54,7 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
 
 
 def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volume_names():
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
     client.dbutils.fs.mounts.return_value = [
         MountInfo("/Volume", "DbfsReserved", "info_1"),
         MountInfo("/Volumes", "DbfsReserved", "info_2"),
@@ -153,7 +153,7 @@ LOCATION_STORAGE = MockBackend.rows("location", "storage_properties")
 
 
 def test_save_external_location_mapping_missing_location():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
             "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
@@ -192,7 +192,7 @@ def test_save_external_location_mapping_missing_location():
 
 
 def test_save_external_location_mapping_no_missing_location():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
             "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
