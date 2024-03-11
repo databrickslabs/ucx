@@ -84,7 +84,7 @@ def run_command(command):
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
-    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
+    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
@@ -592,7 +592,7 @@ class AWSResourcePermissions:
             new_path = PurePath(external_location.location)
             matching_role = None
             for role in compatible_roles:
-                if new_path.match(role.resource_path):
+                if new_path.match(role.resource_path + "/*"):
                     matching_role = role.role_arn
                     continue
             if matching_role:
@@ -659,7 +659,9 @@ class AWSResourcePermissions:
                 if external_location_name not in external_location_names:
                     break
                 external_location_num += 1
-            self._ws.external_locations.create(external_location_name, path, credential_dict[role_arn])
+            self._ws.external_locations.create(
+                external_location_name, path, credential_dict[role_arn], skip_validation=True
+            )
             external_location_num += 1
 
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:

@@ -1023,9 +1023,9 @@ def test_create_external_locations(mock_ws, mock_installation, mock_aws, backend
     aws_resource_permissions = AWSResourcePermissions(mock_installation, mock_ws, backend, mock_aws, locations, "ucx")
     aws_resource_permissions.create_external_locations()
     calls = [
-        call(mock.ANY, 's3://BUCKET1/FOLDER1', 'cred1'),
-        call(mock.ANY, 's3://BUCKET2/FOLDER2', 'cred1'),
-        call(mock.ANY, 's3://BUCKETX/FOLDERX', 'credx'),
+        call(mock.ANY, 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
+        call(mock.ANY, 's3://BUCKET2/FOLDER2', 'cred1', skip_validation=True),
+        call(mock.ANY, 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
 
@@ -1055,7 +1055,7 @@ def test_create_external_locations_skip_existing(mock_ws, mock_installation, moc
     aws_resource_permissions = AWSResourcePermissions(mock_installation, mock_ws, backend, mock_aws, locations, "ucx")
     aws_resource_permissions.create_external_locations(location_init="UCX_FOO")
     calls = [
-        call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1'),
+        call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
 
