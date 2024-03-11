@@ -16,15 +16,32 @@ requires-python = ">=3.10"
 keywords = ["Databricks", "Unity Catalog"]
 authors = [
     { name = "Serge Smertin", email = "serge.smertin@databricks.com" },
-    { name = "Ivan Trusov", email = "ivan.trusov@databricks.com" },
+]
+maintainers = [
+    { name = "Serge Smertin", email = "serge.smertin@databricks.com" },
+    { name = "Liran Bareket", email = "liran.bareket@databricks.com" },
+    { name = "Marcin Wojtyczka", email = "marcin.wojtyczka@databricks.com" },
+    { name = "Ziyuan Qin", email = "ziyuan.qin@databricks.com" },
+    { name = "William Conti", email = "william.conti@databricks.com" },
+    { name = "Hari Selvarajan", email = "hari.selvarajan@databricks.com" },
+    { name = "Vuong Nguyen", email = "vuong.nguyen@databricks.com" },
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "License :: Other/Proprietary License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
+    "Environment :: Console",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
 ]
 dependencies = ["databricks-sdk~=0.21.0",
                 "databricks-labs-blueprint~=0.4.0",
