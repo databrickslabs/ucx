@@ -171,6 +171,8 @@ class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
 class PolicyInfo:
     policy_id: str
     policy_name: str
+    success: int
+    failures: str
     spark_version: str | None = None
     policy_description: str | None = None
     creator: str | None = None
@@ -186,9 +188,11 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
         return list(self._assess_policies(all_policices))
 
     def _assess_policies(self, all_policices):
+        failures: list[str] = []
         for policy in all_policices:
             if policy.policy_id is None:
                 continue
+            failures.extend(self._check_cluster_policy(policy.policy_id, "policy"))
             if "spark_version" not in json.loads(policy.definition):
                 spark_version = None
             else:
@@ -201,8 +205,13 @@ class PoliciesCrawler(CrawlerBase[PolicyInfo], CheckClusterMixin):
                 policy_description=policy.description,
                 policy_name=policy_name,
                 spark_version=spark_version,
+                success=1,
+                failures="[]",
                 creator=creator_name,
             )
+            if len(failures) > 0:
+                policy_info.success = 0
+                policy_info.failures = json.dumps(failures)
             yield policy_info
 
     def snapshot(self) -> Iterable[PolicyInfo]:
