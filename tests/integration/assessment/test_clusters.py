@@ -4,7 +4,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode
 
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 
 from .test_assessment import _SPARK_CONF
 
@@ -36,3 +36,16 @@ def test_cluster_crawler_no_isolation(ws, make_cluster, inventory_schema, sql_ba
 
     assert len(results) == 1
     assert results[0].failures == '["No isolation shared clusters not supported in UC"]'
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=6))
+def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend):
+    created_policy = make_cluster_policy(name="test_policy_check")
+    policy_crawler = PoliciesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
+    policies = policy_crawler.snapshot()
+    results = []
+    for policy in policies:
+        if policy.policy_id == created_policy.policy_id:
+            results.append(policy)
+
+    assert len(results) >= 1
