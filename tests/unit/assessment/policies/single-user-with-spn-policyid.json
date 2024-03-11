@@ -1,4 +1,5 @@
 {
-  "policy_id": "123",
-  "definition": "{\"spark_version\": {\"type\": \"unlimited\",\"defaultValue\": \"auto:latest-ml\"}}"
+  "policy_id": "single-user-with-spn-policyid",
+  "definition": "{\"spark_version\": {\"type\": \"unlimited\",\"defaultValue\": \"auto:latest-ml\"}}",
+  "policy_family_definition_overrides": "{\"not.spark.conf\": {\"type\": \"fixed\", \"value\": \"OAuth\", \"hidden\": true}}"
 }

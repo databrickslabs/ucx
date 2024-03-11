@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
@@ -177,7 +177,7 @@ def test_policy_crawler():
 def test_policy_try_fetch():
     ws = workspace_client_mock(policy_ids=['single-user-with-spn-policyid'])
     mock_backend = MagicMock()
-    mock_backend.fetch.return_value = [("000", "test_policy", "13.3x", "test", "abc")]
+    mock_backend.fetch.return_value = [("000", "test_policy", 1, "[]", "13.3x", "test", "abc")]
     crawler = PoliciesCrawler(ws, mock_backend, "ucx")
     result_set = list(crawler.snapshot())
 
@@ -187,3 +187,13 @@ def test_policy_try_fetch():
     assert result_set[0].spark_version == "13.3x"
     assert result_set[0].policy_description == "test"
     assert result_set[0].creator == "abc"
+
+
+def test_policy_crawler():
+    ws = workspace_client_mock(
+        policy_ids=['single-user-with-spn-policyid'],
+    )
+
+    with patch("databricks.labs.ucx.assessment.crawlers.azure_sp_conf_present_check", retrun_value=True):
+        crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
+        result_set = list(crawler.snapshot())
