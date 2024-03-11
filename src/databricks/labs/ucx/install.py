@@ -779,7 +779,7 @@ class WorkspaceInstallation:
                     ),
                 )
             )
-        if "migration_sync" in names:
+        if "migration_clone" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="migration_sync",
@@ -788,8 +788,8 @@ class WorkspaceInstallation:
                         data_security_mode=compute.DataSecurityMode.SINGLE_USER,
                         # https://databricks.atlassian.net/browse/ES-975874
                         # the default 200 partition may not be enough for large tables, but it's hard to
-                        # find a number that fits all.
-                        spark_conf={"spark.sql.sources.parallelPartitionDiscovery.parallelism": "1000"},
+                        # find a number that fits all. If we need higher parallelism, we can use config below
+                        # spark_conf={"spark.sql.sources.parallelPartitionDiscovery.parallelism": "1000"},
                         autoscale=compute.Autoscale( #number of executors matters to parallelism of file copy
                             min_workers=1,
                             max_workers=10,
@@ -797,7 +797,7 @@ class WorkspaceInstallation:
                     ),
                 )
             )
-        if "migration_clone" in names:
+        if "migration_sync" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="migration_clone",
