@@ -464,7 +464,7 @@ def test_table_status(mocker):
         TableMigrationStatus(
             src_schema='schema1',
             src_table='table1',
-            dst_catalog='hive_metastore',
+            dst_catalog='cat1',
             dst_schema='schema1',
             dst_table='table1',
             update_ts='0',

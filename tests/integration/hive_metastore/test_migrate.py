@@ -6,7 +6,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import (
+    MigrationStatus,
+    TablesMigrate,
+)
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 from ..conftest import StaticTableMapping, StaticTablesCrawler
@@ -141,6 +144,14 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
     assert target_table_properties["upgraded_from"] == src_external_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+    migration_status = MigrationStatus(ws, sql_backend, inventory_schema, table_crawler).snapshot()
+    assert len(migration_status) == 1
+    assert migration_status[0].src_schema == src_external_table.schema_name
+    assert migration_status[0].src_table == src_external_table.name
+    assert migration_status[0].dst_catalog == dst_catalog.name
+    assert migration_status[0].dst_schema == dst_schema.name
+    assert migration_status[0].dst_table == src_external_table.name
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
