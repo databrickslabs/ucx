@@ -994,6 +994,6 @@ if __name__ == "__main__":
     logger.setLevel("INFO")
     app = ProductInfo.from_class(WorkspaceConfig)
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    current = app.current_installation(workspace_client)
+    current = Installation.assume_global(workspace_client, app.product_name())
     installer = WorkspaceInstaller(Prompts(), current, workspace_client, app)
     installer.run()
