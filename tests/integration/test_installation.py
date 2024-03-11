@@ -38,11 +38,10 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
 
     def factory(
         config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+        installation: Installation | None = None,
         product_info: ProductInfo | None = None,
         environ: dict[str, str] | None = None,
         extend_prompts: dict[str, str] | None = None,
-        single_user_install: bool = False,
-        fresh_install: bool = True,
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
@@ -75,19 +74,8 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
             ],
         )
 
-        if not fresh_install:
-            installation = product_info.current_installation(ws)
-        elif single_user_install:
-            installation = Installation(
-                ws,
-                product_info.product_name(),
-                install_folder=f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}",
-            )
-        else:
-            installation = Installation(
-                ws, product_info.product_name(), install_folder=f"/Applications/{product_info.product_name()}"
-            )
-
+        if not installation:
+            installation = Installation(ws, product_info.product_name())
         installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
         workspace_config = installer.configure()
         installation = product_info.current_installation(ws)
@@ -350,10 +338,11 @@ def test_uninstallation(ws, sql_backend, new_installation):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
 
 
-def test_fresh_global_installation(new_installation):
+def test_fresh_global_installation(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     global_installation = new_installation(
         product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
     )
     assert global_installation.folder == f"/Applications/{product_info.product_name()}"
     global_installation.uninstall()
@@ -361,20 +350,24 @@ def test_fresh_global_installation(new_installation):
 
 def test_fresh_user_installation(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    user_installation = new_installation(product_info=product_info, single_user_install=True)
+    user_installation = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_user_home(ws, product_info.product_name()),
+    )
     assert user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     user_installation.uninstall()
 
 
-def test_global_installation_on_existing_global_install(new_installation):
+def test_global_installation_on_existing_global_install(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     existing_global_installation = new_installation(
         product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
     )
     assert existing_global_installation.folder == f"/Applications/{product_info.product_name()}"
     reinstall_global = new_installation(
         product_info=product_info,
-        fresh_install=False,
+        installation=Installation.assume_global(ws, product_info.product_name()),
     )
     assert reinstall_global.folder == f"/Applications/{product_info.product_name()}"
     reinstall_global.uninstall()
@@ -385,13 +378,14 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     existing_global_installation = new_installation(
         product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
     with pytest.raises(RuntimeWarning) as err:
         new_installation(
             product_info=product_info,
-            fresh_install=False,
+            installation=Installation.assume_global(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'user'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'no',
@@ -402,7 +396,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
     # successful override with confirmation
     reinstall_user_force = new_installation(
         product_info=product_info,
-        fresh_install=False,
+        installation=Installation.assume_global(ws, product_info.product_name()),
         environ={'UCX_FORCE_INSTALL': 'user'},
         extend_prompts={
             r".*UCX is already installed on this workspace.*": 'yes',
@@ -416,7 +410,9 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
 def test_global_installation_on_existing_user_install(ws, new_installation):
     # existing installation at user level
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    existing_user_installation = new_installation(product_info=product_info, single_user_install=True)
+    existing_user_installation = new_installation(
+        product_info=product_info, installation=Installation.assume_user_home(ws, product_info.product_name())
+    )
     assert (
         existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
@@ -425,7 +421,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     with pytest.raises(RuntimeWarning) as err:
         new_installation(
             product_info=product_info,
-            fresh_install=False,
+            installation=Installation.assume_user_home(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'global'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'no',
@@ -434,11 +430,10 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     assert err.value.args[0] == "UCX is already installed, but no confirmation"
 
     # not implemented error with confirmation
-
     with pytest.raises(databricks.sdk.errors.NotImplemented) as err:
         new_installation(
             product_info=product_info,
-            fresh_install=False,
+            installation=Installation.assume_user_home(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'global'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'yes',
