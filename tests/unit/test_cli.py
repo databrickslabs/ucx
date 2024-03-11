@@ -344,9 +344,7 @@ def test_migrate_credentials_aws(ws, mocker):
     mocker.patch(
         "databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value={"Account": "123456789012"}
     )
-    uc_trust_policy = mocker.patch(
-        "databricks.labs.ucx.aws.access.AWSResourcePermissions.update_uc_role_trust_policy"
-    )
+    uc_trust_policy = mocker.patch("databricks.labs.ucx.aws.access.AWSResourcePermissions.update_uc_role_trust_policy")
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws, aws_profile="profile")
         ws.storage_credentials.list.assert_called()
