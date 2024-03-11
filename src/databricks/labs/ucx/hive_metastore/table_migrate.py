@@ -1,5 +1,7 @@
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
@@ -15,6 +17,7 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import SqlBackend, StatementExecutionBackend, CrawlerBase
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
@@ -22,13 +25,24 @@ from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, Wha
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class TableMigrationStatus:
+    src_workspace_id: str
+    src_schema: str
+    src_table: str
+    dst_catalog: str = None
+    dst_schema: str = None
+    dst_table: str = None
+    update_ts: str = None
+
+
 class TablesMigrate:
     def __init__(
-        self,
-        tables_crawler: TablesCrawler,
-        ws: WorkspaceClient,
-        backend: SqlBackend,
-        table_mapping: TableMapping,
+            self,
+            tables_crawler: TablesCrawler,
+            ws: WorkspaceClient,
+            backend: SqlBackend,
+            table_mapping: TableMapping,
     ):
         self._tc = tables_crawler
         self._backend = backend
@@ -53,6 +67,10 @@ class TablesMigrate:
             if not what or table.src.what == what:
                 tasks.append(partial(self._migrate_table, table.src, table.rule))
         Threads.strict("migrate tables", tasks)
+
+    def get_seen_tables(self):
+        self._init_seen_tables()
+        return self._seen_tables
 
     def _migrate_table(self, src_table: Table, rule: Rule):
         if self._table_already_upgraded(rule.as_uc_table_key):
@@ -229,13 +247,13 @@ class TableMove:
         return cls(ws, sql_backend)
 
     def move_tables(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-        del_table: bool,  # noqa: FBT001
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
+            del_table: bool,  # noqa: FBT001
     ):
         try:
             self._ws.schemas.get(f"{from_catalog}.{from_schema}")
@@ -345,13 +363,13 @@ class TableMove:
         logger.info(f"Created {len(list(alias_tasks))} table and view aliases in the new schema {to_schema}.")
 
     def _move_table(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-        del_table: bool,  # noqa: FBT001
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
+            del_table: bool,  # noqa: FBT001
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
@@ -371,12 +389,12 @@ class TableMove:
         return False
 
     def _alias_table(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_table: str,
+            to_catalog: str,
+            to_schema: str,
     ) -> bool:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
@@ -428,14 +446,14 @@ class TableMove:
         self._backend.execute(create_view_sql)
 
     def _move_view(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_view: str,
-        to_catalog: str,
-        to_schema: str,
-        del_view: bool,  # noqa: FBT001
-        view_text: str | None = None,
+            self,
+            from_catalog: str,
+            from_schema: str,
+            from_view: str,
+            to_catalog: str,
+            to_schema: str,
+            del_view: bool,  # noqa: FBT001
+            view_text: str | None = None,
     ) -> bool:
         from_view_name = f"{from_catalog}.{from_schema}.{from_view}"
         to_view_name = f"{to_catalog}.{to_schema}.{from_view}"
@@ -458,3 +476,32 @@ class TableMove:
         create_sql = f"CREATE VIEW {to_view_name} AS {view_text}"
         logger.info(f"Creating view {to_view_name}")
         self._backend.execute(create_sql)
+
+
+class TableStatusCrawler(CrawlerBase[TableMigrationStatus]):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema,
+                 table_migrate: TablesMigrate, table_crawler: TablesCrawler):
+        super().__init__(sbe, "hive_metastore", schema, "table_migration_status", TableMigrationStatus)
+        self._ws = ws
+        self._table_migrate = table_migrate
+        self._table_crawler = table_crawler
+
+    def _crawl(self) -> Iterable[TableMigrationStatus]:
+        all_tables = self._table_crawler.snapshot()
+        seen_tables = self._table_migrate.get_seen_tables()
+        timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        for table in all_tables:
+            table_migration_status = TableMigrationStatus(
+                src_workspace_id=str(self._ws.get_workspace_id()),
+                src_schema=table.database,
+                src_table=table.name,
+                update_ts=str(timestamp)
+            )
+            if table.key not in seen_tables:
+                yield table_migration_status
+            if not self._table_migrate.is_upgraded(table.database, table.name):
+                yield table_migration_status
+            TableMigrationStatus.dst_catalog = table.catalog
+            TableMigrationStatus.dst_schema = table.database
+            TableMigrationStatus.dst_table = table.name
+
