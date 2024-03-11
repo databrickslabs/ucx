@@ -4,6 +4,8 @@ import sys
 
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.blueprint.installation import Installation
+
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
@@ -18,7 +20,10 @@ from databricks.labs.ucx.hive_metastore import (
     Mounts,
     TablesCrawler,
 )
+from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
+from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -380,6 +385,43 @@ def destroy_schema(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBac
     """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
     the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
     sql_backend.execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
+
+
+@task("migrate_tables")
+def migrate_external_tables_sync(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """This workflow task migrates the *external tables that are supported by SYNC command* from the Hive Metastore to the Unity Catalog.
+    Following cli commands are required to be run before running this task:
+    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
+    - For AWS: TBD
+    """
+    installation = Installation.current(ws, "ucx")
+    table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    table_mapping = TableMapping(installation, ws, sql_backend)
+    TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(What.EXTERNAL_SYNC)
+
+
+def migrate_dbfs_root_delta_tables(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
+    Following cli commands are required to be run before running this task:
+    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
+    - For AWS: TBD
+    """
+    installation = Installation.current(ws, "ucx")
+    table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    table_mapping = TableMapping(installation, ws, sql_backend)
+    TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(What.DBFS_ROOT_DELTA)
+
+
+def migrate_views(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """This workflow task migrates the views from the Hive Metastore to the Unity Catalog. New views will be created in UC but base tables are still in HMS.
+    Following cli commands are required to be run before running this task:
+    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
+    - For AWS: TBD
+    """
+    installation = Installation.current(ws, "ucx")
+    table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    table_mapping = TableMapping(installation, ws, sql_backend)
+    TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(What.VIEW)
 
 
 def main(*argv):
