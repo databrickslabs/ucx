@@ -361,7 +361,7 @@ class AWSResources:
             f"iam add-role-to-instance-profile --instance-profile-name {instance_profile_name} --role-name {role_name}"
         )
 
-    def is_role_exists(self, role_name: str) -> bool:
+    def role_exists(self, role_name: str) -> bool:
         """
         Check if the given role exists in the AWS account.
         """
@@ -491,8 +491,8 @@ class AWSResourcePermissions:
             return None
         return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
 
-    def is_role_exists(self, role_name: str) -> bool:
-        return self._aws_resources.is_role_exists(role_name)
+    def role_exists(self, role_name: str) -> bool:
+        return self._aws_resources.role_exists(role_name)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
@@ -687,7 +687,7 @@ class AWSResourcePermissions:
         iam_role_name_in_cluster_policy = self._get_iam_role_from_cluster_policy(str(cluster_policy.definition))
 
         iam_policy_name = f"UCX_MIGRATION_POLICY_{config.inventory_database}"
-        if iam_role_name_in_cluster_policy and self.is_role_exists(iam_role_name_in_cluster_policy):
+        if iam_role_name_in_cluster_policy and self.role_exists(iam_role_name_in_cluster_policy):
             if not prompts.confirm(
                 f"We have identified existing UCX migration role \"{iam_role_name_in_cluster_policy}\" "
                 f"in cluster policy \"{cluster_policy.name}\". "
@@ -701,7 +701,7 @@ class AWSResourcePermissions:
             return
 
         iam_role_name = f"UCX_MIGRATION_ROLE_{config.inventory_database}"
-        if self.is_role_exists(iam_role_name):
+        if self.role_exists(iam_role_name):
             if not prompts.confirm(
                 f"We have identified existing UCX migration role \"{iam_role_name}\". "
                 f"Do you want to update the role's migration iam policy "
