@@ -315,7 +315,7 @@ def test_save_storage_and_principal_aws(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=True)
     ws.config.is_azure = False
     ws.config.is_aws = True
-    aws_resource = mocker.patch("databricks.labs.ucx.assessment.aws.AWSResourcePermissions.for_cli")
+    aws_resource = mocker.patch("databricks.labs.ucx.aws.access.AWSResourcePermissions.for_cli")
     principal_prefix_access(ws, aws_profile="profile")
     aws_resource.assert_called_once()
 
@@ -345,7 +345,7 @@ def test_migrate_credentials_aws(ws, mocker):
         "databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value={"Account": "123456789012"}
     )
     uc_trust_policy = mocker.patch(
-        "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
+        "databricks.labs.ucx.aws.access.AWSResourcePermissions.update_uc_role_trust_policy"
     )
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws, aws_profile="profile")

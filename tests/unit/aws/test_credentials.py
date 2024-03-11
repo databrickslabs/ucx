@@ -14,11 +14,8 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
 )
 
-from databricks.labs.ucx.assessment.aws import (
-    AWSResourcePermissions,
-    AWSResources,
-    AWSRoleAction,
-)
+from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import CredentialManager, IamRoleMigration
 from tests.unit import DEFAULT_CONFIG
 from tests.unit.azure.test_credentials import side_effect_validate_storage_credential

@@ -12,11 +12,8 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import (
-    AWSResourcePermissions,
-    AWSResources,
-    AWSRoleAction,
-)
+from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 

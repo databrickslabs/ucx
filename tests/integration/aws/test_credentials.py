@@ -2,7 +2,8 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
+from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import (
     CredentialManager,
     CredentialValidationResult,

@@ -12,7 +12,8 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
+from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
