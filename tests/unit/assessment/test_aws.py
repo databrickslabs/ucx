@@ -602,3 +602,61 @@ def test_create_uc_role_kms(mocker):
         '"Effect":"Allow"},{"Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey*"],'
         '"Resource":["arn:aws:kms:key_arn"],"Effect":"Allow"}]} --output json'
     ) in command_calls
+
+
+def test_create_instance_profile(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"InstanceProfile": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.create_instance_profile("test_profile")
+    assert '/path/aws iam create-instance-profile --instance-profile-name test_profile --output json' in command_calls
+
+    def failed_call(_):
+        return -1, "", "Can't connect"
+
+    aws = AWSResources("Fake_Profile", failed_call)
+    assert not aws.create_instance_profile("test_profile")
+
+
+def test_delete_instance_profile(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.delete_instance_profile("test_profile", "test_profile")
+    assert '/path/aws iam delete-instance-profile --instance-profile-name test_profile --output json' in command_calls
+    assert '/path/aws iam delete-role --role-name test_profile --output json' in command_calls
+    assert (
+        '/path/aws iam remove-role-from-instance-profile '
+        '--instance-profile-name test_profile --role-name test_profile --output json'
+    ) in command_calls
+
+
+def test_role_exists(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def empty_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '', ""
+
+    aws = AWSResources("Fake_Profile", empty_call)
+    assert aws.role_exists("test_profile") is False
+    assert '/path/aws iam list-roles --output json' in command_calls
+
+    def exists_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"Roles": [{"RoleName": "test_profile"}]}', ""
+
+    aws = AWSResources("Fake_Profile", exists_call)
+    assert aws.role_exists("test_profile") is True
+    assert '/path/aws iam list-roles --output json' in command_calls

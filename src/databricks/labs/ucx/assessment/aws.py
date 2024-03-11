@@ -361,7 +361,7 @@ class AWSResources:
         """
         Check if the given role exists in the AWS account.
         """
-        result = self._run_json_command(f"iam list-roles --profile {self._profile}")
+        result = self._run_json_command("iam list-roles")
         roles = result.get("Roles", [])
         for role in roles:
             if role["RoleName"] == role_name:
