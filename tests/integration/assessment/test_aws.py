@@ -47,7 +47,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     account_id = aws.validate_connection().get("Account")
     s3_prefixes = {f"bucket{rand}"}
     aws.add_uc_role(role_name)
-    aws.add_uc_role_policy(role_name, policy_name, s3_prefixes, account_id)
+    aws.put_role_policy(role_name, policy_name, s3_prefixes, account_id)
     ws.storage_credentials.create(
         f"ucx_{rand}", aws_iam_role=AwsIamRole(role_arn=f"arn:aws:iam::{account_id}:role/{role_name}"), read_only=False
     )
