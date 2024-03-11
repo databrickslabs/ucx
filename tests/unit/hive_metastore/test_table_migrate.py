@@ -499,3 +499,57 @@ def test_table_status_reset(mocker):
     assert list(backend.queries) == [
         "DELETE FROM hive_metastore.ucx.table_migration_status",
     ]
+
+
+def test_table_status_seen_tables(mocker):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
+    client.schemas.list.return_value = [
+        SchemaInfo(catalog_name="cat1", name="schema1"),
+    ]
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table1",
+            full_name="cat1.schema1.table1",
+            properties={"upgraded_from": "hive_metastore.schema1.table1"},
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table2",
+            full_name="cat1.schema1.table2",
+            properties={"upgraded_from": "hive_metastore.schema1.table2"},
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table3",
+            full_name="cat1.schema1.table3",
+            properties={"upgraded_from": "hive_metastore.schema1.table3"},
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table4",
+            full_name="cat1.schema1.table4",
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table5",
+            properties={"upgraded_from": "hive_metastore.schema1.table2"},
+        ),
+    ]
+    table_status_crawler = MigrationStatus(client, backend, "ucx", table_crawler)
+    seen_tables = table_status_crawler.get_seen_tables()
+    assert seen_tables == {
+        'cat1.schema1.table1': 'hive_metastore.schema1.table1',
+        'cat1.schema1.table2': 'hive_metastore.schema1.table2',
+        'cat1.schema1.table3': 'hive_metastore.schema1.table3',
+    }
