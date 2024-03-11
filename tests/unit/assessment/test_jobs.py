@@ -2,7 +2,7 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler, SubmitRunsCrawler
-
+from databricks.labs.lsql import Row
 from . import workspace_client_mock
 
 
@@ -54,7 +54,7 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     sql_backend = MockBackend()
     JobsCrawler(ws, sql_backend, "ucx").snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "append")
-    assert result == [JobInfo(job_id="9001", job_name="No Tasks", creator=None, success=1, failures="[]")]
+    assert result == [Row(job_id="9001", job_name="No Tasks", creator=None, success=1, failures="[]")]
 
 
 @pytest.mark.parametrize(

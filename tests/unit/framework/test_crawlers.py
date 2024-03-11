@@ -5,6 +5,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.lsql import Row
 
 # pylint: disable=protected-access
 
@@ -44,8 +45,8 @@ def test_snapshot_appends_to_existing_table():
 
     result = cb._snapshot(fetcher=lambda: [], loader=lambda: [Foo(first="first", second=True)])
 
-    assert [Foo(first="first", second=True)] == result
-    assert [Foo(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
+    assert [Row(first="first", second=True)] == result
+    assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
 
 
 def test_snapshot_appends_to_new_table():
@@ -58,8 +59,8 @@ def test_snapshot_appends_to_new_table():
 
     result = cb._snapshot(fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)])
 
-    assert [Foo(first="first", second=True)] == result
-    assert [Foo(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
+    assert [Row(first="first", second=True)] == result
+    assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
 
 
 def test_snapshot_wrong_error():

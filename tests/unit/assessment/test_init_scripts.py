@@ -1,6 +1,7 @@
 import base64
 
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql import Row
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.compute import GlobalInitScriptDetails
 
@@ -80,7 +81,7 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
     mock_ws = mocker.Mock()
     mocker.Mock()
     mock_ws.global_init_scripts.list.return_value = [
-        GlobalInitScriptDetails(
+        Row(
             created_at=111,
             created_by=None,
             enabled=False,

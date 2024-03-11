@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql import Row
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
@@ -110,12 +111,12 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
     assert result == [
-        ClusterInfo(
+        Row(
             cluster_id="simplest-autoscale",
-            cluster_name="Simplest Shared Autoscale",
-            creator=None,
             success=1,
             failures='[]',
+            cluster_name="Simplest Shared Autoscale",
+            creator=None,
         )
     ]
 

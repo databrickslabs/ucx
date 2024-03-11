@@ -34,7 +34,7 @@ def test_save(mock_backend):
 
     permission_manager._save([Permissions("object1", "clusters", "test acl")])  # pylint: disable=protected-access
 
-    assert [Permissions(object_id="object1", object_type="clusters", raw="test acl")] == mock_backend.rows_written_for(
+    assert [Row(object_id="object1", object_type="clusters", raw="test acl")] == mock_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
 
@@ -65,7 +65,7 @@ def test_load_all():
     permission_manager = PermissionManager(sql_backend, "test_database", [])
 
     output = permission_manager.load_all()
-    assert output[0] == Permissions("object1", "clusters", "test acl")
+    assert output[0] == Row("object1", "clusters", "test acl")
 
 
 def test_load_all_no_rows_present():
