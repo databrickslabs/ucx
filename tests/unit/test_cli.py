@@ -255,7 +255,7 @@ def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
     ws.config.is_azure = True
     principal_prefix_access(ws, "")
 
-    assert 'Please enter subscription id to scan storage account in.' in caplog.messages
+    assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
 
 
 def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
@@ -264,7 +264,7 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
 
     principal_prefix_access(ws)
 
-    assert "Please enter subscription id to scan storage account in." in caplog.messages
+    assert "Please enter subscription id to scan storage accounts in." in caplog.messages
 
 
 def test_save_storage_and_principal_azure(ws, caplog, mocker):
@@ -315,7 +315,7 @@ def test_save_storage_and_principal_aws(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=True)
     ws.config.is_azure = False
     ws.config.is_aws = True
-    aws_resource = mocker.patch("databricks.labs.ucx.assessment.aws.AWSResourcePermissions.for_cli")
+    aws_resource = mocker.patch("databricks.labs.ucx.aws.access.AWSResourcePermissions.for_cli")
     principal_prefix_access(ws, aws_profile="profile")
     aws_resource.assert_called_once()
 
@@ -341,9 +341,10 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
-    uc_trust_policy = mocker.patch(
-        "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
+    mocker.patch(
+        "databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value={"Account": "123456789012"}
     )
+    uc_trust_policy = mocker.patch("databricks.labs.ucx.aws.access.AWSResourcePermissions.update_uc_role_trust_policy")
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws, aws_profile="profile")
         ws.storage_credentials.list.assert_called()
