@@ -20,6 +20,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
+    AwsIamRole,
     AzureServicePrincipal,
     CatalogInfo,
     DataSourceFormat,
@@ -1090,24 +1091,31 @@ def make_query(ws, make_table, make_random):
 
 
 @pytest.fixture
-def make_storage_credential_spn(ws):
+def make_storage_credential(ws):
     def create(
-        *, credential_name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
+        *,
+        credential_name: str,
+        application_id: str = "",
+        client_secret: str = "",
+        directory_id: str = "",
+        aws_iam_role_arn: str = "",
+        read_only=False,
     ) -> StorageCredentialInfo:
-        azure_service_principal = AzureServicePrincipal(
-            directory_id,
-            application_id,
-            client_secret,
-        )
-        storage_credential = ws.storage_credentials.create(
-            credential_name, azure_service_principal=azure_service_principal, read_only=read_only
-        )
+        if aws_iam_role_arn != "":
+            storage_credential = ws.storage_credentials.create(
+                credential_name, aws_iam_role=AwsIamRole(role_arn=aws_iam_role_arn), read_only=read_only
+            )
+        else:
+            azure_service_principal = AzureServicePrincipal(directory_id, application_id, client_secret)
+            storage_credential = ws.storage_credentials.create(
+                credential_name, azure_service_principal=azure_service_principal, read_only=read_only
+            )
         return storage_credential
 
     def remove(storage_credential: StorageCredentialInfo):
         ws.storage_credentials.delete(storage_credential.name, force=True)
 
-    yield from factory("storage_credential_from_spn", create, remove)
+    yield from factory("storage_credential", create, remove)
 
 
 @pytest.fixture

@@ -17,6 +17,7 @@ from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +44,16 @@ class AWSRoleAction:
     privilege: str
     resource_path: str
 
+    @property
+    def role_name(self):
+        role_match = re.match(AWSInstanceProfile.ROLE_NAME_REGEX, self.role_arn)
+        return role_match.group(1)
+
 
 @dataclass
 class AWSInstanceProfile:
     instance_profile_arn: str
-    iam_role_arn: str | None = None
+    iam_role_arn: str
 
     ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
 
@@ -75,7 +81,7 @@ def run_command(command):
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
-    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9+=,.@_-]*)\/\*$"
+    S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
@@ -218,8 +224,8 @@ class AWSResources:
             s3_actions = [actions]
         return s3_actions
 
-    def add_uc_role(self, role_name):
-        aws_role_trust_doc = {
+    def _aws_role_trust_doc(self, external_id="0000"):
+        return {
             "Version": "2012-10-17",
             "Statement": [
                 {
@@ -228,13 +234,18 @@ class AWSResources:
                         "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
                     },
                     "Action": "sts:AssumeRole",
-                    "Condition": {"StringEquals": {"sts:ExternalId": "0000"}},
+                    "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
                 }
             ],
         }
-        # the AssumeRole condition will be modified with the external ID captured from the UC credential.
-        # https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
-        assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
+
+    def add_uc_role(self, role_name: str) -> bool:
+        """
+        Create an IAM role for Unity Catalog to access the S3 buckets.
+        the AssumeRole condition will be modified later with the external ID captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
+        assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc())
         add_role = self._run_json_command(
             f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
         )
@@ -242,8 +253,27 @@ class AWSResources:
             return False
         return True
 
-    def add_uc_role_policy(self, role_name, policy_name, s3_prefixes: set[str], account_id: str, kms_key=None):
-        s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes])
+    def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> bool:
+        """
+        Modify an existing IAM role for Unity Catalog to access the S3 buckets with the external ID
+        captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
+        assume_role_json = self._get_json_for_cli(self._aws_role_trust_doc(external_id))
+        update_role = self._run_json_command(
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
+        )
+        if not update_role:
+            return False
+        return True
+
+    def add_uc_role_policy(
+        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
+    ) -> bool:
+        s3_prefixes_enriched = sorted(
+            [f"{self.S3_PREFIX}{s3_prefix}" for s3_prefix in s3_prefixes]
+            + [f"{self.S3_PREFIX}{s3_prefix}/*" for s3_prefix in s3_prefixes]
+        )
         statement = [
             {
                 "Action": [
@@ -277,7 +307,8 @@ class AWSResources:
 
         policy_document_json = self._get_json_for_cli(policy_document)
         if not self._run_command(
-            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} --policy-document {policy_document_json}"
+            f"iam put-role-policy --role-name {role_name} "
+            f"--policy-name {policy_name} --policy-document {policy_document_json}"
         ):
             return False
         return True
@@ -324,6 +355,7 @@ class AWSResourcePermissions:
         self._schema = schema
         self._aws_account_id = aws_account_id
         self._kms_key = kms_key
+        self._filename = self.INSTANCE_PROFILES_FILE_NAMES
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, backend, aws_profile, schema, kms_key=None, product='ucx'):
@@ -337,27 +369,17 @@ class AWSResourcePermissions:
             ws,
             backend,
             aws,
-            schema=schema,
-            aws_account_id=caller_identity.get("Account"),
-            kms_key=kms_key,
+            schema,
+            caller_identity.get("Account"),
+            kms_key,
         )
 
-    def save_uc_compatible_roles(self):
-        uc_role_access = list(self._get_role_access())
-        if len(uc_role_access) == 0:
-            logger.warning("No Mapping Was Generated.")
-            return None
-        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
-
-    def get_uc_compatible_roles(self):
-        try:
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
-        except ResourceDoesNotExist:
-            self.save_uc_compatible_roles()
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
-        return role_actions
-
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+        # Get the missing paths
+        # Identify the S3 prefixes
+        # Create the roles and policies for the missing S3 prefixes
+        # If single_role is True, create a single role and policy for all the missing S3 prefixes
+        # If single_role is False, create a role and policy for each missing S3 prefix
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
         for missing_path in missing_paths:
@@ -367,7 +389,7 @@ class AWSResourcePermissions:
         if single_role:
             if self._aws_resources.add_uc_role(role_name):
                 self._aws_resources.add_uc_role_policy(
-                    role_name, policy_name, s3_prefixes, account_id=self._aws_account_id, kms_key=self._kms_key
+                    role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
                 )
         else:
             role_id = 1
@@ -377,15 +399,44 @@ class AWSResourcePermissions:
                         f"{role_name}-{role_id}",
                         f"{policy_name}-{role_id}",
                         {s3_prefix},
-                        account_id=self._aws_account_id,
-                        kms_key=self._kms_key,
+                        self._aws_account_id,
+                        self._kms_key,
                     )
                 role_id += 1
+
+    def update_uc_role_trust_policy(self, role_name, external_id="0000"):
+        return self._aws_resources.update_uc_trust_role(role_name, external_id)
+
+    def save_uc_compatible_roles(self):
+        uc_role_access = list(self._get_role_access())
+        if len(uc_role_access) == 0:
+            logger.warning("No mapping was generated.")
+            return None
+        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
+
+    def load_uc_compatible_roles(self):
+        try:
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
+        except ResourceDoesNotExist:
+            self.save_uc_compatible_roles()
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
+        return role_actions
+
+    def save_instance_profile_permissions(self) -> str | None:
+        instance_profile_access = list(self._get_instance_profiles_access())
+        if len(instance_profile_access) == 0:
+            logger.warning("No mapping was generated.")
+            return None
+        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
 
     def _get_instance_profiles(self) -> Iterable[AWSInstanceProfile]:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
         for instance_profile in instance_profiles:
+            if not instance_profile.iam_role_arn:
+                instance_profile.iam_role_arn = instance_profile.instance_profile_arn.replace(
+                    "instance-profile", "role"
+                )
             result_instance_profiles.append(
                 AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
             )
@@ -440,7 +491,7 @@ class AWSResourcePermissions:
 
     def _identify_missing_paths(self):
         external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
-        compatible_roles = self.get_uc_compatible_roles()
+        compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()
         for external_location in external_locations:
             path = PurePath(external_location.location)
@@ -454,9 +505,65 @@ class AWSResourcePermissions:
             missing_paths.add(external_location.location)
         return missing_paths
 
-    def save_instance_profile_permissions(self) -> str | None:
-        instance_profile_access = list(self._get_instance_profiles_access())
-        if len(instance_profile_access) == 0:
-            logger.warning("No Mapping Was Generated.")
-            return None
-        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
+    def _identify_missing_external_locations(
+        self,
+        external_locations: Iterable[ExternalLocation],
+        existing_paths: list[str],
+        compatible_roles: list[AWSRoleAction],
+    ) -> set[tuple[str, str]]:
+        # Get recommended external locations
+        # Get existing external locations
+        # Get list of paths from get_uc_compatible_roles
+        # Identify recommended external location paths that don't have an external location and return them
+        missing_paths = set()
+        for external_location in external_locations:
+            existing = False
+            for path in existing_paths:
+                if path in external_location.location:
+                    existing = True
+                    continue
+            if existing:
+                continue
+            new_path = PurePath(external_location.location)
+            matching_role = None
+            for role in compatible_roles:
+                if new_path.match(role.resource_path + "/*"):
+                    matching_role = role.role_arn
+                    continue
+            if matching_role:
+                missing_paths.add((external_location.location, matching_role))
+
+        return missing_paths
+
+    def _get_existing_credentials_dict(self):
+        credentials = self._ws.storage_credentials.list()
+        credentials_dict = {}
+        for credential in credentials:
+            credentials_dict[credential.aws_iam_role.role_arn] = credential.name
+        return credentials_dict
+
+    def create_external_locations(self, location_init="UCX_location"):
+        # For each path find out the role that has access to it
+        # Find out the credential that is pointing to this path
+        # Create external location for the path using the credential identified
+        credential_dict = self._get_existing_credentials_dict()
+        external_locations = ExternalLocations(self._ws, self._backend, self._schema).snapshot()
+        existing_external_locations = list(self._ws.external_locations.list())
+        existing_paths = [external_location.url for external_location in existing_external_locations]
+        compatible_roles = self.load_uc_compatible_roles()
+        missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
+        external_location_names = [external_location.name for external_location in existing_external_locations]
+        external_location_num = 1
+        for path, role_arn in missing_paths:
+            if role_arn not in credential_dict:
+                logger.error(f"Missing credential for role {role_arn} for path {path}")
+                continue
+            while True:
+                external_location_name = f"{location_init}_{external_location_num}"
+                if external_location_name not in external_location_names:
+                    break
+                external_location_num += 1
+            self._ws.external_locations.create(
+                external_location_name, path, credential_dict[role_arn], skip_validation=True
+            )
+            external_location_num += 1

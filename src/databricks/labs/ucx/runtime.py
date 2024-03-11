@@ -52,9 +52,9 @@ def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBacke
 
     Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
     ACLs enabled and available for retrieval."""
-    tables = TablesCrawler(sql_backend, cfg.inventory_database)
-    udfs = UdfsCrawler(sql_backend, cfg.inventory_database)
-    grants = GrantsCrawler(tables, udfs)
+    tables = TablesCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
+    udfs = UdfsCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
+    grants = GrantsCrawler(tables, udfs, cfg.include_databases)
     grants.snapshot()
 
 
@@ -259,6 +259,22 @@ def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
     dashboard="assessment_main",
 )
 def assessment_report(*_):
+    """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
+    dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
+
+@task(
+    "assessment",
+    depends_on=[
+        assess_jobs,
+        assess_incompatible_submit_runs,
+        assess_clusters,
+        assess_pipelines,
+        crawl_tables,
+    ],
+    dashboard="assessment_estimates",
+)
+def estimates_report(*_):
     """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
