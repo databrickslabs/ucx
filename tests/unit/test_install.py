@@ -16,6 +16,7 @@ from databricks.labs.blueprint.wheels import (
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
+    AlreadyExists,
     InvalidParameterValue,
     NotFound,
     NotImplemented,
@@ -503,6 +504,7 @@ def test_create_cluster_policy(ws, mock_installation):
             r".*": "",
         }
     )
+    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
     install.configure()
     mock_installation.assert_file_written(
@@ -1087,7 +1089,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             r".*": "",
         }
     )
-
+    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
     install.configure()
 
@@ -1318,3 +1320,23 @@ def test_databricks_runtime_version_set(ws, mock_installation):
 
     with pytest.raises(SystemExit, match="WorkspaceInstaller is not supposed to be executed in Databricks Runtime"):
         WorkspaceInstaller(prompts, mock_installation, ws, product_info, environ)
+
+
+def test_check_inventory_database_exists(ws, mock_installation):
+    ws.config.inventory_database = "ucx_exists"
+    prompts = MockPrompts(
+        {
+            r".*Inventory Database stored in hive_metastore": "ucx_exists",
+            r".*": "",
+        }
+    )
+    installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
+    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    Installation.existing = create_autospec(Installation.existing)
+    Installation.load = create_autospec(Installation.load)
+    Installation.load.side_effect = [NotFound, ws.config]
+    Installation.existing.return_value = [installation]
+
+    with pytest.raises(AlreadyExists) as err:
+        install.configure()
+    assert err.value.args[0] == "Inventory database 'ucx_exists' already exists in another installation"

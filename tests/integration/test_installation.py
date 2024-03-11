@@ -13,7 +13,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk.errors import InvalidParameterValue, NotFound
+from databricks.sdk.errors import AlreadyExists, InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
@@ -441,3 +441,23 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
         )
     assert err.value.args[0] == "Migration needed. Not implemented yet."
     existing_user_installation.uninstall()
+
+
+def test_check_inventory_database_exists(ws, new_installation):
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    install = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+    )
+    inventory_database = install.config.inventory_database
+
+    with pytest.raises(AlreadyExists) as err:
+        new_installation(
+            product_info=product_info,
+            installation=Installation.assume_global(ws, product_info.product_name()),
+            environ={'UCX_FORCE_INSTALL': 'user'},
+            extend_prompts={
+                r".*UCX is already installed on this workspace.*": 'yes',
+            },
+        )
+    assert err.value.args[0] == f"Inventory database '{inventory_database}' already exists in another installation"

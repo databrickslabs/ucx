@@ -265,6 +265,8 @@ class WorkspaceInstaller:
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
+
+        self._check_inventory_database_exists(inventory_database)
         warehouse_id = self._configure_warehouse()
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
@@ -330,6 +332,13 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
         return warehouse_id
+
+    def _check_inventory_database_exists(self, inventory_database: str):
+        logger.info("Fetching installations...")
+        for installation in Installation.existing(self._ws, self._product_info.product_name()):
+            config = installation.load(WorkspaceConfig)
+            if config.inventory_database == inventory_database:
+                raise AlreadyExists(f"Inventory database '{inventory_database}' already exists in another installation")
 
 
 class WorkspaceInstallation:
