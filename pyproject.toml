@@ -25,7 +25,6 @@ maintainers = [
     { name = "William Conti", email = "william.conti@databricks.com" },
     { name = "Hari Selvarajan", email = "hari.selvarajan@databricks.com" },
     { name = "Vuong Nguyen", email = "vuong.nguyen@databricks.com" },
-    { name = "Pritish Pai", email = "pritish.pai@databricks.com" },
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -36,20 +35,16 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
     "Environment :: Console",
-    "Environment :: Databricks Runtime",
-    "Framework :: Databricks SDK",
     "Framework :: Pytest",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Operating System :: MacOS",
-    "Operating System :: Linux",
     "Operating System :: Microsoft :: Windows",
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities",
-    "Topic :: Databricks",
 ]
 dependencies = ["databricks-sdk~=0.21.0",
-                "databricks-labs-blueprint~=0.3.1",
+                "databricks-labs-blueprint~=0.4.0",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
