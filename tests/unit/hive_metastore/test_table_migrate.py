@@ -1,3 +1,4 @@
+import datetime
 import logging
 from itertools import cycle
 from unittest.mock import create_autospec
@@ -11,7 +12,11 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import (
+    MigrationStatus,
+    TableMigrationStatus,
+    TablesMigrate,
+)
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 
 logger = logging.getLogger(__name__)
@@ -386,3 +391,111 @@ def test_is_upgraded():
     table_migrate.migrate_tables()
     assert table_migrate.is_upgraded("schema1", "table1")
     assert not table_migrate.is_upgraded("schema1", "table2")
+
+
+def test_table_status(mocker):
+    class FakeDate(datetime.datetime):
+
+        def timestamp(self):
+            return 0
+
+    datetime.datetime = FakeDate
+    errors = {}
+    rows = {
+        "SHOW TBLPROPERTIES `schema1`.`table1`": [
+            {"key": "upgraded_to", "value": "cat1.schema1.dest1"},
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = create_autospec(TablesCrawler)
+    table_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+            location="s3://some_location/table1",
+            upgraded_to="cat1.schema1.dest1",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table2",
+            location="s3://some_location/table2",
+            upgraded_to="foo.bar.err",
+        ),
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table3",
+            location="s3://some_location/table2",
+            upgraded_to="cat1.schema1.table3",
+        ),
+    ]
+    client = create_autospec(WorkspaceClient)
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
+    client.schemas.list.return_value = [
+        SchemaInfo(catalog_name="cat1", name="schema1"),
+    ]
+    client.tables.list.return_value = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table1",
+            full_name="cat1.schema1.table1",
+            properties={"upgraded_from": "hive_metastore.schema1.table1"},
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="table2",
+            full_name="cat1.schema1.table2",
+            properties={"upgraded_from": "hive_metastore.schema1.table2"},
+        ),
+    ]
+    table_status_crawler = MigrationStatus(client, backend, "ucx", table_crawler)
+    snapshot = list(table_status_crawler.snapshot())
+    assert snapshot == [
+        TableMigrationStatus(
+            src_schema='schema1',
+            src_table='table1',
+            dst_catalog='hive_metastore',
+            dst_schema='schema1',
+            dst_table='table1',
+            update_ts='0',
+        ),
+        TableMigrationStatus(
+            src_schema='schema1',
+            src_table='table2',
+            dst_catalog=None,
+            dst_schema=None,
+            dst_table=None,
+            update_ts='0',
+        ),
+        TableMigrationStatus(
+            src_schema='schema1',
+            src_table='table3',
+            dst_catalog=None,
+            dst_schema=None,
+            dst_table=None,
+            update_ts='0',
+        ),
+    ]
+
+
+def test_table_status_reset(mocker):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = create_autospec(TablesCrawler)
+    client = create_autospec(WorkspaceClient)
+    table_status_crawler = MigrationStatus(client, backend, "ucx", table_crawler)
+    table_status_crawler.reset()
+    assert list(backend.queries) == [
+        "DELETE FROM hive_metastore.ucx.table_migration_status",
+    ]

@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TableMigrationStatus:
-    src_workspace_id: str
     src_schema: str
     src_table: str
     dst_catalog: str | None = None
@@ -52,6 +51,7 @@ class TablesMigrate:
         self._backend = backend
         self._ws = ws
         self._tm = table_mapping
+        self._migration_status = MigrationStatus(ws, backend, "hive_metastore", tables_crawler)
         self._seen_tables: dict[str, str] = {}
 
     @classmethod
@@ -114,19 +114,6 @@ class TablesMigrate:
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return True
-
-    def _iter_schemas(self):
-        for catalog in self._ws.catalogs.list():
-            yield from self._ws.schemas.list(catalog_name=catalog.name)
-
-    def _init_seen_tables(self):
-        for schema in self._iter_schemas():
-            for table in self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name):
-                if table.properties is None:
-                    continue
-                if "upgraded_from" not in table.properties:
-                    continue
-                self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
@@ -191,13 +178,7 @@ class TablesMigrate:
         return migration_list
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
-        for value in result:
-            if value["key"] == "upgraded_to":
-                logger.info(f"{schema}.{table} is set as upgraded")
-                return True
-        logger.info(f"{schema}.{table} is set as not upgraded")
-        return False
+        return self._migration_status.is_upgraded(schema, table)
 
     def print_revert_report(self, *, delete_managed: bool) -> bool | None:
         migrated_count = self._get_revert_count()
@@ -236,6 +217,9 @@ class TablesMigrate:
             print("- Migrated DBFS Root Tables will be left intact")
             print("To revert and delete Migrated Tables, add --delete_managed true flag to the command")
         return True
+
+    def _init_seen_tables(self):
+        self._seen_tables = self._migration_status.get_seen_tables()
 
 
 class TableMove:
@@ -482,31 +466,58 @@ class TableMove:
         self._backend.execute(create_sql)
 
 
-class TableStatusCrawler(CrawlerBase[TableMigrationStatus]):
-    def __init__(
-        self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_migrate: TablesMigrate, table_crawler: TablesCrawler
-    ):
+class MigrationStatus(CrawlerBase[TableMigrationStatus]):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
         super().__init__(sbe, "hive_metastore", schema, "table_migration_status", TableMigrationStatus)
         self._ws = ws
-        self._table_migrate = table_migrate
         self._table_crawler = table_crawler
+
+    def snapshot(self) -> Iterable[TableMigrationStatus]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def get_seen_tables(self) -> dict[str, str]:
+        seen_tables: dict[str, str] = {}
+        for schema in self._iter_schemas():
+            for table in self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name):
+                if not table.properties:
+                    continue
+                if "upgraded_from" not in table.properties:
+                    continue
+                if not table.full_name:
+                    logger.warning(f"The table {table.name} in {schema.name} has no full name")
+                    continue
+                seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
+        return seen_tables
+
+    def is_upgraded(self, schema: str, table: str) -> bool:
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
+        for value in result:
+            if value["key"] == "upgraded_to":
+                logger.info(f"{schema}.{table} is set as upgraded")
+                return True
+        logger.info(f"{schema}.{table} is set as not upgraded")
+        return False
 
     def _crawl(self) -> Iterable[TableMigrationStatus]:
         all_tables = self._table_crawler.snapshot()
-        seen_tables = self._table_migrate.get_seen_tables()
+        reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:
             table_migration_status = TableMigrationStatus(
-                src_workspace_id=str(self._ws.get_workspace_id()),
                 src_schema=table.database,
                 src_table=table.name,
                 update_ts=str(timestamp),
             )
-            if table.key not in seen_tables:
-                yield table_migration_status
-            if not self._table_migrate.is_upgraded(table.database, table.name):
-                yield table_migration_status
-            TableMigrationStatus.dst_catalog = table.catalog
-            TableMigrationStatus.dst_schema = table.database
-            TableMigrationStatus.dst_table = table.name
+            if table.key in reverse_seen and self.is_upgraded(table.database, table.name):
+                table_migration_status.dst_catalog = table.catalog
+                table_migration_status.dst_schema = table.database
+                table_migration_status.dst_table = table.name
             yield table_migration_status
+
+    def _try_fetch(self) -> Iterable[TableMigrationStatus]:
+        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
+            yield TableMigrationStatus(*row)
+
+    def _iter_schemas(self):
+        for catalog in self._ws.catalogs.list():
+            yield from self._ws.schemas.list(catalog_name=catalog.name)
