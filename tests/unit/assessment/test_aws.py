@@ -50,40 +50,48 @@ def mock_installation():
 
 @pytest.fixture
 def installation_single_role():
-    return MockInstallation(DEFAULT_CONFIG |
-                            {"uc_roles_access.csv": [
-                                {
-                                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
-                                    "resource_type": "s3",
-                                    "privilege": "WRITE_FILES",
-                                    "resource_path": "s3://BUCKETX/*"
-                                }
-                            ]})
+    return MockInstallation(
+        DEFAULT_CONFIG
+        | {
+            "uc_roles_access.csv": [
+                {
+                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
+                    "resource_type": "s3",
+                    "privilege": "WRITE_FILES",
+                    "resource_path": "s3://BUCKETX/*",
+                }
+            ]
+        }
+    )
 
 
 @pytest.fixture
 def installation_multiple_roles():
-    return MockInstallation(DEFAULT_CONFIG |
-                            {"uc_roles_access.csv": [
-                                {
-                                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
-                                    "resource_type": "s3",
-                                    "privilege": "WRITE_FILES",
-                                    "resource_path": "s3://BUCKET1"
-                                },
-                                {
-                                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
-                                    "resource_type": "s3",
-                                    "privilege": "WRITE_FILES",
-                                    "resource_path": "s3://BUCKET2"
-                                },
-                                {
-                                    "role_arn": "arn:aws:iam::12345:role/uc-rolex",
-                                    "resource_type": "s3",
-                                    "privilege": "WRITE_FILES",
-                                    "resource_path": "s3://BUCKETX"
-                                }
-                            ]})
+    return MockInstallation(
+        DEFAULT_CONFIG
+        | {
+            "uc_roles_access.csv": [
+                {
+                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
+                    "resource_type": "s3",
+                    "privilege": "WRITE_FILES",
+                    "resource_path": "s3://BUCKET1",
+                },
+                {
+                    "role_arn": "arn:aws:iam::12345:role/uc-role1",
+                    "resource_type": "s3",
+                    "privilege": "WRITE_FILES",
+                    "resource_path": "s3://BUCKET2",
+                },
+                {
+                    "role_arn": "arn:aws:iam::12345:role/uc-rolex",
+                    "resource_type": "s3",
+                    "privilege": "WRITE_FILES",
+                    "resource_path": "s3://BUCKETX",
+                },
+            ]
+        }
+    )
 
 
 @pytest.fixture
@@ -831,12 +839,12 @@ def test_create_uc_role(mocker):
     aws = AWSResources("Fake_Profile", command_call)
     aws.add_uc_role("test_role")
     assert (
-               '/path/aws iam create-role --role-name test_role '
-               '--assume-role-policy-document '
-               '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
-               '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
-               ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
-           ) in command_calls
+        '/path/aws iam create-role --role-name test_role '
+        '--assume-role-policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
+    ) in command_calls
 
 
 def test_update_uc_trust_role(mocker):
@@ -850,12 +858,12 @@ def test_update_uc_trust_role(mocker):
     aws = AWSResources("Fake_Profile", command_call)
     aws.update_uc_trust_role("test_role", "1234")
     assert (
-               '/path/aws iam update-assume-role-policy --role-name test_role '
-               '--policy-document '
-               '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
-               '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
-               ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} --output json'
-           ) in command_calls
+        '/path/aws iam update-assume-role-policy --role-name test_role '
+        '--policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} --output json'
+    ) in command_calls
 
 
 def test_create_uc_role_policy_no_kms(mocker):
@@ -870,14 +878,14 @@ def test_create_uc_role_policy_no_kms(mocker):
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
     aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234")
     assert (
-               '/path/aws iam put-role-policy --role-name test_role '
-               '--policy-name test_policy --policy-document '
-               '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:DeleteObject",'
-               '"s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
-               '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
-               '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
-               '"Effect":"Allow"}]} --output json'
-           ) in command_calls
+        '/path/aws iam put-role-policy --role-name test_role '
+        '--policy-name test_policy --policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:DeleteObject",'
+        '"s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
+        '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
+        '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
+        '"Effect":"Allow"}]} --output json'
+    ) in command_calls
 
 
 def test_create_uc_role_kms(mocker):
@@ -892,43 +900,45 @@ def test_create_uc_role_kms(mocker):
     s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
     aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234", "key_arn")
     assert (
-               '/path/aws iam put-role-policy --role-name test_role '
-               '--policy-name test_policy '
-               '--policy-document {"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject",'
-               '"s3:DeleteObject","s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
-               '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
-               '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
-               '"Effect":"Allow"},{"Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey*"],'
-               '"Resource":["arn:aws:kms:key_arn"],"Effect":"Allow"}]} --output json'
-           ) in command_calls
+        '/path/aws iam put-role-policy --role-name test_role '
+        '--policy-name test_policy '
+        '--policy-document {"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject",'
+        '"s3:DeleteObject","s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
+        '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
+        '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
+        '"Effect":"Allow"},{"Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey*"],'
+        '"Resource":["arn:aws:kms:key_arn"],"Effect":"Allow"}]} --output json'
+    ) in command_calls
 
 
 def test_create_uc_role_single(mock_ws, installation_single_role, mock_aws, backend, locations):
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, backend, mock_aws, locations,
-                                                      "ucx")
+    aws_resource_permissions = AWSResourcePermissions(
+        installation_single_role, mock_ws, backend, mock_aws, locations, "ucx"
+    )
     aws_resource_permissions.create_uc_roles_cli()
     assert mock_aws.add_uc_role.assert_called_with('UC_ROLE') is None
     assert (
-            mock_aws.put_role_policy.assert_called_with(
-                'UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None
-            )
-            is None
+        mock_aws.put_role_policy.assert_called_with(
+            'UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None
+        )
+        is None
     )
 
 
 def test_create_uc_role_multiple(mock_ws, installation_single_role, mock_aws, backend, locations):
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, backend, mock_aws, locations,
-                                                      "ucx")
+    aws_resource_permissions = AWSResourcePermissions(
+        installation_single_role, mock_ws, backend, mock_aws, locations, "ucx"
+    )
     aws_resource_permissions.create_uc_roles_cli(single_role=False)
     assert call('UC_ROLE-1') in mock_aws.add_uc_role.call_args_list
     assert call('UC_ROLE-2') in mock_aws.add_uc_role.call_args_list
     assert (
-            call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None)
-            in mock_aws.put_role_policy.call_args_list
+        call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None)
+        in mock_aws.put_role_policy.call_args_list
     )
     assert (
-            call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None)
-            in mock_aws.put_role_policy.call_args_list
+        call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None)
+        in mock_aws.put_role_policy.call_args_list
     )
 
 
@@ -1047,8 +1057,9 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, mock_aw
             aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-rolex"),
         ),
     ]
-    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, backend, mock_aws,
-                                                      locations, "ucx")
+    aws_resource_permissions = AWSResourcePermissions(
+        installation_multiple_roles, mock_ws, backend, mock_aws, locations, "ucx"
+    )
     aws_resource_permissions.create_external_locations()
     calls = [
         call(mock.ANY, 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
@@ -1091,10 +1102,11 @@ def test_create_external_locations_skip_existing(mock_ws, mock_installation, moc
 def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installation, mock_aws, backend, locations):
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     cluster_policy = Policy(
-        policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)",
+        policy_id="foo",
+        name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps(
-            {"foo": "bar",
-             "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}})
+            {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
+        ),
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     mock_aws.get_instance_profile.return_value = instance_profile_arn
@@ -1103,8 +1115,11 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     aws_resource_permissions = AWSResourcePermissions(mock_installation, mock_ws, backend, mock_aws, locations, "ucx")
     aws_resource_permissions.create_uber_principal(prompts)
     mock_aws.put_role_policy.assert_called_with(
-        'role1', 'UCX_MIGRATION_POLICY_ucx',
-        {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKETX/FOLDERX'}, None, None
+        'role1',
+        'UCX_MIGRATION_POLICY_ucx',
+        {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKETX/FOLDERX'},
+        None,
+        None,
     )
 
 
