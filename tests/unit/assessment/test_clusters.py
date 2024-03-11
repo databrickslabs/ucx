@@ -189,17 +189,17 @@ def test_policy_crawler():
 
 def test_policy_try_fetch():
     ws = workspace_client_mock(policy_ids=['single-user-with-spn-policyid'])
-    mock_backend = MagicMock()
-    mock_backend.fetch.return_value = [("000", "test_policy", 1, "[]", "13.3x", "test", "abc")]
+    mock_backend = MockBackend()
+    # mock_backend.fetch = iter(["000", "test_policy", 1, "[]", "13.3x", "test", "abc"])
     crawler = PoliciesCrawler(ws, mock_backend, "ucx")
     result_set = list(crawler.snapshot())
 
     assert len(result_set) == 1
-    assert result_set[0].policy_id == "000"
+    assert result_set[0].policy_id == "single-user-with-spn-policyid"
     assert result_set[0].policy_name == "test_policy"
-    assert result_set[0].spark_version == "13.3x"
+    assert result_set[0].spark_version == {'defaultValue': 'auto:latest-ml', 'type': 'unlimited'}
     assert result_set[0].policy_description == "test"
-    assert result_set[0].creator == "abc"
+    assert result_set[0].creator == "test_creator"
 
 
 def test_policy_failure():

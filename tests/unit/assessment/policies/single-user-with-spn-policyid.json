@@ -17,5 +17,9 @@
       "value": "https://login.microsoftonline.com/1234ededed/oauth2/token",
       "hidden": true
     }
-  }
+  },
+  "name": "test_policy",
+  "spark_version": "13.3X,",
+  "description": "test",
+  "creator_user_name": "test_creator"
 }
