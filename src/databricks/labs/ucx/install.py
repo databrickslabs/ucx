@@ -1,5 +1,4 @@
 import functools
-import json
 import logging
 import os
 import re
@@ -72,6 +71,7 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
@@ -167,6 +167,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
+    deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
 class WorkspaceInstaller:
@@ -177,6 +178,7 @@ class WorkspaceInstaller:
         self._ws = ws
         self._installation = installation
         self._prompts = prompts
+        self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
 
     def run(
         self,
@@ -239,24 +241,11 @@ class WorkspaceInstaller:
         warehouse_id = self._configure_warehouse()
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
+
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
 
-        # Checking for external HMS
-        instance_profile = None
-        spark_conf_dict = {}
-        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
-        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
-            "Would you like to set UCX to connect to the external metastore?"
-        ):
-            logger.info("Setting up an external metastore")
-            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
-            if len(cluster_policies) >= 1:
-                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
-                instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
-
-        policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
+        policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
 
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
@@ -281,6 +270,7 @@ class WorkspaceInstaller:
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
+            include_databases=self._select_databases(),
             run_assessment_workflow=run_assessment_workflow,
         )
         self._installation.save(config)
@@ -288,6 +278,16 @@ class WorkspaceInstaller:
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
+
+    def _select_databases(self):
+        selected_databases = self._prompts.question(
+            "Comma-separated list of databases to migrate. If not specified, we'll use all "
+            "databases in hive_metastore",
+            default="<ALL>",
+        )
+        if selected_databases != "<ALL>":
+            return [x.strip() for x in selected_databases.split(",")]
+        return None
 
     def _configure_warehouse(self):
         def warehouse_type(_):
@@ -311,83 +311,6 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
         return warehouse_id
-
-    @staticmethod
-    def _policy_config(value: str):
-        return {"type": "fixed", "value": value}
-
-    def _create_cluster_policy(
-        self, inventory_database: str, spark_conf: dict, instance_profile: str | None
-    ) -> str | None:
-        policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
-        policies = self._ws.cluster_policies.list()
-        policy_id = None
-        for policy in policies:
-            if policy.name == policy_name:
-                policy_id = policy.policy_id
-                logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
-                break
-        if not policy_id:
-            logger.info("Creating UCX cluster policy.")
-            policy_id = self._ws.cluster_policies.create(
-                name=policy_name,
-                definition=self._cluster_policy_definition(conf=spark_conf, instance_profile=instance_profile),
-                description="Custom cluster policy for Unity Catalog Migration (UCX)",
-            ).policy_id
-        return policy_id
-
-    def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
-        policy_definition = {
-            "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
-            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
-        }
-        if conf:
-            for key, value in conf.items():
-                policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
-        if self._ws.config.is_aws:
-            policy_definition["aws_attributes.availability"] = self._policy_config(
-                compute.AwsAvailability.ON_DEMAND.value
-            )
-            if instance_profile:
-                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
-            policy_definition["azure_attributes.availability"] = self._policy_config(
-                compute.AzureAvailability.ON_DEMAND_AZURE.value
-            )
-        else:
-            policy_definition["gcp_attributes.availability"] = self._policy_config(
-                compute.GcpAvailability.ON_DEMAND_GCP.value
-            )
-        return json.dumps(policy_definition)
-
-    @staticmethod
-    def _get_ext_hms_conf_from_policy(cluster_policy):
-        spark_conf_dict = {}
-        instance_profile = None
-        if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
-            instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
-            logger.info(f"Instance Profile is Set to {instance_profile}")
-        for key in cluster_policy.keys():
-            if (
-                key.startswith("spark_conf.spark.sql.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
-                or key.startswith("spark_conf.spark.databricks.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
-            ):
-                spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
-        return instance_profile, spark_conf_dict
-
-    def _get_cluster_policies_with_external_hive_metastores(self):
-        for policy in self._ws.cluster_policies.list():
-            def_json = json.loads(policy.definition)
-            glue_node = def_json.get("spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled")
-            if glue_node is not None and glue_node.get("value") == "true":
-                yield policy
-                continue
-            for key in def_json.keys():
-                if key.startswith("spark_conf.spark.sql.hive.metastore"):
-                    yield policy
-                    break
 
 
 class WorkspaceInstallation:
@@ -628,35 +551,16 @@ class WorkspaceInstallation:
                 self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()
 
-    def _upload_cluster_policy(self, remote_wheel: str):
-        try:
-            if self.config.policy_id is None:
-                msg = "Cluster policy not present, please uninstall and reinstall ucx completely."
-                raise InvalidParameterValue(msg)
-            policy = self._ws.cluster_policies.get(policy_id=self.config.policy_id)
-        except NotFound as err:
-            msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
-            logger.error(msg)
-            raise NotFound(msg) from err
-        if policy.name is not None:
-            self._ws.cluster_policies.edit(
-                policy_id=self.config.policy_id,
-                name=policy.name,
-                definition=policy.definition,
-                libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
-            )
-
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        self._upload_cluster_policy(remote_wheel)
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
-            settings = self._job_settings(step_name)
+            settings = self._job_settings(step_name, remote_wheel)
             if self._config.override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
@@ -756,7 +660,7 @@ class WorkspaceInstallation:
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 
-    def _job_settings(self, step_name: str):
+    def _job_settings(self, step_name: str, remote_wheel: str):
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -775,7 +679,7 @@ class WorkspaceInstallation:
             "tags": {"version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task) for task in tasks],
+            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
         }
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -799,7 +703,7 @@ class WorkspaceInstallation:
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
-    def _job_task(self, task: Task) -> jobs.Task:
+    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
@@ -812,7 +716,7 @@ class WorkspaceInstallation:
             return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task)
+        return self._job_wheel_task(jobs_task, task, remote_wheel)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -844,10 +748,11 @@ class WorkspaceInstallation:
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
         return replace(
             jobs_task,
             # TODO: check when we can install wheels from WSFS properly
+            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml

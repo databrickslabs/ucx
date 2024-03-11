@@ -31,13 +31,16 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
         f"view={view.full_name}"
     )
 
-    tables = TablesCrawler(sql_backend, inventory_schema)
+    schema_c = make_schema(catalog_name="hive_metastore")
+    make_table(schema_name=schema_c.name)
+
+    tables = TablesCrawler(sql_backend, inventory_schema, [schema_a.name, schema_b.name])
 
     all_tables = {}
     for table in tables.snapshot():
         all_tables[table.key] = table
 
-    assert len(all_tables) >= 5
+    assert len(all_tables) == 5
     assert all_tables[non_delta.full_name].table_format == "JSON"
     assert all_tables[non_delta.full_name].what == What.DB_DATASET
     assert all_tables[managed_table.full_name].object_type == "MANAGED"
