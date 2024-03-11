@@ -1004,9 +1004,9 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations
 def test_create_external_locations(mock_ws, mock_installation, mock_aws, backend, locations):
     mock_installation.load = MagicMock()
     mock_installation.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1/*"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET2/*"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX/FOLDERX"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET2"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX"),
     ]
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
@@ -1033,8 +1033,8 @@ def test_create_external_locations(mock_ws, mock_installation, mock_aws, backend
 def test_create_external_locations_skip_existing(mock_ws, mock_installation, mock_aws, backend, locations):
     mock_installation.load = MagicMock()
     mock_installation.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1/*"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX/FOLDERX"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
+        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX"),
     ]
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
