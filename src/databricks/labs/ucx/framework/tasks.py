@@ -34,6 +34,7 @@ class Task:
     notebook: str | None = None
     dashboard: str | None = None
     cloud: str | None = None
+    max_retries: int | None = None
 
     def dependencies(self):
         if not self.depends_on:
@@ -72,6 +73,7 @@ def task(
     notebook: str | None = None,
     dashboard: str | None = None,
     cloud: str | None = None,
+    max_retries: int | None = None,
 ):
     def decorator(func):
         @wraps(func)
@@ -115,6 +117,7 @@ def task(
             notebook=notebook,
             dashboard=dashboard,
             cloud=cloud,
+            max_retries=max_retries,
         )
 
         return wrapper
