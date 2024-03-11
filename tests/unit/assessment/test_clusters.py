@@ -189,11 +189,13 @@ def test_policy_try_fetch():
     assert result_set[0].creator == "abc"
 
 
-def test_policy_crawler():
+def test_policy_failure():
     ws = workspace_client_mock(
         policy_ids=['single-user-with-spn-policyid'],
     )
 
-    with patch("databricks.labs.ucx.assessment.crawlers.azure_sp_conf_present_check", retrun_value=True):
+    with patch("databricks.labs.ucx.assessment.clusters.azure_sp_conf_present_check", retrun_value=True):
         crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
         result_set = list(crawler.snapshot())
+        failures = json.loads(result_set[0].failures)
+        assert "Uses azure service principal credentials config in policy." in failures
