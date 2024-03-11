@@ -13,13 +13,13 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
@@ -38,12 +38,12 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
     cleanup = []
 
     def factory(
-            config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
-            product_info: ProductInfo | None = None,
-            environ: dict[str, str] | None = None,
-            extend_prompts: dict[str, str] | None = None,
-            single_user_install: bool = False,
-            fresh_install: bool = True,
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+        product_info: ProductInfo | None = None,
+        environ: dict[str, str] | None = None,
+        extend_prompts: dict[str, str] | None = None,
+        single_user_install: bool = False,
+        fresh_install: bool = True,
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
@@ -153,8 +153,8 @@ def test_job_cluster_policy(ws, new_installation):
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
     if ws.config.is_azure:
         assert (
-                policy_definition["azure_attributes.availability"]["value"]
-                == compute.AzureAvailability.ON_DEMAND_AZURE.value
+            policy_definition["azure_attributes.availability"]["value"]
+            == compute.AzureAvailability.ON_DEMAND_AZURE.value
         )
     if ws.config.is_aws:
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
@@ -163,7 +163,7 @@ def test_job_cluster_policy(ws, new_installation):
 @pytest.mark.skip
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
-        ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
@@ -183,7 +183,7 @@ def test_new_job_cluster_with_policy_assessment(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
-        ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = make_ucx_group()
 
@@ -204,7 +204,7 @@ def test_running_real_assessment_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
-        ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, acc_group_a = make_ucx_group()
 
@@ -237,7 +237,7 @@ def test_running_real_migrate_groups_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job(
-        ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
+    ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
 ):
     ws_group_a = make_group()
 
@@ -263,7 +263,7 @@ def test_running_real_validate_groups_permissions_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job_fails(
-        ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a = make_group()
 
@@ -419,7 +419,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     existing_user_installation = new_installation(product_info=product_info, single_user_install=True)
     assert (
-            existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
