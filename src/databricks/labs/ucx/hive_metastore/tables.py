@@ -37,6 +37,7 @@ class Table:
     upgraded_to: str | None = None
 
     storage_properties: str | None = None
+    is_partitioned: bool = False
 
     DBFS_ROOT_PREFIXES: typing.ClassVar[list[str]] = [
         "/dbfs/",

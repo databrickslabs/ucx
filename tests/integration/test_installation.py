@@ -13,6 +13,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
@@ -37,12 +38,12 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
     cleanup = []
 
     def factory(
-        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
-        product_info: ProductInfo | None = None,
-        environ: dict[str, str] | None = None,
-        extend_prompts: dict[str, str] | None = None,
-        single_user_install: bool = False,
-        fresh_install: bool = True,
+            config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+            product_info: ProductInfo | None = None,
+            environ: dict[str, str] | None = None,
+            extend_prompts: dict[str, str] | None = None,
+            single_user_install: bool = False,
+            fresh_install: bool = True,
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
@@ -152,8 +153,8 @@ def test_job_cluster_policy(ws, new_installation):
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
     if ws.config.is_azure:
         assert (
-            policy_definition["azure_attributes.availability"]["value"]
-            == compute.AzureAvailability.ON_DEMAND_AZURE.value
+                policy_definition["azure_attributes.availability"]["value"]
+                == compute.AzureAvailability.ON_DEMAND_AZURE.value
         )
     if ws.config.is_aws:
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
@@ -162,7 +163,7 @@ def test_job_cluster_policy(ws, new_installation):
 @pytest.mark.skip
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
-    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+        ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
@@ -182,7 +183,7 @@ def test_new_job_cluster_with_policy_assessment(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
-    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+        ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = make_ucx_group()
 
@@ -203,7 +204,7 @@ def test_running_real_assessment_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
-    ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+        ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, acc_group_a = make_ucx_group()
 
@@ -236,7 +237,7 @@ def test_running_real_migrate_groups_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job(
-    ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
+        ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
 ):
     ws_group_a = make_group()
 
@@ -262,7 +263,7 @@ def test_running_real_validate_groups_permissions_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job_fails(
-    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+        ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a = make_group()
 
@@ -418,7 +419,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     existing_user_installation = new_installation(product_info=product_info, single_user_install=True)
     assert (
-        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+            existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
@@ -446,3 +447,27 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
         )
     assert err.value.args[0] == "Migration needed. Not implemented yet."
     existing_user_installation.uninstall()
+
+
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema, make_schema, make_table):
+    install = new_installation()
+
+    schema = make_schema(catalog_name="hive_metastore")
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) PARTITIONED BY (column1)"
+    )
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)"
+    )
+    install.run_workflow("assessment")
+
+    tables = TablesCrawler(sql_backend, inventory_schema)
+
+    all_tables = {}
+    for table in tables.snapshot():
+        all_tables[table.key] = table
+
+    assert len(all_tables) >= 2
+    assert all_tables[f"{schema.full_name}.partitioned_table"].is_partitioned is True
+    assert all_tables[f"{schema.full_name}.non_partitioned_table"].is_partitioned is False

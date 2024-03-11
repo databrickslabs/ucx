@@ -77,7 +77,7 @@ class StatementExecutionExt:
         self.type_converters = {
             ColumnInfoTypeName.ARRAY: json.loads,
             # ColumnInfoTypeName.BINARY: not_supported(ColumnInfoTypeName.BINARY),
-            ColumnInfoTypeName.BOOLEAN: bool,
+            ColumnInfoTypeName.BOOLEAN: lambda value: value.lower() == "true",
             # ColumnInfoTypeName.BYTE: not_supported(ColumnInfoTypeName.BYTE),
             ColumnInfoTypeName.CHAR: str,
             # ColumnInfoTypeName.DATE: not_supported(ColumnInfoTypeName.DATE),
