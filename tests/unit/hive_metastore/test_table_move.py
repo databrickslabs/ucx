@@ -1,6 +1,8 @@
 import logging
 from unittest.mock import MagicMock, create_autospec
 
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
@@ -14,11 +16,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove
-from databricks.labs.ucx.mixins.sql import Row
-
-from ..framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 

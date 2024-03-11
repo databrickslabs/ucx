@@ -3,6 +3,8 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 from databricks.sdk.service.catalog import (
@@ -16,9 +18,7 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.azure import get_az_api_mapping
-from tests.unit.framework.mocks import MockBackend
 
 
 @pytest.fixture

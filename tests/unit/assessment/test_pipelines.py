@@ -1,7 +1,8 @@
+from databricks.labs.lsql.backends import MockBackend
+
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
-from ..framework.mocks import MockBackend
 from . import workspace_client_mock
 
 

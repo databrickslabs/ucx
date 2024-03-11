@@ -2,13 +2,13 @@ import json
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
 
-from ..framework.mocks import MockBackend
 from . import workspace_client_mock
 
 

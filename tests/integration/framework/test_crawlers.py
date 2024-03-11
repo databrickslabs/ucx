@@ -1,6 +1,6 @@
 from databricks.labs.blueprint.commands import CommandExecutor
+from databricks.labs.lsql.deployment import SchemaDeployer
 
-from databricks.labs.ucx.framework.crawlers import SchemaDeployer
 from databricks.labs.ucx.hive_metastore.grants import Grant
 
 

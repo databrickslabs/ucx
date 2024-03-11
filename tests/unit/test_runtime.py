@@ -2,6 +2,7 @@ import os.path
 import sys
 from unittest.mock import create_autospec, patch
 
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
@@ -11,8 +12,6 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     Task,
 )
 from databricks.labs.ucx.runtime import assess_azure_service_principals, crawl_grants
-
-from .framework.mocks import MockBackend
 
 
 def azure_mock_config() -> WorkspaceConfig:

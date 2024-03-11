@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, Mock, create_autospec
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.dbutils import MountInfo
 from databricks.sdk.service.catalog import ExternalLocationInfo
@@ -11,8 +13,6 @@ from databricks.labs.ucx.hive_metastore.locations import (
     Mount,
     Mounts,
 )
-from databricks.labs.ucx.mixins.sql import Row
-from tests.unit.framework.mocks import MockBackend
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():

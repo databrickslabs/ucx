@@ -1,6 +1,7 @@
+from databricks.labs.lsql.backends import MockBackend
+
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
 
-from ..framework.mocks import MockBackend
 from .test_grants import make_row
 
 

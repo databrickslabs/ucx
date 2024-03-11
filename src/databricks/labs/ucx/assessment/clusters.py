@@ -4,6 +4,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import (
@@ -26,7 +27,7 @@ from databricks.labs.ucx.assessment.crawlers import (
     spark_version_compatibility,
 )
 from databricks.labs.ucx.assessment.init_scripts import CheckInitScriptMixin
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
 logger = logging.getLogger(__name__)
 

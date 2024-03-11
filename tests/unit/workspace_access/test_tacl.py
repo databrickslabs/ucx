@@ -1,16 +1,15 @@
 import json
 
 import pytest
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
-
-from ..framework.mocks import MockBackend
 
 
 def test_tacl_crawler():

@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 

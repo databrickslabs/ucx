@@ -4,16 +4,14 @@ from unittest.mock import MagicMock, call, create_autospec
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-
-from ..framework.mocks import MockBackend
 
 MANAGED_DELTA_TABLE = Table(
     object_type="MANAGED",

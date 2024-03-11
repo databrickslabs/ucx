@@ -2,13 +2,12 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.service import iam
 
-from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
-
-from ..framework.mocks import MockBackend
 
 
 @pytest.fixture
