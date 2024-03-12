@@ -648,7 +648,8 @@ def make_cluster_policy(ws, make_random):
             name = f"sdk-{make_random(4)}"
         if "definition" not in kwargs:
             kwargs["definition"] = json.dumps(
-                {"spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"}}
+                {"spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"},
+                 "spark_version": {'type': 'fixed', 'value': '14.3.x-scala2.12'}}
             )
         cluster_policy = ws.cluster_policies.create(name, **kwargs)
         logger.info(

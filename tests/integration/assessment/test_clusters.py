@@ -7,6 +7,7 @@ from databricks.sdk.service.compute import DataSecurityMode
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 
 from .test_assessment import _SPARK_CONF
+import json
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
@@ -48,4 +49,7 @@ def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend):
         if policy.policy_id == created_policy.policy_id:
             results.append(policy)
 
-    assert len(results) >= 1
+    assert results[0].policy_name == "test_policy_check"
+    assert results[0].success == 1
+    assert results[0].failures == "[]"
+    assert results[0].spark_version == json.dumps({'type': 'fixed', 'value': '14.3.x-scala2.12'})
