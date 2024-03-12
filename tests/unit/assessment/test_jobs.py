@@ -1,8 +1,9 @@
 import pytest
+from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler, SubmitRunsCrawler
-from databricks.labs.lsql import Row
+from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
+
 from . import workspace_client_mock
 
 

@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
 import pytest
+from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.lsql import Row
 
 # pylint: disable=protected-access
 

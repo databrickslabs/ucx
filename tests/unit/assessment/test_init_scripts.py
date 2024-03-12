@@ -1,14 +1,11 @@
 import base64
 
-from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.compute import GlobalInitScriptDetails
 
-from databricks.labs.ucx.assessment.init_scripts import (
-    GlobalInitScriptCrawler,
-    GlobalInitScriptInfo,
-)
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 
 
 def test_global_init_scripts_no_config(mocker):
