@@ -72,13 +72,11 @@ class ClusterPolicyInstaller:
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
+            if instance_profile:
+                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
             policy_definition["aws_attributes.availability"] = self._policy_config(
                 compute.AwsAvailability.ON_DEMAND.value
             )
-            if instance_profile:
-                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-            else:
-                pass
         elif self._ws.config.is_azure:
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
