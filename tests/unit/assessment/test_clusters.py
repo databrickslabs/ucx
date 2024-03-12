@@ -184,30 +184,44 @@ def test_policy_crawler():
 
     crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
+    failures = json.loads(result_set[0].failures)
     assert len(result_set) == 2
+    assert "Uses azure service principal credentials config in policy." in failures
 
 
 def test_policy_try_fetch():
     ws = workspace_client_mock(policy_ids=['single-user-with-spn-policyid'])
-    mock_backend = MockBackend()
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM ucx.policies": [
+                (
+                    "single-user-with-spn-policyid",
+                    "test_policy",
+                    1,
+                    "[]",
+                    json.dumps({"type": "unlimited", "defaultValue": "auto:latest-ml"}),
+                    "test",
+                    "test_creator",
+                )
+            ]
+        }
+    )
     crawler = PoliciesCrawler(ws, mock_backend, "ucx")
     result_set = list(crawler.snapshot())
 
     assert len(result_set) == 1
     assert result_set[0].policy_id == "single-user-with-spn-policyid"
     assert result_set[0].policy_name == "test_policy"
-    assert result_set[0].spark_version == {'defaultValue': 'auto:latest-ml', 'type': 'unlimited'}
+    assert result_set[0].spark_version == json.dumps({"type": "unlimited", "defaultValue": "auto:latest-ml"})
     assert result_set[0].policy_description == "test"
     assert result_set[0].creator == "test_creator"
 
 
-def test_policy_failure():
+def test_policy_without_failure():
     ws = workspace_client_mock(
-        policy_ids=['single-user-with-spn-policyid'],
+        policy_ids=['single-user-with-spn-no-sparkversion'],
     )
 
     crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
     result_set = list(crawler.snapshot())
-    failures = json.loads(result_set[0].failures)
-    assert "Uses azure service principal credentials config in policy." in failures
-
+    assert result_set[0].failures == '[]'
