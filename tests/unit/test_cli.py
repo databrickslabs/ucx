@@ -71,6 +71,7 @@ def ws():
     workspace_client.statement_execution.execute_statement.return_value = sql.ExecuteStatementResponse(
         status=sql.StatementStatus(state=sql.StatementState.SUCCEEDED),
         manifest=sql.ResultManifest(schema=sql.ResultSchema()),
+        statement_id='123',
     )
     return workspace_client
 
@@ -102,7 +103,7 @@ def test_skip_with_table(ws):
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=sql.Disposition.INLINE,
+        disposition=None,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )
@@ -117,7 +118,7 @@ def test_skip_with_schema(ws):
         byte_limit=None,
         catalog=None,
         schema=None,
-        disposition=sql.Disposition.INLINE,
+        disposition=None,
         format=sql.Format.JSON_ARRAY,
         wait_timeout=None,
     )

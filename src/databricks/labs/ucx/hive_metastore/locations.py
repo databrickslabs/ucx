@@ -23,7 +23,7 @@ class ExternalLocation:
     table_count: int
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Mount:
     name: str
     source: str
@@ -223,9 +223,9 @@ class Mounts(CrawlerBase[Mount]):
         deduplicated_mounts = []
         for obj in mounts:
             if "dbfsreserved" in obj.source.lower():
-                obj_tuple = ("/Volume", obj.source)
+                obj_tuple = Mount("/Volume", obj.source)
             else:
-                obj_tuple = (obj.name, obj.source)
+                obj_tuple = Mount(obj.name, obj.source)
             if obj_tuple not in seen:
                 seen.add(obj_tuple)
                 deduplicated_mounts.append(obj)

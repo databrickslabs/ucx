@@ -288,7 +288,7 @@ def test_grants_returning_error_when_showing_grants():
             ("test_database", "table1", False),
             ("test_database", "table2", False),
         ],
-        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": SHOW_GRANTS[("principal1", "OWNER", "TABLE", "")],
+        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": SHOW_GRANTS[("principal1", "OWNER", "TABLE", ""),],
         "DESCRIBE *": DESCRIBE_TABLE[
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
@@ -322,7 +322,7 @@ def test_grants_returning_error_when_describing():
             ("test_database", "table1", False),
             ("test_database", "table2", False),
         ],
-        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": SHOW_GRANTS[("principal1", "OWNER", "TABLE", "")],
+        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": SHOW_GRANTS[("principal1", "OWNER", "TABLE", ""),],
         "DESCRIBE *": DESCRIBE_TABLE[
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
@@ -362,7 +362,7 @@ def test_udf_grants_returning_error_when_showing_grants():
         "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": SHOW_GRANTS[
             ("principal1", "OWN", "FUNCTION", "")
         ],
-        "DESCRIBE *": DESCRIBE_TABLE[
+        "DESCRIBE *": SHOW_FUNCTIONS[
             ("Type: SCALAR",),
             ("Body: 1",),
         ],
@@ -398,9 +398,9 @@ def test_udf_grants_returning_error_when_describing():
         "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": SHOW_GRANTS[
             ("principal1", "OWN", "FUNCTION", ""),
         ],
-        "DESCRIBE *": DESCRIBE_TABLE[
-            ("Type: SCALAR"),
-            ("Body: 1"),
+        "DESCRIBE *": SHOW_FUNCTIONS[
+            ("Type: SCALAR",),
+            ("Body: 1",),
         ],
     }
 

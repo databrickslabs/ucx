@@ -39,44 +39,31 @@ def test_save(mock_backend):
     )
 
 
-def permissions_row(*data):
-    row = Row(data)
-    row.__columns__ = ["object_id", "object_type", "raw"]
-    return row
-
-
-def make_row(data, columns):
-    row = Row(data)
-    row.__columns__ = columns
-    return row
+_PermissionsRow = Row.factory(["object_id", "object_type", "raw"])
 
 
 def test_load_all():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
-                permissions_row("object1", "clusters", "test acl"),
+                _PermissionsRow("object1", "clusters", "test acl"),
             ],
-            "SELECT COUNT": [
-                make_row([12], ["cnt"]),
-            ],
+            "SELECT COUNT": [Row(cnt=12)],
         }
     )
     permission_manager = PermissionManager(sql_backend, "test_database", [])
 
     output = permission_manager.load_all()
-    assert output[0] == Row("object1", "clusters", "test acl")
+    assert output[0] == Permissions(object_id="object1", object_type="clusters", raw="test acl")
 
 
 def test_load_all_no_rows_present():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
-                permissions_row("object1", "clusters", "test acl"),
+                _PermissionsRow("object1", "clusters", "test acl"),
             ],
-            "SELECT COUNT": [
-                make_row([0], ["cnt"]),
-            ],
+            "SELECT COUNT": [Row(cnt=0)],
         }
     )
 
@@ -93,7 +80,7 @@ def test_manager_inventorize(mock_backend, mocker):
 
     permission_manager.inventorize_permissions()
 
-    assert [Permissions(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
+    assert [Row(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
 
@@ -102,7 +89,7 @@ def test_manager_apply(mocker):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
-                permissions_row(
+                _PermissionsRow(
                     "test",
                     "clusters",
                     json.dumps(
@@ -120,7 +107,7 @@ def test_manager_apply(mocker):
                         ).as_dict()
                     ),
                 ),
-                permissions_row(
+                _PermissionsRow(
                     "test2",
                     "cluster-policies",
                     json.dumps(
@@ -139,9 +126,7 @@ def test_manager_apply(mocker):
                     ),
                 ),
             ],
-            "SELECT COUNT": [
-                make_row([12], ["cnt"]),
-            ],
+            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 
@@ -177,7 +162,7 @@ def test_unregistered_support():
     sql_backend = MockBackend(
         rows={
             "SELECT": [
-                permissions_row("test", "__unknown__", "{}"),
+                _PermissionsRow("test", "__unknown__", "{}"),
             ]
         }
     )
@@ -230,7 +215,7 @@ def test_manager_verify(mocker):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
-                permissions_row(
+                _PermissionsRow(
                     "test",
                     "clusters",
                     json.dumps(
@@ -249,9 +234,7 @@ def test_manager_verify(mocker):
                     ),
                 ),
             ],
-            "SELECT COUNT": [
-                make_row([12], ["cnt"]),
-            ],
+            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 
@@ -273,7 +256,7 @@ def test_manager_verify_not_supported_type(mocker):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
-                permissions_row(
+                _PermissionsRow(
                     "test",
                     "clusters",
                     json.dumps(
@@ -292,9 +275,7 @@ def test_manager_verify_not_supported_type(mocker):
                     ),
                 ),
             ],
-            "SELECT COUNT": [
-                make_row([12], ["cnt"]),
-            ],
+            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 
@@ -310,7 +291,7 @@ def test_manager_verify_no_tasks(mocker):
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
-                permissions_row(
+                _PermissionsRow(
                     "test",
                     "clusters",
                     json.dumps(
@@ -329,9 +310,7 @@ def test_manager_verify_no_tasks(mocker):
                     ),
                 ),
             ],
-            "SELECT COUNT": [
-                make_row([12], ["cnt"]),
-            ],
+            "SELECT COUNT": [Row(cnt=12)],
         }
     )
 

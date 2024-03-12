@@ -10,7 +10,6 @@ from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
     ExternalLocations,
-    Mount,
     Mounts,
 )
 
@@ -28,8 +27,11 @@ def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
 
     instance.inventorize_mounts()
 
-    expected = [Mount("mp_1", "path_1"), Mount("mp_2", "path_2"), Mount("mp_3", "path_3")]
-    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    assert [
+        Row(name="mp_1", source="path_1"),
+        Row(name="mp_2", source="path_2"),
+        Row(name="mp_3", source="path_3"),
+    ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
 def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_type():
@@ -45,8 +47,10 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_encryption_ty
 
     instance.inventorize_mounts()
 
-    expected = [Mount("mp_1", "path_1"), Mount("mp_2", "path_2")]
-    assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
+    assert [
+        Row(name="mp_1", source="path_1"),
+        Row(name="mp_2", source="path_2"),
+    ] == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
 def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volume_names():
@@ -66,7 +70,11 @@ def test_list_mounts_should_return_a_deduped_list_of_mount_without_variable_volu
 
     instance.inventorize_mounts()
 
-    expected = [Mount("/Volume", "DbfsReserved"), Mount("mp_1", "path_1"), Mount("mp_2", "path_2")]
+    expected = [
+        Row(name="/Volume", source="DbfsReserved"),
+        Row(name="mp_1", source="path_1"),
+        Row(name="mp_2", source="path_2"),
+    ]
     assert expected == backend.rows_written_for("hive_metastore.test.mounts", "append")
 
 
@@ -141,21 +149,17 @@ def test_external_locations():
     assert result_set[6].location == "jdbc:providerunknown://somedb.us-east-1.rds.amazonaws.com:1234/test_db"
 
 
-def make_row(data, columns):
-    row = Row(data)
-    row.__columns__ = columns
-    return row
+LOCATION_STORAGE = MockBackend.rows("location", "storage_properties")
 
 
 def test_save_external_location_mapping_missing_location():
     ws = MagicMock()
-    select_cols = ["location", "storage_properties"]
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": [
-                make_row(("s3://test_location/test1/table1", ""), select_cols),
-                make_row(("gcs://test_location2/test2/table2", ""), select_cols),
-                make_row(("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""), select_cols),
+            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+                ("s3://test_location/test1/table1", ""),
+                ("gcs://test_location2/test2/table2", ""),
+                ("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""),
             ],
         }
     )
@@ -189,11 +193,10 @@ def test_save_external_location_mapping_missing_location():
 
 def test_save_external_location_mapping_no_missing_location():
     ws = MagicMock()
-    select_cols = ["location", "storage_properties"]
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": [
-                make_row(("s3://test_location/test1/table1", ""), select_cols),
+            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+                ("s3://test_location/test1/table1", ""),
             ],
         }
     )
@@ -207,12 +210,12 @@ def test_match_table_external_locations():
     ws = create_autospec(WorkspaceClient)
     sbe = MockBackend(
         rows={
-            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": [
-                make_row(("s3://test_location/a/b/c/table1", ""), ["location", "storage_properties"]),
-                make_row(("s3://test_location/a/b/table1", ""), ["location", "storage_properties"]),
-                make_row(("gcs://test_location2/a/b/table2", ""), ["location", "storage_properties"]),
-                make_row(("abfss://cont1@storagetest1/a/table3", ""), ["location", "storage_properties"]),
-                make_row(("abfss://cont1@storagetest1/a/table4", ""), ["location", "storage_properties"]),
+            "SELECT location, storage_properties FROM test.tables WHERE location IS NOT NULL": LOCATION_STORAGE[
+                ("s3://test_location/a/b/c/table1", ""),
+                ("s3://test_location/a/b/table1", ""),
+                ("gcs://test_location2/a/b/table2", ""),
+                ("abfss://cont1@storagetest1/a/table3", ""),
+                ("abfss://cont1@storagetest1/a/table4", ""),
             ],
         }
     )
