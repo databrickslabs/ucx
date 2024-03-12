@@ -345,7 +345,7 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_aws = True
     ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
-    aws_resources.validate_connection.return_value={"Account": "123456789012"}
+    aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
         migrate_credentials(ws, aws_profile="profile", aws_resources=aws_resources)
         ws.storage_credentials.list.assert_called()
