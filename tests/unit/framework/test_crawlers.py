@@ -41,17 +41,17 @@ def test_full_name():
 
 def test_snapshot_appends_to_existing_table():
     mock_backend = MockBackend()
-    cb = CrawlerBase(mock_backend, "a", "b", "c", Bar)
+    cb = CrawlerBase[Baz](mock_backend, "a", "b", "c", Baz)
 
-    result = cb._snapshot(fetcher=lambda: [], loader=lambda: [Foo(first="first", second=True)])
+    result = cb._snapshot(fetcher=lambda: [], loader=lambda: [Baz(first="first")])
 
-    assert [Row(first="first", second=True)] == result
-    assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
+    assert [Baz(first="first")] == result
+    assert [Row(first="first", second=None)] == mock_backend.rows_written_for("a.b.c", "append")
 
 
 def test_snapshot_appends_to_new_table():
     mock_backend = MockBackend()
-    cb = CrawlerBase(mock_backend, "a", "b", "c", Bar)
+    cb = CrawlerBase[Foo](mock_backend, "a", "b", "c", Foo)
 
     def fetcher():
         msg = ".. TABLE_OR_VIEW_NOT_FOUND .."
@@ -59,7 +59,7 @@ def test_snapshot_appends_to_new_table():
 
     result = cb._snapshot(fetcher=fetcher, loader=lambda: [Foo(first="first", second=True)])
 
-    assert [Row(first="first", second=True)] == result
+    assert [Foo(first="first", second=True)] == result
     assert [Row(first="first", second=True)] == mock_backend.rows_written_for("a.b.c", "append")
 
 

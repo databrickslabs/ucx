@@ -81,7 +81,7 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
     mock_ws = mocker.Mock()
     mocker.Mock()
     mock_ws.global_init_scripts.list.return_value = [
-        Row(
+        GlobalInitScriptDetails(
             created_at=111,
             created_by=None,
             enabled=False,
@@ -99,9 +99,7 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
     result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
 
     assert result == [
-        GlobalInitScriptInfo(
-            script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures="[]"
-        ),
+        Row(script_id="222", success=1, failures="[]", script_name="newscript", enabled=False, created_by=None),
     ]
 
 
