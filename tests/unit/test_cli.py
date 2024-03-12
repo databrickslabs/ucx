@@ -9,6 +9,9 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
 
+from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
+from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.cli import (
     alias,
     create_account_groups,
@@ -270,9 +273,9 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
 def test_save_storage_and_principal_azure(ws, caplog, mocker):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
-    azure_resource = mocker.patch("databricks.labs.ucx.azure.access.AzureResourcePermissions.save_spn_permissions")
-    principal_prefix_access(ws, "test")
-    azure_resource.assert_called_once()
+    azure_resource_permissions = create_autospec(AzureResourcePermissions)
+    principal_prefix_access(ws, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
+    azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
 def test_validate_groups_membership(ws):
@@ -315,9 +318,9 @@ def test_save_storage_and_principal_aws(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=True)
     ws.config.is_azure = False
     ws.config.is_aws = True
-    aws_resource = mocker.patch("databricks.labs.ucx.aws.access.AWSResourcePermissions.for_cli")
-    principal_prefix_access(ws, aws_profile="profile")
-    aws_resource.assert_called_once()
+    aws_resource_permissions = create_autospec(AWSResourcePermissions)
+    principal_prefix_access(ws, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
+    aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
 def test_save_storage_and_principal_gcp(ws, caplog):
@@ -341,14 +344,12 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
-    mocker.patch(
-        "databricks.labs.ucx.assessment.aws.AWSResources.validate_connection", return_value={"Account": "123456789012"}
-    )
-    uc_trust_policy = mocker.patch("databricks.labs.ucx.aws.access.AWSResourcePermissions.update_uc_role_trust_policy")
+    aws_resources = create_autospec(AWSResources)
+    aws_resources.validate_connection.return_value={"Account": "123456789012"}
     with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        migrate_credentials(ws, aws_profile="profile")
+        migrate_credentials(ws, aws_profile="profile", aws_resources=aws_resources)
         ws.storage_credentials.list.assert_called()
-        uc_trust_policy.assert_called_once()
+        aws_resources.update_uc_trust_role.assert_called_once()
 
 
 def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
@@ -398,14 +399,13 @@ def test_migrate_locations_azure(ws):
     ws.external_locations.list.assert_called()
 
 
-@pytest.mark.skip
 def test_migrate_locations_aws(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
+    mocker.patch("shutil.which", return_value=True)
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
-    with pytest.raises(ResourceWarning):
-        migrate_locations(ws, aws_profile="profile")
+    migrate_locations(ws, aws_profile="profile")
+    ws.external_locations.list.assert_called()
 
 
 def test_missing_aws_cli(ws, caplog, mocker):
