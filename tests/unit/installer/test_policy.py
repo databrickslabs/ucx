@@ -379,3 +379,38 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
         definition=json.dumps(policy_definition_actual),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
+
+
+def test_cluster_policy_definition_empty_config():
+    ws, prompts = common()
+    ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
+
+    ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=None
+    )
+
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps({}),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+
+    policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
+    policy_id, _, _ = policy_installer.create('ucx')
+    policy_definition_actual = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
+    }
+    assert policy_id == "foo1"
+
+    ws.cluster_policies.create.assert_called_with(
+        name="Unity Catalog Migration (ucx) (me@example.com)",
+        definition=json.dumps(policy_definition_actual),
+        description="Custom cluster policy for Unity Catalog Migration (UCX)",
+    )

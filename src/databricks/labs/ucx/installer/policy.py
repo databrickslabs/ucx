@@ -77,7 +77,9 @@ class ClusterPolicyInstaller:
             )
             if instance_profile:
                 policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
+            else:
+                pass
+        elif self._ws.config.is_azure:
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
             )
@@ -163,7 +165,8 @@ class ClusterPolicyInstaller:
                 assert job.job_id is not None
                 assert job_settings is not None
                 if job_settings.job_clusters is None:
-                    # if job_clusters is None, it means override cluster is being set and hence policy should not be applied
+                    # if job_clusters is None, it means override cluster is being set
+                    # and hence policy should not be applied
                     return
             except NotFound:
                 logger.error(f"Job id {job_id} not found. Please check if the job is present in the workspace")
