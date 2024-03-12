@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class TableMigrationStatus:
+class MigrationStatus:
     src_schema: str
     src_table: str
     dst_catalog: str | None = None
@@ -46,12 +46,13 @@ class TablesMigrate:
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
+        migration_status_refresher,
     ):
         self._tc = tables_crawler
         self._backend = backend
         self._ws = ws
         self._tm = table_mapping
-        self._migration_status = MigrationStatus(ws, backend, "hive_metastore", tables_crawler)
+        self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
 
     @classmethod
@@ -61,7 +62,8 @@ class TablesMigrate:
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
         table_mapping = TableMapping(installation, ws, sql_backend)
-        return cls(table_crawler, ws, sql_backend, table_mapping)
+        migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
+        return cls(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
 
     def migrate_tables(self, *, what: What | None = None):
         self._init_seen_tables()
@@ -174,7 +176,7 @@ class TablesMigrate:
         return migration_list
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        return self._migration_status.is_upgraded(schema, table)
+        return self._migration_status_refresher.is_upgraded(schema, table)
 
     def print_revert_report(self, *, delete_managed: bool) -> bool | None:
         migrated_count = self._get_revert_count()
@@ -215,7 +217,7 @@ class TablesMigrate:
         return True
 
     def _init_seen_tables(self):
-        self._seen_tables = self._migration_status.get_seen_tables()
+        self._seen_tables = self._migration_status_refresher.get_seen_tables()
 
 
 class TableMove:
@@ -462,13 +464,13 @@ class TableMove:
         self._backend.execute(create_sql)
 
 
-class MigrationStatus(CrawlerBase[TableMigrationStatus]):
+class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "table_migration_status", TableMigrationStatus)
+        super().__init__(sbe, "hive_metastore", schema, "table_migration_status", MigrationStatus)
         self._ws = ws
         self._table_crawler = table_crawler
 
-    def snapshot(self) -> Iterable[TableMigrationStatus]:
+    def snapshot(self) -> Iterable[MigrationStatus]:
         return self._snapshot(self._try_fetch, self._crawl)
 
     def get_seen_tables(self) -> dict[str, str]:
@@ -494,12 +496,12 @@ class MigrationStatus(CrawlerBase[TableMigrationStatus]):
         logger.info(f"{schema}.{table} is set as not upgraded")
         return False
 
-    def _crawl(self) -> Iterable[TableMigrationStatus]:
+    def _crawl(self) -> Iterable[MigrationStatus]:
         all_tables = self._table_crawler.snapshot()
         reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:
-            table_migration_status = TableMigrationStatus(
+            table_migration_status = MigrationStatus(
                 src_schema=table.database,
                 src_table=table.name,
                 update_ts=str(timestamp),
@@ -512,9 +514,9 @@ class MigrationStatus(CrawlerBase[TableMigrationStatus]):
                     table_migration_status.dst_table = target_table.split(".")[2]
             yield table_migration_status
 
-    def _try_fetch(self) -> Iterable[TableMigrationStatus]:
+    def _try_fetch(self) -> Iterable[MigrationStatus]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield TableMigrationStatus(*row)
+            yield MigrationStatus(*row)
 
     def _iter_schemas(self):
         for catalog in self._ws.catalogs.list():
