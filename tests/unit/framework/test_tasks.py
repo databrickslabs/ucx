@@ -1,15 +1,15 @@
 import io
 import logging
 import os
-import pytest
 import sys
-import yaml
-
-from requests import PreparedRequest, Response
 from unittest.mock import create_autospec, patch
 
+import pytest
+import yaml
 from databricks.sdk import WorkspaceClient
-from databricks.labs.ucx.framework.tasks import (
+from requests import PreparedRequest, Response  # pylint: disable=wrong-import-order
+
+from databricks.labs.ucx.framework.tasks import (  # pylint: disable=ungrouped-imports
     Task,
     TaskLogger,
     remove_extra_indentation,
