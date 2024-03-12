@@ -1191,7 +1191,8 @@ def test_fresh_install(ws, mock_installation):
     )
 
 
-def test_get_existing_installation_global(ws, mock_installation):
+def test_get_existing_installation_global(ws, mock_installation, mocker):
+    mocker.patch("webbrowser.open")
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",

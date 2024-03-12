@@ -41,13 +41,12 @@ def test_job_assessment_for_azure_spark_config():
     assert result_set[0].success == 0
 
 
-@pytest.mark.skip
 def test_jobs_assessment_with_spn_cluster_no_job_tasks():
-    ws = workspace_client_mock(job_ids=['legacy-job-on-azure-spn-secret'], cluster_ids=['azure-spn-secret'])
+    ws = workspace_client_mock(job_ids=['no-tasks'])
     sql_backend = MockBackend()
     result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 1
-    assert result_set[0].success == 0
+    assert result_set[0].success == 1
 
 
 def test_job_crawler_with_no_owner_should_have_empty_creator_name():
