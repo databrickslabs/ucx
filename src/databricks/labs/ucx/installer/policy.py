@@ -148,9 +148,8 @@ class ClusterPolicyInstaller:
         for conf in sql_config.data_access_config:
             if conf.key is None:
                 continue
-            if conf.key.startswith("spark.sql.hive.metastore") or conf.key.startswith(
-                "spark.databricks.hive.metastore.glueCatalog.enabled"
-            ):
+            is_glue = conf.key.startswith("spark.databricks.hive.metastore.glueCatalog.enabled")
+            if conf.key.startswith("spark.sql.hive.metastore") or is_glue:
                 return sql_config
         return None
 
