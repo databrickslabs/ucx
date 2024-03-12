@@ -330,14 +330,14 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
     ws.config.is_azure = False
     ws.config.is_gcp = True
     endpoint_conf = [
+        EndpointConfPair(None, None),
+        EndpointConfPair("random", None),
         EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionURL", "url"),
         EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionUserName", "user1"),
         EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionPassword", "pwd"),
         EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionDriverName", "SQLServerDriver"),
         EndpointConfPair("spark.sql.hive.metastore.version", "0.13"),
         EndpointConfPair("spark.sql.hive.metastore.jars", "jar1"),
-        EndpointConfPair(None, None),
-        EndpointConfPair("random", None),
     ]
 
     ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
