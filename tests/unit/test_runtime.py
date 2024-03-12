@@ -2,6 +2,7 @@ import os.path
 import sys
 from unittest.mock import create_autospec, patch
 
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
@@ -10,7 +11,13 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     _TASKS,
     Task,
 )
-from databricks.labs.ucx.runtime import assess_azure_service_principals, crawl_grants
+from databricks.labs.ucx.runtime import (
+    assess_azure_service_principals,
+    crawl_grants,
+    migrate_dbfs_root_delta_tables,
+    migrate_external_tables_sync,
+    migrate_views,
+)
 
 from .framework.mocks import MockBackend
 
@@ -24,6 +31,23 @@ def azure_mock_config() -> WorkspaceConfig:
         inventory_database="ucx",
     )
     return config
+
+
+def mock_installation() -> MockInstallation:
+    return MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'catalog_name': 'catalog',
+                    'dst_schema': 'schema',
+                    'dst_table': 'table',
+                    'src_schema': 'schema',
+                    'src_table': 'table',
+                    'workspace_name': 'workspace',
+                },
+            ]
+        }
+    )
 
 
 def test_azure_crawler(mocker):
@@ -73,3 +97,21 @@ def test_runtime_grants(mocker):
 
         assert "SHOW DATABASES FROM hive_metastore" in sql_backend.queries
         assert "SHOW DATABASES" in sql_backend.queries
+
+
+def test_migrate_external_tables_sync():
+    ws = create_autospec(WorkspaceClient)
+    migrate_external_tables_sync(azure_mock_config(), ws, MockBackend(), mock_installation())
+    ws.catalogs.list.assert_called_once()
+
+
+def test_migrate_dbfs_root_delta_tables():
+    ws = create_autospec(WorkspaceClient)
+    migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
+    ws.catalogs.list.assert_called_once()
+
+
+def test_migrate_views():
+    ws = create_autospec(WorkspaceClient)
+    migrate_views(azure_mock_config(), ws, MockBackend(), mock_installation())
+    ws.catalogs.list.assert_called_once()

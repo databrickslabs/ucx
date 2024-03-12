@@ -254,6 +254,11 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert 'tacl' in job_clusters
     assert job_clusters["main"].new_cluster.policy_id == "123"
 
+    job = created_job(ws, '[MOCK] migrate-tables')
+    job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
+    assert 'migration_clone' in job_clusters
+    assert 'migration_sync' in job_clusters
+
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
     def run_now(job_id):

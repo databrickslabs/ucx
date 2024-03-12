@@ -782,7 +782,7 @@ class WorkspaceInstallation:
         if "migration_clone" in names:
             clusters.append(
                 jobs.JobCluster(
-                    job_cluster_key="migration_sync",
+                    job_cluster_key="migration_clone",
                     new_cluster=replace(
                         spec,
                         data_security_mode=compute.DataSecurityMode.SINGLE_USER,
@@ -790,7 +790,7 @@ class WorkspaceInstallation:
                         # the default 200 partition may not be enough for large tables, but it's hard to
                         # find a number that fits all. If we need higher parallelism, we can use config below
                         # spark_conf={"spark.sql.sources.parallelPartitionDiscovery.parallelism": "1000"},
-                        autoscale=compute.Autoscale( #number of executors matters to parallelism of file copy
+                        autoscale=compute.AutoScale(  # number of executors matters to parallelism of file copy
                             min_workers=1,
                             max_workers=10,
                         ),
@@ -800,7 +800,7 @@ class WorkspaceInstallation:
         if "migration_sync" in names:
             clusters.append(
                 jobs.JobCluster(
-                    job_cluster_key="migration_clone",
+                    job_cluster_key="migration_sync",
                     new_cluster=replace(
                         spec,
                         data_security_mode=compute.DataSecurityMode.SINGLE_USER,
