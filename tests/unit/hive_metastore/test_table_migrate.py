@@ -13,8 +13,8 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableToMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatusRefresher,
     MigrationStatus,
+    MigrationStatusRefresher,
     TablesMigrate,
 )
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What

@@ -115,16 +115,11 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
-
     mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     src_external_table = make_table(schema_name=src_schema.name, external_csv=mounted_location)
-
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
-
-    # crawler = TablesCrawler(sql_backend, inventory_schema)
     table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
     rules = [
         Rule(
@@ -136,9 +131,10 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, ws, sql_backend, StaticTableMapping(ws, sql_backend, rules=rules), migration_status_refresher
+    )
 
     table_migrate.migrate_tables()
 
