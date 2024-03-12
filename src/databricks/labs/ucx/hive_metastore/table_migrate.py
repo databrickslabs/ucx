@@ -466,7 +466,7 @@ class TableMove:
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "table_migration_status", MigrationStatus)
+        super().__init__(sbe, "hive_metastore", schema, "migration_status", MigrationStatus)
         self._ws = ws
         self._table_crawler = table_crawler
 

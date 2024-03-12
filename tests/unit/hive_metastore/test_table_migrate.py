@@ -508,7 +508,7 @@ def test_table_status_reset(mocker):
     table_status_crawler = MigrationStatusRefresher(client, backend, "ucx", table_crawler)
     table_status_crawler.reset()
     assert list(backend.queries) == [
-        "DELETE FROM hive_metastore.ucx.table_migration_status",
+        "DELETE FROM hive_metastore.ucx.migration_status",
     ]
 
 

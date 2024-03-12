@@ -160,7 +160,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
-            functools.partial(table, "table_migration_status", MigrationStatus),
+            functools.partial(table, "migration_status", MigrationStatus),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
