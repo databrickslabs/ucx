@@ -9,7 +9,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import ClusterSpec, Policy
 from databricks.sdk.service.jobs import Job, JobCluster, JobSettings
-from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse, EndpointConfPair
+from databricks.sdk.service.sql import (
+    EndpointConfPair,
+    GetWorkspaceWarehouseConfigResponse,
+)
 
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 
