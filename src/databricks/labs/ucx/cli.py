@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import webbrowser
+from collections.abc import Callable
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
@@ -11,7 +12,8 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
+from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
@@ -250,19 +252,25 @@ def alias(
     tables.alias_tables(from_catalog, from_schema, from_table, to_catalog, to_schema)
 
 
-@ucx.command
-def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
-    """For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its
-    permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
-    its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
-    The output is stored in the workspace install folder.
-    Pass subscription_id for azure and aws_profile for aws."""
+def _execute_for_cloud(
+    w: WorkspaceClient,
+    func_azure: Callable,
+    func_aws: Callable,
+    subscription_id: str | None = None,
+    aws_profile: str | None = None,
+):
     if w.config.is_azure:
-        if not subscription_id:
-            logger.error("Please enter subscription id to scan storage account in.")
+        if w.config.auth_type != "azure-cli":
+            logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
             return None
-        return _azure_principal_prefix_access(w, subscription_id)
+        if not subscription_id:
+            logger.error("Please enter subscription id to scan storage accounts in.")
+            return None
+        return func_azure(w, subscription_id)
     if w.config.is_aws:
+        if not shutil.which("aws"):
+            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
+            return None
         if not aws_profile:
             aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
         if not aws_profile:
@@ -271,9 +279,49 @@ def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = No
                 "or use the '--aws-profile=[profile-name]' parameter."
             )
             return None
-        return _aws_principal_prefix_access(w, aws_profile)
+        return func_aws(w, aws_profile)
     logger.error("This cmd is only supported for azure and aws workspaces")
     return None
+
+
+@ucx.command
+def create_uber_principal(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
+    used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
+    it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
+    Pass subscription_id for azure and aws_profile for aws."""
+    return _execute_for_cloud(w, _azure_setup_uber_principal, _aws_setup_uber_principal, subscription_id, aws_profile)
+
+
+def _azure_setup_uber_principal(w: WorkspaceClient, subscription_id: str):
+    prompts = Prompts()
+    include_subscriptions = [subscription_id] if subscription_id else None
+    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    azure_resource_permissions.create_uber_principal(prompts)
+
+
+def _aws_setup_uber_principal(w: WorkspaceClient, aws_profile: str):
+    prompts = Prompts()
+    installation = Installation.current(w, 'ucx')
+    config = installation.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    aws = AWSResources(aws_profile)
+    aws_resource_permissions = AWSResourcePermissions.for_cli(
+        w, installation, sql_backend, aws, config.inventory_database
+    )
+    aws_resource_permissions.create_uber_principal(prompts)
+
+
+@ucx.command
+def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+    """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
+    permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
+    its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
+    The output is stored in the workspace install folder.
+    Pass subscription_id for azure and aws_profile for aws."""
+    return _execute_for_cloud(
+        w, _azure_principal_prefix_access, _aws_principal_prefix_access, subscription_id, aws_profile
+    )
 
 
 def _azure_principal_prefix_access(w: WorkspaceClient, subscription_id: str):
@@ -297,7 +345,8 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+    aws = AWSResources(aws_profile)
+    aws_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
     instance_role_path = aws_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
@@ -346,30 +395,11 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
 
 
 @ucx.command
-def create_uber_principal(w: WorkspaceClient, subscription_id: str):
-    """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
-    used by tables in the workspace and stores the spn info in the UCX cluster policy."""
-    if not w.config.is_azure:
-        logger.error("This command is only supported on azure workspaces.")
-        return
-    if w.config.auth_type != "azure-cli":
-        logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
-        return
-    if not subscription_id:
-        logger.error("Please enter subscription id to scan storage account in.")
-        return
-    prompts = Prompts()
-    include_subscriptions = [subscription_id] if subscription_id else None
-    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
-    azure_resource_permissions.create_uber_principal(prompts)
-    return
-
-
-@ucx.command
 def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
-    """This command creates UC external locations. The candidate locations to be created are extracted from guess_external_locations
-    task in the assessment job. You can run validate_external_locations command to check the candidate locations. Please make sure
-    the credentials haven migrated before running this command. The command will only create the locations that have corresponded UC Storage Credentials.
+    """This command creates UC external locations. The candidate locations to be created are extracted from
+    guess_external_locations task in the assessment job. You can run validate_external_locations command to check
+    the candidate locations. Please make sure the credentials haven migrated before running this command. The command
+    will only create the locations that have corresponded UC Storage Credentials.
     """
     if w.config.is_azure:
         logger.info("Running migrate_locations for Azure")
@@ -381,10 +411,20 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
         if not shutil.which("aws"):
             logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
             return
+        if not aws_profile:
+            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+        if not aws_profile:
+            logger.error(
+                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+                "or use the '--aws-profile=[profile-name]' parameter."
+            )
+            return
         installation = Installation.current(w, 'ucx')
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws_profile, config.inventory_database)
+        aws = AWSResources(aws_profile)
+        location = ExternalLocations(w, sql_backend, config.inventory_database)
+        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws, location, config.inventory_database)
         aws_permissions.create_external_locations()
     if w.config.is_gcp:
         logger.error("migrate_locations is not yet supported in GCP")

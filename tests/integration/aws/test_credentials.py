@@ -2,12 +2,14 @@ import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.labs.ucx.assessment.aws import AWSResourcePermissions, AWSResources
+from databricks.labs.ucx.assessment.aws import AWSResources
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import (
     CredentialManager,
     CredentialValidationResult,
     IamRoleMigration,
 )
+from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 @pytest.fixture
@@ -27,7 +29,8 @@ def run_migration(ws, sql_backend, env_or_skip):
         )
 
         aws = AWSResources(env_or_skip("AWS_DEFAULT_PROFILE"))
-        resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, "inventory_schema")
+        location = ExternalLocations(ws, sql_backend, "inventory_schema")
+        resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, location, "inventory_schema")
 
         instance_profile_migration = IamRoleMigration(installation, ws, resource_permissions, CredentialManager(ws))
 
