@@ -5,6 +5,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 
@@ -26,14 +27,22 @@ class ClusterPolicyInstaller:
         spark_conf_dict = {}
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
-            "Would you like to set UCX to connect to the external metastore?"
+                "We have identified one or more cluster policies set up for an external metastore"
+                "Would you like to set UCX to connect to the external metastore?"
         ):
             logger.info("Setting up an external metastore")
             cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
             if len(cluster_policies) >= 1:
                 cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
                 instance_profile, spark_conf_dict = self._extract_external_hive_metastore_conf(cluster_policy)
+        else:
+            warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
+            if warehouse_config and self._prompts.confirm(
+                    "We have identified the workspace warehouse is set up for an external metastore"
+                    "Would you like to set UCX to connect to the external metastore?"
+            ):
+                logger.info("Setting up an external metastore")
+                instance_profile, spark_conf_dict = self._extract_external_hive_metastore_sql_conf(warehouse_config)
         policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
         policies = self._ws.cluster_policies.list()
         for policy in policies:
@@ -87,10 +96,10 @@ class ClusterPolicyInstaller:
             logger.info(f"Instance Profile is Set to {instance_profile}")
         for key in cluster_policy.keys():
             if (
-                key.startswith("spark_conf.spark.sql.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
-                or key.startswith("spark_conf.spark.databricks.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
+                    key.startswith("spark_conf.spark.sql.hive.metastore")
+                    or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
+                    or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                    or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
             ):
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
@@ -106,6 +115,33 @@ class ClusterPolicyInstaller:
                 if key.startswith("spark_conf.spark.sql.hive.metastore"):
                     yield policy
                     break
+
+    @staticmethod
+    def _extract_external_hive_metastore_sql_conf(sql_config: GetWorkspaceWarehouseConfigResponse):
+        spark_conf_dict = {}
+        instance_profile = None
+        if sql_config.instance_profile_arn is not None:
+            instance_profile = sql_config.instance_profile_arn
+            logger.info(f"Instance Profile is Set to {instance_profile}")
+        for conf in sql_config.data_access_config:
+            if (
+                    conf.key.startswith("spark.sql.hive.metastore")
+                    or conf.key.startswith("spark.hadoop.javax.jdo.option")
+                    or conf.key.startswith("spark.databricks.hive.metastore")
+                    or conf.key.startswith("spark.hadoop.hive.metastore.glue")
+            ):
+                spark_conf_dict[conf.key] = conf.value
+        return instance_profile, spark_conf_dict
+
+    def _get_warehouse_config_with_external_hive_metastore(self) -> GetWorkspaceWarehouseConfigResponse | None:
+        sql_config = self._ws.warehouses.get_workspace_warehouse_config()
+        if sql_config is None:
+            return None
+        for conf in sql_config.data_access_config:
+            if (conf.key.startswith("spark.sql.hive.metastore") or
+                    conf.key.startswith("spark.databricks.hive.metastore.glueCatalog.enabled")):
+                return sql_config
+        return None
 
     def update_job_policy(self, state: InstallState, policy_id: str):
         if not state.jobs:
