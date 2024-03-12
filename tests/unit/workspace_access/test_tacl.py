@@ -234,13 +234,7 @@ def test_tacl_crawler_multiple_permissions():
     ) == Grant(**json.loads(permissions.raw))
 
 
-def make_row(data, columns):
-    row = Row(data)
-    row.__columns__ = columns
-    return row
-
-
-SHOW_COLS = ["principal", "action_type", "object_type", "ignored"]
+show_grant_row = Row.factory(["principal", "action_type", "object_type", "ignored"])
 
 
 def test_tacl_applier():
@@ -250,7 +244,7 @@ def test_tacl_applier():
                 ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ],
             "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("account-abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+                show_grant_row("account-abc", "SELECT", "TABLE", "table_c"),
             ],
         }
     )
@@ -345,7 +339,7 @@ def test_tacl_udf_applier(mocker):
                 ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ],
             "SHOW GRANTS ON FUNCTION catalog_a.database_b.function_c": [
-                make_row(("account-abc", "SELECT", "FUNCTION", "function_c"), SHOW_COLS),
+                show_grant_row("account-abc", "SELECT", "FUNCTION", "function_c"),
             ],
         }
     )
@@ -397,8 +391,8 @@ def test_tacl_applier_multiple_actions(mocker):
                 ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ],
             "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("account-abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
-                make_row(("account-abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
+                show_grant_row("account-abc", "SELECT", "TABLE", "table_c"),
+                show_grant_row("account-abc", "MODIFY", "TABLE", "table_c"),
             ],
         }
     )
@@ -483,7 +477,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
     sql_backend = MockBackend(
         rows={
             "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+                show_grant_row("abc", "SELECT", "TABLE", "table_c"),
             ],
         }
     )
@@ -515,7 +509,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
     sql_backend = MockBackend(
         rows={
             "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
+                show_grant_row("abc", "MODIFY", "TABLE", "table_c"),
             ],
         }
     )
