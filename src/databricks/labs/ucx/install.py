@@ -66,6 +66,7 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
+from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
@@ -159,6 +160,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
+            functools.partial(table, "table_migration_status", MigrationStatus),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
