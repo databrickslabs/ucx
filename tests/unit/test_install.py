@@ -316,7 +316,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
 
 
 def test_run_workflow_creates_failure_from_mapping(
-    ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs
+        ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs
 ):
     def run_now(job_id):
         assert job_id == 123
@@ -900,32 +900,32 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
     "state,expected",
     [
         (
-            RunState(
-                result_state=None,
-                life_cycle_state=RunLifeCycleState.RUNNING,
-            ),
-            "RUNNING",
+                RunState(
+                    result_state=None,
+                    life_cycle_state=RunLifeCycleState.RUNNING,
+                ),
+                "RUNNING",
         ),
         (
-            RunState(
-                result_state=RunResultState.SUCCESS,
-                life_cycle_state=RunLifeCycleState.TERMINATED,
-            ),
-            "SUCCESS",
+                RunState(
+                    result_state=RunResultState.SUCCESS,
+                    life_cycle_state=RunLifeCycleState.TERMINATED,
+                ),
+                "SUCCESS",
         ),
         (
-            RunState(
-                result_state=RunResultState.FAILED,
-                life_cycle_state=RunLifeCycleState.TERMINATED,
-            ),
-            "FAILED",
+                RunState(
+                    result_state=RunResultState.FAILED,
+                    life_cycle_state=RunLifeCycleState.TERMINATED,
+                ),
+                "FAILED",
         ),
         (
-            RunState(
-                result_state=None,
-                life_cycle_state=None,
-            ),
-            "UNKNOWN",
+                RunState(
+                    result_state=None,
+                    life_cycle_state=None,
+                ),
+                "UNKNOWN",
         ),
     ],
 )
@@ -962,7 +962,7 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, s
     ],
 )
 def test_latest_job_status_success_with_time(
-    mock_datetime, ws, mock_installation_with_jobs, any_prompt, start_time, expected
+        mock_datetime, ws, mock_installation_with_jobs, any_prompt, start_time, expected
 ):
     base = [
         BaseRun(
@@ -1191,7 +1191,8 @@ def test_fresh_install(ws, mock_installation):
     )
 
 
-def test_get_existing_installation_global(ws, mock_installation):
+def test_get_existing_installation_global(ws, mock_installation, mocker):
+    mocker.patch("webbrowser.open")
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
