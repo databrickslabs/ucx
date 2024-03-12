@@ -42,6 +42,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         product_info: ProductInfo | None = None,
         environ: dict[str, str] | None = None,
         extend_prompts: dict[str, str] | None = None,
+        inventory_schema_suffix: str = "",
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
@@ -57,7 +58,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": inventory_schema,
+                r".*Inventory Database.*": f"{inventory_schema}{inventory_schema_suffix}",
                 r".*Backup prefix*": renamed_group_prefix,
                 r".*": "",
             }
@@ -401,6 +402,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
         extend_prompts={
             r".*UCX is already installed on this workspace.*": 'yes',
         },
+        inventory_schema_suffix="_reinstall",
     )
     assert reinstall_user_force.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     reinstall_user_force.uninstall()
