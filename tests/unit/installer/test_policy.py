@@ -336,6 +336,8 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
         EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionDriverName", "SQLServerDriver"),
         EndpointConfPair("spark.sql.hive.metastore.version", "0.13"),
         EndpointConfPair("spark.sql.hive.metastore.jars", "jar1"),
+        EndpointConfPair(None, None),
+        EndpointConfPair("random", None),
     ]
 
     ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(

@@ -141,8 +141,6 @@ class ClusterPolicyInstaller:
 
     def _get_warehouse_config_with_external_hive_metastore(self) -> GetWorkspaceWarehouseConfigResponse | None:
         sql_config = self._ws.warehouses.get_workspace_warehouse_config()
-        if sql_config is None:
-            return None
         if sql_config.data_access_config is None:
             return None
         for conf in sql_config.data_access_config:
