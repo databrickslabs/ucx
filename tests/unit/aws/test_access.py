@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, call, create_autospec
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
@@ -24,7 +25,6 @@ from databricks.labs.ucx.assessment.aws import (
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.unit import DEFAULT_CONFIG
-from tests.unit.framework.mocks import MockBackend
 
 
 @pytest.fixture

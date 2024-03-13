@@ -1,7 +1,9 @@
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 
-from ..framework.mocks import MockBackend
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+
 from . import workspace_client_mock
 
 
@@ -50,7 +52,7 @@ def test_pipeline_without_owners_should_have_empty_creator_name():
     result = mockbackend.rows_written_for("hive_metastore.ucx.pipelines", "append")
 
     assert result == [
-        PipelineInfo(
+        Row(
             pipeline_id="empty-spec",
             pipeline_name="New DLT Pipeline",
             creator_name=None,

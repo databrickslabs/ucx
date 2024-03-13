@@ -5,12 +5,12 @@ from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import SqlBackend, StatementExecutionBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -150,7 +150,10 @@ class TableMapping:
         describe = {}
         for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
             describe[value["database_description_item"]] = value["database_description_value"]
-        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
+        properties = describe.get("Properties", "")
+        if not properties:
+            return database
+        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(properties.lower()):
             logger.info(f"Database {database} is marked to be skipped")
             return None
         return database

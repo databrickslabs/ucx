@@ -2,13 +2,12 @@ from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-
-from ..framework.mocks import MockBackend
 
 
 def prepare_test(ws, mock_prompts) -> CatalogSchema:
