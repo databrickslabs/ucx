@@ -37,7 +37,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables()
 
     assert (
-        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE " "hive_metastore.db1_src.managed_dbfs;"
+        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;"
     ) in list(backend.queries)
     assert "SYNC TABLE ucx_default.db1_dst.managed_mnt FROM hive_metastore.db1_src.managed_mnt;" in list(
         backend.queries
