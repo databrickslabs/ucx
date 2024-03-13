@@ -2,6 +2,7 @@ import logging
 from itertools import cycle
 from unittest.mock import create_autospec
 
+import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
@@ -17,6 +18,13 @@ from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 from .. import table_mapping_mock
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def ws():
+    client = create_autospec(WorkspaceClient)
+    client.get_workspace_id.return_value = "12345"
+    return client
 
 
 def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):

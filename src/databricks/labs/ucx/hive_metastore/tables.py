@@ -8,7 +8,6 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -69,20 +68,6 @@ class Table:
             view_text=data.get("view_text", None),
             upgraded_to=data.get("upgraded_to", None),
             storage_properties=data.get("storage_properties", None),
-        )
-
-    @classmethod
-    def from_info(cls, table: TableInfo):
-        return cls(
-            catalog=table.catalog_name if table.catalog_name else "UNKNOWN",
-            database=table.schema_name if table.schema_name else "UNKNOWN",
-            name=table.name if table.name else "UNKNOWN",
-            object_type=str(table.table_type) if table.table_type else "UNKNOWN",
-            table_format=str(table.data_source_format) if table.data_source_format else "UNKNOWN",
-            location=table.storage_location,
-            view_text=table.view_definition,
-            upgraded_to=None,
-            storage_properties=table.properties,  # type: ignore[arg-type]
         )
 
     @property

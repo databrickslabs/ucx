@@ -104,7 +104,7 @@ class TablesMigrate:
                     continue
                 if "upgraded_from" not in table.properties:
                     continue
-                self._seen_tables[Table.from_info(table).key.lower()] = table.properties["upgraded_from"].lower()
+                self._seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
 
     def _table_already_upgraded(self, target) -> bool:
         return target in self._seen_tables
