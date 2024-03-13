@@ -15,7 +15,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 
-from .. import table_mapping_mock
+from .. import table_mapping_mock, workspace_client_mock
 
 logger = logging.getLogger(__name__)
 
@@ -153,15 +153,15 @@ def test_migrate_view_should_produce_proper_queries(ws):
     ) in list(backend.queries)
 
 
-def get_table_migrate(ws, backend: SqlBackend) -> TablesMigrate:
+def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
     table_crawler = create_autospec(TablesCrawler)
-
-    ws.catalogs.list.return_value = [CatalogInfo(name="cat1")]
-    ws.schemas.list.return_value = [
+    client = workspace_client_mock()
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
+    client.schemas.list.return_value = [
         SchemaInfo(catalog_name="cat1", name="test_schema1"),
         SchemaInfo(catalog_name="cat1", name="test_schema2"),
     ]
-    ws.tables.list.side_effect = cycle(
+    client.tables.list.side_effect = cycle(
         [
             [
                 TableInfo(
@@ -239,15 +239,15 @@ def get_table_migrate(ws, backend: SqlBackend) -> TablesMigrate:
     ]
     table_crawler.snapshot.return_value = test_tables
     table_mapping = table_mapping_mock()
-    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping)
+    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
     return table_migrate
 
 
-def test_revert_migrated_tables_skip_managed(ws):
+def test_revert_migrated_tables_skip_managed():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(ws, backend)
+    table_migrate = get_table_migrate(backend)
     table_migrate.revert_migrated_tables(schema="test_schema1")
     revert_queries = list(backend.queries)
     assert (
@@ -266,7 +266,7 @@ def test_revert_migrated_tables_including_managed(ws):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(ws, backend)
+    table_migrate = get_table_migrate(backend)
     # testing reverting managed tables
     table_migrate.revert_migrated_tables(schema="test_schema1", delete_managed=True)
     revert_with_managed_queries = list(backend.queries)
@@ -307,7 +307,7 @@ def test_revert_report(ws, capsys):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(ws, backend)
+    table_migrate = get_table_migrate(backend)
     table_migrate.print_revert_report(delete_managed=True)
     captured = capsys.readouterr()
     assert "test_schema1|1|0|1|0|1|0|0|" in captured.out.replace(" ", "")

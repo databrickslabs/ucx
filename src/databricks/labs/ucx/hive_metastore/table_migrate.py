@@ -15,6 +15,7 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
@@ -169,7 +170,7 @@ class TablesMigrate:
         return migration_list
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES {schema}.{table}")
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema+'.'+table)}")
         for value in result:
             if value["key"] == "upgraded_to":
                 logger.info(f"{schema}.{table} is set as upgraded")
