@@ -386,7 +386,7 @@ def destroy_schema(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBac
     sql_backend.execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")
 
 
-@task("migrate-tables", job_cluster="migration_sync")
+@task("migrate-tables", job_cluster="table_migration")
 def migrate_external_tables_sync(
     cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, installation: Installation
 ):
@@ -400,7 +400,7 @@ def migrate_external_tables_sync(
     TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(what=What.EXTERNAL_SYNC)
 
 
-@task("migrate-tables", job_cluster="migration_clone")
+@task("migrate-tables", job_cluster="table_migration")
 def migrate_dbfs_root_delta_tables(
     cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, installation: Installation
 ):
@@ -412,18 +412,6 @@ def migrate_dbfs_root_delta_tables(
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     table_mapping = TableMapping(installation, ws, sql_backend)
     TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(what=What.DBFS_ROOT_DELTA)
-
-
-@task("migrate-tables", job_cluster="migration_sync")
-def migrate_views(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, installation: Installation):
-    """This workflow task migrates the views from the Hive Metastore to the Unity Catalog. New views will be created in UC but base tables are still in HMS.
-    Following cli commands are required to be run before running this task:
-    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
-    - For AWS: TBD
-    """
-    table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
-    table_mapping = TableMapping(installation, ws, sql_backend)
-    TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(what=What.VIEW)
 
 
 def main(*argv):

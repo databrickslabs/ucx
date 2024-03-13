@@ -44,7 +44,11 @@ from databricks.sdk.service.workspace import ObjectInfo
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.install import (
+    WorkspaceInstallation,
+    WorkspaceInstaller,
+    load_cluster_specs,
+)
 
 from ..unit.framework.mocks import MockBackend
 
@@ -114,6 +118,14 @@ def created_job(workspace_client, name):
 def created_job_tasks(workspace_client: MagicMock, name: str) -> dict[str, jobs.Task]:
     call = created_job(workspace_client, name)
     return {_.task_key: _ for _ in call['tasks']}
+
+
+def expected_cluster_specs(policy_id: str) -> dict[str, dict]:
+    expected_specs = {}
+    for cluster_key, cluster_specs in load_cluster_specs().items():
+        expected_specs[cluster_key] = cluster_specs.as_dict()
+        expected_specs[cluster_key]['policy_id'] = policy_id
+    return expected_specs
 
 
 @pytest.fixture
@@ -256,8 +268,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
 
     job = created_job(ws, '[MOCK] migrate-tables')
     job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
-    assert 'migration_clone' in job_clusters
-    assert 'migration_sync' in job_clusters
+    assert 'table_migration' in job_clusters
 
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
@@ -434,6 +445,7 @@ def test_save_config(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'cluster_specs': expected_cluster_specs('foo'),
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -465,6 +477,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'cluster_specs': expected_cluster_specs('foo'),
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -505,6 +518,7 @@ def test_create_cluster_policy(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'cluster_specs': expected_cluster_specs('foo1'),
             'policy_id': 'foo1',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1070,6 +1084,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'inventory_database': 'ucx',
             'log_level': 'INFO',
             'num_threads': 8,
+            'cluster_specs': expected_cluster_specs('foo'),
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',

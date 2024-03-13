@@ -1,6 +1,7 @@
 import functools
 import logging
 import os
+import pathlib
 import re
 import sys
 import time
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import yaml
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -44,6 +46,7 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.compute import ClusterSpec
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -170,6 +173,16 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
+def load_cluster_specs() -> dict[str, ClusterSpec]:
+    current_file_dir = pathlib.Path(__file__).parent
+    cluster_spec_yaml_path = current_file_dir / "job_cluster_spec.yml"
+    with open(cluster_spec_yaml_path, 'r', encoding='utf-8') as f:
+        cluster_specs = {}
+        for cluster_key, spec_dict in yaml.safe_load(f).items():
+            cluster_specs[cluster_key] = ClusterSpec.from_dict(spec_dict)
+        return cluster_specs
+
+
 class WorkspaceInstaller:
     def __init__(self, prompts: Prompts, installation: Installation, ws: WorkspaceClient):
         if "DATABRICKS_RUNTIME_VERSION" in os.environ:
@@ -247,6 +260,38 @@ class WorkspaceInstaller:
 
         policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
 
+        # Load job cluster specifications
+        cluster_specs = load_cluster_specs()
+        for _, cluster_spec in cluster_specs.items():
+            cluster_spec.policy_id = policy_id
+            spark_conf = cluster_spec.spark_conf
+            if spark_conf:
+                spark_conf.update(spark_conf_dict)
+                continue
+            cluster_spec.spark_conf = spark_conf_dict
+        # Save configurable table migration cluster specifications
+        parallelism = self._prompts.question(
+            "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
+        )
+        spark_conf = cluster_specs['table_migration'].spark_conf
+        if spark_conf:
+            spark_conf.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
+        else:
+            cluster_specs['table_migration'].spark_conf = {
+                'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism
+            }
+        min_workers = int(
+            self._prompts.question(
+                "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
+            )
+        )
+        max_workers = int(
+            self._prompts.question(
+                "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
+            )
+        )
+        cluster_specs['table_migration'].autoscale = compute.AutoScale(max_workers, min_workers)
+
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         config = WorkspaceConfig(
@@ -261,7 +306,7 @@ class WorkspaceInstaller:
             log_level=log_level,
             num_threads=num_threads,
             instance_profile=instance_profile,
-            spark_conf=spark_conf_dict,
+            cluster_specs=cluster_specs,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
             include_databases=self._select_databases(),
@@ -746,66 +791,31 @@ class WorkspaceInstallation:
 
     def _job_clusters(self, names: set[str]):
         clusters = []
-        spark_conf = {
-            "spark.databricks.cluster.profile": "singleNode",
-            "spark.master": "local[*]",
-        }
-        if self._config.spark_conf is not None:
-            spark_conf = spark_conf | self._config.spark_conf
-        spec = compute.ClusterSpec(
-            data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-            spark_conf=spark_conf,
-            custom_tags={"ResourceClass": "SingleNode"},
-            num_workers=0,
-            policy_id=self.config.policy_id,
-        )
+        cluster_specs = self._config.cluster_specs
+        if not cluster_specs:
+            # load default job cluster specs
+            cluster_specs = load_cluster_specs()
+            for _, cluster_spec in cluster_specs.items():
+                cluster_spec.policy_id = self._config.policy_id
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="main",
-                    new_cluster=spec,
+                    new_cluster=cluster_specs["main"],
                 )
             )
         if "tacl" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="tacl",
-                    new_cluster=replace(
-                        spec,
-                        data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
-                        spark_conf={"spark.databricks.acl.sqlOnly": "true"},
-                        num_workers=1,  # ShowPermissionsCommand needs a worker
-                        custom_tags={},
-                    ),
+                    new_cluster=cluster_specs["tacl"],
                 )
             )
-        if "migration_clone" in names:
+        if "table_migration" in names:
             clusters.append(
                 jobs.JobCluster(
-                    job_cluster_key="migration_clone",
-                    new_cluster=replace(
-                        spec,
-                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
-                        # https://databricks.atlassian.net/browse/ES-975874
-                        # the default 200 partition may not be enough for large tables, but it's hard to
-                        # find a number that fits all. If we need higher parallelism, we can use config below
-                        # spark_conf={"spark.sql.sources.parallelPartitionDiscovery.parallelism": "1000"},
-                        autoscale=compute.AutoScale(  # number of executors matters to parallelism of file copy
-                            min_workers=1,
-                            max_workers=10,
-                        ),
-                    ),
-                )
-            )
-        if "migration_sync" in names:
-            clusters.append(
-                jobs.JobCluster(
-                    job_cluster_key="migration_sync",
-                    new_cluster=replace(
-                        spec,
-                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
-                        num_workers=1,
-                    ),
+                    job_cluster_key="table_migration",
+                    new_cluster=cluster_specs["table_migration"],
                 )
             )
         return clusters

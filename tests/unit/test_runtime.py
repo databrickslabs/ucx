@@ -16,7 +16,6 @@ from databricks.labs.ucx.runtime import (
     crawl_grants,
     migrate_dbfs_root_delta_tables,
     migrate_external_tables_sync,
-    migrate_views,
 )
 
 from .framework.mocks import MockBackend
@@ -108,10 +107,4 @@ def test_migrate_external_tables_sync():
 def test_migrate_dbfs_root_delta_tables():
     ws = create_autospec(WorkspaceClient)
     migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
-    ws.catalogs.list.assert_called_once()
-
-
-def test_migrate_views():
-    ws = create_autospec(WorkspaceClient)
-    migrate_views(azure_mock_config(), ws, MockBackend(), mock_installation())
     ws.catalogs.list.assert_called_once()

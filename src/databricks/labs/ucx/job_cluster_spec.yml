@@ -1,0 +1,26 @@
+# job cluster specifications for "main", see runtime.py for which tasks are using this cluster specifications
+main:
+  data_security_mode: 'LEGACY_SINGLE_USER'
+  num_workers: 0
+  spark_conf:
+    "spark.databricks.cluster.profile": "singleNode"
+    "spark.master": "local[*]"
+  custom_tags:
+    ResourceClass: "SingleNode"
+
+# job cluster specifications for "tacl", see runtime.py for which tasks are using this cluster specifications
+tacl:
+  data_security_mode: 'LEGACY_TABLE_ACL'
+  num_workers: 1
+  spark_conf:
+    "spark.databricks.acl.sqlOnly": "true"
+
+# job cluster specifications for "table_migration", see runtime.py for which tasks are using this cluster specifications
+table_migration:
+  data_security_mode: 'SINGLE_USER'
+  autoscale:
+    min_workers: 1
+    max_workers: 10
+  spark_conf:
+    "spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"
+

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from databricks.sdk.core import Config
+from databricks.sdk.service.compute import ClusterSpec
 
 __all__ = ["WorkspaceConfig"]
 
@@ -31,7 +32,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Starting path for notebooks and directories crawler
     workspace_start_path: str = "/"
     instance_profile: str | None = None
-    spark_conf: dict[str, str] | None = None
+    cluster_specs: dict[str, ClusterSpec] | None = None
 
     override_clusters: dict[str, str] | None = None
     policy_id: str | None = None
