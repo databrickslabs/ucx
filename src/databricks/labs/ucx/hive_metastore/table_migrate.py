@@ -169,7 +169,7 @@ class TablesMigrate:
         return migration_list
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES `{schema}`.`{table}`")
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES {schema}.{table}")
         for value in result:
             if value["key"] == "upgraded_to":
                 logger.info(f"{schema}.{table} is set as upgraded")

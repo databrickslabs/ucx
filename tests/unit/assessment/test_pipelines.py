@@ -6,6 +6,7 @@ from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 
 from .. import workspace_client_mock
 
+
 def test_pipeline_assessment_with_config():
     ws = workspace_client_mock(pipeline_ids=['spec-with-spn'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="

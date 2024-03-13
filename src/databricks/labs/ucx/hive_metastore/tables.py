@@ -8,6 +8,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -92,24 +93,24 @@ class Table:
 
     @property
     def key(self) -> str:
-        return f"`{self.catalog}`.`{self.database}`.`{self.name}`".lower()
+        return f"{self.catalog}.{self.database}.{self.name}".lower()
 
     @property
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
     def sql_alter_to(self, target_table_key):
-        return f"ALTER {self.kind} {self.key} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
+        return f"ALTER {self.kind} {escape_sql_identifier(self.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
     def sql_alter_from(self, target_table_key, ws_id):
         return (
-            f"ALTER {self.kind} {target_table_key} SET TBLPROPERTIES "
+            f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
             f"('upgraded_from' = '{self.key}'"
             f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
 
     def sql_unset_upgraded_to(self):
-        return f"ALTER {self.kind} {self.key} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        return f"ALTER {self.kind} {escape_sql_identifier(self.key)} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
     @property
     def is_dbfs_root(self) -> bool:

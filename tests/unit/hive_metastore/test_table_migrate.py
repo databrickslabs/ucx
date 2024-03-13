@@ -29,24 +29,22 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables()
 
     assert (
-        "CREATE TABLE IF NOT EXISTS `ucx_default`.`db1_dst`.`managed_dbfs` DEEP CLONE "
-        "`hive_metastore`.`db1_src`.`managed_dbfs`;"
+        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE " "hive_metastore.db1_src.managed_dbfs;"
     ) in list(backend.queries)
-    assert "SYNC TABLE `ucx_default`.`db1_dst`.`managed_mnt` FROM `hive_metastore`.`db1_src`.`managed_mnt`;" in list(
+    assert "SYNC TABLE ucx_default.db1_dst.managed_mnt FROM hive_metastore.db1_src.managed_mnt;" in list(
         backend.queries
     )
     assert (
-        "ALTER TABLE `hive_metastore`.`db1_src`.`managed_dbfs` "
-        "SET TBLPROPERTIES ('upgraded_to' = '`ucx_default`.`db1_dst`.`managed_dbfs`');"
+        "ALTER TABLE hive_metastore.db1_src.managed_dbfs "
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
     ) in list(backend.queries)
     assert (
-        f"ALTER TABLE `ucx_default`.`db1_dst`.`managed_dbfs` "
-        f"SET TBLPROPERTIES ('upgraded_from' = '`hive_metastore`.`db1_src`.`managed_dbfs`' , "
+        f"ALTER TABLE ucx_default.db1_dst.managed_dbfs "
+        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in backend.queries
-    assert (
-        "SYNC TABLE `ucx_default`.`db1_dst`.`managed_other` FROM `hive_metastore`.`db1_src`.`managed_other`;"
-        in list(backend.queries)
+    assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in list(
+        backend.queries
     )
 
 
@@ -72,10 +70,10 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables()
 
     assert (list(backend.queries)) == [
-        "SYNC TABLE `ucx_default`.`db1_dst`.`external_dst` FROM `hive_metastore`.`db1_src`.`external_src`;",
+        "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
         (
-            f"ALTER TABLE `ucx_default`.`db1_dst`.`external_dst` "
-            f"SET TBLPROPERTIES ('upgraded_from' = '`hive_metastore`.`db1_src`.`external_src`' , "
+            f"ALTER TABLE ucx_default.db1_dst.external_dst "
+            f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , "
             f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
         ),
     ]
@@ -96,7 +94,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
             schema_name="schema1",
             name="dest1",
             full_name="cat1.schema1.dest1",
-            properties={"upgraded_from": "`hive_metastore`.`db1_src`.`external_src`"},
+            properties={"upgraded_from": "hive_metastore.db1_src.external_src"},
         ),
     ]
 
@@ -135,16 +133,14 @@ def test_migrate_view_should_produce_proper_queries(ws):
     table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping)
     table_migrate.migrate_tables()
 
-    assert "CREATE VIEW IF NOT EXISTS `ucx_default`.`db1_dst`.`view_dst` AS SELECT * FROM table;" in list(
-        backend.queries
-    )
+    assert "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;" in list(backend.queries)
     assert (
-        "ALTER VIEW `hive_metastore`.`db1_src`.`view_src` "
-        "SET TBLPROPERTIES ('upgraded_to' = '`ucx_default`.`db1_dst`.`view_dst`');"
+        "ALTER VIEW hive_metastore.db1_src.view_src "
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     ) in list(backend.queries)
     assert (
-        f"ALTER VIEW `ucx_default`.`db1_dst`.`view_dst` "
-        f"SET TBLPROPERTIES ('upgraded_from' = '`hive_metastore`.`db1_src`.`view_src`' , "
+        f"ALTER VIEW ucx_default.db1_dst.view_dst "
+        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , "
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in list(backend.queries)
 
@@ -165,21 +161,21 @@ def get_table_migrate(ws, backend: SqlBackend) -> TablesMigrate:
                     schema_name="schema1",
                     name="dest1",
                     full_name="cat1.schema1.dest1",
-                    properties={"upgraded_from": "`hive_metastore`.`test_schema1`.`test_table1`"},
+                    properties={"upgraded_from": "hive_metastore.test_schema1.test_table1"},
                 ),
                 TableInfo(
                     catalog_name="cat1",
                     schema_name="schema1",
                     name="dest_view1",
                     full_name="cat1.schema1.dest_view1",
-                    properties={"upgraded_from": "`hive_metastore`.`test_schema1`.`test_view1`"},
+                    properties={"upgraded_from": "hive_metastore.test_schema1.test_view1"},
                 ),
                 TableInfo(
                     catalog_name="cat1",
                     schema_name="schema1",
                     name="dest2",
                     full_name="cat1.schema1.dest2",
-                    properties={"upgraded_from": "`hive_metastore`.`test_schema1`.`test_table2`"},
+                    properties={"upgraded_from": "hive_metastore.test_schema1.test_table2"},
                 ),
             ],
             [
@@ -188,7 +184,7 @@ def get_table_migrate(ws, backend: SqlBackend) -> TablesMigrate:
                     schema_name="schema2",
                     name="dest3",
                     full_name="cat1.schema2.dest3",
-                    properties={"upgraded_from": "`hive_metastore`.`test_schema2`.`test_table3`"},
+                    properties={"upgraded_from": "hive_metastore.test_schema2.test_table3"},
                 ),
             ],
         ]
@@ -247,15 +243,15 @@ def test_revert_migrated_tables_skip_managed(ws):
     table_migrate.revert_migrated_tables(schema="test_schema1")
     revert_queries = list(backend.queries)
     assert (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_queries
     )
-    assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest1`" in revert_queries
+    assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_queries
     assert (
-        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER VIEW hive_metastore.test_schema1.test_view1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_queries
     )
-    assert "DROP VIEW IF EXISTS `cat1`.`schema1`.`dest_view1`" in revert_queries
+    assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_queries
 
 
 def test_revert_migrated_tables_including_managed(ws):
@@ -267,20 +263,20 @@ def test_revert_migrated_tables_including_managed(ws):
     table_migrate.revert_migrated_tables(schema="test_schema1", delete_managed=True)
     revert_with_managed_queries = list(backend.queries)
     assert (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE hive_metastore.test_schema1.test_table1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
-    assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest1`" in revert_with_managed_queries
+    assert "DROP TABLE IF EXISTS cat1.schema1.dest1" in revert_with_managed_queries
     assert (
-        "ALTER VIEW `hive_metastore`.`test_schema1`.`test_view1` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER VIEW hive_metastore.test_schema1.test_view1 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
-    assert "DROP VIEW IF EXISTS `cat1`.`schema1`.`dest_view1`" in revert_with_managed_queries
+    assert "DROP VIEW IF EXISTS cat1.schema1.dest_view1" in revert_with_managed_queries
     assert (
-        "ALTER TABLE `hive_metastore`.`test_schema1`.`test_table2` UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        "ALTER TABLE hive_metastore.test_schema1.test_table2 UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
         in revert_with_managed_queries
     )
-    assert "DROP TABLE IF EXISTS `cat1`.`schema1`.`dest2`" in revert_with_managed_queries
+    assert "DROP TABLE IF EXISTS cat1.schema1.dest2" in revert_with_managed_queries
 
 
 def test_no_migrated_tables(ws):
@@ -331,10 +327,10 @@ def test_empty_revert_report(ws):
 def test_is_upgraded(ws):
     errors = {}
     rows = {
-        "SHOW TBLPROPERTIES `schema1`.`table1`": [
+        "SHOW TBLPROPERTIES schema1.table1": [
             {"key": "upgraded_to", "value": "fake_dest"},
         ],
-        "SHOW TBLPROPERTIES `schema1`.`table2`": [
+        "SHOW TBLPROPERTIES schema1.table2": [
             {"key": "another_key", "value": "fake_value"},
         ],
     }

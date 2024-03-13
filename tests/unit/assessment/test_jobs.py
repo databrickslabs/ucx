@@ -5,7 +5,6 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 
 from .. import workspace_client_mock
-from ..framework.mocks import MockBackend
 
 
 def test_job_assessment():
