@@ -3,11 +3,8 @@
     "src/databricks/labs/ucx/__about__.py": "__version__ = \"$VERSION\""
   },
   "toolchain": {
-    "required": ["python3"],
-    "pre_setup": [
-      "python3 -m pip install hatch==1.7.0",
-      "python3 -m hatch env create"
-    ],
+    "required": ["python3", "hatch"],
+    "pre_setup": ["hatch env create"],
     "prepend_path": ".venv/bin",
     "acceptance_path": "tests/integration",
     "test": [

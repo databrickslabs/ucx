@@ -15,7 +15,7 @@ on:
       - main
 
 env:
-  HATCH_VERSION: 1.7.0
+  HATCH_VERSION: 1.9.4
 
 jobs:
   ci:
