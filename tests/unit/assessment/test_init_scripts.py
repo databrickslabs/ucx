@@ -1,14 +1,11 @@
 import base64
 
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.compute import GlobalInitScriptDetails
 
-from databricks.labs.ucx.assessment.init_scripts import (
-    GlobalInitScriptCrawler,
-    GlobalInitScriptInfo,
-)
-
-from ..framework.mocks import MockBackend
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 
 
 def test_global_init_scripts_no_config(mocker):
@@ -99,9 +96,7 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
     result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
 
     assert result == [
-        GlobalInitScriptInfo(
-            script_id="222", script_name="newscript", enabled=False, created_by=None, success=1, failures="[]"
-        ),
+        Row(script_id="222", success=1, failures="[]", script_name="newscript", enabled=False, created_by=None),
     ]
 
 

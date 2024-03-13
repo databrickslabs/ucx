@@ -11,6 +11,7 @@ from typing import ClassVar
 from databricks.labs.blueprint.limiter import rate_limited
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import (
     BadRequest,
@@ -23,7 +24,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
 logger = logging.getLogger(__name__)
 

@@ -2,13 +2,13 @@ import logging
 from urllib.parse import urlparse
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 logger = logging.getLogger(__name__)

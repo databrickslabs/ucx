@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
@@ -15,7 +16,6 @@ from databricks.sdk.service.catalog import (
 from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 logger = logging.getLogger(__name__)
 

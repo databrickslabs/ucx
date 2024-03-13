@@ -2,10 +2,10 @@ import logging
 from itertools import cycle
 from unittest.mock import create_autospec
 
+from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -15,7 +15,6 @@ from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
 
 from .. import table_mapping_mock
-from ..framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
