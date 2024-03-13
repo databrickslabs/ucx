@@ -650,7 +650,6 @@ def make_cluster_policy(ws, make_random):
             kwargs["definition"] = json.dumps(
                 {
                     "spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"},
-                    "spark_version": {'type': 'fixed', 'value': '14.3.x-scala2.12'},
                 }
             )
         cluster_policy = ws.cluster_policies.create(name, **kwargs)
