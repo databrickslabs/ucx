@@ -1,6 +1,6 @@
 import logging
 from itertools import cycle
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -66,7 +66,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external():
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
-    client = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = [
         TableToMigrate(
@@ -74,7 +74,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external():
             Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_dbfs", "managed_dbfs"),
         ),
     ]
-    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping)
+    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping)
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
