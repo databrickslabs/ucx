@@ -7,6 +7,7 @@ from enum import Enum, auto
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
+from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -55,6 +56,34 @@ class Table:
 
     UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_workspace_id"
 
+    @classmethod
+    def from_dict(cls, data: dict[str, typing.Any]):
+        return cls(
+            catalog=data.get("catalog", "UNKNOWN"),
+            database=data.get("database", "UNKNOWN"),
+            name=data.get("name", "UNKNOWN"),
+            object_type=data.get("object_type", "UNKNOWN"),
+            table_format=data.get("table_format", "UNKNOWN"),
+            location=data.get("location", None),
+            view_text=data.get("view_text", None),
+            upgraded_to=data.get("upgraded_to", None),
+            storage_properties=data.get("storage_properties", None),
+        )
+
+    @classmethod
+    def from_info(cls, table: TableInfo):
+        return cls(
+            catalog=table.catalog_name if table.catalog_name else "UNKNOWN",
+            database=table.schema_name if table.schema_name else "UNKNOWN",
+            name=table.name if table.name else "UNKNOWN",
+            object_type=str(table.table_type) if table.table_type else "UNKNOWN",
+            table_format=str(table.data_source_format) if table.data_source_format else "UNKNOWN",
+            location=table.storage_location,
+            view_text=table.view_definition,
+            upgraded_to=None,
+            storage_properties=table.properties,  # type: ignore[arg-type]
+        )
+
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
@@ -63,7 +92,7 @@ class Table:
 
     @property
     def key(self) -> str:
-        return f"{self.catalog}.{self.database}.{self.name}".lower()
+        return f"`{self.catalog}`.`{self.database}`.`{self.name}`".lower()
 
     @property
     def kind(self) -> str:
@@ -259,7 +288,9 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
+                storage_properties=self._parse_table_props(
+                    describe.get("Storage Properties", "").lower()
+                ),  # type: ignore[arg-type]
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406

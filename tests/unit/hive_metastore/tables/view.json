@@ -1,0 +1,18 @@
+{
+  "table": {
+    "catalog": "hive_metastore",
+    "database": "db1_src",
+    "name": "view_src",
+    "type": "VIEW",
+    "format": "VIEW",
+    "view_text": "SELECT * FROM table"
+  },
+  "rule": {
+    "workspace_name": "workspace",
+    "catalog_name": "ucx_default",
+    "src_schema": "db1_src",
+    "dst_schema": "db1_dst",
+    "src_table": "view_src",
+    "dst_table": "view_dst"
+  }
+}

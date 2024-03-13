@@ -8,8 +8,8 @@ from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSou
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
 
+from .. import workspace_client_mock
 from ..framework.mocks import MockBackend
-from . import workspace_client_mock
 
 
 def test_cluster_assessment():

@@ -1,8 +1,8 @@
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo, PipelinesCrawler
 
+from .. import workspace_client_mock
 from ..framework.mocks import MockBackend
-from . import workspace_client_mock
 
 
 def test_pipeline_assessment_with_config():

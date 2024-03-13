@@ -2,6 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import partial
+from typing import Any
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
@@ -28,6 +29,18 @@ class Rule:
     dst_table: str
 
     @classmethod
+    def from_dict(cls, data: dict[str, Any]):
+        """Deserializes the Rule from a dictionary."""
+        return cls(
+            workspace_name=data["workspace_name"],
+            catalog_name=data["catalog_name"],
+            src_schema=data["src_schema"],
+            dst_schema=data["dst_schema"],
+            src_table=data["src_table"],
+            dst_table=data["dst_table"],
+        )
+
+    @classmethod
     def initial(cls, workspace_name: str, catalog_name: str, table: Table) -> "Rule":
         return cls(
             workspace_name=workspace_name,
@@ -40,17 +53,25 @@ class Rule:
 
     @property
     def as_uc_table_key(self):
-        return f"{self.catalog_name}.{self.dst_schema}.{self.dst_table}"
+        return f"`{self.catalog_name}`.`{self.dst_schema}`.`{self.dst_table}`"
 
     @property
     def as_hms_table_key(self):
-        return f"hive_metastore.{self.src_schema}.{self.src_table}"
+        return f"hive_metastore.`{self.src_schema}`.`{self.src_table}`"
+
+    def sql_alter_to_acl_upgraded(self) -> str:
+        return f"ALTER {self.as_uc_table_key} SET TBLPROPERTIES ('acl_upgraded' = 'true');"
 
 
 @dataclass
 class TableToMigrate:
     src: Table
     rule: Rule
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]):
+        """Deserializes the TableToMigrate from a dictionary."""
+        return cls(Table.from_dict(data["table"]), Rule.from_dict(data["rule"]))
 
 
 class TableMapping:

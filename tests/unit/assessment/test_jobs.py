@@ -2,8 +2,8 @@ import pytest
 
 from databricks.labs.ucx.assessment.jobs import JobInfo, JobsCrawler, SubmitRunsCrawler
 
+from .. import workspace_client_mock
 from ..framework.mocks import MockBackend
-from . import workspace_client_mock
 
 
 def test_job_assessment():
