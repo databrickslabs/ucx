@@ -8,7 +8,7 @@ from pathlib import PurePath
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.compute import Policy
@@ -32,7 +32,7 @@ class AWSResourcePermissions:
         self,
         installation: Installation,
         ws: WorkspaceClient,
-        backend: StatementExecutionBackend,
+        backend: SqlBackend,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
         schema: str,

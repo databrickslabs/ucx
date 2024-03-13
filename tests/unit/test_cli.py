@@ -5,6 +5,7 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
@@ -65,6 +66,7 @@ def ws():
         return io.StringIO(state[path])
 
     workspace_client = create_autospec(WorkspaceClient)
+    workspace_client.get_workspace_id.return_value = 123
     workspace_client.config.host = 'https://localhost'
     workspace_client.current_user.me().user_name = "foo"
     workspace_client.workspace.download = download
@@ -131,42 +133,33 @@ def test_skip_no_schema(ws, caplog):
 
 
 def test_sync_workspace_info():
-    with (
-        patch("databricks.labs.ucx.account.AccountWorkspaces.sync_workspace_info", return_value=None) as swi,
-        patch("databricks.labs.ucx.account.AccountWorkspaces.__init__", return_value=None),
-    ):
-        # TODO: rewrite with mocks, not patches
-        a = create_autospec(AccountClient)
-        sync_workspace_info(a)
-        swi.assert_called_once()
+    a = create_autospec(AccountClient)
+    sync_workspace_info(a)
+    a.workspaces.list.assert_called()
 
 
 def test_create_account_groups():
     a = create_autospec(AccountClient)
-    with (
-        patch("databricks.sdk.WorkspaceClient.__init__", return_value=None),
-        patch("databricks.sdk.WorkspaceClient.get_workspace_id", return_value=None),
-    ):
-        create_account_groups(a)
-        a.groups.list.assert_called_with(attributes="id")
+    w = create_autospec(WorkspaceClient)
+    a.get_workspace_client.return_value = w
+    w.get_workspace_id.return_value = None
+    prompts = MockPrompts({})
+    create_account_groups(a, prompts, new_workspace_client=lambda: w)
+    a.groups.list.assert_called_with(attributes="id")
 
 
 def test_manual_workspace_info(ws):
-    with patch("databricks.labs.ucx.account.WorkspaceInfo.manual_workspace_info", return_value=None) as mwi:
-        manual_workspace_info(ws)
-        mwi.assert_called_once()
+    prompts = MockPrompts({'Workspace name for 123': 'abc', 'Next workspace id': ''})
+    manual_workspace_info(ws, prompts)
 
 
 def test_create_table_mapping(ws):
-    with (
-        patch("databricks.labs.ucx.account.WorkspaceInfo._current_workspace_id", return_value=123),
-        pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'),
-    ):
+    with pytest.raises(ValueError, match='databricks labs ucx sync-workspace-info'):
         create_table_mapping(ws)
 
 
 def test_validate_external_locations(ws):
-    validate_external_locations(ws)
+    validate_external_locations(ws, MockPrompts({}))
 
     ws.statement_execution.execute_statement.assert_called()
 
@@ -190,28 +183,32 @@ def test_no_step_in_repair_run(ws):
 
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=False):
-        assert revert_migrated_tables(ws, schema=None, table=None) is None
+    prompts = MockPrompts({'.*': 'no'})
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+
     # test with no schema and no table, user confirm to retry, but no ucx installation found
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        assert revert_migrated_tables(ws, schema=None, table=None) is None
-        assert 'No migrated tables were found.' in caplog.messages
+    prompts = MockPrompts({'.*': 'yes'})
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+    assert 'No migrated tables were found.' in caplog.messages
 
 
 def test_move_no_catalog(ws, caplog):
-    move(ws, "", "", "", "", "")
+    prompts = MockPrompts({})
+    move(ws, prompts, "", "", "", "", "")
 
     assert 'Please enter from_catalog and to_catalog details' in caplog.messages
 
 
 def test_move_same_schema(ws, caplog):
-    move(ws, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
+    prompts = MockPrompts({})
+    move(ws, prompts, "SrcCat", "SrcS", "*", "SrcCat", "SrcS")
 
     assert 'please select a different schema or catalog to migrate to' in caplog.messages
 
 
 def test_move_no_schema(ws, caplog):
-    move(ws, "SrcCat", "", "*", "TgtCat", "")
+    prompts = MockPrompts({})
+    move(ws, prompts, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
         'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
@@ -220,8 +217,8 @@ def test_move_no_schema(ws, caplog):
 
 
 def test_move(ws):
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        move(ws, "SrcC", "SrcS", "*", "TgtC", "ToS")
+    prompts = MockPrompts({'.*': 'yes'})
+    move(ws, prompts, "SrcC", "SrcS", "*", "TgtC", "ToS")
 
     ws.tables.list.assert_called_once()
 
@@ -248,8 +245,7 @@ def test_alias_no_schema(ws, caplog):
 
 
 def test_alias(ws):
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        alias(ws, "SrcC", "SrcS", "*", "TgtC", "ToS")
+    alias(ws, "SrcC", "SrcS", "*", "TgtC", "ToS")
 
     ws.tables.list.assert_called_once()
 
@@ -257,7 +253,8 @@ def test_alias(ws):
 def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
     ws.config.auth_type = "azure_clis"
     ws.config.is_azure = True
-    principal_prefix_access(ws, "")
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts, "")
 
     assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
 
@@ -266,16 +263,18 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
 
-    principal_prefix_access(ws)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts)
 
     assert "Please enter subscription id to scan storage accounts in." in caplog.messages
 
 
-def test_save_storage_and_principal_azure(ws, caplog, mocker):
+def test_save_storage_and_principal_azure(ws, caplog):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
+    prompts = MockPrompts({})
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
-    principal_prefix_access(ws, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
+    principal_prefix_access(ws, prompts, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
@@ -288,7 +287,8 @@ def test_save_storage_and_principal_aws_no_profile(ws, caplog, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     ws.config.is_azure = False
     ws.config.is_aws = True
-    principal_prefix_access(ws)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts)
     assert any({"AWS Profile is not specified." in message for message in caplog.messages})
 
 
@@ -302,16 +302,18 @@ def test_save_storage_and_principal_aws_no_connection(ws, mocker):
     mocker.patch("subprocess.Popen.__init__", return_value=None)
     mocker.patch("subprocess.Popen.__enter__", return_value=pop)
     mocker.patch("subprocess.Popen.__exit__", return_value=None)
+    prompts = MockPrompts({})
 
     with pytest.raises(ResourceWarning, match="AWS CLI is not configured properly."):
-        principal_prefix_access(ws, aws_profile="profile")
+        principal_prefix_access(ws, prompts, aws_profile="profile")
 
 
 def test_save_storage_and_principal_aws_no_cli(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=None)
     ws.config.is_azure = False
     ws.config.is_aws = True
-    principal_prefix_access(ws, aws_profile="profile")
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts, aws_profile="profile")
     assert any({"Couldn't find AWS" in message for message in caplog.messages})
 
 
@@ -320,7 +322,8 @@ def test_save_storage_and_principal_aws(ws, mocker, caplog):
     ws.config.is_azure = False
     ws.config.is_aws = True
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    principal_prefix_access(ws, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
     aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
@@ -328,16 +331,17 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     ws.config.is_azure = False
     ws.config.is_aws = False
     ws.config.is_gcp = True
-    principal_prefix_access(ws)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts)
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
 
 
 def test_migrate_credentials_azure(ws):
     ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        migrate_credentials(ws)
-        ws.storage_credentials.list.assert_called()
+    prompts = MockPrompts({'.*': 'yes'})
+    migrate_credentials(ws, prompts)
+    ws.storage_credentials.list.assert_called()
 
 
 def test_migrate_credentials_aws(ws, mocker):
@@ -347,17 +351,18 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
-    with patch("databricks.labs.blueprint.tui.Prompts.confirm", return_value=True):
-        migrate_credentials(ws, aws_profile="profile", aws_resources=aws_resources)
-        ws.storage_credentials.list.assert_called()
-        aws_resources.update_uc_trust_role.assert_called_once()
+    prompts = MockPrompts({'.*': 'yes'})
+    migrate_credentials(ws, prompts, aws_profile="profile", aws_resources=aws_resources)
+    ws.storage_credentials.list.assert_called()
+    aws_resources.update_uc_trust_role.assert_called_once()
 
 
 def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     ws.config.is_azure = False
     ws.config.is_aws = True
-    migrate_credentials(ws)
+    prompts = MockPrompts({})
+    migrate_credentials(ws, prompts)
     assert (
         "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] or use the "
         "'--aws-profile=[profile-name]' parameter." in caplog.messages
@@ -366,30 +371,33 @@ def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
 
 def test_create_master_principal_not_azure(ws):
     ws.config.is_azure = False
-    create_uber_principal(ws, subscription_id="")
+    prompts = MockPrompts({})
+    create_uber_principal(ws, prompts, subscription_id="")
     ws.workspace.get_status.assert_not_called()
 
 
 def test_create_master_principal_no_azure_cli(ws):
     ws.config.auth_type = "azure_clis"
     ws.config.is_azure = True
-    create_uber_principal(ws, subscription_id="")
+    prompts = MockPrompts({})
+    create_uber_principal(ws, prompts, subscription_id="")
     ws.workspace.get_status.assert_not_called()
 
 
 def test_create_master_principal_no_subscription(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
-    create_uber_principal(ws, subscription_id="")
+    prompts = MockPrompts({})
+    create_uber_principal(ws, prompts, subscription_id="")
     ws.workspace.get_status.assert_not_called()
 
 
-def test_create_master_principal(ws):
+def test_create_uber_principal(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
-    with patch("databricks.labs.blueprint.tui.Prompts.question", return_value=True):
-        with pytest.raises(ValueError):
-            create_uber_principal(ws, subscription_id="12")
+    prompts = MockPrompts({})
+    with pytest.raises(ValueError):
+        create_uber_principal(ws, prompts, subscription_id="12")
 
 
 def test_migrate_locations_azure(ws):
@@ -428,6 +436,6 @@ def test_migrate_locations_gcp(ws, caplog):
 
 
 def test_create_catalogs_schemas(ws):
-    with patch("databricks.labs.blueprint.tui.Prompts.question", return_value="s3://test"):
-        create_catalogs_schemas(ws)
-        ws.catalogs.list.assert_called_once()
+    prompts = MockPrompts({'.*': 's3://test'})
+    create_catalogs_schemas(ws, prompts)
+    ws.catalogs.list.assert_called_once()

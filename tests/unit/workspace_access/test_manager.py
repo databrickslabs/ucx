@@ -1,5 +1,4 @@
 import json
-from unittest.mock import MagicMock
 
 import pytest
 from databricks.labs.lsql import Row
@@ -167,7 +166,7 @@ def test_unregistered_support():
         }
     )
     permission_manager = PermissionManager(sql_backend, "test", [])
-    permission_manager.apply_group_permissions(migration_state=MagicMock())
+    permission_manager.apply_group_permissions(migration_state=MigrationState([]))
 
 
 def test_factory(mocker):

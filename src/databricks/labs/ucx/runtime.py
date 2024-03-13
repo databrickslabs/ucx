@@ -20,10 +20,10 @@ from databricks.labs.ucx.hive_metastore import (
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.verification import VerifyHasMetastore
 
 logger = logging.getLogger(__name__)
 
