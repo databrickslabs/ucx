@@ -8,9 +8,8 @@ from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClusterInfo, ClustersCrawler
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 
 from . import workspace_client_mock
 

@@ -7,7 +7,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
-# pylint: disable=protected-access,prohibited-patch
+# pylint: disable=protected-access
 
 
 @dataclass

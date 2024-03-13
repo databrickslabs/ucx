@@ -9,7 +9,6 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
-from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -160,7 +159,7 @@ def test_create_table_mapping(ws):
 
 
 def test_validate_external_locations(ws):
-    validate_external_locations(ws)
+    validate_external_locations(ws, MockPrompts({}))
 
     ws.statement_execution.execute_statement.assert_called()
 
@@ -254,7 +253,8 @@ def test_alias(ws):
 def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
     ws.config.auth_type = "azure_clis"
     ws.config.is_azure = True
-    principal_prefix_access(ws, "")
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts, "")
 
     assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
 
@@ -263,7 +263,8 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
 
-    principal_prefix_access(ws)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts)
 
     assert "Please enter subscription id to scan storage accounts in." in caplog.messages
 
@@ -271,8 +272,9 @@ def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
 def test_save_storage_and_principal_azure(ws, caplog):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
+    prompts = MockPrompts({})
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
-    principal_prefix_access(ws, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
+    principal_prefix_access(ws, prompts, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
@@ -285,7 +287,8 @@ def test_save_storage_and_principal_aws_no_profile(ws, caplog, mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
     ws.config.is_azure = False
     ws.config.is_aws = True
-    principal_prefix_access(ws)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts)
     assert any({"AWS Profile is not specified." in message for message in caplog.messages})
 
 
@@ -299,16 +302,18 @@ def test_save_storage_and_principal_aws_no_connection(ws, mocker):
     mocker.patch("subprocess.Popen.__init__", return_value=None)
     mocker.patch("subprocess.Popen.__enter__", return_value=pop)
     mocker.patch("subprocess.Popen.__exit__", return_value=None)
+    prompts = MockPrompts({})
 
     with pytest.raises(ResourceWarning, match="AWS CLI is not configured properly."):
-        principal_prefix_access(ws, aws_profile="profile")
+        principal_prefix_access(ws, prompts, aws_profile="profile")
 
 
 def test_save_storage_and_principal_aws_no_cli(ws, mocker, caplog):
     mocker.patch("shutil.which", return_value=None)
     ws.config.is_azure = False
     ws.config.is_aws = True
-    principal_prefix_access(ws, aws_profile="profile")
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts, aws_profile="profile")
     assert any({"Couldn't find AWS" in message for message in caplog.messages})
 
 
@@ -317,7 +322,8 @@ def test_save_storage_and_principal_aws(ws, mocker, caplog):
     ws.config.is_azure = False
     ws.config.is_aws = True
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    principal_prefix_access(ws, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
     aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
@@ -325,7 +331,8 @@ def test_save_storage_and_principal_gcp(ws, caplog):
     ws.config.is_azure = False
     ws.config.is_aws = False
     ws.config.is_gcp = True
-    principal_prefix_access(ws)
+    prompts = MockPrompts({})
+    principal_prefix_access(ws, prompts)
     assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
 
 
@@ -342,15 +349,12 @@ def test_migrate_credentials_aws(ws, mocker):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.config.is_gcp = False
-    # TODO: (Vuong) refactor this asap
-    # pylint: disable-next=prohibited-patch
-    uc_trust_policy = mocker.patch(
-        "databricks.labs.ucx.assessment.aws.AWSResourcePermissions.update_uc_role_trust_policy"
-    )
+    aws_resources = create_autospec(AWSResources)
+    aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
-    migrate_credentials(ws, prompts, aws_profile="profile")
+    migrate_credentials(ws, prompts, aws_profile="profile", aws_resources=aws_resources)
     ws.storage_credentials.list.assert_called()
-    uc_trust_policy.assert_called_once()
+    aws_resources.update_uc_trust_role.assert_called_once()
 
 
 def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
@@ -388,7 +392,7 @@ def test_create_master_principal_no_subscription(ws):
     ws.workspace.get_status.assert_not_called()
 
 
-def test_create_master_principal(ws):
+def test_create_uber_principal(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
     prompts = MockPrompts({})

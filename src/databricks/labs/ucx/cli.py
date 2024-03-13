@@ -137,9 +137,8 @@ def create_table_mapping(w: WorkspaceClient):
 
 
 @ucx.command
-def validate_external_locations(w: WorkspaceClient):
+def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
@@ -255,6 +254,7 @@ def alias(
 
 def _execute_for_cloud(
     w: WorkspaceClient,
+    prompts: Prompts,
     func_azure: Callable,
     func_aws: Callable,
     azure_resource_permissions: AzureResourcePermissions | None = None,
@@ -269,7 +269,9 @@ def _execute_for_cloud(
         if not subscription_id:
             logger.error("Please enter subscription id to scan storage accounts in.")
             return None
-        return func_azure(w, subscription_id, azure_resource_permissions)
+        return func_azure(
+            w, prompts, subscription_id=subscription_id, azure_resource_permissions=azure_resource_permissions
+        )
     if w.config.is_aws:
         if not shutil.which("aws"):
             logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
@@ -282,7 +284,7 @@ def _execute_for_cloud(
                 "or use the '--aws-profile=[profile-name]' parameter."
             )
             return None
-        return func_aws(w, aws_profile, aws_permissions)
+        return func_aws(w, prompts, aws_profile=aws_profile, aws_permissions=aws_permissions)
     logger.error("This cmd is only supported for azure and aws workspaces")
     return None
 
@@ -290,6 +292,7 @@ def _execute_for_cloud(
 @ucx.command
 def create_uber_principal(
     w: WorkspaceClient,
+    prompts: Prompts,
     subscription_id: str | None = None,
     azure_resource_permissions: AzureResourcePermissions | None = None,
     aws_profile: str | None = None,
@@ -301,6 +304,7 @@ def create_uber_principal(
     Pass subscription_id for azure and aws_profile for aws."""
     return _execute_for_cloud(
         w,
+        prompts,
         _azure_setup_uber_principal,
         _aws_setup_uber_principal,
         azure_resource_permissions,
@@ -311,9 +315,11 @@ def create_uber_principal(
 
 
 def _azure_setup_uber_principal(
-    w: WorkspaceClient, subscription_id: str, azure_resource_permissions: AzureResourcePermissions | None = None
+    w: WorkspaceClient,
+    prompts: Prompts,
+    subscription_id: str,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
 ):
-    prompts = Prompts()
     include_subscriptions = [subscription_id] if subscription_id else None
     if azure_resource_permissions is None:
         azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
@@ -321,9 +327,11 @@ def _azure_setup_uber_principal(
 
 
 def _aws_setup_uber_principal(
-    w: WorkspaceClient, aws_profile: str, aws_resource_permissions: AWSResourcePermissions | None = None
+    w: WorkspaceClient,
+    prompts: Prompts,
+    aws_profile: str,
+    aws_resource_permissions: AWSResourcePermissions | None = None,
 ):
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
@@ -338,6 +346,7 @@ def _aws_setup_uber_principal(
 @ucx.command
 def principal_prefix_access(
     w: WorkspaceClient,
+    prompts: Prompts,
     subscription_id: str | None = None,
     azure_resource_permissions: AzureResourcePermissions | None = None,
     aws_profile: str | None = None,
@@ -350,6 +359,7 @@ def principal_prefix_access(
     Pass subscription_id for azure and aws_profile for aws."""
     return _execute_for_cloud(
         w,
+        prompts,
         _azure_principal_prefix_access,
         _aws_principal_prefix_access,
         azure_resource_permissions,
@@ -360,7 +370,11 @@ def principal_prefix_access(
 
 
 def _azure_principal_prefix_access(
-    w: WorkspaceClient, subscription_id: str, azure_resource_permissions: AzureResourcePermissions | None = None
+    w: WorkspaceClient,
+    _: Prompts,
+    *,
+    subscription_id: str,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
 ):
     if w.config.auth_type != "azure-cli":
         logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
@@ -376,7 +390,11 @@ def _azure_principal_prefix_access(
 
 
 def _aws_principal_prefix_access(
-    w: WorkspaceClient, aws_profile: str, aws_resource_permissions: AWSResourcePermissions | None = None
+    w: WorkspaceClient,
+    _: Prompts,
+    *,
+    aws_profile: str,
+    aws_permissions: AWSResourcePermissions | None = None,
 ):
     if not shutil.which("aws"):
         logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
@@ -386,19 +404,19 @@ def _aws_principal_prefix_access(
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     aws = AWSResources(aws_profile)
-    if aws_resource_permissions is None:
-        aws_resource_permissions = AWSResourcePermissions.for_cli(
-            w, installation, sql_backend, aws, config.inventory_database
-        )
-    instance_role_path = aws_resource_permissions.save_instance_profile_permissions()
+    if aws_permissions is None:
+        aws_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
+    instance_role_path = aws_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
-    uc_role_path = aws_resource_permissions.save_uc_compatible_roles()
+    uc_role_path = aws_permissions.save_uc_compatible_roles()
     logger.info(f"UC roles and bucket info saved {uc_role_path}")
 
 
 @ucx.command
-def migrate_credentials(w: WorkspaceClient, prompts: Prompts, aws_profile: str | None = None, aws_resources: AWSResources | None = None):
+def migrate_credentials(
+    w: WorkspaceClient, prompts: Prompts, aws_profile: str | None = None, aws_resources: AWSResources | None = None
+):
     """For Azure, this command migrates Azure Service Principals, which have Storage Blob Data Contributor,
     Storage Blob Data Reader, Storage Blob Data Owner roles on ADLS Gen2 locations that are being used in
     Databricks, to UC storage credentials.

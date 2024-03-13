@@ -2,11 +2,7 @@ import logging
 from unittest.mock import create_autospec
 
 from databricks.labs.lsql import Row
-from databricks.labs.lsql.backends import (
-    MockBackend,
-    SqlBackend,
-    StatementExecutionBackend,
-)
+from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
