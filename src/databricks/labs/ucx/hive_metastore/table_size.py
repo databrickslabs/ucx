@@ -3,7 +3,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.lsql.backends import SqlBackend
+
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 
 logger = logging.getLogger(__name__)

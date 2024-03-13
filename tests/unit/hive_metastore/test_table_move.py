@@ -1,6 +1,12 @@
 import logging
 from unittest.mock import MagicMock, create_autospec
 
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import (
+    MockBackend,
+    SqlBackend,
+    StatementExecutionBackend,
+)
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
@@ -14,11 +20,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove
-from databricks.labs.ucx.mixins.sql import Row
-
-from ..framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,7 @@ def test_move_tables_invalid_to_schema(caplog):
 def test_move_tables_not_found_table_error(mocker, caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
-    backend = mocker.patch("databricks.labs.ucx.framework.crawlers.StatementExecutionBackend.__init__")
+    backend = create_autospec(SqlBackend)
     backend.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
 
     client.tables.list.return_value = [

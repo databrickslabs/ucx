@@ -4,19 +4,18 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
     MigratedGroup,
     MigrationState,
 )
-from tests.unit.framework.mocks import MockBackend
 
 
 def test_snapshot_with_group_created_in_account_console_should_be_considered():

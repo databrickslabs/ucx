@@ -14,6 +14,7 @@ from databricks.labs.blueprint.wheels import (
     WheelsV2,
     find_project_root,
 )
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     InvalidParameterValue,
@@ -52,8 +53,6 @@ import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
-
-from ..unit.framework.mocks import MockBackend
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 

@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from itertools import groupby
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import sql
 
@@ -12,7 +13,6 @@ from databricks.labs.ucx.framework.crawlers import (
     CrawlerBase,
     Dataclass,
     DataclassInstance,
-    SqlBackend,
 )
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler

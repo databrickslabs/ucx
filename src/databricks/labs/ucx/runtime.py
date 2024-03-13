@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -10,7 +11,6 @@ from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import (
     ExternalLocations,

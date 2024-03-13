@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import Aborted, InternalError, NotFound, PermissionDenied
@@ -33,7 +34,6 @@ from databricks.labs.ucx.workspace_access.generic import (
     tokens_and_passwords,
 )
 from databricks.labs.ucx.workspace_access.groups import MigrationState
-from tests.unit.framework.mocks import MockBackend
 
 # pylint: disable=protected-access
 

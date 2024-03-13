@@ -5,6 +5,7 @@ from functools import partial
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
@@ -14,7 +15,6 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
