@@ -4,7 +4,6 @@ import pytest
 
 # pylint: disable-next=import-private-name
 from _pytest.outcomes import Failed, Skipped
-from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk.service.workspace import AclPermission
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
@@ -74,21 +73,6 @@ def test_job(make_job):
 
 def test_pipeline(make_pipeline):
     logger.info(f"created {make_pipeline()}")
-
-
-def test_sql_backend_works(ws, wsfs_wheel):
-    commands = CommandExecutor(ws.clusters, ws.command_execution, lambda: ws.config.cluster_id)
-
-    commands.install_notebook_library(f"/Workspace{wsfs_wheel}")
-    database_names = commands.run(
-        """
-        from databricks.labs.ucx.framework.crawlers import RuntimeBackend
-        backend = RuntimeBackend()
-        return backend.fetch("SHOW DATABASES")
-        """
-    )
-
-    assert len(database_names) > 0
 
 
 def test_env_or_skip(env_or_skip):

@@ -150,7 +150,10 @@ class TableMapping:
         describe = {}
         for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
             describe[value["database_description_item"]] = value["database_description_value"]
-        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(describe.get("Properties", "").lower()):
+        properties = describe.get("Properties", "")
+        if not properties:
+            return database
+        if self.UCX_SKIP_PROPERTY in TablesCrawler.parse_database_props(properties.lower()):
             logger.info(f"Database {database} is marked to be skipped")
             return None
         return database
