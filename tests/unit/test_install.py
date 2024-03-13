@@ -1,8 +1,10 @@
+import io
 import json
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
+import yaml
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
@@ -85,6 +87,26 @@ def mock_clusters():
 
 @pytest.fixture
 def ws():
+    state = {
+        "/Applications/ucx/config.yml": yaml.dump(
+            {
+                'version': 1,
+                'inventory_database': 'ucx_exists',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            }
+        ),
+    }
+
+    def download(path: str) -> io.StringIO | io.BytesIO:
+        if path not in state:
+            raise NotFound(path)
+        if ".csv" in path:
+            return io.BytesIO(state[path].encode('utf-8'))
+        return io.StringIO(state[path])
+
     workspace_client = create_autospec(WorkspaceClient)
 
     workspace_client.current_user.me = lambda: iam.User(
@@ -108,6 +130,7 @@ def ws():
     workspace_client.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
     workspace_client.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
     workspace_client.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    workspace_client.workspace.download = download
 
     return workspace_client
 
@@ -765,7 +788,6 @@ def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
             state=RunState(result_state=RunResultState.FAILED),
         )
     ]
-    mocker.patch("webbrowser.open")
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
 
@@ -1192,7 +1214,6 @@ def test_fresh_install(ws, mock_installation):
 
 
 def test_get_existing_installation_global(ws, mock_installation, mocker):
-    mocker.patch("webbrowser.open")
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1223,9 +1244,8 @@ def test_get_existing_installation_global(ws, mock_installation, mocker):
 
     # test for force user install variable without prompts
     second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
-    with pytest.raises(RuntimeWarning) as err:
+    with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
         second_install.configure()
-    assert err.value.args[0] == 'UCX is already installed, but no confirmation'
 
     # test for force user install variable with prompts
     prompts = MockPrompts(
@@ -1323,20 +1343,20 @@ def test_databricks_runtime_version_set(ws, mock_installation):
 
 
 def test_check_inventory_database_exists(ws, mock_installation):
-    ws.config.inventory_database = "ucx_exists"
+    ws.current_user.me().user_name = "foo"
+
     prompts = MockPrompts(
         {
             r".*Inventory Database stored in hive_metastore": "ucx_exists",
             r".*": "",
         }
     )
-    installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
-    Installation.existing = create_autospec(Installation.existing)
-    Installation.load = create_autospec(Installation.load)
-    Installation.load.side_effect = [NotFound, ws.config]
-    Installation.existing.return_value = [installation]
 
-    with pytest.raises(AlreadyExists) as err:
+    installation_type_mock = create_autospec(Installation)
+    installation_type_mock.load.side_effect = NotFound
+
+    installation = Installation(ws, 'ucx')
+    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+
+    with pytest.raises(AlreadyExists, match="Inventory database 'ucx_exists' already exists in another installation"):
         install.configure()
-    assert err.value.args[0] == "Inventory database 'ucx_exists' already exists in another installation"

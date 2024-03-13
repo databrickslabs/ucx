@@ -13,7 +13,7 @@ from typing import Any
 
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
@@ -336,9 +336,16 @@ class WorkspaceInstaller:
     def _check_inventory_database_exists(self, inventory_database: str):
         logger.info("Fetching installations...")
         for installation in Installation.existing(self._ws, self._product_info.product_name()):
-            config = installation.load(WorkspaceConfig)
-            if config.inventory_database == inventory_database:
-                raise AlreadyExists(f"Inventory database '{inventory_database}' already exists in another installation")
+            try:
+                config = installation.load(WorkspaceConfig)
+                if config.inventory_database == inventory_database:
+                    raise AlreadyExists(
+                        f"Inventory database '{inventory_database}' already exists in another installation"
+                    )
+            except NotFound:
+                continue
+            except SerdeError:
+                continue
 
 
 class WorkspaceInstallation:
