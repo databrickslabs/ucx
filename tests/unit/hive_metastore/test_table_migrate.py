@@ -80,9 +80,8 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external():
             Rule("workspace", "ucx_default", "db1_src", "db1_dst", "managed_dbfs", "managed_dbfs"),
         ),
     ]
-    migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, client, backend, table_mapping, migration_status_refresher)
-    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping, migration_status_refresher)
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
