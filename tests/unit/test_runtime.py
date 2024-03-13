@@ -63,7 +63,7 @@ def test_azure_crawler(mocker):
         )
         ws = create_autospec(WorkspaceClient)
         sql_backend = MockBackend()
-        assess_azure_service_principals(cfg, ws, sql_backend)
+        assess_azure_service_principals(cfg, ws, sql_backend, MockInstallation())
 
 
 def test_tasks():
@@ -92,7 +92,7 @@ def test_runtime_grants(mocker):
         cfg = azure_mock_config()
         ws = create_autospec(WorkspaceClient)
         sql_backend = MockBackend()
-        crawl_grants(cfg, ws, sql_backend)
+        crawl_grants(cfg, ws, sql_backend, MockInstallation())
 
         assert "SHOW DATABASES FROM hive_metastore" in sql_backend.queries
         assert "SHOW DATABASES" in sql_backend.queries

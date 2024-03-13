@@ -47,7 +47,7 @@ def setup_tacl(*_):
 
 
 @task("assessment", depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
-def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend):
+def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Scans the previously created Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS`
     statement for every object to retrieve the permissions it has assigned to it. The permissions include information
     such as the _principal_, _action type_, and the _table_ it applies to. This is persisted in the Delta table
@@ -63,7 +63,9 @@ def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBacke
 
 
 @task("assessment", depends_on=[crawl_tables])
-def estimate_table_size_for_migration(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend):
+def estimate_table_size_for_migration(
+    cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Scans the previously created Delta table named `$inventory_database.tables` and locate tables that cannot be
     "synced". These tables will have to be cloned in the migration process.
     Assesses the size of these tables and create `$inventory_database.table_size` table to list these sizes.
@@ -73,7 +75,7 @@ def estimate_table_size_for_migration(cfg: WorkspaceConfig, _: WorkspaceClient, 
 
 
 @task("assessment")
-def crawl_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def crawl_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Defines the scope of the _mount points_ intended for migration into Unity Catalog. As these objects are not
     compatible with the Unity Catalog paradigm, a key component of the migration process involves transferring them
     to Unity Catalog External Locations.
@@ -85,7 +87,9 @@ def crawl_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
 
 
 @task("assessment", depends_on=[crawl_mounts, crawl_tables])
-def guess_external_locations(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def guess_external_locations(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Determines the shared path prefixes of all the tables. Specifically, the focus is on identifying locations that
     utilize mount points. The goal is to identify the _external locations_ necessary for a successful migration and
     store this information in the `$inventory.external_locations` table.
@@ -99,7 +103,7 @@ def guess_external_locations(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_back
 
 
 @task("assessment")
-def assess_jobs(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def assess_jobs(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is
     stored in the `$inventory.jobs` table.
 
@@ -114,7 +118,7 @@ def assess_jobs(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBacke
 
 
 @task("assessment")
-def assess_clusters(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def assess_clusters(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Scan through all the clusters and identifies those that are not compatible with UC. The list of all the clusters
     is stored in the`$inventory.clusters` table.
 
@@ -129,7 +133,7 @@ def assess_clusters(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlB
 
 
 @task("assessment")
-def assess_pipelines(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def assess_pipelines(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
     embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
     configurations.
@@ -144,7 +148,9 @@ def assess_pipelines(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sql
 
 
 @task("assessment")
-def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def assess_incompatible_submit_runs(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """This module scans through all the Submit Runs and identifies those runs which may become incompatible after
     the workspace attachment.
 
@@ -159,7 +165,9 @@ def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, s
 
 
 @task("assessment", cloud="azure")
-def assess_azure_service_principals(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def assess_azure_service_principals(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
     given access to the Azure storage accounts via spark configurations referred in those entities.
@@ -175,7 +183,9 @@ def assess_azure_service_principals(cfg: WorkspaceConfig, ws: WorkspaceClient, s
 
 
 @task("assessment")
-def assess_global_init_scripts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def assess_global_init_scripts(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
     who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
 
@@ -186,7 +196,7 @@ def assess_global_init_scripts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_ba
 
 
 @task("assessment")
-def workspace_listing(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def workspace_listing(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Scans the workspace for workspace objects. It recursively list all sub directories
     and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
 
@@ -197,7 +207,7 @@ def workspace_listing(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sq
 
 
 @task("assessment", depends_on=[crawl_grants, workspace_listing])
-def crawl_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def crawl_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.
 
@@ -215,7 +225,7 @@ def crawl_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sq
 
 
 @task("assessment")
-def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation):
     """Scans all groups for the local group migration scope"""
     group_manager = GroupManager(
         sql_backend,
@@ -270,7 +280,9 @@ def estimates_report(*_):
 
 
 @task("migrate-groups", depends_on=[crawl_groups])
-def rename_workspace_local_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def rename_workspace_local_groups(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Renames workspace local groups by adding `ucx-renamed-` prefix."""
     verify_has_metastore = VerifyHasMetastore(ws)
     if verify_has_metastore.verify_metastore():
@@ -291,7 +303,9 @@ def rename_workspace_local_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql
 
 
 @task("migrate-groups", depends_on=[rename_workspace_local_groups])
-def reflect_account_groups_on_workspace(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def reflect_account_groups_on_workspace(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
     step to be successful. This process does not create the account level group(s)."""
     group_manager = GroupManager(
@@ -309,7 +323,9 @@ def reflect_account_groups_on_workspace(cfg: WorkspaceConfig, ws: WorkspaceClien
 
 
 @task("migrate-groups", depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
-def apply_permissions_to_account_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def apply_permissions_to_account_groups(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Fourth phase of the workspace-local group migration process. It does the following:
       - Assigns the full set of permissions of the original group to the account-level one
 
@@ -347,7 +363,9 @@ def apply_permissions_to_account_groups(cfg: WorkspaceConfig, ws: WorkspaceClien
 
 
 @task("validate-groups-permissions", job_cluster="tacl")
-def validate_groups_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def validate_groups_permissions(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Validate that all the crawled permissions are applied correctly to the destination groups."""
     logger.info("Running validation of permissions applied to destination groups.")
     permission_manager = PermissionManager.factory(
@@ -361,7 +379,9 @@ def validate_groups_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_b
 
 
 @task("remove-workspace-local-backup-groups", depends_on=[apply_permissions_to_account_groups])
-def delete_backup_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def delete_backup_groups(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """Last step of the group migration process. Removes all workspace-level backup groups, along with their
     permissions. Execute this workflow only after you've confirmed that workspace-local migration worked
     successfully for all the groups involved."""
@@ -380,7 +400,9 @@ def delete_backup_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend:
 
 
 @task("099-destroy-schema")
-def destroy_schema(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend):
+def destroy_schema(
+    cfg: WorkspaceConfig, _workspace_client: WorkspaceClient, sql_backend: SqlBackend, _installation: Installation
+):
     """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
     the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
     sql_backend.execute(f"DROP DATABASE {cfg.inventory_database} CASCADE")

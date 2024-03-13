@@ -113,7 +113,7 @@ def mock_cfg_response():
     return mock_cfg, mock_api_response
 
 
-def test_trigger_task_of_migrate_tables(mocker, capsys):
+def test_trigger_task(mocker, capsys):
     # define a mock task that is under "migrate-tables" workflow, which needs 4 parameters including installation
     @task("migrate-tables", job_cluster="migration_sync")
     def mock_migrate_external_tables_sync(cfg, workspace_client, sql_backend, installation):
@@ -130,22 +130,3 @@ def test_trigger_task_of_migrate_tables(mocker, capsys):
         sys.modules["pyspark.sql.session"] = mocker.Mock()
         trigger("--config=config.yml", "--task=mock_migrate_external_tables_sync")
         assert "This mock task of migrate-tables" in capsys.readouterr().out
-
-
-def test_trigger_task_of_assessment(mocker, capsys):
-    # define a mock task that is under "assessment" workflow, which needs 3 parameters
-    @task("assessment", job_cluster="main")
-    def mock_crawl_tables(cfg, workspace_client, sql_backend):
-        """This mock task of assessment"""
-        return f"Hello, World! {cfg} {workspace_client} {sql_backend}"
-
-    mock_cfg, mock_api_response = mock_cfg_response()
-
-    with (
-        patch('pathlib.Path.open', return_value=mock_cfg),
-        patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}),
-        patch("requests.Session.send", return_value=mock_api_response),
-    ):
-        sys.modules["pyspark.sql.session"] = mocker.Mock()
-        trigger("--config=config.yml", "--task=mock_crawl_tables")
-        assert "This mock task of assessment" in capsys.readouterr().out

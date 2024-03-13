@@ -254,7 +254,4 @@ def trigger(*argv):
     ) as task_logger:
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
-        if current_task.workflow == "migrate-tables":
-            current_task.fn(cfg, workspace_client, sql_backend, installation)
-        else:
-            current_task.fn(cfg, workspace_client, sql_backend)
+        current_task.fn(cfg, workspace_client, sql_backend, installation)
