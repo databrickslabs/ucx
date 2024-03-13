@@ -28,7 +28,7 @@ class Task:
     workflow: str
     name: str
     doc: str
-    fn: Callable[[WorkspaceConfig, WorkspaceClient, SqlBackend], None]
+    fn: Callable[[WorkspaceConfig, WorkspaceClient, SqlBackend, Installation], None]
     depends_on: list[str] | None = None
     job_cluster: str = "main"
     notebook: str | None = None
@@ -238,6 +238,7 @@ def trigger(*argv):
     cfg = Installation.load_local(WorkspaceConfig, config_path)
     sql_backend = RuntimeBackend(debug_truncate_bytes=cfg.connect.debug_truncate_bytes)
     workspace_client = WorkspaceClient(config=cfg.connect, product='ucx', product_version=__version__)
+    installation = Installation.current(workspace_client, "ucx")
 
     with TaskLogger(
         config_path.parent,
@@ -249,4 +250,4 @@ def trigger(*argv):
     ) as task_logger:
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
-        current_task.fn(cfg, workspace_client, sql_backend)
+        current_task.fn(cfg, workspace_client, sql_backend, installation)
