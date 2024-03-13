@@ -3,7 +3,6 @@ import logging
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import PermissionDenied
 
-
 logger = logging.getLogger(__name__)
 
 
