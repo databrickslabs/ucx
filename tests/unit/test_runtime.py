@@ -2,18 +2,22 @@ import os.path
 import sys
 from unittest.mock import create_autospec, patch
 
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
-from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-private-name
     _TASKS,
     Task,
 )
-from databricks.labs.ucx.runtime import assess_azure_service_principals, crawl_grants, \
-    migrate_external_tables_sync, migrate_dbfs_root_delta_tables
+from databricks.labs.ucx.runtime import (
+    assess_azure_service_principals,
+    crawl_grants,
+    migrate_dbfs_root_delta_tables,
+    migrate_external_tables_sync,
+)
 
 
 def azure_mock_config() -> WorkspaceConfig:

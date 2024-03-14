@@ -204,7 +204,11 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two', "table_migration":"three"}, policy_id='123'),
+        WorkspaceConfig(
+            inventory_database='ucx',
+            override_clusters={"main": 'one', "tacl": 'two', "table_migration": "three"},
+            policy_id='123',
+        ),
         mock_installation,
         sql_backend,
         wheels,
@@ -1285,12 +1289,11 @@ def test_install_with_external_hms_conf(ws, mock_installation):
 
     policy_definition = {
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
-        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
-        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
-        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "driver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "2.3"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar"},
     }
     ws.cluster_policies.list.return_value = [
         Policy(
@@ -1313,20 +1316,21 @@ def test_install_with_external_hms_conf(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
-            'spark_conf': {'spark.hadoop.javax.jdo.option.ConnectionDriverName': 'SQLServerDriver',
-                           'spark.hadoop.javax.jdo.option.ConnectionPassword': 'pwd',
-                           'spark.hadoop.javax.jdo.option.ConnectionURL': 'url',
-                           'spark.hadoop.javax.jdo.option.ConnectionUserName': 'user1',
-                           'spark.sql.hive.metastore.jars': 'jar1',
-                           'spark.sql.hive.metastore.version': '0.13',
-                           'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'spark_conf': {
+                'spark.hadoop.javax.jdo.option.ConnectionDriverName': 'driver',
+                'spark.hadoop.javax.jdo.option.ConnectionPassword': 'pwd',
+                'spark.hadoop.javax.jdo.option.ConnectionURL': 'url',
+                'spark.hadoop.javax.jdo.option.ConnectionUserName': 'user',
+                'spark.sql.hive.metastore.jars': 'jar',
+                'spark.sql.hive.metastore.version': '2.3',
+                'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000',
+            },
             'max_workers': 20,
             'min_workers': 2,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
-            'instance_profile': 'role_arn_1',
         },
     )
 
