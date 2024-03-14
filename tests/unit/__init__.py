@@ -57,6 +57,7 @@ _FOLDERS = {
     BaseRun: 'assessment/jobruns',
     ClusterDetails: 'assessment/clusters',
     PipelineStateInfo: 'assessment/pipelines',
+    Policy: 'assessment/policies',
     TableToMigrate: 'hive_metastore/tables',
 }
 
@@ -95,11 +96,13 @@ def workspace_client_mock(
     pipeline_ids: list[str] | None = None,
     job_ids: list[str] | None = None,
     jobruns_ids: list[str] | None = None,
+    policy_ids: list[str] | None = None,
     warehouse_config="single-config.json",
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
+    ws.cluster_policies.list.return_value = _id_list(Policy, policy_ids)
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
