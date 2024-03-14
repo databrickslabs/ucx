@@ -47,6 +47,13 @@ class CrawlerBase(Generic[Result]):
         """
         return f"{self._catalog}.{self._schema}.{self._table}"
 
+    def reset(self):
+        """
+        Delete the content of the inventory table.
+        The next call to `snapshot` will re-populate the table.
+        """
+        self._exec(f"DELETE FROM {self.full_name}")
+
     @staticmethod
     def _valid(name: str) -> str:
         """
