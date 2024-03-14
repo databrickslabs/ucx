@@ -7,6 +7,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
+from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,14 @@ class ClusterPolicyInstaller:
             if len(cluster_policies) >= 1:
                 cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
                 instance_profile, spark_conf_dict = self._extract_external_hive_metastore_conf(cluster_policy)
+        else:
+            warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
+            if warehouse_config and self._prompts.confirm(
+                "We have identified the workspace warehouse is set up for an external metastore"
+                "Would you like to set UCX to connect to the external metastore?"
+            ):
+                logger.info("Setting up an external metastore")
+                instance_profile, spark_conf_dict = self._extract_external_hive_metastore_sql_conf(warehouse_config)
         policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
         policies = self._ws.cluster_policies.list()
         for policy in policies:
@@ -63,12 +72,12 @@ class ClusterPolicyInstaller:
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
+            if instance_profile:
+                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
             policy_definition["aws_attributes.availability"] = self._policy_config(
                 compute.AwsAvailability.ON_DEMAND.value
             )
-            if instance_profile:
-                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
+        elif self._ws.config.is_azure:
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
             )
@@ -107,6 +116,41 @@ class ClusterPolicyInstaller:
                     yield policy
                     break
 
+    @staticmethod
+    def _extract_external_hive_metastore_sql_conf(sql_config: GetWorkspaceWarehouseConfigResponse):
+        spark_conf_dict: dict[str, str] = {}
+        instance_profile = None
+        if sql_config.instance_profile_arn is not None:
+            instance_profile = sql_config.instance_profile_arn
+            logger.info(f"Instance Profile is Set to {instance_profile}")
+        if sql_config.data_access_config is None:
+            return instance_profile, spark_conf_dict
+        for conf in sql_config.data_access_config:
+            if conf.key is None:
+                continue
+            if conf.value is None:
+                continue
+            if (
+                conf.key.startswith("spark.sql.hive.metastore")
+                or conf.key.startswith("spark.hadoop.javax.jdo.option")
+                or conf.key.startswith("spark.databricks.hive.metastore")
+                or conf.key.startswith("spark.hadoop.hive.metastore.glue")
+            ):
+                spark_conf_dict[conf.key] = conf.value
+        return instance_profile, spark_conf_dict
+
+    def _get_warehouse_config_with_external_hive_metastore(self) -> GetWorkspaceWarehouseConfigResponse | None:
+        sql_config = self._ws.warehouses.get_workspace_warehouse_config()
+        if sql_config.data_access_config is None:
+            return None
+        for conf in sql_config.data_access_config:
+            if conf.key is None:
+                continue
+            is_glue = conf.key.startswith("spark.databricks.hive.metastore.glueCatalog.enabled")
+            if conf.key.startswith("spark.sql.hive.metastore") or is_glue:
+                return sql_config
+        return None
+
     def update_job_policy(self, state: InstallState, policy_id: str):
         if not state.jobs:
             logger.error("No jobs found in states")
@@ -118,7 +162,8 @@ class ClusterPolicyInstaller:
                 assert job.job_id is not None
                 assert job_settings is not None
                 if job_settings.job_clusters is None:
-                    # if job_clusters is None, it means override cluster is being set and hence policy should not be applied
+                    # if job_clusters is None, it means override cluster is being set
+                    # and hence policy should not be applied
                     return
             except NotFound:
                 logger.error(f"Job id {job_id} not found. Please check if the job is present in the workspace")
