@@ -10,7 +10,7 @@ def test_azure_service_principal_info_crawl():
         cluster_ids=['azure-spn-secret', 'simplest-autoscale'],
         pipeline_ids=['spec-with-spn'],
         job_ids=['some-spn'],
-        warehouse_config="spn-config.json",
+        warehouse_config="spn-config",
         secret_exists=True,
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -23,7 +23,7 @@ def test_azure_service_principal_info_spark_conf_crawl():
         cluster_ids=['simplest-autoscale'],
         pipeline_ids=['empty-spec'],
         job_ids=['some-spn'],
-        warehouse_config="spn-config.json",
+        warehouse_config="spn-config",
     )
 
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -36,7 +36,7 @@ def test_azure_service_principal_info_no_spark_conf_crawl():
         cluster_ids=['simplest-autoscale'],
         pipeline_ids=['empty-spec'],
         job_ids=['single-job'],
-        warehouse_config="single-config.json",
+        warehouse_config="single-config",
     )
 
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -70,7 +70,7 @@ def test_list_all_cluster_with_spn_in_spark_conf_with_secret():
 
 def test_list_all_wh_config_with_spn_no_secret():
     ws = workspace_client_mock(
-        cluster_ids=['simplest-autoscale'], pipeline_ids=['empty-spec'], warehouse_config="spn-config.json"
+        cluster_ids=['simplest-autoscale'], pipeline_ids=['empty-spec'], warehouse_config="spn-config"
     )
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
 
@@ -84,7 +84,7 @@ def test_list_all_wh_config_with_spn_and_secret():
     ws = workspace_client_mock(
         cluster_ids=['simplest-autoscale'],
         pipeline_ids=['empty-spec'],
-        warehouse_config="spn-secret-config.json",
+        warehouse_config="spn-secret-config",
         secret_exists=True,
     )
     result_set = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -107,7 +107,7 @@ def test_azure_service_principal_info_policy_conf():
         cluster_ids=['policy-single-user-with-spn', 'policy-azure-oauth'],
         pipeline_ids=['spec-with-spn'],
         job_ids=['policy-single-job-with-spn'],
-        warehouse_config="spn-config.json",
+        warehouse_config="spn-config",
         secret_exists=True,
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -120,7 +120,7 @@ def test_azure_service_principal_info_dedupe():
         cluster_ids=['policy-single-user-with-spn'],
         pipeline_ids=['spec-with-spn'],
         job_ids=['policy-single-job-with-spn'],
-        warehouse_config="dupe-spn-config.json",
+        warehouse_config="dupe-spn-config",
         secret_exists=True,
     )
     spn_crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()

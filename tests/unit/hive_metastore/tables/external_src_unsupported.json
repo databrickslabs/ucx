@@ -1,9 +1,9 @@
 {
-  "table": {
+  "src": {
     "catalog": "hive_metastore",
     "database": "db1_src",
     "name": "external_src",
-    "type": "EXTERNAL",
+    "object_type": "EXTERNAL",
     "table_format": "UNSUPPORTED_FORMAT"
   },
   "rule": {
