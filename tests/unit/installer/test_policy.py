@@ -118,8 +118,8 @@ def test_cluster_policy_definition_aws_glue():
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {"type": "fixed", "value": "true"},
-        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
         "aws_attributes.instance_profile_arn": {"type": "fixed", "value": "role_arn_1"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
     }
     assert policy_id == "foo1"
     assert instance_profile == "role_arn_1"
@@ -311,8 +311,8 @@ def test_cluster_policy_definition_aws_glue_warehouse():
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled": {"type": "fixed", "value": "true"},
-        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
         "aws_attributes.instance_profile_arn": {"type": "fixed", "value": "role_arn_1"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
     }
     assert policy_id == "foo1"
     assert instance_profile == "role_arn_1"
