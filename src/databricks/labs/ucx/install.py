@@ -18,7 +18,7 @@ from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
+from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
     InvalidParameterValue,
