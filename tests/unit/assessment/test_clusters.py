@@ -8,7 +8,7 @@ from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 
 from .. import workspace_client_mock
@@ -109,10 +109,12 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     assert result == [
         Row(
             cluster_id="simplest-autoscale",
-            success=1,
-            failures='[]',
+            policy_id="single-user-with-spn",
             cluster_name="Simplest Shared Autoscale",
             creator=None,
+            spark_version="13.3.x-cpu-ml-scala2.12",
+            success=1,
+            failures='[]',
         )
     ]
 
@@ -166,3 +168,54 @@ def test_unsupported_clusters():
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
     assert result_set[0].failures == '["cluster type not supported : LEGACY_PASSTHROUGH"]'
+
+
+def test_policy_crawler():
+    ws = workspace_client_mock(
+        policy_ids=['single-user-with-spn', 'single-user-with-spn-policyid', 'single-user-with-spn-no-sparkversion'],
+    )
+
+    sql_backend = create_autospec(SqlBackend)
+    crawler = PoliciesCrawler(ws, sql_backend, "ucx")
+    result_set = list(crawler.snapshot())
+    failures = json.loads(result_set[0].failures)
+    assert len(result_set) == 2
+    assert "Uses azure service principal credentials config in policy." in failures
+
+
+def test_policy_try_fetch():
+    ws = workspace_client_mock(policy_ids=['single-user-with-spn-policyid'])
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM ucx.policies": [
+                (
+                    "single-user-with-spn-policyid",
+                    "test_policy",
+                    1,
+                    "[]",
+                    json.dumps({"type": "unlimited", "defaultValue": "auto:latest-ml"}),
+                    "test",
+                    "test_creator",
+                )
+            ]
+        }
+    )
+    crawler = PoliciesCrawler(ws, mock_backend, "ucx")
+    result_set = list(crawler.snapshot())
+
+    assert len(result_set) == 1
+    assert result_set[0].policy_id == "single-user-with-spn-policyid"
+    assert result_set[0].policy_name == "test_policy"
+    assert result_set[0].spark_version == json.dumps({"type": "unlimited", "defaultValue": "auto:latest-ml"})
+    assert result_set[0].policy_description == "test"
+    assert result_set[0].creator == "test_creator"
+
+
+def test_policy_without_failure():
+    ws = workspace_client_mock(
+        policy_ids=['single-user-with-spn-no-sparkversion'],
+    )
+
+    crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
+    result_set = list(crawler.snapshot())
+    assert result_set[0].failures == '[]'

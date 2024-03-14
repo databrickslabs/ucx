@@ -6,7 +6,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
@@ -154,6 +154,19 @@ def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, s
     crawler.snapshot()
 
 
+@task("assessment")
+def crawl_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """This module scans through all the Cluster Policies and get the necessary information
+
+    It looks for:
+      - Clusters Policies with Databricks Runtime (DBR) version earlier than 11.3
+
+      Subsequently, a list of all the policies with matching configurations are stored in the
+    `$inventory.policies` table."""
+    crawler = PoliciesCrawler(ws, sql_backend, cfg.inventory_database)
+    crawler.snapshot()
+
+
 @task("assessment", cloud="azure")
 def assess_azure_service_principals(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
@@ -237,6 +250,7 @@ def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
         assess_jobs,
         assess_incompatible_submit_runs,
         assess_clusters,
+        crawl_cluster_policies,
         assess_azure_service_principals,
         assess_pipelines,
         assess_global_init_scripts,
