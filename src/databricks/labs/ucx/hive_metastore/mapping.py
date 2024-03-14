@@ -59,9 +59,6 @@ class Rule:
     def as_hms_table_key(self):
         return f"hive_metastore.{self.src_schema}.{self.src_table}"
 
-    def sql_alter_to_acl_upgraded(self) -> str:
-        return f"ALTER {self.as_uc_table_key} SET TBLPROPERTIES ('acl_upgraded' = 'true');"
-
 
 @dataclass
 class TableToMigrate:
