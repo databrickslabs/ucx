@@ -15,7 +15,7 @@ from databricks.labs.blueprint.wheels import (
     WheelsV2,
     find_project_root,
 )
-from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
@@ -1172,8 +1172,6 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
 
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
-
-    StatementExecutionBackend.execute = MockBackend().execute
 
     install.run(
         verify_timeout=timedelta(seconds=1),
