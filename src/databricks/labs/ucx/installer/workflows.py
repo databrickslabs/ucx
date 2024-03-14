@@ -3,7 +3,9 @@ import logging
 import os
 import re
 import sys
+import webbrowser
 from dataclasses import replace
+from datetime import timedelta
 from typing import Any
 
 import databricks.sdk.errors
@@ -26,6 +28,7 @@ from databricks.sdk.service import jobs, compute
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
+from databricks.labs.ucx.install import InstallationMixin
 from databricks.labs.ucx.runtime import main
 
 logger = logging.getLogger(__name__)
@@ -83,14 +86,15 @@ main(f'--config=/Workspace{config_file}',
 """
 
 
-class WorkflowsInstallation:
+class WorkflowsInstallation(InstallationMixin):
     def __init__(self,
                  config: WorkspaceConfig,
                  installation: Installation,
                  ws: WorkspaceClient,
                  wheels: WheelsV2,
                  prompts: Prompts,
-                 product_info: ProductInfo):
+                 product_info: ProductInfo,
+                 verify_timeout: timedelta):
         self._config = config
         self._installation = installation
         self._ws = ws
@@ -98,6 +102,8 @@ class WorkflowsInstallation:
         self._wheels = wheels
         self._prompts = prompts
         self._product_info = product_info
+        self._verify_timeout = verify_timeout
+        super().__init__(config, installation, ws)
 
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
@@ -136,6 +142,49 @@ class WorkflowsInstallation:
         self._state.save()
         self._create_debug(remote_wheel)
 
+    def repair_run(self, workflow):
+        try:
+            job_id, run_id = self._repair_workflow(workflow)
+            run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
+            latest_repair_run_id = run_details.repair_history[-1].id
+            job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
+            logger.debug(f"Repair Running {workflow} job: {job_url}")
+            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
+            webbrowser.open(job_url)
+        except InvalidParameterValue as e:
+            logger.warning(f"skipping {workflow}: {e}")
+        except TimeoutError:
+            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
+
+    def latest_job_status(self) -> list[dict]:
+        latest_status = []
+        for step, job_id in self._state.jobs.items():
+            job_state = None
+            start_time = None
+            try:
+                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
+            except InvalidParameterValue as e:
+                logger.warning(f"skipping {step}: {e}")
+                continue
+            if job_runs:
+                state = job_runs[0].state
+                if state and state.result_state:
+                    job_state = state.result_state.name
+                elif state and state.life_cycle_state:
+                    job_state = state.life_cycle_state.name
+                if job_runs[0].start_time:
+                    start_time = job_runs[0].start_time / 1000
+            latest_status.append(
+                {
+                    "step": step,
+                    "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
+                    "started": (
+                        "<never run>" if not (job_runs and start_time) else self._readable_timedelta(start_time)
+                    ),
+                }
+            )
+        return latest_status
+
     @property
     def _config_file(self):
         return f"{self._installation.install_folder()}/config.yml"
@@ -155,28 +204,6 @@ class WorkflowsInstallation:
         assert new_job.job_id is not None
         self._state.jobs[step_name] = str(new_job.job_id)
         return None
-
-    @property
-    def _my_username(self):
-        if not hasattr(self, "_me"):
-            self._me = self._ws.current_user.me()
-            is_workspace_admin = any(g.display == "admins" for g in self._me.groups)
-            if not is_workspace_admin:
-                msg = "Current user is not a workspace admin"
-                raise PermissionError(msg)
-        return self._me.user_name
-
-    def _name(self, name: str) -> str:
-        prefix = os.path.basename(self._installation.install_folder()).removeprefix('.')
-        return f"[{prefix.upper()}] {name}"
-
-    @property
-    def _short_name(self):
-        if "@" in self._my_username:
-            username = self._my_username.split("@")[0]
-        else:
-            username = self._me.display_name
-        return username
 
     def _infer_error_from_job_run(self, job_run) -> Exception:
         errors: list[Exception] = []
@@ -418,3 +445,30 @@ class WorkflowsInstallation:
             remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
+
+    def _repair_workflow(self, workflow):
+        job_id = self._state.jobs.get(workflow)
+        if not job_id:
+            raise InvalidParameterValue("job does not exists hence skipping repair")
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        if not job_runs:
+            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
+        latest_job_run = job_runs[0]
+        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+        retried_check = retry_on_attribute_error(self._get_result_state)
+        state_value = retried_check(job_id)
+        logger.info(f"The status for the latest run is {state_value}")
+        if state_value != "FAILED":
+            raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
+        run_id = latest_job_run.run_id
+        return job_id, run_id
+
+    def _get_result_state(self, job_id):
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        latest_job_run = job_runs[0]
+        if not latest_job_run.state.result_state:
+            raise AttributeError("no result state in job run")
+        job_state = latest_job_run.state.result_state.value
+        return job_state
+
+

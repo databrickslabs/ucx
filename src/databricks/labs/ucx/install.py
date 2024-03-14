@@ -119,6 +119,15 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
 
 
 class InstallationMixin:
+    def __init__(self,
+                 config: WorkspaceConfig,
+                 installation: Installation,
+                 ws: WorkspaceClient):
+        self._config = config
+        self._installation = installation
+        self._ws = ws
+        self._this_file = Path(__file__)
+
     @staticmethod
     def sorted_tasks() -> list[Task]:
         return sorted(_TASKS.values(), key=lambda x: x.task_id)
@@ -130,6 +139,60 @@ class InstallationMixin:
             if task.workflow not in step_list:
                 step_list.append(task.workflow)
         return step_list
+
+    def _name(self, name: str) -> str:
+        prefix = os.path.basename(self._installation.install_folder()).removeprefix('.')
+        return f"[{prefix.upper()}] {name}"
+
+    @property
+    def _my_username(self):
+        if not hasattr(self, "_me"):
+            self._me = self._ws.current_user.me()
+            is_workspace_admin = any(g.display == "admins" for g in self._me.groups)
+            if not is_workspace_admin:
+                msg = "Current user is not a workspace admin"
+                raise PermissionError(msg)
+        return self._me.user_name
+
+    @property
+    def _short_name(self):
+        if "@" in self._my_username:
+            username = self._my_username.split("@")[0]
+        else:
+            username = self._me.display_name
+        return username
+
+    @staticmethod
+    def _readable_timedelta(epoch):
+        when = datetime.utcfromtimestamp(epoch)
+        duration = datetime.now() - when
+        data = {}
+        data["days"], remaining = divmod(duration.total_seconds(), 86_400)
+        data["hours"], remaining = divmod(remaining, 3_600)
+        data["minutes"], data["seconds"] = divmod(remaining, 60)
+
+        time_parts = ((name, round(value)) for (name, value) in data.items())
+        time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
+        if len(time_parts) > 0:
+            time_parts.append("ago")
+        if time_parts:
+            return " ".join(time_parts)
+        return "less than 1 second ago"
+
+    @property
+    def _warehouse_id(self) -> str:
+        if self._config.warehouse_id is not None:
+            logger.info("Fetching warehouse_id from a config")
+            return self._config.warehouse_id
+        warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
+        warehouse_id = self._config.warehouse_id
+        if not warehouse_id and not warehouses:
+            msg = "need either configured warehouse_id or an existing PRO SQL warehouse"
+            raise ValueError(msg)
+        if not warehouse_id:
+            warehouse_id = warehouses[0].id
+        self._config.warehouse_id = warehouse_id
+        return warehouse_id
 
 
 class WorkspaceInstaller:
@@ -167,7 +230,7 @@ class WorkspaceInstaller:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
         workflows_installer = WorkflowsInstallation(config, self._installation, self._ws, wheels, self._prompts,
-                                                    self._product_info)
+                                                    self._product_info, verify_timeout)
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
@@ -175,7 +238,6 @@ class WorkspaceInstaller:
             self._ws,
             workflows_installer,
             self._prompts,
-            verify_timeout,
             self._product_info,
         )
         try:
@@ -318,7 +380,7 @@ class WorkspaceInstaller:
                 continue
 
 
-class WorkspaceInstallation:
+class WorkspaceInstallation(InstallationMixin):
     def __init__(
             self,
             config: WorkspaceConfig,
@@ -327,7 +389,6 @@ class WorkspaceInstallation:
             ws: WorkspaceClient,
             workflows_installer: WorkflowsInstallation,
             prompts: Prompts,
-            verify_timeout: timedelta,
             product_info: ProductInfo,
     ):
         self._config = config
@@ -336,10 +397,9 @@ class WorkspaceInstallation:
         self._sql_backend = sql_backend
         self._workflows_installer = workflows_installer
         self._prompts = prompts
-        self._verify_timeout = verify_timeout
         self._state = InstallState.from_installation(installation)
-        self._this_file = Path(__file__)
         self._product_info = product_info
+        super().__init__(config, installation, ws)
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
@@ -349,11 +409,11 @@ class WorkspaceInstallation:
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
-
-        workflows_installer = WorkflowsInstallation(config, installation, ws, wheels, prompts, product_info)
         timeout = timedelta(minutes=2)
+        workflows_installer = WorkflowsInstallation(config, installation, ws, wheels, prompts, product_info, timeout)
+
         return cls(config, installation, sql_backend, ws, workflows_installer, prompts,
-                   timeout, product_info)
+                   product_info)
 
     @property
     def config(self):
@@ -413,21 +473,6 @@ class WorkspaceInstallation:
         )
         dash.create_dashboards()
 
-    @property
-    def _warehouse_id(self) -> str:
-        if self._config.warehouse_id is not None:
-            logger.info("Fetching warehouse_id from a config")
-            return self._config.warehouse_id
-        warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
-        warehouse_id = self._config.warehouse_id
-        if not warehouse_id and not warehouses:
-            msg = "need either configured warehouse_id or an existing PRO SQL warehouse"
-            raise ValueError(msg)
-        if not warehouse_id:
-            warehouse_id = warehouses[0].id
-        self._config.warehouse_id = warehouse_id
-        return warehouse_id
-
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
         markdown = [
@@ -436,7 +481,7 @@ class WorkspaceInstallation:
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
-        for step_name in self._workflows_installer.step_list():
+        for step_name in self.step_list():
             if step_name not in self._state.jobs:
                 logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
                 continue
@@ -454,7 +499,7 @@ class WorkspaceInstallation:
             markdown.append(f"## {job_link}\n\n")
             markdown.append(f"{dashboard_link}")
             markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self._workflows_installer.sorted_tasks():
+            for task in self.sorted_tasks():
                 if task.workflow != step_name:
                     continue
                 doc = self._config.replace_inventory_variable(task.doc)
@@ -471,91 +516,6 @@ class WorkspaceInstallation:
 
     def _replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self._config.inventory_database}")
-
-    @staticmethod
-    def _readable_timedelta(epoch):
-        when = datetime.utcfromtimestamp(epoch)
-        duration = datetime.now() - when
-        data = {}
-        data["days"], remaining = divmod(duration.total_seconds(), 86_400)
-        data["hours"], remaining = divmod(remaining, 3_600)
-        data["minutes"], data["seconds"] = divmod(remaining, 60)
-
-        time_parts = ((name, round(value)) for (name, value) in data.items())
-        time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
-        if len(time_parts) > 0:
-            time_parts.append("ago")
-        if time_parts:
-            return " ".join(time_parts)
-        return "less than 1 second ago"
-
-    def latest_job_status(self) -> list[dict]:
-        latest_status = []
-        for step, job_id in self._state.jobs.items():
-            job_state = None
-            start_time = None
-            try:
-                job_runs = list(self._ws.jobs.list_runs(job_id=int(job_id), limit=1))
-            except InvalidParameterValue as e:
-                logger.warning(f"skipping {step}: {e}")
-                continue
-            if job_runs:
-                state = job_runs[0].state
-                if state and state.result_state:
-                    job_state = state.result_state.name
-                elif state and state.life_cycle_state:
-                    job_state = state.life_cycle_state.name
-                if job_runs[0].start_time:
-                    start_time = job_runs[0].start_time / 1000
-            latest_status.append(
-                {
-                    "step": step,
-                    "state": "UNKNOWN" if not (job_runs and job_state) else job_state,
-                    "started": (
-                        "<never run>" if not (job_runs and start_time) else self._readable_timedelta(start_time)
-                    ),
-                }
-            )
-        return latest_status
-
-    def _get_result_state(self, job_id):
-        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-        latest_job_run = job_runs[0]
-        if not latest_job_run.state.result_state:
-            raise AttributeError("no result state in job run")
-        job_state = latest_job_run.state.result_state.value
-        return job_state
-
-    def repair_run(self, workflow):
-        try:
-            job_id, run_id = self._repair_workflow(workflow)
-            run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
-            latest_repair_run_id = run_details.repair_history[-1].id
-            job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
-            logger.debug(f"Repair Running {workflow} job: {job_url}")
-            self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
-            webbrowser.open(job_url)
-        except InvalidParameterValue as e:
-            logger.warning(f"skipping {workflow}: {e}")
-        except TimeoutError:
-            logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
-
-    def _repair_workflow(self, workflow):
-        job_id = self._state.jobs.get(workflow)
-        if not job_id:
-            raise InvalidParameterValue("job does not exists hence skipping repair")
-        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-        if not job_runs:
-            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
-        latest_job_run = job_runs[0]
-        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
-        retried_check = retry_on_attribute_error(self._get_result_state)
-        state_value = retried_check(job_id)
-        logger.info(f"The status for the latest run is {state_value}")
-        if state_value != "FAILED":
-            raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
-        run_id = latest_job_run.run_id
-        return job_id, run_id
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
