@@ -13,7 +13,7 @@ from typing import Any
 
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
@@ -66,6 +66,7 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
+from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
@@ -159,6 +160,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
+            functools.partial(table, "migration_status", MigrationStatus),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
@@ -265,6 +267,8 @@ class WorkspaceInstaller:
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
+
+        self._check_inventory_database_exists(inventory_database)
         warehouse_id = self._configure_warehouse()
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
@@ -330,6 +334,20 @@ class WorkspaceInstaller:
             )
             warehouse_id = new_warehouse.id
         return warehouse_id
+
+    def _check_inventory_database_exists(self, inventory_database: str):
+        logger.info("Fetching installations...")
+        for installation in Installation.existing(self._ws, self._product_info.product_name()):
+            try:
+                config = installation.load(WorkspaceConfig)
+                if config.inventory_database == inventory_database:
+                    raise AlreadyExists(
+                        f"Inventory database '{inventory_database}' already exists in another installation"
+                    )
+            except NotFound:
+                continue
+            except SerdeError:
+                continue
 
 
 class WorkspaceInstallation:
@@ -991,6 +1009,9 @@ if __name__ == "__main__":
     logger.setLevel("INFO")
     app = ProductInfo.from_class(WorkspaceConfig)
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    current = Installation.assume_global(workspace_client, app.product_name())
+    try:
+        current = app.current_installation(workspace_client)
+    except NotFound:
+        current = Installation.assume_global(workspace_client, app.product_name())
     installer = WorkspaceInstaller(Prompts(), current, workspace_client, app)
     installer.run()
