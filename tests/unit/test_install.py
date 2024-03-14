@@ -56,7 +56,6 @@ import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
-from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
@@ -1375,12 +1374,19 @@ def test_check_inventory_database_exists(ws, mock_installation):
         install.configure()
 
 
-def test_user_not_admin(ws):
+def test_user_not_admin(ws, mock_installation, any_prompt):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="group1")])
+    wheels = create_autospec(WheelsV2)
+    workspace_installation = WorkflowsInstallation(
+        WorkspaceConfig(inventory_database='ucx', policy_id='123'),
+        mock_installation,
+        ws,
+        wheels,
+        any_prompt,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+    )
 
-    config = WorkspaceConfig(inventory_database='ucx')
-
-    installation = InstallationMixin(config, MockInstallation(), ws)
     with pytest.raises(PermissionError) as failure:
-        installation._my_username()
+        workspace_installation.create_jobs()
     assert "Current user is not a workspace admin" in str(failure.value)

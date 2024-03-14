@@ -46,14 +46,6 @@ class InstallationMixin:
                 raise PermissionError(msg)
         return self._me.user_name
 
-    @property
-    def _short_name(self):
-        if "@" in self._my_username:
-            username = self._my_username.split("@")[0]
-        else:
-            username = self._me.display_name
-        return username
-
     @staticmethod
     def _readable_timedelta(epoch):
         when = datetime.utcfromtimestamp(epoch)
