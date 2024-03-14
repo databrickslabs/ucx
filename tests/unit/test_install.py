@@ -50,6 +50,7 @@ from databricks.sdk.service.workspace import ObjectInfo
 
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 
@@ -1150,6 +1151,8 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
 
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
+
+    StatementExecutionBackend.execute = MockBackend().execute
 
     install.run(
         verify_timeout=timedelta(seconds=1),
