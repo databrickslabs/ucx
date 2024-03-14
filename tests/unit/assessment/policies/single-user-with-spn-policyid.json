@@ -1,0 +1,24 @@
+{
+  "policy_id": "single-user-with-spn-policyid",
+  "definition": "{\"spark_version\": {\"type\": \"unlimited\",\"defaultValue\": \"auto:latest-ml\"},\"spark_conf.fs.azure.account.auth.type\": {\"type\": \"fixed\", \"value\": \"OAuth\", \"hidden\": true}}",
+  "policy_family_definition_overrides": {
+    "spark_conf.fs.azure.account.auth.type": {
+      "type": "fixed",
+      "value": "OAuth",
+      "hidden": true
+    },
+    "not.a.type": {
+      "type": "fixed",
+      "value": "not.a.matching.type",
+      "hidden": true
+    },
+    "not.a.matching.type": {
+      "type": "fixed",
+      "value": "https://login.microsoftonline.com/1234ededed/oauth2/token",
+      "hidden": true
+    }
+  },
+  "name": "test_policy",
+  "description": "test",
+  "creator_user_name": "test_creator"
+}
