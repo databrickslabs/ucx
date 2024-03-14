@@ -55,6 +55,7 @@ import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -182,15 +183,15 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     sql_backend = MockBackend(
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
     )
-    wheels = create_autospec(WheelsV2)
+    workflows_installation = create_autospec(WorkflowsInstallation)
+
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation,
         sql_backend,
-        wheels,
         ws,
+        workflows_installation,
         any_prompt,
-        timedelta(seconds=1),
         PRODUCT_INFO,
     )
 
@@ -201,21 +202,15 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
 
 
 def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
-    sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
-    workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(
-            inventory_database='ucx',
-            override_clusters={"main": 'one', "tacl": 'two', "table_migration": "three"},
-            policy_id='123',
-        ),
+    workspace_installation = WorkflowsInstallation(
+        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
         mock_installation,
-        sql_backend,
-        wheels,
         ws,
+        wheels,
         any_prompt,
-        timedelta(seconds=1),
         PRODUCT_INFO,
+        timedelta(seconds=1),
     )
 
     workspace_installation.create_jobs()
@@ -225,14 +220,9 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
     assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
 
-    tasks = created_job_tasks(ws, '[MOCK] migrate-tables')
-    assert tasks['migrate_external_tables_sync'].existing_cluster_id == 'three'
-    assert tasks['migrate_dbfs_root_delta_tables'].existing_cluster_id == 'three'
-
 
 def test_write_protected_dbfs(ws, tmp_path, mock_installation):
     """Simulate write protected DBFS AND override clusters"""
-    sql_backend = MockBackend()
     wheels = create_autospec(Wheels)
     wheels.upload_to_dbfs.side_effect = PermissionDenied(...)
     wheels.upload_to_wsfs.return_value = "/a/b/c"
@@ -245,18 +235,17 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
         }
     )
 
-    workspace_installation = WorkspaceInstallation(
+    workflows_installation = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
-        sql_backend,
-        wheels,
         ws,
+        wheels,
         prompts,
-        timedelta(seconds=1),
         PRODUCT_INFO,
+        timedelta(seconds=1),
     )
 
-    workspace_installation.create_jobs()
+    workflows_installation.create_jobs()
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == "2222-999999-nosecuri"
@@ -271,8 +260,6 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 10,
-            'max_workers': 10,
-            'min_workers': 1,
             'override_clusters': {'main': '2222-999999-nosecuri', 'tacl': '3333-999999-legacytc'},
             'policy_id': '123',
             'renamed_group_prefix': 'ucx-renamed-',
@@ -283,31 +270,24 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
 
 def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
-    sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
-    workspace_installation = WorkspaceInstallation(
+    workflows_installation = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
-        sql_backend,
-        wheels,
         ws,
+        wheels,
         any_prompt,
-        timedelta(seconds=1),
         PRODUCT_INFO,
+        timedelta(seconds=1),
     )
 
-    workspace_installation.create_jobs()
+    workflows_installation.create_jobs()
 
     job = created_job(ws, '[MOCK] assessment')
     job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
     assert 'main' in job_clusters
     assert 'tacl' in job_clusters
     assert job_clusters["main"].new_cluster.policy_id == "123"
-
-    job = created_job(ws, '[MOCK] migrate-tables')
-    job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
-    assert 'table_migration' in job_clusters
-    assert job_clusters["table_migration"].new_cluster.policy_id == "123"
 
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
@@ -334,17 +314,15 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
         ],
     )
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
-    sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
-    installer = WorkspaceInstallation(
+    installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
-        sql_backend,
-        wheels,
         ws,
+        wheels,
         any_prompt,
-        timedelta(seconds=1),
         PRODUCT_INFO,
+        timedelta(seconds=1),
     )
     with pytest.raises(Unknown) as failure:
         installer.run_workflow("assessment")
@@ -380,17 +358,15 @@ def test_run_workflow_creates_failure_from_mapping(
     ws.jobs.get_run_output.return_value = jobs.RunOutput(
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
-    sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
-    installer = WorkspaceInstallation(
+    installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
-        sql_backend,
-        wheels,
         ws,
+        wheels,
         any_prompt,
-        timedelta(seconds=1),
         PRODUCT_INFO,
+        timedelta(seconds=1),
     )
     with pytest.raises(PermissionDenied) as failure:
         installer.run_workflow("assessment")
@@ -434,17 +410,15 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_in
     ws.jobs.get_run_output.return_value = jobs.RunOutput(
         error="something: DataLoss: does not compute", error_trace="# goes to stderr"
     )
-    sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
-    installer = WorkspaceInstallation(
+    installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
-        sql_backend,
-        wheels,
         ws,
+        wheels,
         any_prompt,
-        timedelta(seconds=1),
         PRODUCT_INFO,
+        timedelta(seconds=1),
     )
     with pytest.raises(ManyError) as failure:
         installer.run_workflow("assessment")
@@ -483,9 +457,6 @@ def test_save_config(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
-            'max_workers': 10,
-            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -518,9 +489,6 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
-            'max_workers': 10,
-            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -561,9 +529,6 @@ def test_create_cluster_policy(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
-            'max_workers': 10,
-            'min_workers': 1,
             'policy_id': 'foo1',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -582,14 +547,22 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
             r".*": "",
         }
     )
+    workflows_installer = WorkflowsInstallation(
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        mock_installation,
+        ws,
+        create_autospec(WheelsV2),
+        prompts,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+    )
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
         sql_backend,
-        create_autospec(WheelsV2),
         ws,
+        workflows_installer,
         prompts,
-        timedelta(seconds=1),
         PRODUCT_INFO,
     )
     workspace_installation.run()
@@ -614,9 +587,9 @@ def test_remove_database(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
-    timeout = timedelta(seconds=1)
+    workflow_installer = create_autospec(WorkflowsInstallation)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, wheels, ws, prompts, timeout, PRODUCT_INFO
+        config, installation, sql_backend, ws, workflow_installer, prompts, PRODUCT_INFO
     )
 
     workspace_installation.uninstall()
@@ -636,9 +609,9 @@ def test_remove_jobs_no_state(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
-    timeout = timedelta(seconds=1)
+    workflow_installer = create_autospec(WorkflowsInstallation)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, wheels, ws, prompts, timeout, PRODUCT_INFO
+        config, installation, sql_backend, ws, workflow_installer, prompts, PRODUCT_INFO
     )
 
     workspace_installation.uninstall()
@@ -658,9 +631,9 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         }
     )
     config = WorkspaceConfig(inventory_database='ucx')
-    timeout = timedelta(seconds=1)
+    workflows_installer= create_autospec(WorkflowsInstallation)
     workspace_installation = WorkspaceInstallation(
-        config, mock_installation_with_jobs, sql_backend, wheels, ws, prompts, timeout, PRODUCT_INFO
+        config, mock_installation_with_jobs, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
     with caplog.at_level('ERROR'):
@@ -683,9 +656,9 @@ def test_remove_warehouse(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
-    timeout = timedelta(seconds=1)
+    workflows_installer = create_autospec(WorkflowsInstallation)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, wheels, ws, prompts, timeout, PRODUCT_INFO
+        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
     workspace_installation.uninstall()
@@ -706,9 +679,9 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
-    timeout = timedelta(seconds=1)
+    workflows_installer = create_autospec(WorkflowsInstallation)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, wheels, ws, prompts, timeout, PRODUCT_INFO
+        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
     workspace_installation.uninstall()
@@ -1149,9 +1122,6 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'inventory_database': 'ucx',
             'log_level': 'INFO',
             'num_threads': 8,
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
-            'max_workers': 10,
-            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1240,9 +1210,6 @@ def test_fresh_install(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
             r".*": "",
         }
     )
@@ -1260,73 +1227,6 @@ def test_fresh_install(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
-            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
-            'max_workers': 20,
-            'min_workers': 2,
-            'policy_id': 'foo',
-            'renamed_group_prefix': 'db-temp-',
-            'warehouse_id': 'abc',
-            'workspace_start_path': '/',
-        },
-    )
-
-
-def test_install_with_external_hms_conf(ws, mock_installation):
-    prompts = MockPrompts(
-        {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r"Open config file in.*": "no",
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
-            r".*We have identified one or more cluster.*": "Yes",
-            r".*Choose a cluster policy.*": "0",
-            r".*": "",
-        }
-    )
-    ws.workspace.get_status = not_found
-
-    policy_definition = {
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "driver"},
-        "spark_conf.spark.sql.hive.metastore.version": {"value": "2.3"},
-        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar"},
-    }
-    ws.cluster_policies.list.return_value = [
-        Policy(
-            policy_id="id1",
-            name="foo",
-            definition=json.dumps(policy_definition),
-            description="Custom cluster policy for Unity Catalog Migration (UCX)",
-        )
-    ]
-
-    install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 8,
-            'spark_conf': {
-                'spark.hadoop.javax.jdo.option.ConnectionDriverName': 'driver',
-                'spark.hadoop.javax.jdo.option.ConnectionPassword': 'pwd',
-                'spark.hadoop.javax.jdo.option.ConnectionURL': 'url',
-                'spark.hadoop.javax.jdo.option.ConnectionUserName': 'user',
-                'spark.sql.hive.metastore.jars': 'jar',
-                'spark.sql.hive.metastore.version': '2.3',
-                'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000',
-            },
-            'max_workers': 20,
-            'min_workers': 2,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',

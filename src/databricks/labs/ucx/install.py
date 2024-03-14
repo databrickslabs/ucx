@@ -1,14 +1,10 @@
 import functools
 import logging
 import os
-import re
-import sys
 import time
 import webbrowser
 from collections.abc import Callable
-from dataclasses import replace
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import timedelta
 from typing import Any
 
 import databricks.sdk.errors
@@ -23,30 +19,11 @@ from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
-    Aborted,
     AlreadyExists,
     BadRequest,
-    Cancelled,
-    DataLoss,
-    DeadlineExceeded,
-    InternalError,
     InvalidParameterValue,
     NotFound,
-    NotImplemented,
-    OperationFailed,
-    PermissionDenied,
-    RequestLimitExceeded,
-    ResourceAlreadyExists,
-    ResourceConflict,
-    ResourceDoesNotExist,
-    ResourceExhausted,
-    TemporarilyUnavailable,
-    TooManyRequests,
-    Unauthenticated,
-    Unknown,
 )
-from databricks.sdk.retries import retried
-from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -61,18 +38,16 @@ from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
-from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -118,91 +93,14 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
-class InstallationMixin:
-    def __init__(self,
-                 config: WorkspaceConfig,
-                 installation: Installation,
-                 ws: WorkspaceClient):
-        self._config = config
-        self._installation = installation
-        self._ws = ws
-        self._this_file = Path(__file__)
-
-    @staticmethod
-    def sorted_tasks() -> list[Task]:
-        return sorted(_TASKS.values(), key=lambda x: x.task_id)
-
-    @classmethod
-    def step_list(cls) -> list[str]:
-        step_list = []
-        for task in cls.sorted_tasks():
-            if task.workflow not in step_list:
-                step_list.append(task.workflow)
-        return step_list
-
-    def _name(self, name: str) -> str:
-        prefix = os.path.basename(self._installation.install_folder()).removeprefix('.')
-        return f"[{prefix.upper()}] {name}"
-
-    @property
-    def _my_username(self):
-        if not hasattr(self, "_me"):
-            self._me = self._ws.current_user.me()
-            is_workspace_admin = any(g.display == "admins" for g in self._me.groups)
-            if not is_workspace_admin:
-                msg = "Current user is not a workspace admin"
-                raise PermissionError(msg)
-        return self._me.user_name
-
-    @property
-    def _short_name(self):
-        if "@" in self._my_username:
-            username = self._my_username.split("@")[0]
-        else:
-            username = self._me.display_name
-        return username
-
-    @staticmethod
-    def _readable_timedelta(epoch):
-        when = datetime.utcfromtimestamp(epoch)
-        duration = datetime.now() - when
-        data = {}
-        data["days"], remaining = divmod(duration.total_seconds(), 86_400)
-        data["hours"], remaining = divmod(remaining, 3_600)
-        data["minutes"], data["seconds"] = divmod(remaining, 60)
-
-        time_parts = ((name, round(value)) for (name, value) in data.items())
-        time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
-        if len(time_parts) > 0:
-            time_parts.append("ago")
-        if time_parts:
-            return " ".join(time_parts)
-        return "less than 1 second ago"
-
-    @property
-    def _warehouse_id(self) -> str:
-        if self._config.warehouse_id is not None:
-            logger.info("Fetching warehouse_id from a config")
-            return self._config.warehouse_id
-        warehouses = [_ for _ in self._ws.warehouses.list() if _.warehouse_type == EndpointInfoWarehouseType.PRO]
-        warehouse_id = self._config.warehouse_id
-        if not warehouse_id and not warehouses:
-            msg = "need either configured warehouse_id or an existing PRO SQL warehouse"
-            raise ValueError(msg)
-        if not warehouse_id:
-            warehouse_id = warehouses[0].id
-        self._config.warehouse_id = warehouse_id
-        return warehouse_id
-
-
 class WorkspaceInstaller:
     def __init__(
-            self,
-            prompts: Prompts,
-            installation: Installation,
-            ws: WorkspaceClient,
-            product_info: ProductInfo,
-            environ: dict[str, str] | None = None,
+        self,
+        prompts: Prompts,
+        installation: Installation,
+        ws: WorkspaceClient,
+        product_info: ProductInfo,
+        environ: dict[str, str] | None = None,
     ):
         if not environ:
             environ = dict(os.environ.items())
@@ -217,10 +115,10 @@ class WorkspaceInstaller:
         self._force_install = environ.get("UCX_FORCE_INSTALL")
 
     def run(
-            self,
-            verify_timeout=timedelta(minutes=2),
-            sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
-            wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+        self,
+        verify_timeout=timedelta(minutes=2),
+        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
+        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
     ):
         logger.info(f"Installing UCX v{self._product_info.version()}")
         config = self.configure()
@@ -229,8 +127,9 @@ class WorkspaceInstaller:
         if not wheel_builder_factory:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
-        workflows_installer = WorkflowsInstallation(config, self._installation, self._ws, wheels, self._prompts,
-                                                    self._product_info, verify_timeout)
+        workflows_installer = WorkflowsInstallation(
+            config, self._installation, self._ws, wheels, self._prompts, self._product_info, verify_timeout
+        )
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
@@ -382,14 +281,14 @@ class WorkspaceInstaller:
 
 class WorkspaceInstallation(InstallationMixin):
     def __init__(
-            self,
-            config: WorkspaceConfig,
-            installation: Installation,
-            sql_backend: SqlBackend,
-            ws: WorkspaceClient,
-            workflows_installer: WorkflowsInstallation,
-            prompts: Prompts,
-            product_info: ProductInfo,
+        self,
+        config: WorkspaceConfig,
+        installation: Installation,
+        sql_backend: SqlBackend,
+        ws: WorkspaceClient,
+        workflows_installer: WorkflowsInstallation,
+        prompts: Prompts,
+        product_info: ProductInfo,
     ):
         self._config = config
         self._installation = installation
@@ -412,8 +311,7 @@ class WorkspaceInstallation(InstallationMixin):
         timeout = timedelta(minutes=2)
         workflows_installer = WorkflowsInstallation(config, installation, ws, wheels, prompts, product_info, timeout)
 
-        return cls(config, installation, sql_backend, ws, workflows_installer, prompts,
-                   product_info)
+        return cls(config, installation, sql_backend, ws, workflows_installer, prompts, product_info)
 
     @property
     def config(self):
@@ -519,8 +417,8 @@ class WorkspaceInstallation(InstallationMixin):
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
-                "Do you want to uninstall ucx from the workspace too, this would "
-                "remove ucx project folder, dashboards, queries and jobs"
+            "Do you want to uninstall ucx from the workspace too, this would "
+            "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
@@ -540,7 +438,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _remove_database(self):
         if self._prompts and not self._prompts.confirm(
-                f"Do you want to delete the inventory database {self._config.inventory_database} too?"
+            f"Do you want to delete the inventory database {self._config.inventory_database} too?"
         ):
             return
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
@@ -593,9 +491,9 @@ class WorkspaceInstallation(InstallationMixin):
                 return True
         for run in current_runs:
             if (
-                    run.run_id
-                    and run.state
-                    and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
+                run.run_id
+                and run.state
+                and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
             ):
                 logger.info("Identified a run in progress waiting for run completion")
                 self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run.run_id)

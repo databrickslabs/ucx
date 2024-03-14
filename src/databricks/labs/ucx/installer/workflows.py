@@ -1,6 +1,4 @@
-import functools
 import logging
-import os
 import re
 import sys
 import webbrowser
@@ -8,27 +6,42 @@ from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
-import databricks.sdk.errors
-from databricks.labs.blueprint.entrypoint import get_logger
-from databricks.labs.blueprint.installation import Installation, SerdeError
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
-from databricks.sdk.retries import retried
-
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
-from databricks.labs.blueprint.parallel import ManyError, Threads, Task
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.blueprint.upgrades import Upgrades
-from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
+from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import OperationFailed, BadRequest, Unauthenticated, PermissionDenied, NotFound, \
-    ResourceConflict, TooManyRequests, Cancelled, InternalError, TemporarilyUnavailable, DeadlineExceeded, \
-    InvalidParameterValue, ResourceDoesNotExist, Aborted, AlreadyExists, ResourceAlreadyExists, ResourceExhausted, \
-    RequestLimitExceeded, Unknown, DataLoss
-from databricks.sdk.service import jobs, compute
+from databricks.sdk.errors import (
+    Aborted,
+    AlreadyExists,
+    BadRequest,
+    Cancelled,
+    DataLoss,
+    DeadlineExceeded,
+    InternalError,
+    InvalidParameterValue,
+    NotFound,
+    OperationFailed,
+    PermissionDenied,
+    RequestLimitExceeded,
+    ResourceAlreadyExists,
+    ResourceConflict,
+    ResourceDoesNotExist,
+    ResourceExhausted,
+    TemporarilyUnavailable,
+    TooManyRequests,
+    Unauthenticated,
+    Unknown,
+)
+from databricks.sdk.retries import retried
+from databricks.sdk.service import compute, jobs
 
+import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
-from databricks.labs.ucx.install import InstallationMixin
+from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.runtime import main
 
 logger = logging.getLogger(__name__)
@@ -87,14 +100,16 @@ main(f'--config=/Workspace{config_file}',
 
 
 class WorkflowsInstallation(InstallationMixin):
-    def __init__(self,
-                 config: WorkspaceConfig,
-                 installation: Installation,
-                 ws: WorkspaceClient,
-                 wheels: WheelsV2,
-                 prompts: Prompts,
-                 product_info: ProductInfo,
-                 verify_timeout: timedelta):
+    def __init__(
+        self,
+        config: WorkspaceConfig,
+        installation: Installation,
+        ws: WorkspaceClient,
+        wheels: WheelsV2,
+        prompts: Prompts,
+        product_info: ProductInfo,
+        verify_timeout: timedelta,
+    ):
         self._config = config
         self._installation = installation
         self._ws = ws
@@ -104,6 +119,17 @@ class WorkflowsInstallation(InstallationMixin):
         self._product_info = product_info
         self._verify_timeout = verify_timeout
         super().__init__(config, installation, ws)
+
+    @classmethod
+    def current(cls, ws: WorkspaceClient):
+        product_info = ProductInfo.from_class(WorkspaceConfig)
+        installation = product_info.current_installation(ws)
+        config = installation.load(WorkspaceConfig)
+        wheels = product_info.wheels(ws)
+        prompts = Prompts()
+        timeout = timedelta(minutes=2)
+
+        return cls(config, installation, ws, wheels, prompts, product_info, timeout)
 
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
@@ -249,7 +275,7 @@ class WorkflowsInstallation(InstallationMixin):
 
     @staticmethod
     def _infer_task_exception(haystack: str) -> Exception:
-        needles = [
+        needles: list[type[Exception]] = [
             BadRequest,
             Unauthenticated,
             PermissionDenied,
@@ -257,8 +283,8 @@ class WorkflowsInstallation(InstallationMixin):
             ResourceConflict,
             TooManyRequests,
             Cancelled,
+            databricks.sdk.errors.NotImplemented,
             InternalError,
-            NotImplemented,
             TemporarilyUnavailable,
             DeadlineExceeded,
             InvalidParameterValue,
@@ -370,7 +396,7 @@ class WorkflowsInstallation(InstallationMixin):
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.notebook is not None
-        local_notebook = self._this_file.parent / task.notebook
+        local_notebook = self._this_file.parent.parent / task.notebook
         with local_notebook.open("rb") as f:
             remote_notebook = self._installation.upload(local_notebook.name, f.read())
         return replace(
@@ -470,5 +496,3 @@ class WorkflowsInstallation(InstallationMixin):
             raise AttributeError("no result state in job run")
         job_state = latest_job_run.state.result_state.value
         return job_state
-
-

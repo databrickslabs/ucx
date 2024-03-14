@@ -26,7 +26,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
-from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
+from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
