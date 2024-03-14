@@ -25,6 +25,11 @@ class What(Enum):
     UNKNOWN = auto()
 
 
+class AclMigrationWhat(Enum):
+    LEGACY_TACL = auto()
+    PRINCIPAL = auto()
+
+
 @dataclass
 class Table:
     catalog: str

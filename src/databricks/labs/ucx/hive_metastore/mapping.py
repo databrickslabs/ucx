@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from functools import partial
 from typing import Any
@@ -136,7 +137,7 @@ class TableMapping:
         except BadRequest as err:
             logger.error(err)
 
-    def get_tables_to_migrate(self, tables_crawler: TablesCrawler):
+    def get_tables_to_migrate(self, tables_crawler: TablesCrawler) -> Collection[TableToMigrate]:
         rules = self.load()
         # Getting all the source tables from the rules
         databases_in_scope = self._get_databases_in_scope({rule.src_schema for rule in rules})

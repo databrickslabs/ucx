@@ -9,20 +9,20 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
-from databricks.sdk.service.catalog import (
-    PermissionsChange,
-    Privilege,
-    SecurableType,
-    TableType,
-)
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
+from databricks.labs.ucx.hive_metastore.tables import (
+    AclMigrationWhat,
+    MigrationCount,
+    Table,
+    What,
+)
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +40,15 @@ class MigrationStatus:
 class TablesMigrate:
     def __init__(
         self,
-        tables_crawler: TablesCrawler,
+        table_crawler: TablesCrawler,
+        grant_crawler: GrantsCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
         migration_status_refresher,
     ):
-        self._tc = tables_crawler
+        self._tc = table_crawler
+        self._gc = grant_crawler
         self._backend = backend
         self._ws = ws
         self._tm = table_mapping
@@ -59,56 +61,79 @@ class TablesMigrate:
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        udfs_crawler = UdfsCrawler(sql_backend, config.inventory_database)
+        grants_crawler = GrantsCrawler(table_crawler, udfs_crawler)
         table_mapping = TableMapping(installation, ws, sql_backend)
         migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
-        return cls(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
+        return cls(table_crawler, grants_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
 
-    def migrate_tables(self, *, what: What | None = None):
+    def migrate_tables(self, *, what: What | None = None, acl_strategy: AclMigrationWhat | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        grants_to_migrate = self._gc.snapshot()
         tasks = []
         for table in tables_to_migrate:
-            if not what or table.src.what == what:
-                tasks.append(partial(self._migrate_table, table.src, table.rule))
+            if what is not None and table.src.what != what:
+                continue
+            match acl_strategy:
+                case None:
+                    tasks.append(partial(self._migrate_table, table.src, table.rule))
+                case AclMigrationWhat.LEGACY_TACL:
+                    grant = self._match_grant(table.src, grants_to_migrate)
+                    tasks.append(partial(self._migrate_table, table.src, table.rule, grant))
+                case AclMigrationWhat.PRINCIPAL:
+                    grant = self._approximate_grant(table.src)
+                    tasks.append(partial(self._migrate_table, table.src, table.rule, grant))
         Threads.strict("migrate tables", tasks)
 
-    def _migrate_table(self, src_table: Table, rule: Rule):
+    def _migrate_table(self, src_table: Table, rule: Rule, grant: Grant | None = None):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
         if src_table.what == What.DBFS_ROOT_DELTA:
-            return self._migrate_dbfs_root_table(src_table, rule)
+            return self._migrate_dbfs_root_table(src_table, rule, grant)
         if src_table.what == What.EXTERNAL_SYNC:
-            return self._migrate_external_table(src_table, rule)
+            return self._migrate_external_table(src_table, rule, grant)
         if src_table.what == What.VIEW:
-            return self._migrate_view(src_table, rule)
+            return self._migrate_view(src_table, rule, grant)
         logger.info(f"Table {src_table.key} is not supported for migration")
         return True
 
-    def _migrate_external_table(self, src_table: Table, rule: Rule):
+    def _migrate_external_table(self, src_table: Table, rule: Rule, grant: Grant | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return True
+        return self._migrate_acl(src_table, rule, grant)
 
-    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
+    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grant: Grant | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return True
+        return self._migrate_acl(src_table, rule, grant)
 
-    def _migrate_view(self, src_table: Table, rule: Rule):
+    def _migrate_view(self, src_table: Table, rule: Rule, grant: Grant | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_view(target_table_key)
         logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_acl(src_table, rule, grant)
+
+    def _migrate_acl(self, src: Table, rule: Rule, grant: Grant | None):
+        if grant is None:
+            return True
+        acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
+        if acl_migrate_sql is None:
+            logger.debug(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
+            return False
+        logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
+        self._backend.execute(acl_migrate_sql)
         return True
 
     def _table_already_upgraded(self, target) -> bool:
@@ -193,7 +218,7 @@ class TablesMigrate:
             table_sub_header = "                    |"
             for what in list(What):
                 if len(what.name.split("_")) - 1 < header:
-                    table_sub_header += f"{' '*12}|"
+                    table_sub_header += f"{' ' * 12}|"
                     continue
                 table_sub_header += f" {what.name.split('_')[header]:<10} |"
             print(table_sub_header)
@@ -217,249 +242,29 @@ class TablesMigrate:
     def _init_seen_tables(self):
         self._seen_tables = self._migration_status_refresher.get_seen_tables()
 
-
-class TableMove:
-    def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
-        self._backend = backend
-        self._ws = ws
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        return cls(ws, sql_backend)
-
-    def move_tables(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-        del_table: bool,  # noqa: FBT001
-    ):
-        try:
-            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
-        except NotFound:
-            logger.error(f"schema {from_schema} not found in catalog {from_catalog}, enter correct schema details.")
-            return
-        try:
-            self._ws.schemas.get(f"{to_catalog}.{to_schema}")
-        except NotFound:
-            logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
-            self._ws.schemas.create(to_schema, to_catalog)
-
-        tables = self._ws.tables.list(from_catalog, from_schema)
-        table_tasks = []
-        view_tasks = []
-        filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
-        for table in filtered_tables:
-            try:
-                self._ws.tables.get(f"{to_catalog}.{to_schema}.{table.name}")
-                logger.warning(
-                    f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
-                )
+    @staticmethod
+    def _match_grant(table: Table, grants: Iterable[Grant]) -> Grant | None:
+        for grant in grants:
+            if grant.database != table.database:
                 continue
-            except NotFound:
-                if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
-                    table_tasks.append(
-                        partial(
-                            self._move_table, from_catalog, from_schema, table.name, to_catalog, to_schema, del_table
-                        )
-                    )
-                    continue
-                if table.view_definition:
-                    view_tasks.append(
-                        partial(
-                            self._move_view,
-                            from_catalog,
-                            from_schema,
-                            table.name,
-                            to_catalog,
-                            to_schema,
-                            del_table,
-                            table.view_definition,
-                        )
-                    )
-                    continue
-                logger.warning(
-                    f"table {from_table} was not identified as a valid table or view. skipping this table..."
-                )
-        Threads.strict("Creating tables", table_tasks)
-        logger.info(f"Moved {len(list(table_tasks))} tables to the new schema {to_schema}.")
-        Threads.strict("Creating views", view_tasks)
-        logger.info(f"Moved {len(list(view_tasks))} views to the new schema {to_schema}.")
+            if table.name in (grant.table, grant.view):
+                return grant
+        return None
 
-    def alias_tables(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-    ):
-        try:
-            self._ws.schemas.get(f"{from_catalog}.{from_schema}")
-        except NotFound:
-            logger.error(f"schema {from_schema} not found in catalog {from_catalog}, enter correct schema details.")
-            return
-        try:
-            self._ws.schemas.get(f"{to_catalog}.{to_schema}")
-        except NotFound:
-            logger.warning(f"schema {to_schema} not found in {to_catalog}, creating...")
-            self._ws.schemas.create(to_schema, to_catalog)
+    def _approximate_grant(self, table: Table) -> Grant | None:
+        if self._ws.config.is_aws:
+            return self._approximate_grant_aws(table)
+        if self._ws.config.is_azure:
+            return self._approximate_grant_azure(table)
+        return None
 
-        tables = self._ws.tables.list(from_catalog, from_schema)
-        alias_tasks = []
-        filtered_tables = [table for table in tables if from_table in [table.name, "*"]]
-        for table in filtered_tables:
-            try:
-                self._ws.tables.get(f"{to_catalog}.{to_schema}.{table.name}")
-                logger.warning(
-                    f"table {from_table} already present in {from_catalog}.{from_schema}. skipping this table..."
-                )
-                continue
-            except NotFound:
-                if table.table_type and table.table_type in (TableType.EXTERNAL, TableType.MANAGED):
-                    alias_tasks.append(
-                        partial(self._alias_table, from_catalog, from_schema, table.name, to_catalog, to_schema)
-                    )
-                    continue
-                if table.view_definition:
-                    alias_tasks.append(
-                        partial(
-                            self._move_view,
-                            from_catalog,
-                            from_schema,
-                            table.name,
-                            to_catalog,
-                            to_schema,
-                            False,
-                            table.view_definition,
-                        )
-                    )
-                    continue
-                logger.warning(
-                    f"table {from_table} was not identified as a valid table or view. skipping this table..."
-                )
-        Threads.strict("Creating aliases", alias_tasks)
-        logger.info(f"Created {len(list(alias_tasks))} table and view aliases in the new schema {to_schema}.")
+    def _approximate_grant_aws(self, table):
+        # TODO migrate acls based on prefix principals mappings
+        pass
 
-    def _move_table(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-        del_table: bool,  # noqa: FBT001
-    ) -> bool:
-        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
-        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
-        try:
-            self._recreate_table(from_table_name, to_table_name)
-            self._reapply_grants(from_table_name, to_table_name)
-            if del_table:
-                logger.info(f"Dropping source table {from_table_name}")
-                drop_sql = f"DROP TABLE {from_table_name}"
-                self._backend.execute(drop_sql)
-            return True
-        except NotFound as err:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
-                logger.error(f"Could not find table {from_table_name}. Table not found.")
-            else:
-                logger.error(f"Failed to move table {from_table_name}: {err!s}", exc_info=True)
-        return False
-
-    def _alias_table(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_table: str,
-        to_catalog: str,
-        to_schema: str,
-    ) -> bool:
-        from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
-        to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
-        try:
-            self._create_alias_view(from_table_name, to_table_name)
-            self._reapply_grants(from_table_name, to_table_name, target_view=True)
-            return True
-        except NotFound as err:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
-                logger.error(f"Could not find table {from_table_name}. Table not found.")
-            else:
-                logger.error(f"Failed to alias table {from_table_name}: {err!s}", exc_info=True)
-            return False
-
-    def _reapply_grants(self, from_table_name, to_table_name, *, target_view: bool = False):
-        try:
-            grants = self._ws.grants.get(SecurableType.TABLE, from_table_name)
-        except NotFound:
-            logger.warning(f"removed on the backend {from_table_name}")
-            return
-        if not grants.privilege_assignments:
-            return
-        logger.info(f"Applying grants on table {to_table_name}")
-        grants_changes = []
-        for permission in grants.privilege_assignments:
-            if not permission.privileges:
-                continue
-            if not target_view:
-                grants_changes.append(PermissionsChange(list(permission.privileges), permission.principal))
-                continue
-            privileges = set()
-            for privilege in permission.privileges:
-                if privilege != Privilege.MODIFY:
-                    privileges.add(privilege)
-            if privileges:
-                grants_changes.append(PermissionsChange(list(privileges), permission.principal))
-
-        self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
-
-    def _recreate_table(self, from_table_name, to_table_name):
-        create_sql = str(next(self._backend.fetch(f"SHOW CREATE TABLE {from_table_name}"))[0])
-        create_table_sql = create_sql.replace(f"CREATE TABLE {from_table_name}", f"CREATE TABLE {to_table_name}")
-        logger.info(f"Creating table {to_table_name}")
-        self._backend.execute(create_table_sql)
-
-    def _create_alias_view(self, from_table_name, to_table_name):
-        create_view_sql = f"CREATE VIEW {to_table_name} AS SELECT * FROM {from_table_name}"
-        logger.info(f"Creating view {to_table_name} on {from_table_name}")
-        self._backend.execute(create_view_sql)
-
-    def _move_view(
-        self,
-        from_catalog: str,
-        from_schema: str,
-        from_view: str,
-        to_catalog: str,
-        to_schema: str,
-        del_view: bool,  # noqa: FBT001
-        view_text: str | None = None,
-    ) -> bool:
-        from_view_name = f"{from_catalog}.{from_schema}.{from_view}"
-        to_view_name = f"{to_catalog}.{to_schema}.{from_view}"
-        try:
-            self._recreate_view(to_view_name, view_text)
-            self._reapply_grants(from_view_name, to_view_name)
-            if del_view:
-                logger.info(f"Dropping source view {from_view_name}")
-                drop_sql = f"DROP VIEW {from_view_name}"
-                self._backend.execute(drop_sql)
-            return True
-        except NotFound as err:
-            if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
-                logger.error(f"Could not find view {from_view_name}. View not found.")
-            else:
-                logger.error(f"Failed to move view {from_view_name}: {err!s}", exc_info=True)
-        return False
-
-    def _recreate_view(self, to_view_name, view_text):
-        create_sql = f"CREATE VIEW {to_view_name} AS {view_text}"
-        logger.info(f"Creating view {to_view_name}")
-        self._backend.execute(create_sql)
+    def _approximate_grant_azure(self, table):
+        # TODO migrate acls based on prefix principals mappings
+        pass
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
@@ -486,7 +291,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         return seen_tables
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema+'.'+table)}")
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)}")
         for value in result:
             if value["key"] == "upgraded_to":
                 logger.info(f"{schema}.{table} is set as upgraded")

@@ -16,7 +16,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.hive_metastore.table_migrate import TableMove
+from databricks.labs.ucx.hive_metastore.table_move import TableMove
 
 logger = logging.getLogger(__name__)
 
