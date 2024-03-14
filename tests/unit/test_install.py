@@ -204,7 +204,7 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
+        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two', "table_migration":"three"}, policy_id='123'),
         mock_installation,
         sql_backend,
         wheels,
@@ -220,6 +220,10 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
     assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
+
+    tasks = created_job_tasks(ws, '[MOCK] migrate-tables')
+    assert tasks['migrate_external_tables_sync'].existing_cluster_id == 'three'
+    assert tasks['migrate_dbfs_root_delta_tables'].existing_cluster_id == 'three'
 
 
 def test_write_protected_dbfs(ws, tmp_path, mock_installation):
@@ -263,6 +267,8 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 10,
+            'max_workers': 10,
+            'min_workers': 1,
             'override_clusters': {'main': '2222-999999-nosecuri', 'tacl': '3333-999999-legacytc'},
             'policy_id': '123',
             'renamed_group_prefix': 'ucx-renamed-',
@@ -293,6 +299,11 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert 'main' in job_clusters
     assert 'tacl' in job_clusters
     assert job_clusters["main"].new_cluster.policy_id == "123"
+
+    job = created_job(ws, '[MOCK] migrate-tables')
+    job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
+    assert 'table_migration' in job_clusters
+    assert job_clusters["table_migration"].new_cluster.policy_id == "123"
 
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
@@ -468,6 +479,9 @@ def test_save_config(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -500,6 +514,9 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -540,6 +557,9 @@ def test_create_cluster_policy(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo1',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1125,6 +1145,9 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'inventory_database': 'ucx',
             'log_level': 'INFO',
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1213,6 +1236,9 @@ def test_fresh_install(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
             r".*": "",
         }
     )
@@ -1230,10 +1256,77 @@ def test_fresh_install(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'max_workers': 20,
+            'min_workers': 2,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+        },
+    )
+
+
+def test_install_with_external_hms_conf(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
+            r".*We have identified one or more cluster.*": "Yes",
+            r".*Choose a cluster policy.*": "0",
+            r".*": "",
+        }
+    )
+    ws.workspace.get_status = not_found
+
+    policy_definition = {
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
+        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
+    }
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(policy_definition),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+
+    install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
+    install.configure()
+
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_days_submit_runs_history': 30,
+            'num_threads': 8,
+            'spark_conf': {'spark.hadoop.javax.jdo.option.ConnectionDriverName': 'SQLServerDriver',
+                           'spark.hadoop.javax.jdo.option.ConnectionPassword': 'pwd',
+                           'spark.hadoop.javax.jdo.option.ConnectionURL': 'url',
+                           'spark.hadoop.javax.jdo.option.ConnectionUserName': 'user1',
+                           'spark.sql.hive.metastore.jars': 'jar1',
+                           'spark.sql.hive.metastore.version': '0.13',
+                           'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'max_workers': 20,
+            'min_workers': 2,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+            'instance_profile': 'role_arn_1',
         },
     )
 
