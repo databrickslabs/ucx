@@ -20,7 +20,10 @@ from databricks.labs.ucx.hive_metastore import (
     TablesCrawler,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import (
+    MigrationStatusRefresher,
+    TablesMigrate,
+)
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
@@ -429,7 +432,10 @@ def migrate_external_tables_sync(
     """
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     table_mapping = TableMapping(install, ws, sql_backend)
-    TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(what=What.EXTERNAL_SYNC)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
+    TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher).migrate_tables(
+        what=What.EXTERNAL_SYNC
+    )
 
 
 @task("migrate-tables", job_cluster="table_migration")
@@ -443,7 +449,10 @@ def migrate_dbfs_root_delta_tables(
     """
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     table_mapping = TableMapping(install, ws, sql_backend)
-    TablesMigrate(table_crawler, ws, sql_backend, table_mapping).migrate_tables(what=What.DBFS_ROOT_DELTA)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
+    TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher).migrate_tables(
+        what=What.DBFS_ROOT_DELTA
+    )
 
 
 def main(*argv):
