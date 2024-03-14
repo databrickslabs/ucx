@@ -71,6 +71,7 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
+from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
@@ -79,58 +80,6 @@ from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, Migrate
 TAG_STEP = "step"
 WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
-
-EXTRA_TASK_PARAMS = {
-    "job_id": "{{job_id}}",
-    "run_id": "{{run_id}}",
-    "parent_run_id": "{{parent_run_id}}",
-}
-DEBUG_NOTEBOOK = """# Databricks notebook source
-# MAGIC %md
-# MAGIC # Debug companion for UCX installation (see [README]({readme_link}))
-# MAGIC
-# MAGIC Production runs are supposed to be triggered through the following jobs: {job_links}
-# MAGIC
-# MAGIC **This notebook is overwritten with each UCX update/(re)install.**
-
-# COMMAND ----------
-
-# MAGIC %pip install /Workspace{remote_wheel}
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
-import logging
-from pathlib import Path
-from databricks.labs.blueprint.installation import Installation
-from databricks.labs.blueprint.logger import install_logger
-from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.sdk import WorkspaceClient
-
-install_logger()
-logging.getLogger("databricks").setLevel("DEBUG")
-
-cfg = Installation.load_local(WorkspaceConfig, Path("/Workspace{config_file}"))
-ws = WorkspaceClient()
-
-print(__version__)
-"""
-
-TEST_RUNNER_NOTEBOOK = """# Databricks notebook source
-# MAGIC %pip install /Workspace{remote_wheel}
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
-from databricks.labs.ucx.runtime import main
-
-main(f'--config=/Workspace{config_file}',
-     f'--task=' + dbutils.widgets.get('task'),
-     f'--job_id=' + dbutils.widgets.get('job_id'),
-     f'--run_id=' + dbutils.widgets.get('run_id'),
-     f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
-"""
 
 logger = logging.getLogger(__name__)
 
@@ -169,14 +118,28 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
+class InstallationMixin:
+    @staticmethod
+    def sorted_tasks() -> list[Task]:
+        return sorted(_TASKS.values(), key=lambda x: x.task_id)
+
+    @classmethod
+    def step_list(cls) -> list[str]:
+        step_list = []
+        for task in cls.sorted_tasks():
+            if task.workflow not in step_list:
+                step_list.append(task.workflow)
+        return step_list
+
+
 class WorkspaceInstaller:
     def __init__(
-        self,
-        prompts: Prompts,
-        installation: Installation,
-        ws: WorkspaceClient,
-        product_info: ProductInfo,
-        environ: dict[str, str] | None = None,
+            self,
+            prompts: Prompts,
+            installation: Installation,
+            ws: WorkspaceClient,
+            product_info: ProductInfo,
+            environ: dict[str, str] | None = None,
     ):
         if not environ:
             environ = dict(os.environ.items())
@@ -191,10 +154,10 @@ class WorkspaceInstaller:
         self._force_install = environ.get("UCX_FORCE_INSTALL")
 
     def run(
-        self,
-        verify_timeout=timedelta(minutes=2),
-        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
-        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+            self,
+            verify_timeout=timedelta(minutes=2),
+            sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
+            wheel_builder_factory: Callable[[], WheelsV2] | None = None,
     ):
         logger.info(f"Installing UCX v{self._product_info.version()}")
         config = self.configure()
@@ -202,12 +165,15 @@ class WorkspaceInstaller:
             sql_backend_factory = self._new_sql_backend
         if not wheel_builder_factory:
             wheel_builder_factory = self._new_wheel_builder
+        wheels = wheel_builder_factory()
+        workflows_installer = WorkflowsInstallation(config, self._installation, self._ws, wheels, self._prompts,
+                                                    self._product_info)
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
             sql_backend_factory(config),
-            wheel_builder_factory(),
             self._ws,
+            workflows_installer,
             self._prompts,
             verify_timeout,
             self._product_info,
@@ -278,26 +244,6 @@ class WorkspaceInstaller:
 
         policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
 
-        # Save configurable spark_conf for table migration cluster
-        # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
-        parallelism = self._prompts.question(
-            "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
-        )
-        if not spark_conf_dict:
-            spark_conf_dict = {}
-        spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
-        # mix max workers for auto-scale migration job cluster
-        min_workers = int(
-            self._prompts.question(
-                "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
-            )
-        )
-        max_workers = int(
-            self._prompts.question(
-                "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
-            )
-        )
-
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
 
@@ -314,8 +260,6 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
-            min_workers=min_workers,
-            max_workers=max_workers,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
             include_databases=self._select_databases(),
@@ -376,21 +320,21 @@ class WorkspaceInstaller:
 
 class WorkspaceInstallation:
     def __init__(
-        self,
-        config: WorkspaceConfig,
-        installation: Installation,
-        sql_backend: SqlBackend,
-        wheels: WheelsV2,
-        ws: WorkspaceClient,
-        prompts: Prompts,
-        verify_timeout: timedelta,
-        product_info: ProductInfo,
+            self,
+            config: WorkspaceConfig,
+            installation: Installation,
+            sql_backend: SqlBackend,
+            ws: WorkspaceClient,
+            workflows_installer: WorkflowsInstallation,
+            prompts: Prompts,
+            verify_timeout: timedelta,
+            product_info: ProductInfo,
     ):
         self._config = config
         self._installation = installation
         self._ws = ws
-        self._wheels = wheels
         self._sql_backend = sql_backend
+        self._workflows_installer = workflows_installer
         self._prompts = prompts
         self._verify_timeout = verify_timeout
         self._state = InstallState.from_installation(installation)
@@ -405,8 +349,11 @@ class WorkspaceInstallation:
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
+
+        workflows_installer = WorkflowsInstallation(config, installation, ws, wheels, prompts, product_info)
         timeout = timedelta(minutes=2)
-        return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout, product_info)
+        return cls(config, installation, sql_backend, ws, workflows_installer, prompts,
+                   timeout, product_info)
 
     @property
     def config(self):
@@ -423,7 +370,7 @@ class WorkspaceInstallation:
             [
                 self._create_dashboards,
                 self._create_database,
-                self.create_jobs,
+                self._workflows_installer.create_jobs,
             ],
         )
 
@@ -466,97 +413,6 @@ class WorkspaceInstallation:
         )
         dash.create_dashboards()
 
-    def run_workflow(self, step: str):
-        job_id = int(self._state.jobs[step])
-        logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
-        job_run_waiter = self._ws.jobs.run_now(job_id)
-        try:
-            job_run_waiter.result()
-        except OperationFailed as err:
-            # currently we don't have any good message from API, so we have to work around it.
-            job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            raise self._infer_error_from_job_run(job_run) from err
-
-    def _infer_error_from_job_run(self, job_run) -> Exception:
-        errors: list[Exception] = []
-        timeouts: list[DeadlineExceeded] = []
-        assert job_run.tasks is not None
-        for run_task in job_run.tasks:
-            error = self._infer_error_from_task_run(run_task)
-            if not error:
-                continue
-            if isinstance(error, DeadlineExceeded):
-                timeouts.append(error)
-                continue
-            errors.append(error)
-        assert job_run.state is not None
-        assert job_run.state.state_message is not None
-        if len(errors) == 1:
-            return errors[0]
-        all_errors = errors + timeouts
-        if len(all_errors) == 0:
-            return Unknown(job_run.state.state_message)
-        return ManyError(all_errors)
-
-    def _infer_error_from_task_run(self, run_task: jobs.RunTask) -> Exception | None:
-        if not run_task.state:
-            return None
-        if run_task.state.result_state == jobs.RunResultState.TIMEDOUT:
-            msg = f"{run_task.task_key}: The run was stopped after reaching the timeout"
-            return DeadlineExceeded(msg)
-        if run_task.state.result_state != jobs.RunResultState.FAILED:
-            return None
-        assert run_task.run_id is not None
-        run_output = self._ws.jobs.get_run_output(run_task.run_id)
-        if not run_output:
-            msg = f'No run output. {run_task.state.state_message}'
-            return InternalError(msg)
-        if logger.isEnabledFor(logging.DEBUG):
-            if run_output.error_trace:
-                sys.stderr.write(run_output.error_trace)
-        if not run_output.error:
-            msg = f'No error in run output. {run_task.state.state_message}'
-            return InternalError(msg)
-        return self._infer_task_exception(f"{run_task.task_key}: {run_output.error}")
-
-    @staticmethod
-    def _infer_task_exception(haystack: str) -> Exception:
-        needles = [
-            BadRequest,
-            Unauthenticated,
-            PermissionDenied,
-            NotFound,
-            ResourceConflict,
-            TooManyRequests,
-            Cancelled,
-            InternalError,
-            NotImplemented,
-            TemporarilyUnavailable,
-            DeadlineExceeded,
-            InvalidParameterValue,
-            ResourceDoesNotExist,
-            Aborted,
-            AlreadyExists,
-            ResourceAlreadyExists,
-            ResourceExhausted,
-            RequestLimitExceeded,
-            Unknown,
-            DataLoss,
-            ValueError,
-            KeyError,
-        ]
-        constructors: dict[re.Pattern, type[Exception]] = {
-            re.compile(r".*\[TABLE_OR_VIEW_NOT_FOUND] (.*)"): NotFound,
-            re.compile(r".*\[SCHEMA_NOT_FOUND] (.*)"): NotFound,
-        }
-        for klass in needles:
-            constructors[re.compile(f".*{klass.__name__}: (.*)")] = klass
-        for pattern, klass in constructors.items():
-            match = pattern.match(haystack)
-            if match:
-                return klass(match.group(1))
-        return Unknown(haystack)
-
     @property
     def _warehouse_id(self) -> str:
         if self._config.warehouse_id is not None:
@@ -572,99 +428,6 @@ class WorkspaceInstallation:
         self._config.warehouse_id = warehouse_id
         return warehouse_id
 
-    @property
-    def _my_username(self):
-        if not hasattr(self, "_me"):
-            self._me = self._ws.current_user.me()
-            is_workspace_admin = any(g.display == "admins" for g in self._me.groups)
-            if not is_workspace_admin:
-                msg = "Current user is not a workspace admin"
-                raise PermissionError(msg)
-        return self._me.user_name
-
-    @property
-    def _short_name(self):
-        if "@" in self._my_username:
-            username = self._my_username.split("@")[0]
-        else:
-            username = self._me.display_name
-        return username
-
-    @property
-    def _config_file(self):
-        return f"{self._installation.install_folder()}/config.yml"
-
-    def _name(self, name: str) -> str:
-        prefix = os.path.basename(self._installation.install_folder()).removeprefix('.')
-        return f"[{prefix.upper()}] {name}"
-
-    def _upload_wheel(self):
-        with self._wheels:
-            try:
-                self._wheels.upload_to_dbfs()
-            except PermissionDenied as err:
-                if not self._prompts:
-                    raise RuntimeWarning("no Prompts instance found") from err
-                logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
-                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, self._prompts.choice_from_dict)
-                self._config.override_clusters = configure_cluster_overrides.configure()
-                self._installation.save(self._config)
-            return self._wheels.upload_to_wsfs()
-
-    def create_jobs(self):
-        logger.debug(f"Creating jobs from tasks in {main.__name__}")
-        remote_wheel = self._upload_wheel()
-        desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
-        wheel_runner = None
-
-        if self._config.override_clusters:
-            wheel_runner = self._upload_wheel_runner(remote_wheel)
-        for step_name in desired_steps:
-            settings = self._job_settings(step_name, remote_wheel)
-            if self._config.override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
-            self._deploy_workflow(step_name, settings)
-
-        for step_name, job_id in self._state.jobs.items():
-            if step_name not in desired_steps:
-                try:
-                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                    self._ws.jobs.delete(job_id)
-                except InvalidParameterValue:
-                    logger.warning(f"step={step_name} does not exist anymore for some reason")
-                    continue
-
-        self._state.save()
-        self._create_debug(remote_wheel)
-
-    def _deploy_workflow(self, step_name: str, settings):
-        if step_name in self._state.jobs:
-            try:
-                job_id = int(self._state.jobs[step_name])
-                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
-                return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
-            except InvalidParameterValue:
-                del self._state.jobs[step_name]
-                logger.warning(f"step={step_name} does not exist anymore for some reason")
-                return self._deploy_workflow(step_name, settings)
-        logger.info(f"Creating new job configuration for step={step_name}")
-        new_job = self._ws.jobs.create(**settings)
-        assert new_job.job_id is not None
-        self._state.jobs[step_name] = str(new_job.job_id)
-        return None
-
-    @staticmethod
-    def _sorted_tasks() -> list[Task]:
-        return sorted(_TASKS.values(), key=lambda x: x.task_id)
-
-    @classmethod
-    def _step_list(cls) -> list[str]:
-        step_list = []
-        for task in cls._sorted_tasks():
-            if task.workflow not in step_list:
-                step_list.append(task.workflow)
-        return step_list
-
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
         markdown = [
@@ -673,7 +436,7 @@ class WorkspaceInstallation:
             "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
-        for step_name in self._step_list():
+        for step_name in self._workflows_installer.step_list():
             if step_name not in self._state.jobs:
                 logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
                 continue
@@ -691,7 +454,7 @@ class WorkspaceInstallation:
             markdown.append(f"## {job_link}\n\n")
             markdown.append(f"{dashboard_link}")
             markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self._sorted_tasks():
+            for task in self._workflows_installer.sorted_tasks():
                 if task.workflow != step_name:
                     continue
                 doc = self._config.replace_inventory_variable(task.doc)
@@ -709,175 +472,6 @@ class WorkspaceInstallation:
     def _replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self._config.inventory_database}")
 
-    def _create_debug(self, remote_wheel: str):
-        readme_link = self._installation.workspace_link('README')
-        job_links = ", ".join(
-            f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            for step_name, job_id in self._state.jobs.items()
-        )
-        content = DEBUG_NOTEBOOK.format(
-            remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
-        ).encode("utf8")
-        self._installation.upload('DEBUG.py', content)
-
-    def _job_settings(self, step_name: str, remote_wheel: str):
-        email_notifications = None
-        if not self._config.override_clusters and "@" in self._my_username:
-            # set email notifications only if we're running the real
-            # installation and not the integration test.
-            email_notifications = jobs.JobEmailNotifications(
-                on_success=[self._my_username], on_failure=[self._my_username]
-            )
-        tasks = sorted(
-            [t for t in _TASKS.values() if t.workflow == step_name],
-            key=lambda _: _.name,
-        )
-        version = self._product_info.version()
-        version = version if not self._ws.config.is_gcp else version.replace("+", "-")
-        return {
-            "name": self._name(step_name),
-            "tags": {"version": f"v{version}"},
-            "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
-            "email_notifications": email_notifications,
-            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
-        }
-
-    def _upload_wheel_runner(self, remote_wheel: str):
-        # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
-        return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
-
-    @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
-        settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
-        for job_task in settings["tasks"]:
-            if job_task.job_cluster_key is None:
-                continue
-            if job_task.job_cluster_key in overrides:
-                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
-                job_task.job_cluster_key = None
-                job_task.libraries = None
-            if job_task.python_wheel_task is not None:
-                job_task.python_wheel_task = None
-                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
-                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
-        return settings
-
-    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
-        jobs_task = jobs.Task(
-            task_key=task.name,
-            job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].dependencies()],
-        )
-        if task.dashboard:
-            # dashboards are created in parallel to wheel uploads, so we'll just retry
-            retry_on_attribute_error = retried(on=[KeyError], timeout=self._verify_timeout)
-            retried_job_dashboard_task = retry_on_attribute_error(self._job_dashboard_task)
-            return retried_job_dashboard_task(jobs_task, task)
-        if task.notebook:
-            return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task, remote_wheel)
-
-    def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
-        assert task.dashboard is not None
-        dashboard_id = self._state.dashboards[task.dashboard]
-        return replace(
-            jobs_task,
-            job_cluster_key=None,
-            sql_task=jobs.SqlTask(
-                warehouse_id=self._warehouse_id,
-                dashboard=jobs.SqlTaskDashboard(dashboard_id=dashboard_id),
-            ),
-        )
-
-    def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
-        assert task.notebook is not None
-        local_notebook = self._this_file.parent / task.notebook
-        with local_notebook.open("rb") as f:
-            remote_notebook = self._installation.upload(local_notebook.name, f.read())
-        return replace(
-            jobs_task,
-            notebook_task=jobs.NotebookTask(
-                notebook_path=remote_notebook,
-                # ES-872211: currently, we cannot read WSFS files from Scala context
-                base_parameters={
-                    "task": task.name,
-                    "config": f"/Workspace{self._config_file}",
-                }
-                | EXTRA_TASK_PARAMS,
-            ),
-        )
-
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
-        return replace(
-            jobs_task,
-            # TODO: check when we can install wheels from WSFS properly
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
-            python_wheel_task=jobs.PythonWheelTask(
-                package_name="databricks_labs_ucx",
-                entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
-            ),
-        )
-
-    def _job_cluster_spark_conf(self, cluster_key: str):
-        conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
-        if cluster_key == "main":
-            spark_conf = {
-                "spark.databricks.cluster.profile": "singleNode",
-                "spark.master": "local[*]",
-            }
-            return spark_conf | conf_from_installation
-        if cluster_key == "tacl":
-            return {"spark.databricks.acl.sqlOnly": "true"} | conf_from_installation
-        if cluster_key == "table_migration":
-            return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
-        return conf_from_installation
-
-    def _job_clusters(self, names: set[str]):
-        clusters = []
-        if "main" in names:
-            clusters.append(
-                jobs.JobCluster(
-                    job_cluster_key="main",
-                    new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-                        spark_conf=self._job_cluster_spark_conf("main"),
-                        custom_tags={"ResourceClass": "SingleNode"},
-                        num_workers=0,
-                        policy_id=self.config.policy_id,
-                    ),
-                )
-            )
-        if "tacl" in names:
-            clusters.append(
-                jobs.JobCluster(
-                    job_cluster_key="tacl",
-                    new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
-                        spark_conf=self._job_cluster_spark_conf("tacl"),
-                        num_workers=1,  # ShowPermissionsCommand needs a worker
-                        policy_id=self.config.policy_id,
-                    ),
-                )
-            )
-        if "table_migration" in names:
-            clusters.append(
-                jobs.JobCluster(
-                    job_cluster_key="table_migration",
-                    new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
-                        spark_conf=self._job_cluster_spark_conf("table_migration"),
-                        policy_id=self.config.policy_id,
-                        autoscale=compute.AutoScale(
-                            max_workers=self.config.max_workers,
-                            min_workers=self.config.min_workers,
-                        ),
-                    ),
-                )
-            )
-        return clusters
-
     @staticmethod
     def _readable_timedelta(epoch):
         when = datetime.utcfromtimestamp(epoch)
@@ -887,7 +481,7 @@ class WorkspaceInstallation:
         data["hours"], remaining = divmod(remaining, 3_600)
         data["minutes"], data["seconds"] = divmod(remaining, 60)
 
-        time_parts = ((name, round(value)) for name, value in data.items())
+        time_parts = ((name, round(value)) for (name, value) in data.items())
         time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
         if len(time_parts) > 0:
             time_parts.append("ago")
@@ -965,8 +559,8 @@ class WorkspaceInstallation:
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
-            "Do you want to uninstall ucx from the workspace too, this would "
-            "remove ucx project folder, dashboards, queries and jobs"
+                "Do you want to uninstall ucx from the workspace too, this would "
+                "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
@@ -986,7 +580,7 @@ class WorkspaceInstallation:
 
     def _remove_database(self):
         if self._prompts and not self._prompts.confirm(
-            f"Do you want to delete the inventory database {self._config.inventory_database} too?"
+                f"Do you want to delete the inventory database {self._config.inventory_database} too?"
         ):
             return
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
@@ -1039,9 +633,9 @@ class WorkspaceInstallation:
                 return True
         for run in current_runs:
             if (
-                run.run_id
-                and run.state
-                and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
+                    run.run_id
+                    and run.state
+                    and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
             ):
                 logger.info("Identified a run in progress waiting for run completion")
                 self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run.run_id)
@@ -1051,7 +645,7 @@ class WorkspaceInstallation:
 
     def validate_and_run(self, step: str):
         if not self.validate_step(step):
-            self.run_workflow(step)
+            self._workflows_installer.run_workflow(step)
 
     def _trigger_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
@@ -1071,5 +665,6 @@ if __name__ == "__main__":
         current = app.current_installation(workspace_client)
     except NotFound:
         current = Installation.assume_global(workspace_client, app.product_name())
-    installer = WorkspaceInstaller(Prompts(), current, workspace_client, app)
+    prmpts = Prompts()
+    installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
     installer.run()
