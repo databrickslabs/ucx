@@ -1,6 +1,6 @@
 import logging
 import re
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -102,7 +102,8 @@ def instance_profile_migration(ws, installation, credential_manager):
 def test_for_cli_not_aws(caplog, ws, installation):
     ws.config.is_aws = False
     with pytest.raises(SystemExit):
-        IamRoleMigration.for_cli(ws, installation, MagicMock(), MockPrompts({}))
+        aws = create_autospec(AWSResources)
+        IamRoleMigration.for_cli(ws, installation, aws, MockPrompts({}))
     assert "Workspace is not on AWS, please run this command on a Databricks on AWS workspaces." in caplog.text
 
 
@@ -115,7 +116,8 @@ def test_for_cli_not_prompts(ws, installation):
         }
     )
     with pytest.raises(SystemExit):
-        IamRoleMigration.for_cli(ws, installation, MagicMock(), prompts)
+        aws = create_autospec(AWSResources)
+        IamRoleMigration.for_cli(ws, installation, aws, prompts)
 
 
 def test_for_cli(ws, installation):

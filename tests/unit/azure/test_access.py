@@ -4,6 +4,7 @@ from unittest.mock import call, create_autospec
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import Policy
@@ -18,7 +19,6 @@ from databricks.labs.ucx.azure.resources import (
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
-from ..framework.mocks import MockBackend
 from . import azure_api_client
 
 

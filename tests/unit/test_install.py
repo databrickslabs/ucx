@@ -1,21 +1,24 @@
+import io
 import json
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, create_autospec, patch
+from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
+import yaml
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import (
     ProductInfo,
     Wheels,
     WheelsV2,
     find_project_root,
 )
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
+    AlreadyExists,
     InvalidParameterValue,
     NotFound,
     NotImplemented,
@@ -54,8 +57,6 @@ from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 
-from ..unit.framework.mocks import MockBackend
-
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
 
@@ -87,6 +88,26 @@ def mock_clusters():
 
 @pytest.fixture
 def ws():
+    state = {
+        "/Applications/ucx/config.yml": yaml.dump(
+            {
+                'version': 1,
+                'inventory_database': 'ucx_exists',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            }
+        ),
+    }
+
+    def download(path: str) -> io.StringIO | io.BytesIO:
+        if path not in state:
+            raise NotFound(path)
+        if ".csv" in path:
+            return io.BytesIO(state[path].encode('utf-8'))
+        return io.StringIO(state[path])
+
     workspace_client = create_autospec(WorkspaceClient)
 
     workspace_client.current_user.me = lambda: iam.User(
@@ -110,6 +131,7 @@ def ws():
     workspace_client.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
     workspace_client.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
     workspace_client.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    workspace_client.workspace.download = download
 
     return workspace_client
 
@@ -506,6 +528,7 @@ def test_create_cluster_policy(ws, mock_installation):
             r".*": "",
         }
     )
+    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
     install.configure()
     mock_installation.assert_file_written(
@@ -766,7 +789,6 @@ def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
             state=RunState(result_state=RunResultState.FAILED),
         )
     ]
-    mocker.patch("webbrowser.open")
     ws.jobs.list_runs.return_value = base
     ws.jobs.list_runs.repair_run = None
 
@@ -1090,7 +1112,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             r".*": "",
         }
     )
-
+    ws.workspace.get_status = not_found
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
     install.configure()
 
@@ -1194,7 +1216,7 @@ def test_fresh_install(ws, mock_installation):
     )
 
 
-def test_get_existing_installation_global(ws, mock_installation):
+def test_get_existing_installation_global(ws, mock_installation, mocker):
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1205,31 +1227,28 @@ def test_get_existing_installation_global(ws, mock_installation):
         }
     )
 
-    def get_status_mock_global(path):
-        if path.startswith("/Users"):
-            raise NotFound
-        return Installation(ws, 'ucx', install_folder="/Applications/ucx")
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx_global',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            },
+        }
+    )
 
-    ws.workspace.get_status = MagicMock(side_effect=get_status_mock_global)
-    ws.config.inventory_database = 'ucx_global'
-    Upgrades.apply = MagicMock()
-
-    # test configure on existing global install
-    Installation.load = Mock()
-    Installation.load.return_value = ws.config
-    installation = Installation(ws, "ucx", install_folder="/Applications/ucx")
-
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
-    workspace_config = install.configure()
+    first_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    workspace_config = first_install.configure()
     assert workspace_config.inventory_database == 'ucx_global'
 
-    environ = {'UCX_FORCE_INSTALL': 'user'}
+    force_user_environ = {'UCX_FORCE_INSTALL': 'user'}
 
     # test for force user install variable without prompts
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, environ)
-    with pytest.raises(RuntimeWarning) as err:
-        install.configure()
-    assert err.value.args[0] == 'UCX is already installed, but no confirmation'
+    second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
+    with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
+        second_install.configure()
 
     # test for force user install variable with prompts
     prompts = MockPrompts(
@@ -1243,17 +1262,12 @@ def test_get_existing_installation_global(ws, mock_installation):
             r".*": "",
         }
     )
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, environ)
-    workspace_config = install.configure()
+    third_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
+    workspace_config = third_install.configure()
     assert workspace_config.inventory_database == 'ucx_user'
 
 
 def test_existing_installation_user(ws, mock_installation):
-    def get_status_mock_user(path):
-        if path.startswith("/Applications"):
-            raise NotFound
-        return Installation(ws, 'ucx', install_folder="/Applications/ucx")
-
     # test configure on existing user install
     prompts = MockPrompts(
         {
@@ -1266,16 +1280,21 @@ def test_existing_installation_user(ws, mock_installation):
             r".*": "",
         }
     )
-    ws.workspace.get_status = MagicMock(side_effect=get_status_mock_user)
-    ws.config.inventory_database = 'ucx_user'
-    Upgrades.apply = MagicMock()
 
-    Installation.load = Mock()
-    Installation.load.return_value = ws.config
-
-    installation = Installation(ws, "ucx", install_folder=f"/Users/{ws.current_user.me()}")
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
-    workspace_config = install.configure()
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx_user',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            },
+        },
+        is_global=False,
+    )
+    first_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    workspace_config = first_install.configure()
     assert workspace_config.inventory_database == 'ucx_user'
 
     # test for force global install variable without prompts
@@ -1290,11 +1309,10 @@ def test_existing_installation_user(ws, mock_installation):
         }
     )
 
-    environ = {'UCX_FORCE_INSTALL': 'global'}
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, environ)
-    with pytest.raises(RuntimeWarning) as err:
-        install.configure()
-    assert err.value.args[0] == 'UCX is already installed, but no confirmation'
+    force_global_env = {'UCX_FORCE_INSTALL': 'global'}
+    second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_global_env)
+    with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
+        second_install.configure()
 
     # test for force global install variable with prompts
     prompts = MockPrompts(
@@ -1309,10 +1327,9 @@ def test_existing_installation_user(ws, mock_installation):
         }
     )
 
-    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, environ)
-    with pytest.raises(NotImplemented) as err:
-        install.configure()
-    assert err.value.args[0] == "Migration needed. Not implemented yet."
+    third_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_global_env)
+    with pytest.raises(NotImplemented, match="Migration needed. Not implemented yet."):
+        third_install.configure()
 
 
 def test_databricks_runtime_version_set(ws, mock_installation):
@@ -1321,9 +1338,28 @@ def test_databricks_runtime_version_set(ws, mock_installation):
             r".*": "",
         }
     )
-    product_info = "mock"
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
     environ = {'DATABRICKS_RUNTIME_VERSION': "13.3"}
 
-    with pytest.raises(SystemExit) as err:
+    with pytest.raises(SystemExit, match="WorkspaceInstaller is not supposed to be executed in Databricks Runtime"):
         WorkspaceInstaller(prompts, mock_installation, ws, product_info, environ)
-    assert err.value.args[0] == "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
+
+
+def test_check_inventory_database_exists(ws, mock_installation):
+    ws.current_user.me().user_name = "foo"
+
+    prompts = MockPrompts(
+        {
+            r".*Inventory Database stored in hive_metastore": "ucx_exists",
+            r".*": "",
+        }
+    )
+
+    installation_type_mock = create_autospec(Installation)
+    installation_type_mock.load.side_effect = NotFound
+
+    installation = Installation(ws, 'ucx')
+    install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+
+    with pytest.raises(AlreadyExists, match="Inventory database 'ucx_exists' already exists in another installation"):
+        install.configure()

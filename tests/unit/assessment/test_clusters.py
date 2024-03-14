@@ -1,7 +1,9 @@
 import json
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, create_autospec, mock_open, patch
 
 import pytest
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
@@ -11,8 +13,9 @@ from databricks.labs.ucx.assessment.clusters import (
     ClustersCrawler,
     PoliciesCrawler,
 )
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.framework.crawlers import SqlBackend
 
-from ..framework.mocks import MockBackend
 from . import workspace_client_mock
 
 
@@ -29,22 +32,17 @@ def test_cluster_assessment():
 
 
 def test_cluster_assessment_cluster_policy_not_found(caplog):
-    ws = workspace_client_mock(
-        cluster_ids=['policy-azure-oauth'],
-    )
-    ws.cluster_policies.get = MagicMock()
-    ws.cluster_policies.get.side_effect = NotFound("NO_POLICY")
+    ws = workspace_client_mock(cluster_ids=['policy-deleted'])
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
     list(crawler.snapshot())
-    assert "The cluster policy was deleted: azure-oauth" in caplog.messages
+    assert "The cluster policy was deleted: deleted" in caplog.messages
 
 
 def test_cluster_assessment_cluster_policy_exception():
     ws = workspace_client_mock(
         cluster_ids=['policy-azure-oauth'],
     )
-    ws.cluster_policies.get = MagicMock()
-    ws.cluster_policies.get.side_effect = InternalError(...)
+    ws.cluster_policies.get = MagicMock(side_effect=InternalError(...))
     crawler = ClustersCrawler(ws, MockBackend(), "ucx")
 
     with pytest.raises(DatabricksError):
@@ -114,7 +112,7 @@ def test_cluster_without_owner_should_have_empty_creator_name():
     ClustersCrawler(ws, mockbackend, "ucx").snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.clusters", "append")
     assert result == [
-        ClusterInfo(
+        Row(
             cluster_id="simplest-autoscale",
             policy_id="single-user-with-spn",
             cluster_name="Simplest Shared Autoscale",
@@ -122,6 +120,8 @@ def test_cluster_without_owner_should_have_empty_creator_name():
             spark_version="13.3.x-cpu-ml-scala2.12",
             success=1,
             failures='[]',
+            cluster_name="Simplest Shared Autoscale",
+            creator=None,
         )
     ]
 
@@ -148,7 +148,7 @@ def test_cluster_with_job_source():
 
 def test_try_fetch():
     ws = workspace_client_mock(cluster_ids=['simplest-autoscale'])
-    mock_backend = MagicMock()
+    mock_backend = create_autospec(SqlBackend)
     mock_backend.fetch.return_value = [("000", 1, "123")]
     crawler = ClustersCrawler(ws, mock_backend, "ucx")
     result_set = list(crawler.snapshot())
@@ -161,7 +161,7 @@ def test_try_fetch():
 
 def test_no_isolation_clusters():
     ws = workspace_client_mock(cluster_ids=['no-isolation'])
-    sql_backend = MagicMock()
+    sql_backend = create_autospec(SqlBackend)
     crawler = ClustersCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
@@ -170,7 +170,7 @@ def test_no_isolation_clusters():
 
 def test_unsupported_clusters():
     ws = workspace_client_mock(cluster_ids=['legacy-passthrough'])
-    sql_backend = MagicMock()
+    sql_backend = create_autospec(SqlBackend)
     crawler = ClustersCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1

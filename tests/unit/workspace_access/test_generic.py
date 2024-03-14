@@ -1,9 +1,10 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock, create_autospec
+from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import Aborted, InternalError, NotFound, PermissionDenied
@@ -33,13 +34,12 @@ from databricks.labs.ucx.workspace_access.generic import (
     tokens_and_passwords,
 )
 from databricks.labs.ucx.workspace_access.groups import MigrationState
-from tests.unit.framework.mocks import MockBackend
 
 # pylint: disable=protected-access
 
 
 def test_crawler():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = [
         compute.ClusterDetails(
             cluster_id="test",
@@ -78,7 +78,7 @@ def test_crawler():
 
 
 def test_apply(migration_state):
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     acl1 = iam.AccessControlResponse(
         all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="test"
@@ -124,7 +124,9 @@ def test_apply(migration_state):
 
 
 def test_relevance():
-    sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])  # no listings since only apply is tested
+    sup = GenericPermissionsSupport(
+        ws=create_autospec(WorkspaceClient), listings=[]
+    )  # no listings since only apply is tested
     item = Permissions(object_id="passwords", object_type="passwords", raw="{}")
     migration_state = create_autospec(MigrationState)
     task = sup.get_apply_task(item, migration_state)
@@ -132,7 +134,7 @@ def test_relevance():
 
 
 def test_safe_get_permissions_when_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.permissions.get.side_effect = NotFound(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     result = sup.load_as_dict("clusters", "test")
@@ -145,7 +147,7 @@ def test_safe_get_permissions_when_error_non_retriable():
 
 
 def test_safe_get_permissions_when_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.permissions.get.side_effect = Aborted(...)
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     with pytest.raises(DatabricksError) as e:
@@ -154,7 +156,7 @@ def test_safe_get_permissions_when_error_retriable():
 
 
 def test_no_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = [
         compute.ClusterDetails(
             cluster_id="test",
@@ -176,7 +178,7 @@ def test_no_permissions():
 
 
 def test_passwords_tokens_crawler(migration_state):
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     basic_acl = [
         iam.AccessControlResponse(
@@ -218,7 +220,7 @@ def test_passwords_tokens_crawler(migration_state):
 
 
 def test_models_listing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.model_registry.list_models.return_value = [ml.Model(name="test"), ml.Model(name="test2")]
     ws.model_registry.get_model.return_value = ml.GetModelResponse(
         registered_model_databricks=ml.ModelDatabricks(
@@ -235,7 +237,7 @@ def test_models_listing():
 
 
 def test_models_listing_failure_raise_error():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.model_registry.list_models.return_value = [ml.Model(name="test")]
     ws.model_registry.get_model.side_effect = InternalError(...)
 
@@ -246,7 +248,7 @@ def test_models_listing_failure_raise_error():
 
 
 def test_experiment_listing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.experiments.list_experiments.return_value = [
         ml.Experiment(experiment_id="test"),
         ml.Experiment(experiment_id="test2", tags=[ml.ExperimentTag(key="whatever", value="SOMETHING")]),
@@ -278,7 +280,7 @@ def test_response_to_request_mapping():
 
     object_permissions = iam.ObjectPermissions(access_control_list=[response1, response2, response3])
 
-    sup = GenericPermissionsSupport(ws=MagicMock(), listings=[])
+    sup = GenericPermissionsSupport(ws=create_autospec(WorkspaceClient), listings=[])
     results = sup._response_to_request(object_permissions.access_control_list)
 
     assert results == [
@@ -292,7 +294,7 @@ def test_response_to_request_mapping():
 
 
 def test_applier_task_should_return_true_if_permission_is_up_to_date():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     acl1 = iam.AccessControlResponse(
         all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)], group_name="group"
     )
@@ -311,7 +313,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date():
 
 
 def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multiple_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     acl = iam.AccessControlResponse(
         all_permissions=[
             iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
@@ -336,7 +338,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
 
 
 def test_applier_task_failed():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     acl = iam.AccessControlResponse(all_permissions=[], group_name="group")
 
     ws.permissions.update.return_value = iam.ObjectPermissions(access_control_list=[acl])
@@ -352,7 +354,7 @@ def test_applier_task_failed():
 
 
 def test_applier_task_failed_when_all_permissions_not_up_to_date():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     group_1_acl = iam.AccessControlResponse(
         all_permissions=[
             iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
@@ -384,7 +386,7 @@ def test_applier_task_failed_when_all_permissions_not_up_to_date():
 
 
 def test_applier_task_failed_when_get_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     group_1_acl = iam.AccessControlResponse(
         all_permissions=[
             iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
@@ -412,7 +414,7 @@ def test_applier_task_failed_when_get_error_retriable():
 
 
 def test_applier_task_failed_when_get_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     group_1_acl = iam.AccessControlResponse(
         all_permissions=[
             iam.Permission(permission_level=iam.PermissionLevel.CAN_USE),
@@ -439,7 +441,7 @@ def test_applier_task_failed_when_get_error_non_retriable():
 
 
 def test_safe_update_permissions_when_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.permissions.update.side_effect = PermissionDenied(...)
 
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
@@ -453,7 +455,7 @@ def test_safe_update_permissions_when_error_non_retriable():
 
 
 def test_safe_update_permissions_when_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.permissions.update.side_effect = InternalError(...)
 
     sup = GenericPermissionsSupport(ws=ws, listings=[], verify_timeout=timedelta(seconds=1))
@@ -468,7 +470,7 @@ def test_safe_update_permissions_when_error_retriable():
 
 
 def test_load_as_dict():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     cluster_id = "cluster_test"
     group_name = "group_test"
@@ -515,7 +517,7 @@ def test_load_as_dict():
 
 
 def test_load_as_dict_permissions_not_found():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = GenericPermissionsSupport(
         ws=ws,
@@ -530,7 +532,7 @@ def test_load_as_dict_permissions_not_found():
 
 
 def test_load_as_dict_no_acls():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     cluster_id = "cluster_test"
 
@@ -551,7 +553,7 @@ def test_load_as_dict_no_acls():
 
 
 def test_load_as_dict_handle_exception_when_getting_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = GenericPermissionsSupport(
         ws=ws,
@@ -566,7 +568,7 @@ def test_load_as_dict_handle_exception_when_getting_permissions():
 
 
 def test_load_as_dict_no_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = GenericPermissionsSupport(
         ws=ws,
@@ -581,7 +583,7 @@ def test_load_as_dict_no_permissions():
 
 
 def test_load_as_dict_no_permission_level():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     cluster_id = "cluster_test"
     group_name = "group_test"
@@ -630,7 +632,7 @@ def test_workspaceobject_crawl():
 
 
 def test_eligibles_assets_with_owner_should_be_accepted():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.jobs.list.return_value = [BaseJob(job_id=13)]
     ws.pipelines.list_pipelines.return_value = [PipelineStateInfo(pipeline_id="12")]
 
@@ -681,7 +683,7 @@ def test_eligibles_assets_with_owner_should_be_accepted():
 
 
 def test_eligibles_assets_without_owner_should_be_ignored():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = [ClusterDetails(cluster_id="1234")]
     ws.jobs.list.return_value = [BaseJob(job_id=13)]
     ws.pipelines.list_pipelines.return_value = [PipelineStateInfo(pipeline_id="12")]
@@ -855,7 +857,7 @@ def test_verify_task_should_fail_if_acls_missing():
 
 
 def test_feature_tables_listing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     def do_api_side_effect(*_, query):
         if not query["page_token"]:
@@ -873,7 +875,7 @@ def test_feature_tables_listing():
 
 
 def test_root_page_listing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     basic_acl = [
         iam.AccessControlResponse(
@@ -896,7 +898,7 @@ def test_root_page_listing():
 
 
 def test_models_page_listing():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     basic_acl = [
         iam.AccessControlResponse(

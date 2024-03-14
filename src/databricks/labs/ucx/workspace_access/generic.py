@@ -8,6 +8,7 @@ from functools import partial
 
 from databricks.labs.blueprint.limiter import rate_limited
 from databricks.labs.blueprint.parallel import ManyError, Threads
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
     DeadlineExceeded,
@@ -22,7 +23,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 

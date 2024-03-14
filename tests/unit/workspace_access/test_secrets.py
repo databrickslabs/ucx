@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, call, create_autospec
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
@@ -16,7 +16,7 @@ from databricks.labs.ucx.workspace_access.secrets import (
 
 
 def test_secret_scopes_crawler():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.list_acls.return_value = [
         workspace.AclItem(
             principal="test",
@@ -43,7 +43,7 @@ def test_secret_scopes_crawler():
 
 
 def test_secret_scopes_apply(migration_state: MigrationState):
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws=ws)
     item = Permissions(
         object_id="test",
@@ -86,7 +86,7 @@ def test_secret_scopes_apply(migration_state: MigrationState):
 
 
 def test_secret_scopes_apply_failed():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws, timedelta(seconds=1))
     expected_permission = workspace.AclPermission.MANAGE
     with pytest.raises(TimeoutError) as e:
@@ -95,7 +95,7 @@ def test_secret_scopes_apply_failed():
 
 
 def test_secret_scopes_apply_incorrect():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.list_acls.return_value = [
         workspace.AclItem(
             principal="db-temp-test",
@@ -110,7 +110,7 @@ def test_secret_scopes_apply_incorrect():
 
 
 def test_secret_scopes_reapply():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.list_acls.side_effect = [
         [
             workspace.AclItem(
@@ -134,7 +134,7 @@ def test_secret_scopes_reapply():
 
 
 def test_secret_scopes_reapply_check_valueerror():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.list_acls.side_effect = [
         [
             workspace.AclItem(
@@ -152,7 +152,7 @@ def test_secret_scopes_reapply_check_valueerror():
 
 
 def test_secret_scopes_reapply_check_exception_type():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.list_acls.return_value = [
         workspace.AclItem(
             principal="db-temp-test",

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 import pytest
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -44,8 +45,6 @@ from databricks.sdk.service.sql import (
     QueryInfo,
 )
 from databricks.sdk.service.workspace import ImportFormat
-
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name

@@ -3,8 +3,9 @@ from unittest import mock
 from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
@@ -24,7 +25,6 @@ from databricks.labs.ucx.assessment.aws import (
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.unit import DEFAULT_CONFIG
-from tests.unit.framework.mocks import MockBackend
 
 
 @pytest.fixture
@@ -132,9 +132,9 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, mock_aw
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
 
 
-def test_create_external_locations_skip_existing(mock_ws, mock_installation, mock_aws, backend, locations):
-    mock_installation.load = MagicMock()
-    mock_installation.load.return_value = [
+def test_create_external_locations_skip_existing(mock_ws, mock_aws, backend, locations):
+    install = create_autospec(Installation)
+    install.load.return_value = [
         AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
         AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX"),
     ]
@@ -154,7 +154,7 @@ def test_create_external_locations_skip_existing(mock_ws, mock_installation, moc
         ExternalLocationInfo(name="UCX_FOO_1", url="s3://BUCKETX/FOLDERX", credential_name="credx"),
     ]
 
-    aws_resource_permissions = AWSResourcePermissions(mock_installation, mock_ws, backend, mock_aws, locations, "ucx")
+    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, backend, mock_aws, locations, "ucx")
     aws_resource_permissions.create_external_locations(location_init="UCX_FOO")
     calls = [
         call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
@@ -321,11 +321,13 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation, mock_ws, MockBackend(), mock_aws, locations, "ucx"
     )
-    mock_installation.load = MagicMock()
-    mock_installation.load.side_effect = [
-        ResourceDoesNotExist(),
-        [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
-    ]
+    # TODO: this is bad practice, we should not be mocking load() methon on a MockInstallation class
+    mock_installation.load = MagicMock(
+        side_effect=[
+            ResourceDoesNotExist(),
+            [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
+        ]
+    )
     aws_resource_permissions.load_uc_compatible_roles()
     mock_installation.assert_file_written(
         'uc_roles_access.csv',

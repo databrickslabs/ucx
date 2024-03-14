@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
@@ -16,7 +16,7 @@ from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 
 def test_applier_task_should_return_true_if_roles_are_properly_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.return_value = Group(id="1", roles=[iam.ComplexValue(value="role1"), iam.ComplexValue(value="role2")])
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
 
@@ -25,7 +25,7 @@ def test_applier_task_should_return_true_if_roles_are_properly_applied():
 
 
 def test_applier_task_should_return_true_if_entitlements_are_properly_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.return_value = Group(
         id="1", roles=[iam.ComplexValue(value="role1")], entitlements=[iam.ComplexValue(value="allow-cluster-create")]
     )
@@ -38,7 +38,7 @@ def test_applier_task_should_return_true_if_entitlements_are_properly_applied():
 
 
 def test_applier_task_should_return_false_if_roles_are_not_properly_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.return_value = Group(id="1", roles=[iam.ComplexValue(value="role2")])
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
 
@@ -48,7 +48,7 @@ def test_applier_task_should_return_false_if_roles_are_not_properly_applied():
 
 
 def test_applier_task_should_return_false_if_entitlements_are_not_properly_applied():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.return_value = Group(id="1", entitlements=[iam.ComplexValue(value="allow-cluster-create")])
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
 
@@ -60,7 +60,7 @@ def test_applier_task_should_return_false_if_entitlements_are_not_properly_appli
 
 
 def test_applier_task_when_get_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.side_effect = InternalError(error_code="INTERNAL_SERVER_ERROR")
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     group_id = "1"
@@ -72,7 +72,7 @@ def test_applier_task_when_get_error_retriable():
 
 
 def test_applier_task_when_get_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     group_id = "1"
@@ -83,7 +83,7 @@ def test_applier_task_when_get_error_non_retriable():
 
 
 def test_safe_patch_group_when_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.patch.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     operations = [iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[iam.ComplexValue(value="role1").as_dict()])]
@@ -93,7 +93,7 @@ def test_safe_patch_group_when_error_non_retriable():
 
 
 def test_safe_patch_group_when_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.patch.side_effect = InternalError(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     operations = [iam.Patch(op=iam.PatchOp.ADD, path="roles", value=[iam.ComplexValue(value="role1").as_dict()])]
@@ -104,7 +104,7 @@ def test_safe_patch_group_when_error_retriable():
 
 
 def test_safe_get_group_when_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.side_effect = PermissionDenied(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     result = sup._safe_get_group(group_id="1")
@@ -112,7 +112,7 @@ def test_safe_get_group_when_error_non_retriable():
 
 
 def test_safe_get_group_when_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.side_effect = InternalError(...)
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
     with pytest.raises(DatabricksError) as e:
@@ -121,7 +121,7 @@ def test_safe_get_group_when_error_retriable():
 
 
 def test_get_crawler_task_with_roles_and_entitlements_should_be_crawled():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.list.return_value = [
         Group(
             id="1",
@@ -144,7 +144,7 @@ def test_get_crawler_task_with_roles_and_entitlements_should_be_crawled():
 
 
 def test_groups_without_roles_and_entitlements_should_be_ignored():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.list.return_value = [Group(id="1", display_name="de")]
     sup = ScimSupport(ws=ws, verify_timeout=timedelta(seconds=1))
 
@@ -153,7 +153,7 @@ def test_groups_without_roles_and_entitlements_should_be_ignored():
 
 
 def test_get_apply_task_should_call_patch_on_group_external_id():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.list.return_value = [
         Group(
             id="1",
@@ -187,7 +187,7 @@ def test_get_apply_task_should_call_patch_on_group_external_id():
 
 
 def test_get_apply_task_should_ignore_groups_not_in_migration_state():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.groups.get.return_value = Group(
         id="1", display_name="de", entitlements=[iam.ComplexValue(value="forbidden-cluster-create")]
     )

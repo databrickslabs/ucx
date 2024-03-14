@@ -3,6 +3,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterSource, Policy
@@ -10,7 +11,7 @@ from databricks.sdk.service.compute import ClusterSource, Policy
 from databricks.labs.ucx.assessment.crawlers import azure_sp_conf_present_check, logger
 from databricks.labs.ucx.assessment.jobs import JobsMixin
 from databricks.labs.ucx.assessment.secrets import SecretsMixin
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
 _STORAGE_ACCOUNT_PATTERN = r"(?:id|endpoint)(.*?)dfs"
 

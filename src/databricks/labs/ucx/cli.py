@@ -8,6 +8,7 @@ from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
@@ -19,7 +20,6 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
@@ -96,7 +96,9 @@ def sync_workspace_info(a: AccountClient):
 
 
 @ucx.command(is_account=True)
-def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = None):
+def create_account_groups(
+    a: AccountClient, prompts: Prompts, workspace_ids: list[int] | None = None, new_workspace_client=WorkspaceClient
+):
     """
     Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present
     in the account.
@@ -109,15 +111,13 @@ def create_account_groups(a: AccountClient, workspace_ids: list[int] | None = No
     account
     """
     logger.info(f"Account ID: {a.config.account_id}")
-    prompts = Prompts()
-    workspaces = AccountWorkspaces(a)
+    workspaces = AccountWorkspaces(a, new_workspace_client)
     workspaces.create_account_level_groups(prompts, workspace_ids)
 
 
 @ucx.command
-def manual_workspace_info(w: WorkspaceClient):
+def manual_workspace_info(w: WorkspaceClient, prompts: Prompts):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     workspace_info = WorkspaceInfo(installation, w)
     workspace_info.manual_workspace_info(prompts)
@@ -137,9 +137,8 @@ def create_table_mapping(w: WorkspaceClient):
 
 
 @ucx.command
-def validate_external_locations(w: WorkspaceClient):
+def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
@@ -188,9 +187,10 @@ def validate_groups_membership(w: WorkspaceClient):
 
 
 @ucx.command
-def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delete_managed: bool = False):
+def revert_migrated_tables(
+    w: WorkspaceClient, prompts: Prompts, schema: str, table: str, *, delete_managed: bool = False
+):
     """remove notation on a migrated table for re-migration"""
-    prompts = Prompts()
     if not schema and not table:
         question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
         if not prompts.confirm(question, max_attempts=2):
@@ -204,6 +204,7 @@ def revert_migrated_tables(w: WorkspaceClient, schema: str, table: str, *, delet
 @ucx.command
 def move(
     w: WorkspaceClient,
+    prompts: Prompts,
     from_catalog: str,
     from_schema: str,
     from_table: str,
@@ -212,7 +213,6 @@ def move(
 ):
     """move a uc table/tables from one schema to another schema in same or different catalog"""
     logger.info("Running move command")
-    prompts = Prompts()
     if from_catalog == "" or to_catalog == "":
         logger.error("Please enter from_catalog and to_catalog details")
         return
@@ -254,9 +254,12 @@ def alias(
 
 def _execute_for_cloud(
     w: WorkspaceClient,
+    prompts: Prompts,
     func_azure: Callable,
     func_aws: Callable,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
     subscription_id: str | None = None,
+    aws_permissions: AWSResourcePermissions | None = None,
     aws_profile: str | None = None,
 ):
     if w.config.is_azure:
@@ -266,7 +269,9 @@ def _execute_for_cloud(
         if not subscription_id:
             logger.error("Please enter subscription id to scan storage accounts in.")
             return None
-        return func_azure(w, subscription_id)
+        return func_azure(
+            w, prompts, subscription_id=subscription_id, azure_resource_permissions=azure_resource_permissions
+        )
     if w.config.is_aws:
         if not shutil.which("aws"):
             logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
@@ -279,57 +284,104 @@ def _execute_for_cloud(
                 "or use the '--aws-profile=[profile-name]' parameter."
             )
             return None
-        return func_aws(w, aws_profile)
+        return func_aws(w, prompts, aws_profile=aws_profile, aws_permissions=aws_permissions)
     logger.error("This cmd is only supported for azure and aws workspaces")
     return None
 
 
 @ucx.command
-def create_uber_principal(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+def create_uber_principal(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    subscription_id: str | None = None,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
+    aws_profile: str | None = None,
+    aws_resource_permissions: AWSResourcePermissions | None = None,
+):
     """For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
     used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
     it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
     Pass subscription_id for azure and aws_profile for aws."""
-    return _execute_for_cloud(w, _azure_setup_uber_principal, _aws_setup_uber_principal, subscription_id, aws_profile)
+    return _execute_for_cloud(
+        w,
+        prompts,
+        _azure_setup_uber_principal,
+        _aws_setup_uber_principal,
+        azure_resource_permissions,
+        subscription_id,
+        aws_resource_permissions,
+        aws_profile,
+    )
 
 
-def _azure_setup_uber_principal(w: WorkspaceClient, subscription_id: str):
-    prompts = Prompts()
+def _azure_setup_uber_principal(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    subscription_id: str,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
+):
     include_subscriptions = [subscription_id] if subscription_id else None
-    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    if azure_resource_permissions is None:
+        azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
     azure_resource_permissions.create_uber_principal(prompts)
 
 
-def _aws_setup_uber_principal(w: WorkspaceClient, aws_profile: str):
-    prompts = Prompts()
+def _aws_setup_uber_principal(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    aws_profile: str,
+    aws_resource_permissions: AWSResourcePermissions | None = None,
+):
     installation = Installation.current(w, 'ucx')
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     aws = AWSResources(aws_profile)
-    aws_resource_permissions = AWSResourcePermissions.for_cli(
-        w, installation, sql_backend, aws, config.inventory_database
-    )
+    if aws_resource_permissions is None:
+        aws_resource_permissions = AWSResourcePermissions.for_cli(
+            w, installation, sql_backend, aws, config.inventory_database
+        )
     aws_resource_permissions.create_uber_principal(prompts)
 
 
 @ucx.command
-def principal_prefix_access(w: WorkspaceClient, subscription_id: str | None = None, aws_profile: str | None = None):
+def principal_prefix_access(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    subscription_id: str | None = None,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
+    aws_profile: str | None = None,
+    aws_resource_permissions: AWSResourcePermissions | None = None,
+):
     """For azure cloud, identifies all storage accounts used by tables in the workspace, identify spn and its
     permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
     its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
     The output is stored in the workspace install folder.
     Pass subscription_id for azure and aws_profile for aws."""
     return _execute_for_cloud(
-        w, _azure_principal_prefix_access, _aws_principal_prefix_access, subscription_id, aws_profile
+        w,
+        prompts,
+        _azure_principal_prefix_access,
+        _aws_principal_prefix_access,
+        azure_resource_permissions,
+        subscription_id,
+        aws_resource_permissions,
+        aws_profile,
     )
 
 
-def _azure_principal_prefix_access(w: WorkspaceClient, subscription_id: str):
+def _azure_principal_prefix_access(
+    w: WorkspaceClient,
+    _: Prompts,
+    *,
+    subscription_id: str,
+    azure_resource_permissions: AzureResourcePermissions | None = None,
+):
     if w.config.auth_type != "azure-cli":
         logger.error("In order to obtain AAD token, Please run azure cli to authenticate.")
         return
     include_subscriptions = [subscription_id] if subscription_id else None
-    azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
+    if azure_resource_permissions is None:
+        azure_resource_permissions = AzureResourcePermissions.for_cli(w, include_subscriptions=include_subscriptions)
     logger.info("Generating azure storage accounts and service principal permission info")
     path = azure_resource_permissions.save_spn_permissions()
     if path:
@@ -337,7 +389,13 @@ def _azure_principal_prefix_access(w: WorkspaceClient, subscription_id: str):
     return
 
 
-def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
+def _aws_principal_prefix_access(
+    w: WorkspaceClient,
+    _: Prompts,
+    *,
+    aws_profile: str,
+    aws_permissions: AWSResourcePermissions | None = None,
+):
     if not shutil.which("aws"):
         logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
         return
@@ -346,7 +404,8 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     aws = AWSResources(aws_profile)
-    aws_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
+    if aws_permissions is None:
+        aws_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
     instance_role_path = aws_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
@@ -355,7 +414,9 @@ def _aws_principal_prefix_access(w: WorkspaceClient, aws_profile: str):
 
 
 @ucx.command
-def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
+def migrate_credentials(
+    w: WorkspaceClient, prompts: Prompts, aws_profile: str | None = None, aws_resources: AWSResources | None = None
+):
     """For Azure, this command migrates Azure Service Principals, which have Storage Blob Data Contributor,
     Storage Blob Data Reader, Storage Blob Data Owner roles on ADLS Gen2 locations that are being used in
     Databricks, to UC storage credentials.
@@ -369,7 +430,6 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
     Please review the file and delete the Instance Profiles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     if w.config.is_azure:
         logger.info("Running migrate_credentials for Azure")
@@ -386,8 +446,9 @@ def migrate_credentials(w: WorkspaceClient, aws_profile: str | None = None):
             )
             return
         logger.info("Running migrate_credentials for AWS")
-        aws = AWSResources(aws_profile)
-        instance_profile_migration = IamRoleMigration.for_cli(w, installation, aws, prompts)
+        if not aws_resources:
+            aws_resources = AWSResources(aws_profile)
+        instance_profile_migration = IamRoleMigration.for_cli(w, installation, aws_resources, prompts)
         instance_profile_migration.run(prompts)
         return
     if w.config.is_gcp:
@@ -424,16 +485,15 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
         sql_backend = StatementExecutionBackend(w, config.warehouse_id)
         aws = AWSResources(aws_profile)
         location = ExternalLocations(w, sql_backend, config.inventory_database)
-        aws_permissions = AWSResourcePermissions.for_cli(w, sql_backend, aws, location, config.inventory_database)
+        aws_permissions = AWSResourcePermissions(installation, w, sql_backend, aws, location, config.inventory_database)
         aws_permissions.create_external_locations()
     if w.config.is_gcp:
         logger.error("migrate_locations is not yet supported in GCP")
 
 
 @ucx.command
-def create_catalogs_schemas(w: WorkspaceClient):
+def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
-    prompts = Prompts()
     installation = Installation.current(w, 'ucx')
     catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
     catalog_schema.create_catalog_schema()

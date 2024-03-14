@@ -1,6 +1,6 @@
 import io
 import json
-from unittest.mock import create_autospec, patch
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -38,39 +38,31 @@ def test_sync_workspace_info(mocker):
     ws.workspace.upload.assert_called()
 
 
-def test_current_workspace_name(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+def test_current_workspace_name():
+    ws = create_autospec(WorkspaceClient)
     ws.config.host = "localhost"
     ws.config.user_agent = "ucx"
     ws.config.authenticate.return_value = {"Foo": "bar"}
     ws.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
-    with patch("requests.get") as requests_get:
-        response = mocker.Mock()
-        response.headers = {"x-databricks-org-id": "123"}
-        requests_get.return_value = response
-        installation = Installation(ws, 'ucx')
-        wir = WorkspaceInfo(installation, ws)
-        assert wir.current() == "some"
+    ws.get_workspace_id.return_value = 123
+    installation = Installation(ws, 'ucx')
+    wir = WorkspaceInfo(installation, ws)
+    assert wir.current() == "some"
 
 
 def test_manual_workspace_info(mocker):
-    ws = mocker.patch("databricks.sdk.WorkspaceClient.__init__")
+    ws = create_autospec(WorkspaceClient)
     ws.config.host = "localhost"
     ws.users.list.return_value = [User(user_name="foo")]
     ws.config.host = "localhost"
     ws.config.user_agent = "ucx"
     ws.config.authenticate.return_value = {"Foo": "bar"}
     ws.workspace.download.return_value = json.dumps([{"workspace_id": 123, "workspace_name": "some"}])
+    ws.get_workspace_id.return_value = 123
     installation = MockInstallation()
-    with patch("requests.get") as requests_get:
-        response = mocker.Mock()
-        response.headers = {"x-databricks-org-id": "123"}
-        requests_get.return_value = response
-        wir = WorkspaceInfo(installation, ws)
-        prompts = MockPrompts({r"Workspace name for 123": "some-name", r"Next workspace id": "stop"})
-
-        wir.manual_workspace_info(prompts)
-
+    wir = WorkspaceInfo(installation, ws)
+    prompts = MockPrompts({r"Workspace name for 123": "some-name", r"Next workspace id": "stop"})
+    wir.manual_workspace_info(prompts)
     ws.workspace.upload.assert_called()
 
 
