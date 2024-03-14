@@ -18,8 +18,8 @@ from databricks.sdk.service.catalog import (
 )
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What

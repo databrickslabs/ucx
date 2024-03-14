@@ -57,7 +57,7 @@ _FOLDERS = {
     BaseRun: 'assessment/jobruns',
     ClusterDetails: 'assessment/clusters',
     PipelineStateInfo: 'assessment/pipelines',
-    TableToMigrate: './hive_metastore/tables',
+    TableToMigrate: 'hive_metastore/tables',
 }
 
 

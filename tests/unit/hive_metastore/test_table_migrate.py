@@ -68,7 +68,8 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     table_mapping = table_mapping_mock(["managed_dbfs"])
-    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping, migration_status_refresher)
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
@@ -366,7 +367,7 @@ def test_is_upgraded(ws):
     assert not table_migrate.is_upgraded("schema1", "table2")
 
 
-def test_table_status(mocker):
+def test_table_status():
     class FakeDate(datetime.datetime):
 
         def timestamp(self):
@@ -375,7 +376,7 @@ def test_table_status(mocker):
     datetime.datetime = FakeDate
     errors = {}
     rows = {
-        "SHOW TBLPROPERTIES `schema1`.`table1`": [
+        "SHOW TBLPROPERTIES schema1.table1": [
             {"key": "upgraded_to", "value": "cat1.schema1.dest1"},
         ],
     }
@@ -410,7 +411,7 @@ def test_table_status(mocker):
             upgraded_to="cat1.schema1.table3",
         ),
     ]
-    client = create_autospec(WorkspaceClient)
+    client = workspace_client_mock()
     client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     client.schemas.list.return_value = [
         SchemaInfo(catalog_name="cat1", name="schema1"),
@@ -461,7 +462,7 @@ def test_table_status(mocker):
     ]
 
 
-def test_table_status_reset(mocker):
+def test_table_status_reset():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
