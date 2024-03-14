@@ -1,4 +1,7 @@
 {
-  "policy_id": "123",
-  "definition": "{\"azure_attributes.availability\": {\"type\": \"fixed\", \"value\": \"ON_DEMAND_AZURE\", \"hidden\": true}}"
+  "policy_id": "single-user-with-spn-no-sparkversion",
+  "name": "test_policy",
+  "definition": "{\"azure_attributes.availability\": {\"type\": \"fixed\", \"value\": \"ON_DEMAND_AZURE\", \"hidden\": true}}",
+  "policy_family_definition_overrides":{
+  }
 }

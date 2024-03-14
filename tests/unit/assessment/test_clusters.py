@@ -8,12 +8,7 @@ from databricks.sdk.errors import DatabricksError, InternalError, NotFound
 from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import (
-    ClusterInfo,
-    ClustersCrawler,
-    PoliciesCrawler,
-)
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 
 from . import workspace_client_mock
@@ -120,8 +115,6 @@ def test_cluster_without_owner_should_have_empty_creator_name():
             spark_version="13.3.x-cpu-ml-scala2.12",
             success=1,
             failures='[]',
-            cluster_name="Simplest Shared Autoscale",
-            creator=None,
         )
     ]
 
@@ -182,7 +175,8 @@ def test_policy_crawler():
         policy_ids=['single-user-with-spn', 'single-user-with-spn-policyid', 'single-user-with-spn-no-sparkversion'],
     )
 
-    crawler = PoliciesCrawler(ws, MockBackend(), "ucx")
+    sql_backend = create_autospec(SqlBackend)
+    crawler = PoliciesCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
     failures = json.loads(result_set[0].failures)
     assert len(result_set) == 2

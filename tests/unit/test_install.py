@@ -15,7 +15,7 @@ from databricks.labs.blueprint.wheels import (
     WheelsV2,
     find_project_root,
 )
-from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
@@ -53,7 +53,6 @@ from databricks.sdk.service.workspace import ObjectInfo
 
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 

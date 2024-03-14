@@ -3,10 +3,10 @@
 import logging
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 logger = logging.getLogger(__name__)
 
