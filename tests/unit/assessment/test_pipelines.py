@@ -4,7 +4,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 
-from . import workspace_client_mock
+from .. import workspace_client_mock
 
 
 def test_pipeline_assessment_with_config():

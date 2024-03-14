@@ -11,7 +11,7 @@ from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.framework.crawlers import SqlBackend
 
-from . import workspace_client_mock
+from .. import workspace_client_mock
 
 
 def test_cluster_assessment():
