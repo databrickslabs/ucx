@@ -6,7 +6,6 @@ from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
-from databricks.sdk.service.serving import ServingEndpointPermission
 
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import (
