@@ -4,6 +4,7 @@ import logging
 import pathlib
 from unittest.mock import create_autospec
 
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
@@ -59,30 +60,32 @@ _FOLDERS = {
     PipelineStateInfo: 'assessment/pipelines',
     Policy: 'assessment/policies',
     TableToMigrate: 'hive_metastore/tables',
+    EndpointConfPair: 'assessment/warehouses',
 }
 
 
-def _load_list(cls: type, filename: str, ids=None):
-    if not ids:  # TODO: remove
-        return [cls.from_dict(_) for _ in _load_fixture(filename)]  # type: ignore[attr-defined]
-    return _id_list(cls, ids)
+def _load_list(cls: type, filename: str):
+    fixtures = _load_fixture(f'{_FOLDERS[cls]}/{filename}.json')
+    installation = MockInstallation(DEFAULT_CONFIG | {str(num): fixture for num, fixture in enumerate(fixtures)})
+    return [installation.load(cls, filename=str(num)) for num in range(len(fixtures))]
 
 
 def _id_list(cls: type, ids=None):
     if not ids:
         return []
-    return [cls.from_dict(_load_fixture(f'{_FOLDERS[cls]}/{_}.json')) for _ in ids]  # type: ignore[attr-defined]
+    installation = MockInstallation(DEFAULT_CONFIG | {_: _load_fixture(f'{_FOLDERS[cls]}/{_}.json') for _ in ids})
+    return [installation.load(cls, filename=_) for _ in ids]
 
 
 def _cluster_policy(policy_id: str):
-    fixture = _load_fixture(f"assessment/policies/{policy_id}.json")
+    fixture = _load_fixture(f"{_FOLDERS[Policy]}/{policy_id}.json")
     definition = json.dumps(fixture["definition"])
     overrides = json.dumps(fixture["policy_family_definition_overrides"])
     return Policy(description=definition, policy_family_definition_overrides=overrides)
 
 
 def _pipeline(pipeline_id: str):
-    fixture = _load_fixture(f"assessment/pipelines/{pipeline_id}.json")
+    fixture = _load_fixture(f"{_FOLDERS[PipelineStateInfo]}/{pipeline_id}.json")
     return GetPipelineResponse.from_dict(fixture)
 
 
@@ -97,7 +100,7 @@ def workspace_client_mock(
     job_ids: list[str] | None = None,
     jobruns_ids: list[str] | None = None,
     policy_ids: list[str] | None = None,
-    warehouse_config="single-config.json",
+    warehouse_config="single-config",
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
@@ -108,9 +111,7 @@ def workspace_client_mock(
     ws.pipelines.get = _pipeline
     ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
     ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
-    ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(
-        EndpointConfPair, f"assessment/warehouses/{warehouse_config}"
-    )
+    ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(EndpointConfPair, warehouse_config)
     ws.workspace.export = _workspace_export
     if secret_exists:
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")

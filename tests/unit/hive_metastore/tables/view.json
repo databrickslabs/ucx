@@ -1,10 +1,10 @@
 {
-  "table": {
+  "src": {
     "catalog": "hive_metastore",
     "database": "db1_src",
     "name": "view_src",
-    "type": "VIEW",
-    "format": "VIEW",
+    "object_type": "VIEW",
+    "table_format": "VIEW",
     "view_text": "SELECT * FROM table"
   },
   "rule": {

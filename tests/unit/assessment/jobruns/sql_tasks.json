@@ -8,6 +8,7 @@
       "task_key": "path",
       "existing_cluster_id": "outdated-autoscale",
       "sql_task": {
+        "warehouse_id": "outdated-autoscale",
         "file": {
           "path": "/foo/bar"
         }
@@ -17,6 +18,7 @@
       "task_key": "alert",
       "existing_cluster_id": "outdated-autoscale",
       "sql_task": {
+        "warehouse_id": "outdated-autoscale",
         "alert": {
           "alert_id": "a123"
         }
@@ -26,6 +28,7 @@
       "task_key": "dashboard",
       "existing_cluster_id": "outdated-autoscale",
       "sql_task": {
+        "warehouse_id": "outdated-autoscale",
         "dashboard": {
           "dashboard_id": "d123"
         }
@@ -35,6 +38,7 @@
       "task_key": "query",
       "existing_cluster_id": "outdated-autoscale",
       "sql_task": {
+        "warehouse_id": "outdated-autoscale",
         "dashboard": {
           "dashboard_id": "q123"
         }

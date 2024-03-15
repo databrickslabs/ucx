@@ -4,6 +4,7 @@
   "start_time": 1704085200000,
   "timeout_seconds": 86400,
   "git_source": {
+    "git_provider": "gitHub",
     "git_url": "https://foo/bar"
   },
 
