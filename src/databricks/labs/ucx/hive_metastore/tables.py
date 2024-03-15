@@ -61,20 +61,6 @@ class Table:
 
     UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_workspace_id"
 
-    @classmethod
-    def from_dict(cls, data: dict[str, typing.Any]):
-        return cls(
-            catalog=data.get("catalog", "UNKNOWN"),
-            database=data.get("database", "UNKNOWN"),
-            name=data.get("name", "UNKNOWN"),
-            object_type=data.get("object_type", "UNKNOWN"),
-            table_format=data.get("table_format", "UNKNOWN"),
-            location=data.get("location", None),
-            view_text=data.get("view_text", None),
-            upgraded_to=data.get("upgraded_to", None),
-            storage_properties=data.get("storage_properties", None),
-        )
-
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:

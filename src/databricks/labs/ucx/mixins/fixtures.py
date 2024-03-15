@@ -280,7 +280,7 @@ def _permissions_mapping():
         (
             "serving_endpoint",
             "serving-endpoints",
-            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE],
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_QUERY],
             _simple,
         ),
         (
