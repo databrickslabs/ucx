@@ -283,10 +283,9 @@ class WorkspaceInstaller:
         parallelism = self._prompts.question(
             "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
         )
-        if spark_conf_dict:
-            spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
-        else:
-            spark_conf_dict = {'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism}
+        if not spark_conf_dict:
+            spark_conf_dict = {}
+        spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
         # mix max workers for auto-scale migration job cluster
         min_workers = int(
             self._prompts.question(

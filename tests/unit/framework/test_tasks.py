@@ -100,8 +100,7 @@ def test_run_task(capsys):
         return f"Hello, World! {cfg} {workspace_client} {sql_backend} {installation}"
 
     args = parse_args("--config=foo", "--task=mock_migrate_external_tables_sync", "--parent_run_id=abc", "--job_id=123")
-    cfg = create_autospec(WorkspaceConfig)
-    cfg.log_level = "INFO"
+    cfg = WorkspaceConfig("test_db", log_level="INFO")
 
     # test the task function is called
     run_task(
