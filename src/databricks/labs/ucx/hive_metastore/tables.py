@@ -1,16 +1,16 @@
 import logging
 import re
 import typing
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.mixins.sql import Row
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,20 @@ class Table:
 
     UPGRADED_FROM_WS_PARAM: typing.ClassVar[str] = "upgraded_from_workspace_id"
 
+    @classmethod
+    def from_dict(cls, data: dict[str, typing.Any]):
+        return cls(
+            catalog=data.get("catalog", "UNKNOWN"),
+            database=data.get("database", "UNKNOWN"),
+            name=data.get("name", "UNKNOWN"),
+            object_type=data.get("object_type", "UNKNOWN"),
+            table_format=data.get("table_format", "UNKNOWN"),
+            location=data.get("location", None),
+            view_text=data.get("view_text", None),
+            upgraded_to=data.get("upgraded_to", None),
+            storage_properties=data.get("storage_properties", None),
+        )
+
     @property
     def is_delta(self) -> bool:
         if self.table_format is None:
@@ -71,31 +85,32 @@ class Table:
         return "VIEW" if self.view_text is not None else "TABLE"
 
     def sql_alter_to(self, target_table_key):
-        return f"ALTER {self.kind} {self.key} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
+        return f"ALTER {self.kind} {escape_sql_identifier(self.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
     def sql_alter_from(self, target_table_key, ws_id):
         return (
-            f"ALTER {self.kind} {target_table_key} SET TBLPROPERTIES "
+            f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
             f"('upgraded_from' = '{self.key}'"
             f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
 
     def sql_unset_upgraded_to(self):
-        return f"ALTER {self.kind} {self.key} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
+        return f"ALTER {self.kind} {escape_sql_identifier(self.key)} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
     @property
     def is_dbfs_root(self) -> bool:
         if not self.location:
             return False
         for prefix in self.DBFS_ROOT_PREFIXES:
-            if self.location.startswith(prefix):
-                for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
-                    if self.location.startswith(exception):
-                        return False
-                for db_datasets in self.DBFS_DATABRICKS_DATASETS:
-                    if self.location.startswith(db_datasets):
-                        return False
-                return True
+            if not self.location.startswith(prefix):
+                continue
+            for exception in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+                if self.location.startswith(exception):
+                    return False
+            for db_datasets in self.DBFS_DATABRICKS_DATASETS:
+                if self.location.startswith(db_datasets):
+                    return False
+            return True
         return False
 
     @property
@@ -157,7 +172,7 @@ class MigrationCount:
 
 
 class TablesCrawler(CrawlerBase):
-    def __init__(self, backend: SqlBackend, schema):
+    def __init__(self, backend: SqlBackend, schema, include_databases: list[str] | None = None):
         """
         Initializes a TablesCrawler instance.
 
@@ -166,9 +181,12 @@ class TablesCrawler(CrawlerBase):
             schema: The schema name for the inventory persistence.
         """
         super().__init__(backend, "hive_metastore", schema, "tables", Table)
+        self._include_database = include_databases
 
-    def _all_databases(self) -> Iterator[Row]:
-        yield from self._fetch("SHOW DATABASES")
+    def _all_databases(self) -> list[str]:
+        if not self._include_database:
+            return [row[0] for row in self._fetch("SHOW DATABASES")]
+        return self._include_database
 
     def snapshot(self) -> list[Table]:
         """
@@ -214,7 +232,7 @@ class TablesCrawler(CrawlerBase):
         """
         tasks = []
         catalog = "hive_metastore"
-        for (database,) in self._all_databases():
+        for database in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
             for _, table, _is_tmp in self._fetch(
                 f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
@@ -256,7 +274,9 @@ class TablesCrawler(CrawlerBase):
                 upgraded_to=self._parse_table_props(describe.get("Table Properties", "").lower()).get(
                     "upgraded_to", None
                 ),
-                storage_properties=self._parse_table_props(describe.get("Storage Properties", "").lower()),  # type: ignore[arg-type]
+                storage_properties=self._parse_table_props(
+                    describe.get("Storage Properties", "").lower()
+                ),  # type: ignore[arg-type]
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406

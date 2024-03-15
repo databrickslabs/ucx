@@ -1,22 +1,26 @@
 import functools
-import json
 import logging
 import os
 import re
 import sys
 import time
 import webbrowser
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
+from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     Aborted,
@@ -52,24 +56,21 @@ from databricks.sdk.service.sql import (
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
-from databricks.labs.ucx.assessment.clusters import ClusterInfo
+from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
-from databricks.labs.ucx.framework.crawlers import (
-    SchemaDeployer,
-    SqlBackend,
-    StatementExecutionBackend,
-)
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
+from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.runtime import main
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
@@ -133,8 +134,6 @@ main(f'--config=/Workspace{config_file}',
 
 logger = logging.getLogger(__name__)
 
-PRODUCT_INFO = ProductInfo(__file__)
-
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     # we need to import it like this because we expect a module instance
@@ -161,48 +160,160 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workspace_objects", WorkspaceObjectInfo),
             functools.partial(table, "permissions", Permissions),
             functools.partial(table, "submit_runs", SubmitRunInfo),
+            functools.partial(table, "policies", PolicyInfo),
+            functools.partial(table, "migration_status", MigrationStatus),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
+    deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
 class WorkspaceInstaller:
-    def __init__(self, prompts: Prompts, installation: Installation, ws: WorkspaceClient):
-        if "DATABRICKS_RUNTIME_VERSION" in os.environ:
+    def __init__(
+        self,
+        prompts: Prompts,
+        installation: Installation,
+        ws: WorkspaceClient,
+        product_info: ProductInfo,
+        environ: dict[str, str] | None = None,
+    ):
+        if not environ:
+            environ = dict(os.environ.items())
+        if "DATABRICKS_RUNTIME_VERSION" in environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         self._ws = ws
         self._installation = installation
         self._prompts = prompts
+        self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
+        self._product_info = product_info
+        self._force_install = environ.get("UCX_FORCE_INSTALL")
 
-    def run(self):
-        logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+    def run(
+        self,
+        verify_timeout=timedelta(minutes=2),
+        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
+        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+    ):
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         config = self.configure()
-        sql_backend = StatementExecutionBackend(self._ws, config.warehouse_id)
-        wheels = WheelsV2(self._installation, PRODUCT_INFO)
+        if not sql_backend_factory:
+            sql_backend_factory = self._new_sql_backend
+        if not wheel_builder_factory:
+            wheel_builder_factory = self._new_wheel_builder
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
-            sql_backend,
-            wheels,
+            sql_backend_factory(config),
+            wheel_builder_factory(),
             self._ws,
             self._prompts,
-            verify_timeout=timedelta(minutes=2),
+            verify_timeout,
+            self._product_info,
         )
-        workspace_installation.run()
+        try:
+            workspace_installation.run()
+        except ManyError as err:
+            if len(err.errs) == 1:
+                raise err.errs[0] from None
+            raise err
+
+    def _new_wheel_builder(self):
+        return WheelsV2(self._installation, self._product_info)
+
+    def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
+        return StatementExecutionBackend(self._ws, config.warehouse_id)
+
+    def _confirm_force_install(self) -> bool:
+        if not self._force_install:
+            return False
+        msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
+        if not self._prompts.confirm(msg):
+            raise RuntimeWarning("UCX is already installed, but no confirmation")
+        if not self._installation.is_global() and self._force_install == "global":
+            # TODO:
+            # Logic for forced global over user install
+            # Migration logic will go here
+            # verify complains without full path, asks to raise NotImplementedError builtin
+            raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
+        if self._installation.is_global() and self._force_install == "user":
+            # Logic for forced user install over global install
+            self._installation = Installation.assume_user_home(self._ws, self._product_info.product_name())
+            return True
+        return False
 
     def configure(self) -> WorkspaceConfig:
         try:
-            return self._installation.load(WorkspaceConfig)
+            config = self._installation.load(WorkspaceConfig)
+            if self._confirm_force_install():
+                return self._configure_new_installation()
+            self._apply_upgrades()
+            return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
+        return self._configure_new_installation()
+
+    def _apply_upgrades(self):
+        try:
+            upgrades = Upgrades(self._product_info, self._installation)
+            upgrades.apply(self._ws)
+        except NotFound as err:
+            logger.warning(f"Installed version is too old: {err}")
+            return
+
+    def _configure_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
 
+        self._check_inventory_database_exists(inventory_database)
+        warehouse_id = self._configure_warehouse()
+        configure_groups = ConfigureGroups(self._prompts)
+        configure_groups.run()
+        log_level = self._prompts.question("Log level", default="INFO").upper()
+        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
+
+        policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
+
+        # Check if terraform is being used
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+        config = WorkspaceConfig(
+            inventory_database=inventory_database,
+            workspace_group_regex=configure_groups.workspace_group_regex,
+            workspace_group_replace=configure_groups.workspace_group_replace,
+            account_group_regex=configure_groups.account_group_regex,
+            group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
+            include_group_names=configure_groups.include_group_names,
+            renamed_group_prefix=configure_groups.renamed_group_prefix,
+            warehouse_id=warehouse_id,
+            log_level=log_level,
+            num_threads=num_threads,
+            instance_profile=instance_profile,
+            spark_conf=spark_conf_dict,
+            policy_id=policy_id,
+            is_terraform_used=is_terraform_used,
+            include_databases=self._select_databases(),
+        )
+        self._installation.save(config)
+        ws_file_url = self._installation.workspace_link(config.__file__)
+        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
+            webbrowser.open(ws_file_url)
+        return config
+
+    def _select_databases(self):
+        selected_databases = self._prompts.question(
+            "Comma-separated list of databases to migrate. If not specified, we'll use all "
+            "databases in hive_metastore",
+            default="<ALL>",
+        )
+        if selected_databases != "<ALL>":
+            return [x.strip() for x in selected_databases.split(",")]
+        return None
+
+    def _configure_warehouse(self):
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
@@ -223,124 +334,21 @@ class WorkspaceInstaller:
                 max_num_clusters=1,
             )
             warehouse_id = new_warehouse.id
+        return warehouse_id
 
-        configure_groups = ConfigureGroups(self._prompts)
-        configure_groups.run()
-        log_level = self._prompts.question("Log level", default="INFO").upper()
-        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
-
-        # Checking for external HMS
-        instance_profile = None
-        spark_conf_dict = {}
-        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
-        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
-            "Would you like to set UCX to connect to the external metastore?"
-        ):
-            logger.info("Setting up an external metastore")
-            cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
-            if len(cluster_policies) >= 1:
-                cluster_policy = json.loads(self._prompts.choice_from_dict("Choose a cluster policy", cluster_policies))
-                instance_profile, spark_conf_dict = self._get_ext_hms_conf_from_policy(cluster_policy)
-
-        policy_id = self._create_cluster_policy(inventory_database, spark_conf_dict, instance_profile)
-        config = WorkspaceConfig(
-            inventory_database=inventory_database,
-            workspace_group_regex=configure_groups.workspace_group_regex,
-            workspace_group_replace=configure_groups.workspace_group_replace,
-            account_group_regex=configure_groups.account_group_regex,
-            group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
-            include_group_names=configure_groups.include_group_names,
-            renamed_group_prefix=configure_groups.renamed_group_prefix,
-            warehouse_id=warehouse_id,
-            log_level=log_level,
-            num_threads=num_threads,
-            instance_profile=instance_profile,
-            spark_conf=spark_conf_dict,
-            policy_id=policy_id,
-        )
-        self._installation.save(config)
-        ws_file_url = self._installation.workspace_link(config.__file__)
-        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
-            webbrowser.open(ws_file_url)
-        return config
-
-    @staticmethod
-    def _policy_config(value: str):
-        return {"type": "fixed", "value": value}
-
-    def _create_cluster_policy(
-        self, inventory_database: str, spark_conf: dict, instance_profile: str | None
-    ) -> str | None:
-        policy_name = f"Unity Catalog Migration ({inventory_database}) ({self._ws.current_user.me().user_name})"
-        policies = self._ws.cluster_policies.list()
-        policy_id = None
-        for policy in policies:
-            if policy.name == policy_name:
-                policy_id = policy.policy_id
-                logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
-                break
-        if not policy_id:
-            logger.info("Creating UCX cluster policy.")
-            policy_id = self._ws.cluster_policies.create(
-                name=policy_name,
-                definition=self._cluster_policy_definition(conf=spark_conf, instance_profile=instance_profile),
-                description="Custom cluster policy for Unity Catalog Migration (UCX)",
-            ).policy_id
-        return policy_id
-
-    def _cluster_policy_definition(self, conf: dict, instance_profile: str | None) -> str:
-        policy_definition = {
-            "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
-            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
-        }
-        if conf:
-            for key, value in conf.items():
-                policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
-        if self._ws.config.is_aws:
-            policy_definition["aws_attributes.availability"] = self._policy_config(
-                compute.AwsAvailability.ON_DEMAND.value
-            )
-            if instance_profile:
-                policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-        elif self._ws.config.is_azure:  # pylint: disable=confusing-consecutive-elif
-            policy_definition["azure_attributes.availability"] = self._policy_config(
-                compute.AzureAvailability.ON_DEMAND_AZURE.value
-            )
-        else:
-            policy_definition["gcp_attributes.availability"] = self._policy_config(
-                compute.GcpAvailability.ON_DEMAND_GCP.value
-            )
-        return json.dumps(policy_definition)
-
-    @staticmethod
-    def _get_ext_hms_conf_from_policy(cluster_policy):
-        spark_conf_dict = {}
-        instance_profile = None
-        if cluster_policy.get("aws_attributes.instance_profile_arn") is not None:
-            instance_profile = cluster_policy.get("aws_attributes.instance_profile_arn").get("value")
-            logger.info(f"Instance Profile is Set to {instance_profile}")
-        for key in cluster_policy.keys():
-            if (
-                key.startswith("spark_conf.spark.sql.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
-                or key.startswith("spark_conf.spark.databricks.hive.metastore")
-                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
-            ):
-                spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
-        return instance_profile, spark_conf_dict
-
-    def _get_cluster_policies_with_external_hive_metastores(self):
-        for policy in self._ws.cluster_policies.list():
-            def_json = json.loads(policy.definition)
-            glue_node = def_json.get("spark_conf.spark.databricks.hive.metastore.glueCatalog.enabled")
-            if glue_node is not None and glue_node.get("value") == "true":
-                yield policy
+    def _check_inventory_database_exists(self, inventory_database: str):
+        logger.info("Fetching installations...")
+        for installation in Installation.existing(self._ws, self._product_info.product_name()):
+            try:
+                config = installation.load(WorkspaceConfig)
+                if config.inventory_database == inventory_database:
+                    raise AlreadyExists(
+                        f"Inventory database '{inventory_database}' already exists in another installation"
+                    )
+            except NotFound:
                 continue
-            for key in def_json.keys():
-                if key.startswith("spark_conf.spark.sql.hive.metastore"):
-                    yield policy
-                    break
+            except SerdeError:
+                continue
 
 
 class WorkspaceInstallation:
@@ -353,6 +361,7 @@ class WorkspaceInstallation:
         ws: WorkspaceClient,
         prompts: Prompts,
         verify_timeout: timedelta,
+        product_info: ProductInfo,
     ):
         self._config = config
         self._installation = installation
@@ -363,16 +372,18 @@ class WorkspaceInstallation:
         self._verify_timeout = verify_timeout
         self._state = InstallState.from_installation(installation)
         self._this_file = Path(__file__)
+        self._product_info = product_info
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
-        installation = Installation.current(ws, PRODUCT_INFO.product_name())
+        product_info = ProductInfo.from_class(WorkspaceConfig)
+        installation = product_info.current_installation(ws)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        wheels = WheelsV2(installation, PRODUCT_INFO)
+        wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout)
+        return WorkspaceInstallation(config, installation, sql_backend, wheels, ws, prompts, timeout, product_info)
 
     @property
     def config(self):
@@ -383,7 +394,7 @@ class WorkspaceInstallation:
         return self._installation.install_folder()
 
     def run(self):
-        logger.info(f"Installing UCX v{PRODUCT_INFO.version()}")
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         Threads.strict(
             "installing components",
             [
@@ -572,35 +583,16 @@ class WorkspaceInstallation:
                 self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()
 
-    def _upload_cluster_policy(self, remote_wheel: str):
-        try:
-            if self.config.policy_id is None:
-                msg = "Cluster policy not present, please uninstall and reinstall ucx completely."
-                raise InvalidParameterValue(msg)
-            policy = self._ws.cluster_policies.get(policy_id=self.config.policy_id)
-        except NotFound as err:
-            msg = f"UCX Policy {self.config.policy_id} not found, please reinstall UCX"
-            logger.error(msg)
-            raise NotFound(msg) from err
-        if policy.name is not None:
-            self._ws.cluster_policies.edit(
-                policy_id=self.config.policy_id,
-                name=policy.name,
-                definition=policy.definition,
-                libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
-            )
-
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel()
-        self._upload_cluster_policy(remote_wheel)
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
         for step_name in desired_steps:
-            settings = self._job_settings(step_name)
+            settings = self._job_settings(step_name, remote_wheel)
             if self._config.override_clusters:
                 settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
@@ -700,7 +692,7 @@ class WorkspaceInstallation:
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 
-    def _job_settings(self, step_name: str):
+    def _job_settings(self, step_name: str, remote_wheel: str):
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -712,20 +704,20 @@ class WorkspaceInstallation:
             [t for t in _TASKS.values() if t.workflow == step_name],
             key=lambda _: _.name,
         )
-        version = PRODUCT_INFO.version()
+        version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
             "tags": {"version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task) for task in tasks],
+            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
         }
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
-        return self._installation.upload(f"wheels/wheel-test-runner-{PRODUCT_INFO.version()}.py", code)
+        return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
     @staticmethod
     def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
@@ -743,7 +735,7 @@ class WorkspaceInstallation:
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
         return settings
 
-    def _job_task(self, task: Task) -> jobs.Task:
+    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
@@ -756,7 +748,7 @@ class WorkspaceInstallation:
             return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task)
+        return self._job_wheel_task(jobs_task, task, remote_wheel)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -788,10 +780,11 @@ class WorkspaceInstallation:
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
+    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
         return replace(
             jobs_task,
             # TODO: check when we can install wheels from WSFS properly
+            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -928,7 +921,7 @@ class WorkspaceInstallation:
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
-        logger.info(f"Deleting UCX v{PRODUCT_INFO.version()} from {self._ws.config.host}")
+        logger.info(f"Deleting UCX v{self._product_info.version()} from {self._ws.config.host}")
         try:
             self._installation.files()
         except NotFound:
@@ -938,6 +931,7 @@ class WorkspaceInstallation:
         self._remove_jobs()
         self._remove_warehouse()
         self._remove_policies()
+        self._remove_secret_scope()
         self._installation.remove()
         logger.info("UnInstalling UCX complete")
 
@@ -956,6 +950,14 @@ class WorkspaceInstallation:
             self._ws.cluster_policies.delete(policy_id=self.config.policy_id)
         except NotFound:
             logger.error("UCX Policy already deleted")
+
+    def _remove_secret_scope(self):
+        logger.info("Deleting secret scope")
+        try:
+            if self.config.uber_spn_id is not None:
+                self._ws.secrets.delete_scope(self.config.inventory_database)
+        except NotFound:
+            logger.error("Secret scope already deleted")
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
@@ -1006,8 +1008,11 @@ class WorkspaceInstallation:
 if __name__ == "__main__":
     logger = get_logger(__file__)
     logger.setLevel("INFO")
-
+    app = ProductInfo.from_class(WorkspaceConfig)
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    current = Installation(workspace_client, PRODUCT_INFO.product_name())
-    installer = WorkspaceInstaller(Prompts(), current, workspace_client)
+    try:
+        current = app.current_installation(workspace_client)
+    except NotFound:
+        current = Installation.assume_global(workspace_client, app.product_name())
+    installer = WorkspaceInstaller(Prompts(), current, workspace_client, app)
     installer.run()

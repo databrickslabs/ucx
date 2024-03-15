@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from unittest.mock import MagicMock, Mock, create_autospec
+from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.sdk import WorkspaceClient
@@ -20,7 +20,7 @@ from databricks.labs.ucx.workspace_access.redash import (
 
 
 def test_crawlers():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     ws.alerts.list.return_value = [
         sql.Alert(
@@ -68,7 +68,7 @@ def test_crawlers():
 
 
 def test_apply(migration_state):
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.ALERT,
         object_id="test",
@@ -181,7 +181,7 @@ def test_apply(migration_state):
 
 
 def test_apply_permissions_not_applied(migration_state):
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = None
     ws.dbsql_permissions.set.return_value = sql.GetResponse(
         object_type=sql.ObjectType.ALERT,
@@ -220,7 +220,7 @@ def test_apply_permissions_not_applied(migration_state):
 
 
 def test_apply_permissions_no_relevant_items(migration_state):
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     item = Permissions(
         object_id="test",
@@ -243,7 +243,7 @@ def test_apply_permissions_no_relevant_items(migration_state):
 
 
 def test_apply_permissions_no_valid_groups():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     migration_state = MigrationState(
         [
             MigratedGroup(
@@ -289,21 +289,21 @@ def test_apply_permissions_no_valid_groups():
 
 
 def test_safe_getter_known():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.side_effect = NotFound(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._safe_get_dbsql_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test") is None
 
 
 def test_safe_setter_known():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.set.side_effect = NotFound(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._safe_set_permissions(object_type=sql.ObjectTypePlural.ALERTS, object_id="test", acl=[]) is None
 
 
 def test_safe_getter_unknown():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.side_effect = InternalError(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     with pytest.raises(DatabricksError):
@@ -311,14 +311,14 @@ def test_safe_getter_unknown():
 
 
 def test_empty_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.side_effect = NotFound(...)
     sup = RedashPermissionsSupport(ws=ws, listings=[])
     assert sup._crawler_task(object_id="test", object_type=sql.ObjectTypePlural.ALERTS) is None
 
 
 def test_applier_task_should_return_true_if_permission_is_up_to_date():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     acl_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)
     acl_grp_2 = sql.AccessControl(group_name="group_2", permission_level=sql.PermissionLevel.CAN_MANAGE)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
@@ -338,7 +338,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date():
 
 
 def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multiple_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     acl_1_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_MANAGE)
     acl_2_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
     acl_3_grp_1 = sql.AccessControl(group_name="group_1", permission_level=sql.PermissionLevel.CAN_RUN)
@@ -360,7 +360,7 @@ def test_applier_task_should_return_true_if_permission_is_up_to_date_with_multip
 
 
 def test_applier_task_failed():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
         object_id="test",
@@ -383,7 +383,7 @@ def test_applier_task_failed():
 
 
 def test_applier_task_failed_when_all_permissions_not_up_to_date():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.get.return_value = sql.GetResponse(
         object_type=sql.ObjectType.QUERY,
         object_id="test",
@@ -409,7 +409,7 @@ def test_applier_task_failed_when_all_permissions_not_up_to_date():
 
 
 def test_applier_task_when_set_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.set.side_effect = PermissionDenied()
 
     sup = RedashPermissionsSupport(
@@ -429,7 +429,7 @@ def test_applier_task_when_set_error_non_retriable():
 
 
 def test_applier_task_when_set_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.set.side_effect = InternalError()
 
     sup = RedashPermissionsSupport(
@@ -449,7 +449,7 @@ def test_applier_task_when_set_error_retriable():
 
 
 def test_safe_set_permissions_when_error_non_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.set.side_effect = PermissionDenied(...)
     sup = RedashPermissionsSupport(
         ws=ws, listings=[], set_permissions_timeout=timedelta(seconds=1), verify_timeout=timedelta(seconds=1)
@@ -460,7 +460,7 @@ def test_safe_set_permissions_when_error_non_retriable():
 
 
 def test_safe_set_permissions_when_error_retriable():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.dbsql_permissions.set.side_effect = InternalError(...)
     sup = RedashPermissionsSupport(
         ws=ws, listings=[], set_permissions_timeout=timedelta(seconds=1), verify_timeout=timedelta(seconds=1)
@@ -472,7 +472,7 @@ def test_safe_set_permissions_when_error_retriable():
 
 
 def test_load_as_dict():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     query_id = "query_test"
     group_name = "group_test"
@@ -508,7 +508,7 @@ def test_load_as_dict():
 
 
 def test_load_as_dict_permissions_not_found():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = RedashPermissionsSupport(
         ws=ws,
@@ -523,7 +523,7 @@ def test_load_as_dict_permissions_not_found():
 
 
 def test_load_as_dict_no_acls():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     query_id = "query_test"
 
@@ -551,7 +551,7 @@ def test_load_as_dict_no_acls():
 
 
 def test_load_as_dict_handle_exception_when_getting_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = RedashPermissionsSupport(
         ws=ws,
@@ -566,7 +566,7 @@ def test_load_as_dict_handle_exception_when_getting_permissions():
 
 
 def test_load_as_dict_no_permissions():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     sup = RedashPermissionsSupport(
         ws=ws,
@@ -581,7 +581,7 @@ def test_load_as_dict_no_permissions():
 
 
 def test_load_as_dict_no_permission_level():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
 
     query_id = "query_test"
     group_name = "group_test"

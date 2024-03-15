@@ -1,22 +1,30 @@
 import json
 
 import pytest
+from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.mixins.sql import Row
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-from ..framework.mocks import MockBackend
+UCX_TABLES = MockBackend.rows("catalog", "database", "table", "object_type", "table_format", "location", "view_text")
+UCX_GRANTS = MockBackend.rows(
+    "principal", "action_type", "catalog", "database", "table", "view", "udf", "any_file", "anonymous_function"
+)
+DESCRIBE_TABLE = MockBackend.rows("key", "value", "ignored")
+SHOW_DATABASES = MockBackend.rows("databaseName")
+SHOW_FUNCTIONS = MockBackend.rows("function")
+SHOW_GRANTS = MockBackend.rows("principal", "action_type", "object_type", "ignored")
+SHOW_TABLES = MockBackend.rows("databaseName", "tableName", "isTmp")
 
 
 def test_tacl_crawler():
     sql_backend = MockBackend(
         rows={
-            "SELECT \\* FROM hive_metastore.test.grants": [
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
                 ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ]
         }
@@ -37,7 +45,7 @@ def test_tacl_crawler():
 def test_tacl_udf_crawler():
     sql_backend = MockBackend(
         rows={
-            "SELECT \\* FROM hive_metastore.test.grants": [
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
                 ("foo@example.com", "READ_METADATA", "catalog_a", "database_b", None, None, "function_c", False, False)
             ]
         }
@@ -58,7 +66,7 @@ def test_tacl_udf_crawler():
 def test_tacl_crawler_multiple_permissions():
     sql_backend = MockBackend(
         rows={
-            "SELECT \\* FROM hive_metastore.test.grants": [
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
                 ("foo@example.com", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False),
                 ("foo@example.com", "MODIFY", "catalog_a", "database_b", "table_c", None, None, False, False),
                 ("foo@example.com", "OWN", "catalog_a", "database_b", "table_c", None, None, False, False),
@@ -235,23 +243,14 @@ def test_tacl_crawler_multiple_permissions():
     ) == Grant(**json.loads(permissions.raw))
 
 
-def make_row(data, columns):
-    row = Row(data)
-    row.__columns__ = columns
-    return row
-
-
-SHOW_COLS = ["principal", "action_type", "object_type", "ignored"]
-
-
 def test_tacl_applier():
     sql_backend = MockBackend(
         rows={
-            "SELECT \\* FROM hive_metastore.test.grants": [
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
                 ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ],
-            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("account-abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": SHOW_GRANTS[
+                ("account-abc", "SELECT", "TABLE", "table_c"),
             ],
         }
     )
@@ -342,11 +341,11 @@ def test_tacl_applier_not_applied():
 def test_tacl_udf_applier(mocker):
     sql_backend = MockBackend(
         rows={
-            "SELECT \\* FROM hive_metastore.test.grants": [
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
                 ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ],
-            "SHOW GRANTS ON FUNCTION catalog_a.database_b.function_c": [
-                make_row(("account-abc", "SELECT", "FUNCTION", "function_c"), SHOW_COLS),
+            "SHOW GRANTS ON FUNCTION catalog_a.database_b.function_c": SHOW_GRANTS[
+                ("account-abc", "SELECT", "FUNCTION", "function_c"),
             ],
         }
     )
@@ -394,12 +393,12 @@ def test_tacl_udf_applier(mocker):
 def test_tacl_applier_multiple_actions(mocker):
     sql_backend = MockBackend(
         rows={
-            "SELECT \\* FROM hive_metastore.test.grants": [
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
                 ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
             ],
-            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("account-abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
-                make_row(("account-abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": SHOW_GRANTS[
+                ("account-abc", "SELECT", "TABLE", "table_c"),
+                ("account-abc", "MODIFY", "TABLE", "table_c"),
             ],
         }
     )
@@ -483,9 +482,7 @@ def test_tacl_applier_no_target_principal(mocker):
 def test_verify_task_should_return_true_if_permissions_applied():
     sql_backend = MockBackend(
         rows={
-            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("abc", "SELECT", "TABLE", "table_c"), SHOW_COLS),
-            ],
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": SHOW_GRANTS[("abc", "SELECT", "TABLE", "table_c"),],
         }
     )
     tables_crawler = TablesCrawler(sql_backend, "test")
@@ -515,9 +512,7 @@ def test_verify_task_should_return_true_if_permissions_applied():
 def test_verify_task_should_fail_if_permissions_not_applied():
     sql_backend = MockBackend(
         rows={
-            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": [
-                make_row(("abc", "MODIFY", "TABLE", "table_c"), SHOW_COLS),
-            ],
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": SHOW_GRANTS[("abc", "MODIFY", "TABLE", "table_c"),],
         }
     )
     tables_crawler = TablesCrawler(sql_backend, "test")

@@ -1,27 +1,26 @@
 import json
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.workspace_access.groups import (
     ConfigureGroups,
     GroupManager,
     MigratedGroup,
     MigrationState,
 )
-from tests.unit.framework.mocks import MockBackend
 
 
 def test_snapshot_with_group_created_in_account_console_should_be_considered():
     backend = MockBackend()
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -59,7 +58,7 @@ def test_snapshot_with_group_created_in_account_console_should_be_considered():
 
 def test_snapshot_with_group_not_created_in_account_console_should_be_filtered():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         display_name="de",
@@ -82,7 +81,7 @@ def test_snapshot_with_group_not_created_in_account_console_should_be_filtered()
 
 def test_snapshot_with_group_already_migrated_should_be_filtered():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         display_name="de",
@@ -105,7 +104,7 @@ def test_snapshot_with_group_already_migrated_should_be_filtered():
 
 def test_snapshot_should_filter_account_system_groups():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         display_name="de",
@@ -128,7 +127,7 @@ def test_snapshot_should_filter_account_system_groups():
 
 def test_snapshot_should_filter_workspace_system_groups():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(id="1", display_name="admins", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group]
     acc_group = Group(id="1234", display_name="de")
@@ -141,7 +140,7 @@ def test_snapshot_should_filter_workspace_system_groups():
 
 def test_snapshot_should_consider_groups_defined_in_conf():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1, group2]
@@ -171,7 +170,7 @@ def test_snapshot_should_consider_groups_defined_in_conf():
 
 def test_snapshot_should_filter_system_groups_defined_in_conf():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
     acc_group_1 = Group(id="11", display_name="de")
@@ -184,7 +183,7 @@ def test_snapshot_should_filter_system_groups_defined_in_conf():
 
 def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_workspace():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
     acc_group_1 = Group(id="11", display_name="de")
@@ -197,7 +196,7 @@ def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_workspace(
 
 def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_account():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
     acc_group_1 = Group(id="11", display_name="ds")
@@ -210,7 +209,7 @@ def test_snapshot_should_filter_groups_defined_in_conf_not_present_in_account():
 
 def test_snapshot_should_rename_groups_defined_in_conf():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     account_admins_group_1 = Group(id="11", display_name="de")
@@ -253,7 +252,7 @@ def test_snapshot_should_rename_groups_defined_in_conf():
 
 def test_rename_groups_should_patch_eligible_groups():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [
         group1,
@@ -272,7 +271,7 @@ def test_rename_groups_should_patch_eligible_groups():
 
 def test_rename_groups_should_filter_account_groups_in_workspace():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="Group"))
     wsclient.groups.list.return_value = [group1]
     account_group1 = Group(id="11", display_name="de")
@@ -285,7 +284,7 @@ def test_rename_groups_should_filter_account_groups_in_workspace():
 
 def test_rename_groups_should_filter_already_renamed_groups():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
     wsclient.groups.get.return_value = group1
@@ -295,7 +294,7 @@ def test_rename_groups_should_filter_already_renamed_groups():
 
 def test_rename_groups_should_fail_if_error_is_thrown():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [
         group1,
@@ -314,7 +313,7 @@ def test_rename_groups_should_fail_if_error_is_thrown():
 
 def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_groups():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     account_group = Group(id="1", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in (account_group,)],
@@ -332,7 +331,7 @@ def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_group
 
 def test_reflect_account_groups_on_workspace_should_filter_account_groups_in_workspace():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="Group"))
     wsclient.groups.list.return_value = [group1]
     wsclient.groups.get.return_value = group1
@@ -348,7 +347,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_in_wor
 
 def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in_account():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [group1]
     wsclient.groups.get.return_value = group1
@@ -364,7 +363,7 @@ def test_reflect_account_groups_on_workspace_should_filter_account_groups_not_in
 
 def test_reflect_account_should_fail_if_error_is_thrown():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     account_group = Group(id="1", display_name="de")
 
     def do_side_effect(*args, **_):
@@ -384,7 +383,7 @@ def test_reflect_account_should_fail_if_error_is_thrown():
 
 def test_reflect_account_should_not_fail_if_group_not_in_the_account_anymore():
     backend = MockBackend(rows={"SELECT": [("1", "de", "de", "test-group-de", "", "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     account_group1 = Group(id="11", display_name="de")
 
     def reflect_account_side_effect(method, *_, **__):
@@ -413,7 +412,7 @@ def test_delete_original_workspace_groups_should_delete_relected_acc_groups_in_w
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
 
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
@@ -427,7 +426,7 @@ def test_delete_original_workspace_groups_should_not_delete_groups_not_renamed()
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
 
     temp_group = Group(id=ws_id, display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
@@ -441,7 +440,7 @@ def test_delete_original_workspace_groups_should_not_delete_groups_not_reflected
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
 
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     wsclient.groups.list.return_value = [temp_group]
@@ -454,7 +453,7 @@ def test_delete_original_workspace_groups_should_not_fail_if_target_group_doesnt
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
 
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
@@ -470,7 +469,7 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
     account_id = "11"
     ws_id = "1"
     backend = MockBackend(rows={"SELECT": [(ws_id, "de", "de", "test-group-de", account_id, "", "", "")]})
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
 
     temp_group = Group(id=ws_id, display_name="test-group-de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     reflected_group = Group(id=account_id, display_name="de", meta=ResourceMeta(resource_type="Group"))
@@ -486,7 +485,7 @@ def test_delete_original_workspace_groups_should_fail_if_delete_does_not_work():
 
 def test_list_workspace_groups():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
 
     # Mock the groups.list method to return a list of groups
     group1 = Group(id="1", display_name="group_1", meta=ResourceMeta(resource_type="WorkspaceGroup"))
@@ -561,7 +560,7 @@ def test_list_workspace_groups():
 
 def test_snapshot_with_group_matched_by_suffix():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -600,7 +599,7 @@ def test_snapshot_with_group_matched_by_suffix():
 
 def test_snapshot_with_group_matched_by_prefix():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -639,7 +638,7 @@ def test_snapshot_with_group_matched_by_prefix():
 
 def test_snapshot_with_group_matched_by_subset():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -678,7 +677,7 @@ def test_snapshot_with_group_matched_by_subset():
 
 def test_snapshot_with_group_matched_by_external_id():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -947,7 +946,7 @@ def test_validate_group_diff_membership_no_account_group_found():
 
 def test_validate_group_same_membership():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -985,7 +984,7 @@ def test_validate_group_same_membership():
 
 def test_validate_acc_group_removed_after_listing():
     backend = MockBackend()
-    wsclient = MagicMock()
+    wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
         external_id="1234",
@@ -1030,9 +1029,9 @@ def test_migration_state_with_filtered_group():
             ]
         }
     )
-    wsclient = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     grp_membership = GroupManager(
-        backend, wsclient, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
+        backend, ws, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
     ).get_migration_state()
 
     assert len(grp_membership.groups) == 1

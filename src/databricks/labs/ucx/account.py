@@ -1,11 +1,10 @@
 import logging
 from typing import ClassVar
 
-import requests
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
@@ -68,17 +67,25 @@ class AccountWorkspaces:
         all_valid_workspace_groups = self._get_valid_workspaces_groups(prompts, workspace_ids)
 
         for group_name, valid_group in all_valid_workspace_groups.items():
-            if group_name in acc_groups:
-                logger.info(f"Group {group_name} already exist in the account, ignoring")
-                continue
+            acc_group = self._try_create_account_groups(group_name, acc_groups)
 
-            acc_group = self._ac.groups.create(display_name=group_name)
-
-            if not valid_group.members or not acc_group.id:
+            if not acc_group or not valid_group.members or not acc_group.id:
                 continue
             if len(valid_group.members) > 0:
                 self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
             logger.info(f"Group {group_name} created in the account")
+
+    def _try_create_account_groups(
+        self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
+    ) -> Group | None:
+        try:
+            if group_name in acc_groups:
+                logger.info(f"Group {group_name} already exist in the account, ignoring")
+                return None
+            return self._ac.groups.create(display_name=group_name)
+        except ResourceConflict:
+            logger.info(f"Group {group_name} already exist in the account, ignoring")
+            return None
 
     def _get_valid_workspaces_ids(self, workspace_ids: list[int] | None = None) -> list[int]:
         if not workspace_ids:
@@ -123,42 +130,37 @@ class AccountWorkspaces:
         for workspace in self._workspaces():
             if workspace.workspace_id not in workspace_ids:
                 continue
-            client = self.client_for(workspace)
-            logger.info(f"Crawling groups in workspace {client.config.host}")
-
-            ws_group_ids = client.groups.list(attributes="id")
-            for group_id in ws_group_ids:
-                if not group_id.id:
-                    continue
-
-                full_workspace_group = client.groups.get(group_id.id)
-                group_name = full_workspace_group.display_name
-
-                if self._is_group_out_of_scope(full_workspace_group):
-                    continue
-
-                if group_name in all_workspaces_groups:
-                    if self._has_same_members(all_workspaces_groups[group_name], full_workspace_group):
-                        logger.info(f"Workspace group {group_name} already found, ignoring")
-                        continue
-
-                    if prompts.confirm(
-                        f"Group {group_name} does not have the same amount of members "
-                        f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
-                        f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
-                    ):
-                        all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
-                        continue
-
-                if not group_name:
-                    continue
-
-                logger.info(f"Found new group {group_name}")
-                all_workspaces_groups[group_name] = full_workspace_group
-
-            logger.info(f"Found a total of {len(all_workspaces_groups)} groups to migrate to the account")
+            self._load_workspace_groups(prompts, workspace, all_workspaces_groups)
 
         return all_workspaces_groups
+
+    def _load_workspace_groups(self, prompts, workspace, all_workspaces_groups):
+        client = self.client_for(workspace)
+        logger.info(f"Crawling groups in workspace {client.config.host}")
+        ws_group_ids = client.groups.list(attributes="id")
+        for group_id in ws_group_ids:
+            full_workspace_group = self._safe_groups_get(client, group_id.id)
+            if not full_workspace_group:
+                continue
+            group_name = full_workspace_group.display_name
+            if self._is_group_out_of_scope(full_workspace_group):
+                continue
+            if not group_name:
+                continue
+            if group_name in all_workspaces_groups:
+                if self._has_same_members(all_workspaces_groups[group_name], full_workspace_group):
+                    logger.info(f"Workspace group {group_name} already found, ignoring")
+                    continue
+                if prompts.confirm(
+                    f"Group {group_name} does not have the same amount of members "
+                    f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
+                    f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
+                ):
+                    all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
+                    continue
+            logger.info(f"Found new group {group_name}")
+            all_workspaces_groups[group_name] = full_workspace_group
+        logger.info(f"Found a total of {len(all_workspaces_groups)} groups to migrate to the account")
 
     def _is_group_out_of_scope(self, group: Group) -> bool:
         if group.display_name in {"users", "admins", "account users"}:
@@ -183,28 +185,29 @@ class AccountWorkspaces:
         for acc_grp_id in self._ac.groups.list(attributes="id"):
             if not acc_grp_id.id:
                 continue
-            full_account_group = self._ac.groups.get(acc_grp_id.id)
-            logger.debug(f"Found account group {acc_grp_id.display_name}")
+            full_account_group = self._safe_groups_get(self._ac, acc_grp_id.id)
+            if not full_account_group:
+                continue
+            logger.debug(f"Found account group {full_account_group.display_name}")
             acc_groups[full_account_group.display_name] = full_account_group.members
 
         logger.info(f"{len(acc_groups)} account groups found")
         return acc_groups
+
+    def _safe_groups_get(self, interface, group_id) -> Group | None:
+        try:
+            if not group_id:
+                return None
+            return interface.groups.get(group_id)
+        except NotFound:
+            logger.info(f"Group {group_id} has been deleted")
+            return None
 
 
 class WorkspaceInfo:
     def __init__(self, installation: Installation, ws: WorkspaceClient):
         self._installation = installation
         self._ws = ws
-
-    def _current_workspace_id(self) -> int:
-        headers = self._ws.config.authenticate()
-        headers["User-Agent"] = self._ws.config.user_agent
-        response = requests.get(f"{self._ws.config.host}/api/2.0/preview/scim/v2/Me", headers=headers, timeout=10)
-        org_id_header = response.headers.get("x-databricks-org-id", None)
-        if not org_id_header:
-            msg = "Cannot determine current workspace id"
-            raise ValueError(msg)
-        return int(org_id_header)
 
     def _load_workspace_info(self) -> dict[int, Workspace]:
         try:
@@ -218,7 +221,7 @@ class WorkspaceInfo:
             raise ValueError(msg) from None
 
     def current(self) -> str:
-        workspace_id = self._current_workspace_id()
+        workspace_id = self._ws.get_workspace_id()
         workspaces = self._load_workspace_info()
         if workspace_id not in workspaces:
             msg = f"Current workspace is not known: {workspace_id}"
@@ -235,7 +238,7 @@ class WorkspaceInfo:
             f'only within {self._ws.config.host}'
         )
         workspaces = []
-        workspace_id = self._current_workspace_id()
+        workspace_id = self._ws.get_workspace_id()
         while workspace_id:
             workspace_name = prompts.question(
                 f"Workspace name for {workspace_id}", default=f"workspace-{workspace_id}", valid_regex=r"^[\w-]+$"

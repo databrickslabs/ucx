@@ -6,23 +6,20 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 
-import pytest
+import databricks.sdk.errors
+import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.labs.blueprint.wheels import WheelsV2
-from databricks.sdk.errors import InvalidParameterValue, NotFound
+from databricks.labs.blueprint.wheels import ProductInfo
+from databricks.sdk.errors import AlreadyExists, InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import (
-    PRODUCT_INFO,
-    WorkspaceInstallation,
-    WorkspaceInstaller,
-)
+from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -36,12 +33,23 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random):
+def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
     cleanup = []
 
-    def factory(config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None):
-        prefix = make_random(4)
-        renamed_group_prefix = f"rename-{prefix}-"
+    def factory(
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+        installation: Installation | None = None,
+        product_info: ProductInfo | None = None,
+        environ: dict[str, str] | None = None,
+        extend_prompts: dict[str, str] | None = None,
+        inventory_schema_suffix: str = "",
+    ):
+        if not product_info:
+            product_info = ProductInfo.for_testing(WorkspaceConfig)
+        if not environ:
+            environ = {}
+        renamed_group_prefix = f"rename-{product_info.product_name()}-"
+
         prompts = MockPrompts(
             {
                 r'Open job overview in your browser.*': 'no',
@@ -50,12 +58,13 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": inventory_schema,
+                r".*Inventory Database.*": f"{inventory_schema}{inventory_schema_suffix}",
                 r".*Backup prefix*": renamed_group_prefix,
                 r".*": "",
             }
+            | (extend_prompts or {})
         )
-        workspace_start_path = f"/Users/{ws.current_user.me().user_name}/.{prefix}"
+
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         Threads.strict(
@@ -65,28 +74,34 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema, make_random
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
             ],
         )
-        installation = Installation(ws, prefix)
-        installer = WorkspaceInstaller(prompts, installation, ws)
+
+        if not installation:
+            installation = Installation(ws, product_info.product_name())
+        installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
         workspace_config = installer.configure()
+        installation = product_info.current_installation(ws)
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
         workspace_config.override_clusters = overrides
-        workspace_config.workspace_start_path = workspace_start_path
+
+        if workspace_config.workspace_start_path == '/':
+            workspace_config.workspace_start_path = installation.install_folder()
         if config_transform:
             workspace_config = config_transform(workspace_config)
+
         installation.save(workspace_config)
 
         # TODO: see if we want to move building wheel as a context manager for yield factory,
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
-        wheels = WheelsV2(installation, PRODUCT_INFO)
         workspace_installation = WorkspaceInstallation(
             workspace_config,
             installation,
             sql_backend,
-            wheels,
+            product_info.wheels(ws),
             ws,
             prompts,
-            verify_timeout=timedelta(minutes=2),
+            timedelta(minutes=2),
+            product_info,
         )
         workspace_installation.run()
         cleanup.append(workspace_installation)
@@ -322,3 +337,129 @@ def test_uninstallation(ws, sql_backend, new_installation):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
+
+
+def test_fresh_global_installation(ws, new_installation):
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    global_installation = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+    )
+    assert global_installation.folder == f"/Applications/{product_info.product_name()}"
+    global_installation.uninstall()
+
+
+def test_fresh_user_installation(ws, new_installation):
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    user_installation = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_user_home(ws, product_info.product_name()),
+    )
+    assert user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+    user_installation.uninstall()
+
+
+def test_global_installation_on_existing_global_install(ws, new_installation):
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    existing_global_installation = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+    )
+    assert existing_global_installation.folder == f"/Applications/{product_info.product_name()}"
+    reinstall_global = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+    )
+    assert reinstall_global.folder == f"/Applications/{product_info.product_name()}"
+    reinstall_global.uninstall()
+
+
+def test_user_installation_on_existing_global_install(ws, new_installation):
+    # existing install at global level
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    existing_global_installation = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+    )
+
+    # warning to be thrown by installer if override environment variable present but no confirmation
+    with pytest.raises(RuntimeWarning) as err:
+        new_installation(
+            product_info=product_info,
+            installation=Installation.assume_global(ws, product_info.product_name()),
+            environ={'UCX_FORCE_INSTALL': 'user'},
+            extend_prompts={
+                r".*UCX is already installed on this workspace.*": 'no',
+            },
+        )
+    assert err.value.args[0] == "UCX is already installed, but no confirmation"
+
+    # successful override with confirmation
+    reinstall_user_force = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+        environ={'UCX_FORCE_INSTALL': 'user'},
+        extend_prompts={
+            r".*UCX is already installed on this workspace.*": 'yes',
+        },
+        inventory_schema_suffix="_reinstall",
+    )
+    assert reinstall_user_force.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+    reinstall_user_force.uninstall()
+    existing_global_installation.uninstall()
+
+
+def test_global_installation_on_existing_user_install(ws, new_installation):
+    # existing installation at user level
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    existing_user_installation = new_installation(
+        product_info=product_info, installation=Installation.assume_user_home(ws, product_info.product_name())
+    )
+    assert (
+        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+    )
+
+    # warning to be thrown by installer if override environment variable present but no confirmation
+    with pytest.raises(RuntimeWarning) as err:
+        new_installation(
+            product_info=product_info,
+            installation=Installation.assume_user_home(ws, product_info.product_name()),
+            environ={'UCX_FORCE_INSTALL': 'global'},
+            extend_prompts={
+                r".*UCX is already installed on this workspace.*": 'no',
+            },
+        )
+    assert err.value.args[0] == "UCX is already installed, but no confirmation"
+
+    # not implemented error with confirmation
+    with pytest.raises(databricks.sdk.errors.NotImplemented) as err:
+        new_installation(
+            product_info=product_info,
+            installation=Installation.assume_user_home(ws, product_info.product_name()),
+            environ={'UCX_FORCE_INSTALL': 'global'},
+            extend_prompts={
+                r".*UCX is already installed on this workspace.*": 'yes',
+            },
+        )
+    assert err.value.args[0] == "Migration needed. Not implemented yet."
+    existing_user_installation.uninstall()
+
+
+def test_check_inventory_database_exists(ws, new_installation):
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    install = new_installation(
+        product_info=product_info,
+        installation=Installation.assume_global(ws, product_info.product_name()),
+    )
+    inventory_database = install.config.inventory_database
+
+    with pytest.raises(AlreadyExists) as err:
+        new_installation(
+            product_info=product_info,
+            installation=Installation.assume_global(ws, product_info.product_name()),
+            environ={'UCX_FORCE_INSTALL': 'user'},
+            extend_prompts={
+                r".*UCX is already installed on this workspace.*": 'yes',
+            },
+        )
+    assert err.value.args[0] == f"Inventory database '{inventory_database}' already exists in another installation"

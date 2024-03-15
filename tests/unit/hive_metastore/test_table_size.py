@@ -1,7 +1,8 @@
 import sys
 
+from databricks.labs.lsql.backends import MockBackend
+
 from databricks.labs.ucx.hive_metastore.table_size import TableSize, TableSizeCrawler
-from tests.unit.framework.mocks import MockBackend
 
 # pylint: disable=protected-access
 

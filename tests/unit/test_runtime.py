@@ -2,6 +2,7 @@ import os.path
 import sys
 from unittest.mock import create_autospec, patch
 
+from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
@@ -10,9 +11,7 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     _TASKS,
     Task,
 )
-from databricks.labs.ucx.runtime import assess_azure_service_principals
-
-from .framework.mocks import MockBackend
+from databricks.labs.ucx.runtime import assess_azure_service_principals, crawl_grants
 
 
 def azure_mock_config() -> WorkspaceConfig:
@@ -32,14 +31,11 @@ def test_azure_crawler(mocker):
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
         cfg = azure_mock_config()
 
-        _fetch = mocker.patch(
-            "databricks.labs.ucx.framework.crawlers.RuntimeBackend.fetch",
-            return_value=[
-                ["1", "secret_scope", "secret_key", "tenant_id", "storage_account"],
-            ],
-        )
         ws = create_autospec(WorkspaceClient)
-        sql_backend = MockBackend()
+        sql_backend = create_autospec(SqlBackend)
+        sql_backend.fetch.return_value = [
+            ["1", "secret_scope", "secret_key", "tenant_id", "storage_account"],
+        ]
         assess_azure_service_principals(cfg, ws, sql_backend)
 
 
@@ -60,3 +56,16 @@ def test_assessment_tasks():
     assert len(_TASKS) >= 19
     azure = [v for k, v in _TASKS.items() if v.cloud == "azure"]
     assert len(azure) >= 1
+
+
+def test_runtime_grants(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        crawl_grants(cfg, ws, sql_backend)
+
+        assert "SHOW DATABASES FROM hive_metastore" in sql_backend.queries
+        assert "SHOW DATABASES" in sql_backend.queries

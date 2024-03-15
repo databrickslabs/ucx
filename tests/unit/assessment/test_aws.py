@@ -1,23 +1,14 @@
 import logging
-from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import MockInstallation
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist
-from databricks.sdk.service import iam
-from databricks.sdk.service.compute import InstanceProfile
 
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSPolicyAction,
-    AWSResourcePermissions,
     AWSResources,
     AWSRole,
-    AWSRoleAction,
     run_command,
 )
-from tests.unit.framework.mocks import MockBackend
 
 logger = logging.getLogger(__name__)
 
@@ -506,205 +497,6 @@ def test_get_uc_roles_missing_keys():
     assert not uc_roles
 
 
-def test_save_instance_profile_permissions():
-    ws = create_autospec(WorkspaceClient)
-    ws.instance_profiles.list.return_value = [
-        InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
-    ]
-    aws = create_autospec(AWSResources)
-    aws.get_role_policy.side_effect = [
-        [
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket1",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket2",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket3",
-            ),
-        ],
-        [],
-        [],
-        [
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketA",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketB",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketC",
-            ),
-        ],
-        [],
-        [],
-    ]
-    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
-    aws.list_attached_policies_in_role.return_value = [
-        "arn:aws:iam::aws:policy/Policy1",
-        "arn:aws:iam::aws:policy/Policy2",
-    ]
-
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
-    aws_resource_permissions.save_instance_profile_permissions()
-
-    installation.assert_file_written(
-        'aws_instance_profile_info.csv',
-        [
-            {
-                'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket1',
-                'resource_type': 's3',
-            },
-            {
-                'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket2',
-                'resource_type': 's3',
-            },
-            {
-                'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket3',
-                'resource_type': 's3',
-            },
-            {
-                'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketA',
-                'resource_type': 's3',
-            },
-            {
-                'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketB',
-                'resource_type': 's3',
-            },
-            {
-                'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketC',
-                'resource_type': 's3',
-            },
-        ],
-    )
-
-
-def test_save_uc_compatible_roles():
-    ws = create_autospec(WorkspaceClient)
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-
-    aws = create_autospec(AWSResources)
-    aws.get_role_policy.side_effect = [
-        [
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket1",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket2",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket3",
-            ),
-        ],
-        [],
-        [],
-        [
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketA",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketB",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketC",
-            ),
-        ],
-        [],
-        [],
-    ]
-    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
-    aws.list_attached_policies_in_role.return_value = [
-        "arn:aws:iam::aws:policy/Policy1",
-        "arn:aws:iam::aws:policy/Policy2",
-    ]
-    aws.list_all_uc_roles.return_value = [
-        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
-    ]
-
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
-    aws_resource_permissions.save_uc_compatible_roles()
-    installation.assert_file_written(
-        'uc_roles_access.csv',
-        [
-            {
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket1',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket2',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket3',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketA',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketB',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketC',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-        ],
-    )
-
-
 def test_role_mismatched(caplog):
     instance_profile = AWSInstanceProfile("test", "fake")
     assert not instance_profile.role_name
@@ -721,32 +513,6 @@ def test_get_role_policy_missing_role(caplog):
     assert "No role name or attached role ARN specified." in caplog.messages[0]
 
 
-def test_instance_profiles_empty_mapping(caplog):
-    ws = create_autospec(WorkspaceClient)
-    ws.instance_profiles.list.return_value = [
-        InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
-    ]
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    aws = create_autospec(AWSResources)
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
-    aws_resource_permissions.save_instance_profile_permissions()
-    assert 'No Mapping Was Generated.' in caplog.messages
-
-
-def test_uc_roles_empty_mapping(caplog):
-    ws = create_autospec(WorkspaceClient)
-    ws.instance_profiles.list.return_value = [
-        InstanceProfile("arn:aws:iam::12345:instance-profile/role1", "arn:aws:iam::12345:role/role1")
-    ]
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
-    aws = create_autospec(AWSResources)
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
-    aws_resource_permissions.save_uc_compatible_roles()
-    assert 'No Mapping Was Generated.' in caplog.messages
-
-
 def test_command(caplog):
     return_code, _, _ = run_command("echo success")
     assert return_code == 0
@@ -761,10 +527,10 @@ def test_create_uc_role(mocker):
 
     def command_call(cmd: str):
         command_calls.append(cmd)
-        return 0, '{"VALID":"JSON"}', ""
+        return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.add_uc_role("test_role")
+    aws.create_uc_role("test_role")
     assert (
         '/path/aws iam create-role --role-name test_role '
         '--assume-role-policy-document '
@@ -774,17 +540,36 @@ def test_create_uc_role(mocker):
     ) in command_calls
 
 
+def test_update_uc_trust_role(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.update_uc_trust_role("test_role", "1234")
+    assert (
+        '/path/aws iam update-assume-role-policy --role-name test_role '
+        '--policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} --output json'
+    ) in command_calls
+
+
 def test_create_uc_role_policy_no_kms(mocker):
     command_calls = []
     mocker.patch("shutil.which", return_value="/path/aws")
 
     def command_call(cmd: str):
         command_calls.append(cmd)
-        return 0, '{"VALID":"JSON"}', ""
+        return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
-    aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234")
+    s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
+    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
@@ -805,8 +590,8 @@ def test_create_uc_role_kms(mocker):
         return 0, '{"VALID":"JSON"}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    s3_prefixes = {"BUCKET1/FOLDER1", "BUCKET1/FOLDER1/*", "BUCKET2/FOLDER2", "BUCKET2/FOLDER2/*"}
-    aws.add_uc_role_policy("test_role", "test_policy", s3_prefixes, "1234", "KMSKEY")
+    s3_prefixes = {"s3://BUCKET1/FOLDER1", "s3://BUCKET1/FOLDER1/*", "s3://BUCKET2/FOLDER2", "s3://BUCKET2/FOLDER2/*"}
+    aws.put_role_policy("test_role", "test_policy", s3_prefixes, "1234", "key_arn")
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '
@@ -815,161 +600,63 @@ def test_create_uc_role_kms(mocker):
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
         '"Effect":"Allow"},{"Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey*"],'
-        '"Resource":["arn:aws:kms:KMSKEY"],"Effect":"Allow"}]} --output json'
+        '"Resource":["arn:aws:kms:key_arn"],"Effect":"Allow"}]} --output json'
     ) in command_calls
 
 
-def test_create_uc_role_single():
-    ws = create_autospec(WorkspaceClient)
-    aws = create_autospec(AWSResources)
-    installation = MockInstallation()
-    installation.load = MagicMock()
-    installation.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")
-    ]
-    rows = {
-        "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
-    }
-    errors = {}
-    backend = MockBackend(rows=rows, fails_on_first=errors)
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
-    aws_resource_permissions.create_uc_roles_cli()
-    assert aws.add_uc_role.assert_called_with('UC_ROLE') is None
+def test_create_instance_profile(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"InstanceProfile": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.create_instance_profile("test_profile")
+    assert '/path/aws iam create-instance-profile --instance-profile-name test_profile --output json' in command_calls
+
+    def failed_call(_):
+        return -1, "", "Can't connect"
+
+    aws = AWSResources("Fake_Profile", failed_call)
+    assert not aws.create_instance_profile("test_profile")
+
+
+def test_delete_instance_profile(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.delete_instance_profile("test_profile", "test_profile")
+    assert '/path/aws iam delete-instance-profile --instance-profile-name test_profile --output json' in command_calls
+    assert '/path/aws iam delete-role --role-name test_profile --output json' in command_calls
     assert (
-        aws.add_uc_role_policy.assert_called_with(
-            'UC_ROLE', 'UC_POLICY', {'BUCKET1/FOLDER1', 'BUCKET2/FOLDER2'}, account_id=None, kms_key=None
-        )
-        is None
-    )
+        '/path/aws iam remove-role-from-instance-profile '
+        '--instance-profile-name test_profile --role-name test_profile --output json'
+    ) in command_calls
 
 
-def test_create_uc_role_multiple():
-    ws = create_autospec(WorkspaceClient)
-    aws = create_autospec(AWSResources)
-    installation = MockInstallation()
-    installation.load = MagicMock()
-    installation.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")
-    ]
-    rows = {
-        "external_locations": [["s3://BUCKET1/FOLDER1", 1], ["s3://BUCKET2/FOLDER2", 1], ["s3://BUCKETX/FOLDERX", 1]]
-    }
-    errors = {}
-    backend = MockBackend(rows=rows, fails_on_first=errors)
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, backend, aws, "ucx")
-    aws_resource_permissions.create_uc_roles_cli(single_role=False)
-    assert call('UC_ROLE-1') in aws.add_uc_role.call_args_list
-    assert call('UC_ROLE-2') in aws.add_uc_role.call_args_list
-    assert (
-        call('UC_ROLE-1', 'UC_POLICY-1', {'BUCKET1/FOLDER1'}, account_id=None, kms_key=None)
-        in aws.add_uc_role_policy.call_args_list
-    )
-    assert (
-        call('UC_ROLE-2', 'UC_POLICY-2', {'BUCKET2/FOLDER2'}, account_id=None, kms_key=None)
-        in aws.add_uc_role_policy.call_args_list
-    )
+def test_role_exists(mocker):
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
 
+    def empty_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '', ""
 
-def test_get_uc_compatible_roles():
-    ws = create_autospec(WorkspaceClient)
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    aws = AWSResources("Fake_Profile", empty_call)
+    assert aws.role_exists("test_profile") is False
+    assert '/path/aws iam list-roles --output json' in command_calls
 
-    aws = create_autospec(AWSResources)
-    aws.get_role_policy.side_effect = [
-        [
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket1",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket2",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="READ_FILES",
-                resource_path="s3://bucket3",
-            ),
-        ],
-        [],
-        [],
-        [
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketA",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketB",
-            ),
-            AWSPolicyAction(
-                resource_type="s3",
-                privilege="WRITE_FILES",
-                resource_path="s3://bucketC",
-            ),
-        ],
-        [],
-        [],
-    ]
-    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
-    aws.list_attached_policies_in_role.return_value = [
-        "arn:aws:iam::aws:policy/Policy1",
-        "arn:aws:iam::aws:policy/Policy2",
-    ]
-    aws.list_all_uc_roles.return_value = [
-        AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
-    ]
+    def exists_call(cmd: str):
+        command_calls.append(cmd)
+        return 0, '{"Roles": [{"RoleName": "test_profile"}]}', ""
 
-    installation = MockInstallation()
-    aws_resource_permissions = AWSResourcePermissions(installation, ws, MockBackend(), aws, "ucx")
-    installation.load = MagicMock()
-    installation.load.side_effect = [
-        ResourceDoesNotExist(),
-        [AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKETX/*")],
-    ]
-    aws_resource_permissions.get_uc_compatible_roles()
-    installation.assert_file_written(
-        'uc_roles_access.csv',
-        [
-            {
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket1',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket2',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'READ_FILES',
-                'resource_path': 's3://bucket3',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketA',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketB',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-            {
-                'privilege': 'WRITE_FILES',
-                'resource_path': 's3://bucketC',
-                'resource_type': 's3',
-                'role_arn': 'arn:aws:iam::12345:role/uc-role1',
-            },
-        ],
-    )
+    aws = AWSResources("Fake_Profile", exists_call)
+    assert aws.role_exists("test_profile") is True
+    assert '/path/aws iam list-roles --output json' in command_calls

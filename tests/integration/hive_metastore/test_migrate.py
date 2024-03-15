@@ -6,7 +6,10 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import (
+    MigrationStatusRefresher,
+    TablesMigrate,
+)
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 from ..conftest import StaticTableMapping, StaticTablesCrawler
@@ -38,7 +41,8 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
         ),
     ]
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
 
     table_migrate.migrate_tables()
 
@@ -94,7 +98,8 @@ def test_migrate_tables_with_cache_should_not_create_table(
         ),
     ]
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
 
     # FIXME: flaky: databricks.sdk.errors.platform.NotFound: Catalog 'ucx_cjazg' does not exist.
     table_migrate.migrate_tables()
@@ -110,16 +115,11 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
-
     mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     src_external_table = make_table(schema_name=src_schema.name, external_csv=mounted_location)
-
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
-
-    # crawler = TablesCrawler(sql_backend, inventory_schema)
     table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
     rules = [
         Rule(
@@ -131,8 +131,10 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
             src_external_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(
+        table_crawler, ws, sql_backend, StaticTableMapping(ws, sql_backend, rules=rules), migration_status_refresher
+    )
 
     table_migrate.migrate_tables()
 
@@ -141,6 +143,14 @@ def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog,
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
     assert target_table_properties["upgraded_from"] == src_external_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+    migration_status = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler).snapshot()
+    assert len(migration_status) == 1
+    assert migration_status[0].src_schema == src_external_table.schema_name
+    assert migration_status[0].src_table == src_external_table.name
+    assert migration_status[0].dst_catalog == dst_catalog.name
+    assert migration_status[0].dst_schema == dst_schema.name
+    assert migration_status[0].dst_table == src_external_table.name
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
@@ -178,7 +188,8 @@ def test_revert_migrated_table(
         ),
     ]
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
     table_migrate.migrate_tables()
 
     table_migrate.revert_migrated_tables(src_schema1.name, delete_managed=True)
@@ -284,7 +295,8 @@ def test_mapping_reverts_table(
         ),
     ]
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
     table_migrate.migrate_tables()
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties

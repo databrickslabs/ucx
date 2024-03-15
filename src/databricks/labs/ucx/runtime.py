@@ -2,15 +2,15 @@ import logging
 import os
 import sys
 
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import (
     ExternalLocations,
@@ -20,10 +20,10 @@ from databricks.labs.ucx.hive_metastore import (
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.verification import VerifyHasMetastore
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +52,9 @@ def crawl_grants(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBacke
 
     Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
     ACLs enabled and available for retrieval."""
-    tables = TablesCrawler(sql_backend, cfg.inventory_database)
-    udfs = UdfsCrawler(sql_backend, cfg.inventory_database)
-    grants = GrantsCrawler(tables, udfs)
+    tables = TablesCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
+    udfs = UdfsCrawler(sql_backend, cfg.inventory_database, cfg.include_databases)
+    grants = GrantsCrawler(tables, udfs, cfg.include_databases)
     grants.snapshot()
 
 
@@ -154,6 +154,19 @@ def assess_incompatible_submit_runs(cfg: WorkspaceConfig, ws: WorkspaceClient, s
     crawler.snapshot()
 
 
+@task("assessment")
+def crawl_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+    """This module scans through all the Cluster Policies and get the necessary information
+
+    It looks for:
+      - Clusters Policies with Databricks Runtime (DBR) version earlier than 11.3
+
+      Subsequently, a list of all the policies with matching configurations are stored in the
+    `$inventory.policies` table."""
+    crawler = PoliciesCrawler(ws, sql_backend, cfg.inventory_database)
+    crawler.snapshot()
+
+
 @task("assessment", cloud="azure")
 def assess_azure_service_principals(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
@@ -237,6 +250,7 @@ def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
         assess_jobs,
         assess_incompatible_submit_runs,
         assess_clusters,
+        crawl_cluster_policies,
         assess_azure_service_principals,
         assess_pipelines,
         assess_global_init_scripts,
@@ -245,6 +259,22 @@ def crawl_groups(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
     dashboard="assessment_main",
 )
 def assessment_report(*_):
+    """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
+    dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
+
+@task(
+    "assessment",
+    depends_on=[
+        assess_jobs,
+        assess_incompatible_submit_runs,
+        assess_clusters,
+        assess_pipelines,
+        crawl_tables,
+    ],
+    dashboard="assessment_estimates",
+)
+def estimates_report(*_):
     """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
     dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 

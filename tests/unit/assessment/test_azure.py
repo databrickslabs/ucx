@@ -1,7 +1,8 @@
+from databricks.labs.lsql.backends import MockBackend
+
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 
-from ..framework.mocks import MockBackend
-from . import workspace_client_mock
+from .. import workspace_client_mock
 
 
 def test_azure_service_principal_info_crawl():

@@ -110,7 +110,7 @@ class Grant:
 
         return inner
 
-    def uc_grant_sql(self):
+    def uc_grant_sql(self, object_type: str | None = None, object_key: str | None = None) -> str | None:
         """Get SQL translated SQL statement for granting similar permissions in UC.
 
         If there's no UC equivalent, returns None. This can also be the case for missing mapping.
@@ -120,13 +120,17 @@ class Grant:
         # See: https://docs.databricks.com/sql/language-manual/sql-ref-privileges-hms.html
         # See: https://docs.databricks.com/data-governance/unity-catalog/manage-privileges/ownership.html
         # See: https://docs.databricks.com/data-governance/unity-catalog/manage-privileges/privileges.html
-        object_type, object_key = self.this_type_and_key()
+        if object_type is None:
+            object_type, object_key = self.this_type_and_key()
         hive_to_uc = {
             ("FUNCTION", "SELECT"): self._uc_action("EXECUTE"),
             ("TABLE", "SELECT"): self._uc_action("SELECT"),
             ("TABLE", "MODIFY"): self._uc_action("MODIFY"),
             ("TABLE", "READ_METADATA"): self._uc_action("BROWSE"),
             ("TABLE", "OWN"): self._set_owner_sql,
+            ("VIEW", "SELECT"): self._uc_action("SELECT"),
+            ("VIEW", "READ_METADATA"): self._uc_action("BROWSE"),
+            ("VIEW", "OWN"): self._set_owner_sql,
             ("DATABASE", "USAGE"): self._uc_action("USE SCHEMA"),
             ("DATABASE", "CREATE"): self._uc_action("CREATE TABLE"),
             ("DATABASE", "CREATE_NAMED_FUNCTION"): self._uc_action("CREATE FUNCTION"),
@@ -144,13 +148,14 @@ class Grant:
 
 
 class GrantsCrawler(CrawlerBase[Grant]):
-    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler):
+    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, include_databases: list[str] | None = None):
         assert tc._backend == udf._backend
         assert tc._catalog == udf._catalog
         assert tc._schema == udf._schema
         super().__init__(tc._backend, tc._catalog, tc._schema, "grants", Grant)
         self._tc = tc
         self._udf = udf
+        self._include_databases = include_databases
 
     def snapshot(self) -> Iterable[Grant]:
         return self._snapshot(partial(self._try_load), partial(self._crawl))
@@ -189,9 +194,13 @@ class GrantsCrawler(CrawlerBase[Grant]):
         # Scanning ANY FILE and ANONYMOUS FUNCTION grants
         tasks.append(partial(self.grants, catalog=catalog, any_file=True))
         tasks.append(partial(self.grants, catalog=catalog, anonymous_function=True))
-        # scan all databases, even empty ones
-        for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
-            tasks.append(partial(self.grants, catalog=catalog, database=row.databaseName))
+        if not self._include_databases:
+            # scan all databases, even empty ones
+            for row in self._fetch(f"SHOW DATABASES FROM {escape_sql_identifier(catalog)}"):
+                tasks.append(partial(self.grants, catalog=catalog, database=row.databaseName))
+        else:
+            for database in self._include_databases:
+                tasks.append(partial(self.grants, catalog=catalog, database=database))
         for table in self._tc.snapshot():
             fn = partial(self.grants, catalog=catalog, database=table.database)
             # views are recognized as tables

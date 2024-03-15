@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 import pytest
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -20,6 +21,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
+    AwsIamRole,
     AzureServicePrincipal,
     CatalogInfo,
     DataSourceFormat,
@@ -43,8 +45,6 @@ from databricks.sdk.service.sql import (
     QueryInfo,
 )
 from databricks.sdk.service.workspace import ImportFormat
-
-from databricks.labs.ucx.framework.crawlers import StatementExecutionBackend
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
@@ -647,7 +647,9 @@ def make_cluster_policy(ws, make_random):
             name = f"sdk-{make_random(4)}"
         if "definition" not in kwargs:
             kwargs["definition"] = json.dumps(
-                {"spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"}}
+                {
+                    "spark_conf.spark.databricks.delta.preview.enabled": {"type": "fixed", "value": "true"},
+                }
             )
         cluster_policy = ws.cluster_policies.create(name, **kwargs)
         logger.info(
@@ -1090,24 +1092,31 @@ def make_query(ws, make_table, make_random):
 
 
 @pytest.fixture
-def make_storage_credential_spn(ws):
+def make_storage_credential(ws):
     def create(
-        *, credential_name: str, application_id: str, client_secret: str, directory_id: str, read_only=False
+        *,
+        credential_name: str,
+        application_id: str = "",
+        client_secret: str = "",
+        directory_id: str = "",
+        aws_iam_role_arn: str = "",
+        read_only=False,
     ) -> StorageCredentialInfo:
-        azure_service_principal = AzureServicePrincipal(
-            directory_id,
-            application_id,
-            client_secret,
-        )
-        storage_credential = ws.storage_credentials.create(
-            credential_name, azure_service_principal=azure_service_principal, read_only=read_only
-        )
+        if aws_iam_role_arn != "":
+            storage_credential = ws.storage_credentials.create(
+                credential_name, aws_iam_role=AwsIamRole(role_arn=aws_iam_role_arn), read_only=read_only
+            )
+        else:
+            azure_service_principal = AzureServicePrincipal(directory_id, application_id, client_secret)
+            storage_credential = ws.storage_credentials.create(
+                credential_name, azure_service_principal=azure_service_principal, read_only=read_only
+            )
         return storage_credential
 
     def remove(storage_credential: StorageCredentialInfo):
         ws.storage_credentials.delete(storage_credential.name, force=True)
 
-    yield from factory("storage_credential_from_spn", create, remove)
+    yield from factory("storage_credential", create, remove)
 
 
 @pytest.fixture

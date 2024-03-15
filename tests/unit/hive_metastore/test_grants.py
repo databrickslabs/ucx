@@ -1,11 +1,9 @@
 import pytest
+from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.mixins.sql import Row
-
-from ..framework.mocks import MockBackend
 
 
 def test_type_and_key_table():
@@ -136,32 +134,30 @@ def test_uc_sql(grant, query):
     assert grant.uc_grant_sql() == query
 
 
-def make_row(data, columns):
-    row = Row(data)
-    row.__columns__ = columns
-    return row
+UCX_TABLES = MockBackend.rows("catalog", "database", "table", "object_type", "table_format", "location", "view_text")
+DESCRIBE_TABLE = MockBackend.rows("key", "value", "ignored")
+SHOW_DATABASES = MockBackend.rows("databaseName")
+SHOW_FUNCTIONS = MockBackend.rows("function")
+SHOW_GRANTS = MockBackend.rows("principal", "action_type", "object_type", "ignored")
+SHOW_TABLES = MockBackend.rows("databaseName", "tableName", "isTmp")
 
-
-SELECT_COLS = ["catalog", "database", "table", "object_type", "table_format", "location", "view_text"]
-SHOW_COLS = ["principal", "action_type", "object_type", "ignored"]
-DESCRIBE_COLS = ["key", "value", "ignored"]
 ROWS = {
-    "SELECT.*": [
-        make_row(("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None), SELECT_COLS),
-        make_row(("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"), SELECT_COLS),
-        make_row(("foo", None, None, "type", "CATALOG", None, None), SELECT_COLS),
+    "SELECT.*": UCX_TABLES[
+        ("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None),
+        ("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"),
+        ("foo", None, None, "type", "CATALOG", None, None),
     ],
-    "SHOW.*": [
-        make_row(("princ1", "SELECT", "TABLE", "ignored"), SHOW_COLS),
-        make_row(("princ1", "SELECT", "VIEW", "ignored"), SHOW_COLS),
-        make_row(("princ1", "USE", "CATALOG$", "ignored"), SHOW_COLS),
+    "SHOW.*": SHOW_GRANTS[
+        ("princ1", "SELECT", "TABLE", "ignored"),
+        ("princ1", "SELECT", "VIEW", "ignored"),
+        ("princ1", "USE", "CATALOG$", "ignored"),
     ],
-    "DESCRIBE.*": [
-        make_row(("Catalog", "foo", "ignored"), DESCRIBE_COLS),
-        make_row(("Type", "TABLE", "ignored"), DESCRIBE_COLS),
-        make_row(("Provider", "", "ignored"), DESCRIBE_COLS),
-        make_row(("Location", "/foo/bar/test", "ignored"), DESCRIBE_COLS),
-        make_row(("View Text", "SELECT * FROM table", "ignored"), DESCRIBE_COLS),
+    "DESCRIBE.*": DESCRIBE_TABLE[
+        ("Catalog", "foo", "ignored"),
+        ("Type", "TABLE", "ignored"),
+        ("Provider", "", "ignored"),
+        ("Location", "/foo/bar/test", "ignored"),
+        ("View Text", "SELECT * FROM table", "ignored"),
     ],
 }
 
@@ -178,30 +174,30 @@ def test_crawler_no_data():
 def test_crawler_crawl():
     sql_backend = MockBackend(
         rows={
-            "SHOW DATABASES": [
-                make_row(("database_one",), ["databaseName"]),
-                make_row(("database_two",), ["databaseName"]),
+            "SHOW DATABASES": SHOW_DATABASES[
+                ("database_one",),
+                ("database_two",),
             ],
-            "SHOW TABLES FROM hive_metastore.database_one": [
+            "SHOW TABLES FROM hive_metastore.database_one": SHOW_TABLES[
                 ("database_one", "table_one", "true"),
                 ("database_one", "table_two", "true"),
             ],
-            "SELECT * FROM hive_metastore.schema.tables": [
-                make_row(("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None), SELECT_COLS),
-                make_row(("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"), SELECT_COLS),
-                make_row(("foo", None, None, "type", "CATALOG", None, None), SELECT_COLS),
+            "SELECT * FROM hive_metastore.schema.tables": UCX_TABLES[
+                ("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None),
+                ("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"),
+                ("foo", None, None, "type", "CATALOG", None, None),
             ],
-            "DESCRIBE TABLE EXTENDED hive_metastore.database_one.*": [
-                make_row(("Catalog", "foo", "ignored"), DESCRIBE_COLS),
-                make_row(("Type", "TABLE", "ignored"), DESCRIBE_COLS),
-                make_row(("Provider", "", "ignored"), DESCRIBE_COLS),
-                make_row(("Location", "/foo/bar/test", "ignored"), DESCRIBE_COLS),
-                make_row(("View Text", "SELECT * FROM table", "ignored"), DESCRIBE_COLS),
+            "DESCRIBE TABLE EXTENDED hive_metastore.database_one.*": DESCRIBE_TABLE[
+                ("Catalog", "foo", "ignored"),
+                ("Type", "TABLE", "ignored"),
+                ("Provider", "", "ignored"),
+                ("Location", "/foo/bar/test", "ignored"),
+                ("View Text", "SELECT * FROM table", "ignored"),
             ],
-            "SHOW GRANTS ON .*": [
-                make_row(("princ1", "SELECT", "TABLE", "ignored"), SHOW_COLS),
-                make_row(("princ1", "SELECT", "VIEW", "ignored"), SHOW_COLS),
-                make_row(("princ1", "USE", "CATALOG$", "ignored"), SHOW_COLS),
+            "SHOW GRANTS ON .*": SHOW_GRANTS[
+                ("princ1", "SELECT", "TABLE", "ignored"),
+                ("princ1", "SELECT", "VIEW", "ignored"),
+                ("princ1", "USE", "CATALOG$", "ignored"),
             ],
         }
     )
@@ -215,25 +211,21 @@ def test_crawler_crawl():
 def test_crawler_udf_crawl():
     sql_backend = MockBackend(
         rows={
-            "SHOW DATABASES": [
-                make_row(("database_one",), ["databaseName"]),
+            "SHOW DATABASES": SHOW_DATABASES[("database_one",),],
+            "SHOW USER FUNCTIONS FROM hive_metastore.database_one": SHOW_FUNCTIONS[
+                ("hive_metastore.database_one.function_one",),
+                ("hive_metastore.database_one.function_two",),
             ],
-            "SHOW USER FUNCTIONS FROM hive_metastore.database_one": [
-                make_row(("hive_metastore.database_one.function_one",), ["function"]),
-                make_row(("hive_metastore.database_one.function_two",), ["function"]),
+            "DESCRIBE FUNCTION EXTENDED hive_metastore.database_one.*": MockBackend.rows("something")[
+                ("Type: SCALAR",),
+                ("Input: p INT",),
+                ("Returns: FLOAT",),
+                ("Deterministic: true",),
+                ("Data Access: CONTAINS SQL",),
+                ("Body: 1",),
+                ("ignore",),
             ],
-            "DESCRIBE FUNCTION EXTENDED hive_metastore.database_one.*": [
-                ("Type: SCALAR"),
-                ("Input: p INT"),
-                ("Returns: FLOAT"),
-                ("Deterministic: true"),
-                ("Data Access: CONTAINS SQL"),
-                ("Body: 1"),
-                ("ignore"),
-            ],
-            "SHOW GRANTS ON .*": [
-                make_row(("princ1", "SELECT", "FUNCTION", "ignored"), SHOW_COLS),
-            ],
+            "SHOW GRANTS ON .*": SHOW_GRANTS[("princ1", "SELECT", "FUNCTION", "ignored"),],
         }
     )
 
@@ -288,16 +280,16 @@ def test_crawler_snapshot_with_data():
 def test_grants_returning_error_when_showing_grants():
     errors = {"SHOW GRANTS ON TABLE hive_metastore.test_database.table1": "error"}
     rows = {
-        "SHOW DATABASES": [
-            make_row(("test_database",), ["databaseName"]),
-            make_row(("other_database",), ["databaseName"]),
+        "SHOW DATABASES": SHOW_DATABASES[
+            ("test_database",),
+            ("other_database",),
         ],
-        "SHOW TABLES FROM hive_metastore.test_database": [
+        "SHOW TABLES FROM hive_metastore.test_database": SHOW_TABLES[
             ("test_database", "table1", False),
             ("test_database", "table2", False),
         ],
-        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": [("principal1", "OWNER", "TABLE", "")],
-        "DESCRIBE *": [
+        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": SHOW_GRANTS[("principal1", "OWNER", "TABLE", ""),],
+        "DESCRIBE *": DESCRIBE_TABLE[
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
         ],
@@ -325,15 +317,13 @@ def test_grants_returning_error_when_showing_grants():
 def test_grants_returning_error_when_describing():
     errors = {"DESCRIBE TABLE EXTENDED hive_metastore.test_database.table1": "error"}
     rows = {
-        "SHOW DATABASES": [
-            make_row(("test_database",), ["databaseName"]),
-        ],
-        "SHOW TABLES FROM hive_metastore.test_database": [
+        "SHOW DATABASES": SHOW_DATABASES[("test_database",),],
+        "SHOW TABLES FROM hive_metastore.test_database": SHOW_TABLES[
             ("test_database", "table1", False),
             ("test_database", "table2", False),
         ],
-        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": [("principal1", "OWNER", "TABLE", "")],
-        "DESCRIBE *": [
+        "SHOW GRANTS ON TABLE hive_metastore.test_database.table2": SHOW_GRANTS[("principal1", "OWNER", "TABLE", ""),],
+        "DESCRIBE *": DESCRIBE_TABLE[
             ("Catalog", "catalog", ""),
             ("Type", "delta", ""),
         ],
@@ -361,18 +351,20 @@ def test_grants_returning_error_when_describing():
 def test_udf_grants_returning_error_when_showing_grants():
     errors = {"SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_bad": "error"}
     rows = {
-        "SHOW DATABASES": [
-            make_row(("test_database",), ["databaseName"]),
-            make_row(("other_database",), ["databaseName"]),
+        "SHOW DATABASES": SHOW_DATABASES[
+            ("test_database",),
+            ("other_database",),
         ],
-        "SHOW USER FUNCTIONS FROM hive_metastore.test_database": [
-            make_row(("hive_metastore.test_database.function_bad",), ["function"]),
-            make_row(("hive_metastore.test_database.function_good",), ["function"]),
+        "SHOW USER FUNCTIONS FROM hive_metastore.test_database": SHOW_FUNCTIONS[
+            ("hive_metastore.test_database.function_bad",),
+            ("hive_metastore.test_database.function_good",),
         ],
-        "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": [("principal1", "OWN", "FUNCTION", "")],
-        "DESCRIBE *": [
-            ("Type: SCALAR"),
-            ("Body: 1"),
+        "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": SHOW_GRANTS[
+            ("principal1", "OWN", "FUNCTION", "")
+        ],
+        "DESCRIBE *": SHOW_FUNCTIONS[
+            ("Type: SCALAR",),
+            ("Body: 1",),
         ],
     }
 
@@ -398,17 +390,17 @@ def test_udf_grants_returning_error_when_showing_grants():
 def test_udf_grants_returning_error_when_describing():
     errors = {"DESCRIBE FUNCTION EXTENDED hive_metastore.test_database.function_bad": "error"}
     rows = {
-        "SHOW DATABASES": [
-            make_row(("test_database",), ["databaseName"]),
+        "SHOW DATABASES": SHOW_DATABASES[("test_database",),],
+        "SHOW USER FUNCTIONS FROM hive_metastore.test_database": SHOW_FUNCTIONS[
+            ("hive_metastore.test_database.function_bad",),
+            ("hive_metastore.test_database.function_good",),
         ],
-        "SHOW USER FUNCTIONS FROM hive_metastore.test_database": [
-            make_row(("hive_metastore.test_database.function_bad",), ["function"]),
-            make_row(("hive_metastore.test_database.function_good",), ["function"]),
+        "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": SHOW_GRANTS[
+            ("principal1", "OWN", "FUNCTION", ""),
         ],
-        "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": [("principal1", "OWN", "FUNCTION", "")],
-        "DESCRIBE *": [
-            ("Type: SCALAR"),
-            ("Body: 1"),
+        "DESCRIBE *": SHOW_FUNCTIONS[
+            ("Type: SCALAR",),
+            ("Body: 1",),
         ],
     }
 
@@ -429,3 +421,37 @@ def test_udf_grants_returning_error_when_describing():
             anonymous_function=False,
         )
     ]
+
+
+def test_crawler_should_filter_databases():
+    sql_backend = MockBackend(
+        rows={
+            "SHOW TABLES FROM hive_metastore.database_one": SHOW_TABLES[
+                ("database_one", "table_one", "true"),
+                ("database_one", "table_two", "true"),
+            ],
+            "SELECT * FROM hive_metastore.schema.tables": UCX_TABLES[
+                ("foo", "bar", "test_table", "type", "DELTA", "/foo/bar/test", None),
+                ("foo", "bar", "test_view", "type", "VIEW", None, "SELECT * FROM table"),
+                ("foo", None, None, "type", "CATALOG", None, None),
+            ],
+            "DESCRIBE TABLE EXTENDED hive_metastore.database_one.*": DESCRIBE_TABLE[
+                ("Catalog", "foo", "ignored"),
+                ("Type", "TABLE", "ignored"),
+                ("Provider", "", "ignored"),
+                ("Location", "/foo/bar/test", "ignored"),
+                ("View Text", "SELECT * FROM table", "ignored"),
+            ],
+            "SHOW GRANTS ON .*": SHOW_GRANTS[
+                ("princ1", "SELECT", "TABLE", "ignored"),
+                ("princ1", "SELECT", "VIEW", "ignored"),
+                ("princ1", "USE", "CATALOG$", "ignored"),
+            ],
+        }
+    )
+    table = TablesCrawler(sql_backend, "schema", include_databases=["database_one"])
+    udf = UdfsCrawler(sql_backend, "schema", include_databases=["database_one"])
+    crawler = GrantsCrawler(table, udf, include_databases=["database_one"])
+    grants = crawler.snapshot()
+    assert len(grants) == 3
+    assert 'SHOW TABLES FROM hive_metastore.database_one' in sql_backend.queries

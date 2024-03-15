@@ -4,6 +4,7 @@ from databricks.labs.blueprint.entrypoint import find_project_root
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk.service import iam
 from databricks.sdk.service.sql import (
     Dashboard,
@@ -13,6 +14,7 @@ from databricks.sdk.service.sql import (
     Widget,
 )
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstaller
 
@@ -51,7 +53,7 @@ def test_dashboard(mocker):
     ws.dashboard_widgets.create.return_value = Widget(id="abc")
     ws.warehouses.list.return_value = []
     prompts = create_autospec(Prompts)
-    WorkspaceInstaller(prompts, installation, ws)
+    WorkspaceInstaller(prompts, installation, ws, ProductInfo.from_class(WorkspaceConfig))
     local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
     dash = DashboardFromFiles(
         ws,
