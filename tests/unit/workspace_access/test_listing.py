@@ -17,7 +17,10 @@ def test_workspace_listing():
         generic.WorkspaceObjectInfo(object_type=None, object_id=6, path="", language=""),  # MLflow Experiment
     ]
 
+    # TODO: there's a huge chance that we'll be rewriting this code to use WSFS FUSE listing, so it'll be irrelevant
+    # pylint: disable-next=prohibited-patch
     with patch("databricks.labs.ucx.workspace_access.generic.WorkspaceListing.snapshot", return_value=listing_instance):
+        # pylint: disable-next=obscure-mock
         results = generic.WorkspaceListing(ws=MagicMock(), sql_backend=MagicMock(), inventory_database=MagicMock())
         assert len(list(results)) == 4
         for res in results:

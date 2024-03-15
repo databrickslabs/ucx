@@ -3,6 +3,8 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.lsql import Row
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 from databricks.sdk.service.catalog import (
@@ -16,9 +18,7 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.mixins.sql import Row
 from tests.unit.azure import get_az_api_mapping
-from tests.unit.framework.mocks import MockBackend
 
 
 @pytest.fixture
@@ -178,6 +178,8 @@ def test_run_managed_identity(ws, mocker):
     )
 
     # mock Azure resource manager and graph API calls for getting application_id of managed identity
+    # TODO: (qziyuan) use a better way to mock the API calls
+    # pylint: disable-next=prohibited-patch
     mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
@@ -398,6 +400,8 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
         }
     )
     # return None when getting application_id of managed identity
+    # TODO: (qziyuan) use a better way to mock the API calls
+    # pylint: disable-next=prohibited-patch
     mocker.patch("databricks.sdk.core.ApiClient.do", return_value={"dummy": "dummy"})
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation)

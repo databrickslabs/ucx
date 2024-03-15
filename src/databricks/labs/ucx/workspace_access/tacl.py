@@ -6,9 +6,9 @@ from collections.abc import Callable, Iterator
 from datetime import timedelta
 from functools import partial
 
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions

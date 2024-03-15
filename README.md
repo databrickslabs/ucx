@@ -18,6 +18,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Installation](#installation)
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
+  * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -122,6 +123,34 @@ These assets are available under the installation folder, i.e. `/Users/<your use
 You can also install a specific version by specifying it like `@v0.13.2` - `databricks labs install ucx@v0.13.2`.
 
 ![macos_install_ucx](docs/macos_2_databrickslabsmac_installucx.gif)
+
+[[back to top](#databricks-labs-ucx)]
+
+## [ADVANCED] Force install over existing UCX
+Using an environment variable `UCX_FORCE_INSTALL` you can force the installation of UCX over an existing installation.
+The values for the environment variable are 'global' and 'user'.
+
+Global Install: When UCX is installed at '/Applications/ucx'
+User Install: When UCX is installed at '/Users/<user>/.ucx'
+
+If there is an existing global installation of UCX, you can force a user installation of UCX over the existing installation by setting the environment variable `UCX_FORCE_INSTALL` to 'global'.
+
+At this moment there is no global override over a user installation of UCX. As this requires migration and can break existing installations.
+
+
+| global | user | expected install location | install_folder | mode |
+| --- | --- | --- | --- |--- |
+| no | no | default | `/Applications/ucx` | install |
+| yes | no | default | `/Applications/ucx` | upgrade |
+| no | yes | default | `/Users/X/.ucx` | upgrade (existing installations must not break) |
+| yes | yes | default | `/Users/X/.ucx` | upgrade |
+| yes | no | **USER** | `/Users/X/.ucx` | install (show prompt) |
+| no | yes | **GLOBAL** | ...  | migrate |
+
+
+* `UCX_FORCE_INSTALL=user databricks labs install ucx` - will force the installation to be for user only
+* `UCX_FORCE_INSTALL=global databricks labs install ucx` - will force the installation to be for root only
+
 
 [[back to top](#databricks-labs-ucx)]
 

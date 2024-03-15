@@ -110,7 +110,7 @@ class Grant:
 
         return inner
 
-    def uc_grant_sql(self):
+    def uc_grant_sql(self, object_type: str | None = None, object_key: str | None = None) -> str | None:
         """Get SQL translated SQL statement for granting similar permissions in UC.
 
         If there's no UC equivalent, returns None. This can also be the case for missing mapping.
@@ -120,13 +120,17 @@ class Grant:
         # See: https://docs.databricks.com/sql/language-manual/sql-ref-privileges-hms.html
         # See: https://docs.databricks.com/data-governance/unity-catalog/manage-privileges/ownership.html
         # See: https://docs.databricks.com/data-governance/unity-catalog/manage-privileges/privileges.html
-        object_type, object_key = self.this_type_and_key()
+        if object_type is None:
+            object_type, object_key = self.this_type_and_key()
         hive_to_uc = {
             ("FUNCTION", "SELECT"): self._uc_action("EXECUTE"),
             ("TABLE", "SELECT"): self._uc_action("SELECT"),
             ("TABLE", "MODIFY"): self._uc_action("MODIFY"),
             ("TABLE", "READ_METADATA"): self._uc_action("BROWSE"),
             ("TABLE", "OWN"): self._set_owner_sql,
+            ("VIEW", "SELECT"): self._uc_action("SELECT"),
+            ("VIEW", "READ_METADATA"): self._uc_action("BROWSE"),
+            ("VIEW", "OWN"): self._set_owner_sql,
             ("DATABASE", "USAGE"): self._uc_action("USE SCHEMA"),
             ("DATABASE", "CREATE"): self._uc_action("CREATE TABLE"),
             ("DATABASE", "CREATE_NAMED_FUNCTION"): self._uc_action("CREATE FUNCTION"),

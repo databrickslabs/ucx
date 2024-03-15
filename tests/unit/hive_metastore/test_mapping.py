@@ -1,19 +1,17 @@
 import io
-from unittest.mock import MagicMock, call, create_autospec
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import TableInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.framework.crawlers import SqlBackend
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
-
-from ..framework.mocks import MockBackend
 
 MANAGED_DELTA_TABLE = Table(
     object_type="MANAGED",
@@ -44,7 +42,7 @@ EXTERNAL_DELTA_TABLE = Table(
 
 
 def test_current_tables_empty_fails():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -59,7 +57,7 @@ def test_current_tables_empty_fails():
 
 
 def test_current_tables_some_rules():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -87,7 +85,7 @@ def test_current_tables_some_rules():
 
 
 def test_save_mapping():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -126,7 +124,7 @@ def test_save_mapping():
 
 
 def test_load_mapping_not_found():
-    ws = MagicMock()
+    ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = NotFound(...)
     errors = {}
     rows = {}
@@ -437,7 +435,7 @@ def test_table_not_in_crawled_tables():
 
 
 def test_skipping_rules_database_skipped():
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
     client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
         "fake_ws,cat1,schema1,schema1,table1,dest1\r\n"
@@ -519,7 +517,7 @@ def test_skip_missing_table_in_snapshot():
 
 
 def test_skipping_rules_target_exists():
-    client = MagicMock()
+    client = create_autospec(WorkspaceClient)
     client.workspace.download.return_value = io.BytesIO(
         "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
         "fake_ws,cat1,schema2,schema2,table2,dest2\r\n"

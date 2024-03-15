@@ -16,18 +16,36 @@ requires-python = ">=3.10"
 keywords = ["Databricks", "Unity Catalog"]
 authors = [
     { name = "Serge Smertin", email = "serge.smertin@databricks.com" },
-    { name = "Ivan Trusov", email = "ivan.trusov@databricks.com" },
+]
+maintainers = [
+    { name = "Serge Smertin", email = "serge.smertin@databricks.com" },
+    { name = "Liran Bareket", email = "liran.bareket@databricks.com" },
+    { name = "Marcin Wojtyczka", email = "marcin.wojtyczka@databricks.com" },
+    { name = "Ziyuan Qin", email = "ziyuan.qin@databricks.com" },
+    { name = "William Conti", email = "william.conti@databricks.com" },
+    { name = "Hari Selvarajan", email = "hari.selvarajan@databricks.com" },
+    { name = "Vuong Nguyen", email = "vuong.nguyen@databricks.com" },
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "License :: Other/Proprietary License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
+    "Environment :: Console",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
 ]
 dependencies = ["databricks-sdk~=0.21.0",
-                "databricks-labs-blueprint~=0.3.1",
+                "databricks-labs-lsql~=0.2.1",
+                "databricks-labs-blueprint~=0.4.1",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
@@ -193,7 +211,7 @@ ignore-patterns = ["^\\.#"]
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-# init-hook =
+init-hook='import sys; sys.path.append("tests/pylint")'
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use, and will cap the count on Windows to
@@ -208,6 +226,7 @@ limit-inference-results = 100
 # List of plugins (as comma separated values of python module names) to load,
 # usually to register additional checkers.
 load-plugins = [
+    "testing",
     "pylint_pytest",
     "pylint.extensions.bad_builtin",
     "pylint.extensions.broad_try_clause",

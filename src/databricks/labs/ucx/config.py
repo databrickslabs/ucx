@@ -37,6 +37,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     policy_id: str | None = None
     num_days_submit_runs_history: int = 30
     uber_spn_id: str | None = None
+    uber_instance_profile: str | None = None
 
     # Flag to see if terraform has been used for deploying certain entities
     is_terraform_used: bool = False

@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import Unknown
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, SqlBackend
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 
 logger = logging.getLogger(__name__)

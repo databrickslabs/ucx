@@ -1,7 +1,6 @@
 import logging
 from typing import ClassVar
 
-import requests
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -210,16 +209,6 @@ class WorkspaceInfo:
         self._installation = installation
         self._ws = ws
 
-    def _current_workspace_id(self) -> int:
-        headers = self._ws.config.authenticate()
-        headers["User-Agent"] = self._ws.config.user_agent
-        response = requests.get(f"{self._ws.config.host}/api/2.0/preview/scim/v2/Me", headers=headers, timeout=10)
-        org_id_header = response.headers.get("x-databricks-org-id", None)
-        if not org_id_header:
-            msg = "Cannot determine current workspace id"
-            raise ValueError(msg)
-        return int(org_id_header)
-
     def _load_workspace_info(self) -> dict[int, Workspace]:
         try:
             id_to_workspace = {}
@@ -232,7 +221,7 @@ class WorkspaceInfo:
             raise ValueError(msg) from None
 
     def current(self) -> str:
-        workspace_id = self._current_workspace_id()
+        workspace_id = self._ws.get_workspace_id()
         workspaces = self._load_workspace_info()
         if workspace_id not in workspaces:
             msg = f"Current workspace is not known: {workspace_id}"
@@ -249,7 +238,7 @@ class WorkspaceInfo:
             f'only within {self._ws.config.host}'
         )
         workspaces = []
-        workspace_id = self._current_workspace_id()
+        workspace_id = self._ws.get_workspace_id()
         while workspace_id:
             workspace_name = prompts.question(
                 f"Workspace name for {workspace_id}", default=f"workspace-{workspace_id}", valid_regex=r"^[\w-]+$"

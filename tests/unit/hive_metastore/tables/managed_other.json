@@ -1,0 +1,18 @@
+{
+  "table": {
+    "catalog": "hive_metastore",
+    "database": "db1_src",
+    "name": "managed_other",
+    "type": "MANAGED",
+    "table_format": "DELTA",
+    "location": "s3:/location"
+  },
+  "rule": {
+    "workspace_name": "workspace",
+    "catalog_name": "ucx_default",
+    "src_schema": "db1_src",
+    "dst_schema": "db1_dst",
+    "src_table": "managed_other",
+    "dst_table": "managed_other"
+  }
+}
