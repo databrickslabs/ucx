@@ -225,26 +225,30 @@ class TableMove:
         self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
 
     def _recreate_table(self, from_table_name, to_table_name, *, is_managed: bool, del_table: bool):
+        drop_table = f"DROP TABLE {escape_sql_identifier(from_table_name)}"
         if is_managed:
             create_table_sql = (
                 f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(to_table_name)} "
-                f"DEEP CLONE {escape_sql_identifier(from_table_name)};"
+                f"DEEP CLONE {escape_sql_identifier(from_table_name)}"
             )
+            logger.info(f"Creating table {to_table_name}")
+            self._backend.execute(create_table_sql)
             if del_table:
                 logger.info(f"Dropping source table {from_table_name}")
-                create_table_sql += f"DROP TABLE {escape_sql_identifier(from_table_name)}"
+                drop_table = f"DROP TABLE {escape_sql_identifier(from_table_name)}"
+                self._backend.execute(drop_table)
         else:
             create_sql = str(
                 next(self._backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(from_table_name)}"))[0]
             )
             logger.info(f"Dropping source table {from_table_name}")
-            create_table_sql = f"DROP TABLE {escape_sql_identifier(from_table_name)};"
-            create_table_sql += create_sql.replace(
+            self._backend.execute(drop_table)
+            create_table_sql = create_sql.replace(
                 f"CREATE TABLE {escape_sql_identifier(from_table_name)}",
                 f"CREATE TABLE {escape_sql_identifier(to_table_name)}",
             )
-        logger.info(f"Creating table {to_table_name}")
-        self._backend.execute(create_table_sql)
+            logger.info(f"Creating table {to_table_name}")
+            self._backend.execute(create_table_sql)
 
     def _create_alias_view(self, from_table_name, to_table_name):
         create_view_sql = (

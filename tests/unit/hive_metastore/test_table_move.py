@@ -1,6 +1,7 @@
 import logging
 from unittest.mock import create_autospec
 
+import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
@@ -229,7 +230,8 @@ def test_move_tables_get_grants_fails_because_table_removed(caplog):
     assert "removed on the backend SrcC.SrcS.table1" in caplog.messages
 
 
-def test_move_all_tables_and_drop_source():
+@pytest.mark.parametrize("del_table", [True, False])
+def test_move_all_tables(del_table: bool):
     client = create_autospec(WorkspaceClient)
 
     client.tables.list.return_value = [
@@ -320,17 +322,23 @@ def test_move_all_tables_and_drop_source():
     client.tables.get.side_effect = target_tables_mapping
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=True)
-
-    assert [
-        "CREATE TABLE IF NOT EXISTS TgtC.TgtS.table1 DEEP CLONE SrcC.SrcS.table1;DROP TABLE SrcC.SrcS.table1",
+    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=del_table)
+    expected_queries = [
+        "CREATE TABLE IF NOT EXISTS TgtC.TgtS.table1 DEEP CLONE SrcC.SrcS.table1",
+        "CREATE TABLE TgtC.TgtS.table2 (name string) LOCATION 's3://bucket/path'",
         "CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.table1",
         "CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.table1",
-        "DROP TABLE SrcC.SrcS.table2;CREATE TABLE TgtC.TgtS.table2 (name string) LOCATION 's3://bucket/path'",
+        "DROP TABLE SrcC.SrcS.table1",
+        "DROP TABLE SrcC.SrcS.table2",
         "DROP VIEW SrcC.SrcS.view1",
         "DROP VIEW SrcC.SrcS.view2",
         "SHOW CREATE TABLE SrcC.SrcS.table2",
-    ] == sorted(backend.queries)
+    ]
+    if not del_table:
+        expected_queries.remove("DROP TABLE SrcC.SrcS.table1")
+        expected_queries.remove("DROP VIEW SrcC.SrcS.view1")
+        expected_queries.remove("DROP VIEW SrcC.SrcS.view2")
+    assert expected_queries == sorted(backend.queries)
 
 
 def test_alias_all_tables():
@@ -457,7 +465,8 @@ def test_move_one_table_without_dropping_source():
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert [
-        "DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string)",
+        "CREATE TABLE TgtC.TgtS.table1 (name string)",
+        "DROP TABLE SrcC.SrcS.table1",
         "SHOW CREATE TABLE SrcC.SrcS.table1",
     ] == sorted(backend.queries)
 
@@ -491,7 +500,8 @@ def test_move_apply_grants():
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert [
-        "DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string) LOCATION 's3://bucket/path'",
+        "CREATE TABLE TgtC.TgtS.table1 (name string) LOCATION 's3://bucket/path'",
+        "DROP TABLE SrcC.SrcS.table1",
         "SHOW CREATE TABLE SrcC.SrcS.table1",
     ] == sorted(backend.queries)
     client.grants.update.assert_called_with(
