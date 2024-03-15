@@ -238,7 +238,7 @@ def test_move_all_tables_and_drop_source():
             schema_name="SrcS",
             name="table1",
             full_name="SrcC.SrcS.table1",
-            table_type=TableType.EXTERNAL,
+            table_type=TableType.MANAGED,
         ),
         TableInfo(
             catalog_name="SrcC",
@@ -252,7 +252,14 @@ def test_move_all_tables_and_drop_source():
             schema_name="SrcS",
             name="table3",
             full_name="SrcC.SrcS.table3",
-            table_type=TableType.MANAGED,
+            table_type=TableType.EXTERNAL,
+        ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
+            name="table4",
+            full_name="SrcC.SrcS.table4",
+            table_type=TableType.MATERIALIZED_VIEW,
         ),
         TableInfo(
             catalog_name="SrcC",
@@ -303,11 +310,8 @@ def test_move_all_tables_and_drop_source():
         return None
 
     rows = {
-        "SHOW CREATE TABLE SrcC.SrcS.table1": [
-            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
-        ],
         "SHOW CREATE TABLE SrcC.SrcS.table2": [
-            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+            ["CREATE TABLE SrcC.SrcS.table2 (name string) LOCATION 's3://bucket/path'"],
         ],
     }
 
@@ -319,15 +323,12 @@ def test_move_all_tables_and_drop_source():
     table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=True)
 
     assert [
-        "CREATE TABLE SrcC.SrcS.table1 (name string)",
-        "CREATE TABLE TgtC.TgtS.table1 (name string)",
+        "CREATE TABLE IF NOT EXISTS TgtC.TgtS.table1 DEEP CLONE SrcC.SrcS.table1;DROP TABLE SrcC.SrcS.table1",
         "CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.table1",
         "CREATE VIEW TgtC.TgtS.view2 AS SELECT * FROM SrcC.SrcS.table1",
-        "DROP TABLE SrcC.SrcS.table1",
-        "DROP TABLE SrcC.SrcS.table2",
+        "DROP TABLE SrcC.SrcS.table2;CREATE TABLE TgtC.TgtS.table2 (name string) LOCATION 's3://bucket/path'",
         "DROP VIEW SrcC.SrcS.view1",
         "DROP VIEW SrcC.SrcS.view2",
-        "SHOW CREATE TABLE SrcC.SrcS.table1",
         "SHOW CREATE TABLE SrcC.SrcS.table2",
     ] == sorted(backend.queries)
 
@@ -455,9 +456,8 @@ def test_move_one_table_without_dropping_source():
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
-    assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
-        backend.queries
-    )
+    assert ["DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string)",
+            "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(backend.queries)
 
 
 def test_move_apply_grants():
@@ -477,7 +477,7 @@ def test_move_apply_grants():
 
     rows = {
         "SHOW CREATE TABLE SrcC.SrcS.table1": [
-            ["CREATE TABLE SrcC.SrcS.table1 (name string)"],
+            ["CREATE TABLE SrcC.SrcS.table1 (name string) LOCATION 's3://bucket/path'"],
         ]
     }
 
@@ -488,7 +488,8 @@ def test_move_apply_grants():
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
-    assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
+    assert ["DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string) LOCATION 's3://bucket/path'",
+            "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
         backend.queries
     )
     client.grants.update.assert_called_with(

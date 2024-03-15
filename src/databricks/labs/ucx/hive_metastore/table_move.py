@@ -167,13 +167,9 @@ class TableMove:
         from_table_name = f"{from_catalog}.{from_schema}.{from_table}"
         to_table_name = f"{to_catalog}.{to_schema}.{from_table}"
         try:
-            self._recreate_table(from_table_name, to_table_name, is_managed=table_type == TableType.MANAGED)
+            self._recreate_table(from_table_name, to_table_name,
+                                 is_managed=table_type == TableType.MANAGED, del_table=del_table)
             self._reapply_grants(from_table_name, to_table_name)
-            if del_table:
-                logger.info(f"Dropping source table {from_table_name}")
-                drop_sql = f"DROP TABLE {escape_sql_identifier(from_table_name)}"
-                self._backend.execute(drop_sql)
-            return True
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err) or "[DELTA_TABLE_NOT_FOUND]" in str(err):
                 logger.error(f"Could not find table {from_table_name}. Table not found.")
@@ -227,17 +223,22 @@ class TableMove:
 
         self._ws.grants.update(SecurableType.TABLE, to_table_name, changes=grants_changes)
 
-    def _recreate_table(self, from_table_name, to_table_name, *, is_managed: bool):
+    def _recreate_table(self, from_table_name, to_table_name, *, is_managed: bool, del_table: bool):
         if is_managed:
             create_table_sql = (
                 f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(to_table_name)} "
                 f"DEEP CLONE {escape_sql_identifier(from_table_name)};"
             )
+            if del_table:
+                logger.info(f"Dropping source table {from_table_name}")
+                create_table_sql += f"DROP TABLE {escape_sql_identifier(from_table_name)}"
         else:
             create_sql = str(
                 next(self._backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(from_table_name)}"))[0]
             )
-            create_table_sql = create_sql.replace(
+            logger.info(f"Dropping source table {from_table_name}")
+            create_table_sql = f"DROP TABLE {escape_sql_identifier(from_table_name)};"
+            create_table_sql += create_sql.replace(
                 f"CREATE TABLE {escape_sql_identifier(from_table_name)}",
                 f"CREATE TABLE {escape_sql_identifier(to_table_name)}",
             )

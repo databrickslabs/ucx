@@ -224,7 +224,10 @@ def move(
         logger.error("please select a different schema or catalog to migrate to")
         return
     tables = TableMove.for_cli(w)
-    del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
+    if not prompts.confirm(f"[WARNING] External tables will be dropped and recreated in the target schema {to_schema}"):
+        return
+    del_table = prompts.confirm(f"should we delete managed tables & views after moving to the new schema"
+                                f" {to_catalog}.{to_schema}")
     logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
     tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table=del_table)
 
