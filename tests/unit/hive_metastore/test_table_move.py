@@ -456,8 +456,10 @@ def test_move_one_table_without_dropping_source():
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
-    assert ["DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string)",
-            "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(backend.queries)
+    assert [
+        "DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string)",
+        "SHOW CREATE TABLE SrcC.SrcS.table1",
+    ] == sorted(backend.queries)
 
 
 def test_move_apply_grants():
@@ -488,10 +490,10 @@ def test_move_apply_grants():
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
-    assert ["DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string) LOCATION 's3://bucket/path'",
-            "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
-        backend.queries
-    )
+    assert [
+        "DROP TABLE SrcC.SrcS.table1;CREATE TABLE TgtC.TgtS.table1 (name string) LOCATION 's3://bucket/path'",
+        "SHOW CREATE TABLE SrcC.SrcS.table1",
+    ] == sorted(backend.queries)
     client.grants.update.assert_called_with(
         SecurableType.TABLE,
         'TgtC.TgtS.table1',
