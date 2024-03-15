@@ -1136,20 +1136,25 @@ def test_save_config_should_include_databases(ws, mock_installation):
 
 def test_triggering_assessment_wf(ws, mocker, mock_installation):
     ws.jobs.run_now = mocker.Mock()
+    mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
     prompts = MockPrompts(
         {
             r".*": "",
+            r"Do you want to trigger assessment job ?.*": "yes",
+            r"Open assessment Job url that just triggered ?.*": "yes",
         }
     )
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database="ucx", policy_id='123', run_assessment_workflow=True),
+        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
         mock_installation,
         sql_backend,
         create_autospec(WheelsV2),
         ws,
         prompts,
-        verify_timeout=timedelta(seconds=1),
+        timedelta(seconds=1),
+        PRODUCT_INFO,
+
     )
     workspace_installation.run()
 

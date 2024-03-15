@@ -42,8 +42,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Flag to see if terraform has been used for deploying certain entities
     is_terraform_used: bool = False
 
-    run_assessment_workflow: bool = False
-
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
 
