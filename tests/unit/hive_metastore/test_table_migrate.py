@@ -475,7 +475,7 @@ def test_table_status_reset():
     ]
 
 
-def test_table_status_seen_tables(mocker):
+def test_table_status_seen_tables():
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)

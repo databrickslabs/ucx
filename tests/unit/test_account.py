@@ -15,7 +15,7 @@ from databricks.sdk.service.provisioning import Workspace
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 
 
-def test_sync_workspace_info(mocker):
+def test_sync_workspace_info():
     acc_client = create_autospec(AccountClient)
     acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
 
@@ -50,7 +50,7 @@ def test_current_workspace_name():
     assert wir.current() == "some"
 
 
-def test_manual_workspace_info(mocker):
+def test_manual_workspace_info():
     ws = create_autospec(WorkspaceClient)
     ws.config.host = "localhost"
     ws.users.list.return_value = [User(user_name="foo")]

@@ -1,16 +1,17 @@
 import base64
+from unittest.mock import create_autospec
 
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.compute import GlobalInitScriptDetails
 
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 
 
-def test_global_init_scripts_no_config(mocker):
-    mock_ws = mocker.Mock()
-    mocker.Mock()
+def test_global_init_scripts_no_config():
+    mock_ws = create_autospec(WorkspaceClient)
     mock_ws.global_init_scripts.list.return_value = [
         GlobalInitScriptDetails(
             created_at=111,
@@ -30,9 +31,8 @@ def test_global_init_scripts_no_config(mocker):
     assert result[0].success == 1
 
 
-def test_global_init_scripts_with_config(mocker):
-    mock_ws = mocker.Mock()
-    mocker.Mock()
+def test_global_init_scripts_with_config():
+    mock_ws = create_autospec(WorkspaceClient)
     mock_ws.global_init_scripts.list.return_value = [
         GlobalInitScriptDetails(
             created_at=111,
@@ -74,9 +74,8 @@ def test_global_init_scripts_with_config(mocker):
     assert result[0].success == 0
 
 
-def test_init_script_without_config_should_have_empty_creator_name(mocker):
-    mock_ws = mocker.Mock()
-    mocker.Mock()
+def test_init_script_without_config_should_have_empty_creator_name():
+    mock_ws = create_autospec(WorkspaceClient)
     mock_ws.global_init_scripts.list.return_value = [
         GlobalInitScriptDetails(
             created_at=111,
@@ -92,7 +91,7 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
     mock_ws.global_init_scripts.get().script = base64.b64encode(b"hello world")
     mockbackend = MockBackend()
     crawler = GlobalInitScriptCrawler(mock_ws, mockbackend, schema="ucx")
-    result = crawler.snapshot()
+    crawler.snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
 
     assert result == [
@@ -100,8 +99,8 @@ def test_init_script_without_config_should_have_empty_creator_name(mocker):
     ]
 
 
-def test_missing_global_init_script(mocker, caplog):
-    mock_ws = mocker.Mock()
+def test_missing_global_init_script(caplog):
+    mock_ws = create_autospec(WorkspaceClient)
     mock_ws.global_init_scripts.list.return_value = [
         GlobalInitScriptDetails(
             created_at=111,
@@ -117,7 +116,7 @@ def test_missing_global_init_script(mocker, caplog):
     mock_ws.global_init_scripts.get.side_effect = ResourceDoesNotExist("RESOURCE_DOES_NOT_EXIST")
     mockbackend = MockBackend()
     crawler = GlobalInitScriptCrawler(mock_ws, mockbackend, schema="ucx")
-    result = crawler.snapshot()
+    crawler.snapshot()
     result = mockbackend.rows_written_for("hive_metastore.ucx.global_init_scripts", "append")
 
     assert len(result) == 0
