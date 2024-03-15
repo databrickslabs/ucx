@@ -16,7 +16,7 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.hive_metastore.table_migrate import TableMove
+from databricks.labs.ucx.hive_metastore.table_move import TableMove
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def test_move_tables_invalid_from_schema(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = NotFound()
     table_move = TableMove(client, MockBackend())
-    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "schema SrcS not found in catalog SrcC" in rec.message]) == 1
 
 
@@ -39,7 +39,7 @@ def test_move_tables_invalid_to_schema(caplog):
     client = create_autospec(WorkspaceClient)
     client.schemas.get.side_effect = [SchemaInfo(), NotFound()]
     table_move = TableMove(client, MockBackend())
-    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "schema TgtS not found in TgtC" in rec.message]) == 1
 
 
@@ -60,7 +60,7 @@ def test_move_tables_not_found_table_error(caplog):
     client.tables.get.side_effect = [NotFound()]
 
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "Could not find table SrcC.SrcS.table1" in rec.message]) == 1
 
 
@@ -82,7 +82,7 @@ def test_move_tables_not_found_table_unknown_error(caplog):
     client.tables.get.side_effect = [NotFound()]
 
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "unknown error" in rec.message]) == 1
 
 
@@ -127,7 +127,7 @@ def test_move_tables_not_found_view_error(caplog):
     client.tables.get.side_effect = [NotFound()]
 
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "view1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "view1", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "Could not find view SrcC.SrcS.view1" in rec.message]) == 1
 
 
@@ -173,7 +173,7 @@ def test_move_tables_not_found_view_unknown_error(caplog):
     client.tables.get.side_effect = [NotFound()]
 
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "view1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "view1", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "unknown error" in rec.message]) == 1
 
 
@@ -196,7 +196,7 @@ def test_alias_tables_not_found_view_unknown_error(caplog):
     client.tables.get.side_effect = [NotFound()]
 
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "view1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "view1", "TgtC", "TgtS", del_table=False)
     assert len([rec.message for rec in caplog.records if "unknown error" in rec.message]) == 1
 
 
@@ -224,7 +224,7 @@ def test_move_tables_get_grants_fails_because_table_removed(caplog):
     client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert "removed on the backend SrcC.SrcS.table1" in caplog.messages
 
@@ -316,7 +316,7 @@ def test_move_all_tables_and_drop_source():
     client.tables.get.side_effect = target_tables_mapping
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", True)
+    table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=True)
 
     assert [
         "CREATE TABLE SrcC.SrcS.table1 (name string)",
@@ -453,7 +453,7 @@ def test_move_one_table_without_dropping_source():
     client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
         backend.queries
@@ -486,7 +486,7 @@ def test_move_apply_grants():
     client.tables.get.side_effect = [NotFound(), NotFound(), NotFound(), NotFound()]
     backend = MockBackend(rows=rows)
     table_move = TableMove(client, backend)
-    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", False)
+    table_move.move_tables("SrcC", "SrcS", "table1", "TgtC", "TgtS", del_table=False)
 
     assert ["CREATE TABLE TgtC.TgtS.table1 (name string)", "SHOW CREATE TABLE SrcC.SrcS.table1"] == sorted(
         backend.queries

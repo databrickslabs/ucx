@@ -5,7 +5,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
-from databricks.labs.ucx.hive_metastore.table_migrate import TableMove
+from databricks.labs.ucx.hive_metastore.table_move import TableMove
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def test_move_tables_no_from_schema(ws, sql_backend, make_random, make_catalog, 
     from_schema = make_random(4)
     to_catalog = make_catalog()
     table_move = TableMove(ws, sql_backend)
-    table_move.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, False)
+    table_move.move_tables(from_catalog.name, from_schema, "*", to_catalog.name, from_schema, del_table=False)
     rec_results = [
         rec.message
         for rec in caplog.records
@@ -52,7 +52,7 @@ def test_move_tables(
     sql_backend.execute(f"GRANT SELECT ON VIEW {from_view_1.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {to_table_3.full_name} TO `{group_a.display_name}`")
 
-    table_move.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, False)
+    table_move.move_tables(from_catalog.name, from_schema.name, "*", to_catalog.name, to_schema.name, del_table=False)
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema.name)
     table_1_grant = ws.grants.get(
@@ -95,7 +95,7 @@ def test_move_tables_no_to_schema(ws, sql_backend, make_catalog, make_schema, ma
 
     # migrate first table
     table_move.move_tables(
-        from_catalog.name, from_schema.name, from_table_to_migrate.name, to_catalog.name, to_schema, True
+        from_catalog.name, from_schema.name, from_table_to_migrate.name, to_catalog.name, to_schema, del_table=True
     )
 
     to_tables = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
@@ -131,7 +131,7 @@ def test_move_views(ws, sql_backend, make_catalog, make_schema, make_table, make
 
     # migrate first table
     table_move.move_tables(
-        from_catalog.name, from_schema.name, from_view_to_migrate.name, to_catalog.name, to_schema, True
+        from_catalog.name, from_schema.name, from_view_to_migrate.name, to_catalog.name, to_schema, del_table=True
     )
 
     to_views = ws.tables.list(catalog_name=to_catalog.name, schema_name=to_schema)
