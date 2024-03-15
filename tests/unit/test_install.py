@@ -1215,12 +1215,17 @@ def test_fresh_install(ws, mock_installation):
 
 
 def test_get_existing_installation_global(ws, mock_installation, mocker):
-    mocker.patch("webbrowser.open")
-    prompts = MockPrompts(
+    base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
+            r".*": "",
+        }
+    )
+
+    first_prompts = base_prompts.extend(
+        {
             r"Inventory Database stored in hive_metastore.*": "ucx_global",
             r".*": "",
         }
@@ -1238,42 +1243,48 @@ def test_get_existing_installation_global(ws, mock_installation, mocker):
         }
     )
 
-    first_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    first_install = WorkspaceInstaller(first_prompts, installation, ws, PRODUCT_INFO)
     workspace_config = first_install.configure()
     assert workspace_config.inventory_database == 'ucx_global'
 
     force_user_environ = {'UCX_FORCE_INSTALL': 'user'}
 
+    second_prompts = base_prompts.extend(
+        {
+            r".*UCX is already installed on this workspace.*": "no",
+        }
+    )
     # test for force user install variable without prompts
-    second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
+    second_install = WorkspaceInstaller(second_prompts, installation, ws, PRODUCT_INFO, force_user_environ)
     with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
         second_install.configure()
 
     # test for force user install variable with prompts
-    prompts = MockPrompts(
+    third_prompts = base_prompts.extend(
         {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
             r".*UCX is already installed on this workspace.*": "yes",
             r"Inventory Database stored in hive_metastore.*": "ucx_user",
-            r".*": "",
         }
     )
-    third_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
+    third_install = WorkspaceInstaller(third_prompts, installation, ws, PRODUCT_INFO, force_user_environ)
     workspace_config = third_install.configure()
     assert workspace_config.inventory_database == 'ucx_user'
 
 
 def test_existing_installation_user(ws, mock_installation):
     # test configure on existing user install
-    prompts = MockPrompts(
+    base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
+            r"Open config file in.*": "no",
+            r".*": "",
+        }
+    )
+
+    first_prompts = base_prompts.extend(
+        {
             r".*UCX is already installed on this workspace.*": "yes",
             r"Inventory Database stored in hive_metastore.*": "ucx_user",
             r".*": "",
@@ -1292,41 +1303,33 @@ def test_existing_installation_user(ws, mock_installation):
         },
         is_global=False,
     )
-    first_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    first_install = WorkspaceInstaller(first_prompts, installation, ws, PRODUCT_INFO)
     workspace_config = first_install.configure()
     assert workspace_config.inventory_database == 'ucx_user'
 
     # test for force global install variable without prompts
     # resetting prompts to remove confirmation
-    prompts = MockPrompts(
+    second_prompts = base_prompts.extend(
         {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
-            r".*": "",
+            r".*UCX is already installed on this workspace.*": "no",
         }
     )
 
     force_global_env = {'UCX_FORCE_INSTALL': 'global'}
-    second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_global_env)
+    second_install = WorkspaceInstaller(second_prompts, installation, ws, PRODUCT_INFO, force_global_env)
     with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
         second_install.configure()
 
     # test for force global install variable with prompts
-    prompts = MockPrompts(
+    third_prompts = base_prompts.extend(
         {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
             r".*UCX is already installed on this workspace.*": "yes",
             r"Inventory Database stored in hive_metastore.*": "ucx_user_new",
             r".*": "",
         }
     )
 
-    third_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_global_env)
+    third_install = WorkspaceInstaller(third_prompts, installation, ws, PRODUCT_INFO, force_global_env)
     with pytest.raises(NotImplemented, match="Migration needed. Not implemented yet."):
         third_install.configure()
 
