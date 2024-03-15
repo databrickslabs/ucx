@@ -149,3 +149,9 @@ commands:
     flags:
       - name: cluster_id
         description: Id of the cluster to remap
+
+  - name: revert-cluster-remap
+    description: Reverting the Re-mapping of the  cluster from  UC
+    flags:
+      - name: cluster_id
+        description: Id of the cluster to revert the remap
