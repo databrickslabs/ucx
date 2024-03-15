@@ -66,7 +66,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 - Databricks Workspace Administrator privileges for the user, that runs the installation.
 - Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
 - Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
-- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [this guide](docs/external_hms_glue.md).
+- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](docs/external_hms_glue.md).
 - Databricks Workspace has to have network access to [pypi.org](https://pypi.org) to download `databricks-sdk` and `pyyaml` packages.
 - A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
 
@@ -138,14 +138,14 @@ If there is an existing global installation of UCX, you can force a user install
 At this moment there is no global override over a user installation of UCX. As this requires migration and can break existing installations.
 
 
-| global | user | expected install location | install_folder | mode |
-| --- | --- | --- | --- |--- |
-| no | no | default | `/Applications/ucx` | install |
-| yes | no | default | `/Applications/ucx` | upgrade |
-| no | yes | default | `/Users/X/.ucx` | upgrade (existing installations must not break) |
-| yes | yes | default | `/Users/X/.ucx` | upgrade |
-| yes | no | **USER** | `/Users/X/.ucx` | install (show prompt) |
-| no | yes | **GLOBAL** | ...  | migrate |
+| global | user | expected install location | install_folder      | mode                                            |
+|--------|------|---------------------------|---------------------|-------------------------------------------------|
+| no     | no   | default                   | `/Applications/ucx` | install                                         |
+| yes    | no   | default                   | `/Applications/ucx` | upgrade                                         |
+| no     | yes  | default                   | `/Users/X/.ucx`     | upgrade (existing installations must not break) |
+| yes    | yes  | default                   | `/Users/X/.ucx`     | upgrade                                         |
+| yes    | no   | **USER**                  | `/Users/X/.ucx`     | install (show prompt)                           |
+| no     | yes  | **GLOBAL**                | ...                 | migrate                                         |
 
 
 * `UCX_FORCE_INSTALL=user databricks labs install ucx` - will force the installation to be for user only
@@ -158,7 +158,7 @@ At this moment there is no global override over a user installation of UCX. As t
 
 Verify that UCX is installed
 
-```commandline
+```text
 databricks labs installed
 
 Name  Description                            Version
@@ -592,10 +592,21 @@ This command is supposed to be run before migrating tables to UC.
 databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E  
 ```
 
-This command moves a UC table/tables from one schema to another schema in the same or different catalog during
-the [table upgrade](docs/table_upgrade.md) process. This command is useful for developers and administrators who want 
-to move tables between schemas. It can also be used to debug issues related to table movement.
-This command also keeps permissions of the source tables when moved to a new schema or catalog.
+This command moves a UC table/tables from one schema to another schema after
+the [table upgrade](docs/table_upgrade.md) process. This is useful for developers and administrators who want 
+to adjust their catalog structure after tables upgrade.
+
+Users will be prompted whether tables/view are dropped after moving to new schema. This only applies to `MANAGED` tables and views.
+
+This command moves different table types differently:
+- `MANAGED` tables are deep-cloned to the new schema. 
+- `EXTERNAL` tables are dropped from the original schema, then created in the target schema using the same location. 
+This is due to Unity Catalog not supporting multiple tables with overlapping paths
+- `VIEW` are recreated using the same view definition.
+
+[[back to top](#databricks-labs-ucx)]
+
+This command supports moving multiple tables at once, by specifying `*` as the table name.
 
 [[back to top](#databricks-labs-ucx)]
 
