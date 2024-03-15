@@ -6,6 +6,7 @@ from databricks.sdk.errors import BadRequest, NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
+from databricks.sdk.service.serving import ServingEndpointPermission
 
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import (
@@ -426,13 +427,13 @@ def test_endpoints(
     endpoint = make_serving_endpoint()
     make_serving_endpoint_permissions(
         object_id=endpoint.response.id,
-        permission_level=PermissionLevel.CAN_MANAGE,
+        permission_level=PermissionLevel.CAN_QUERY,
         group_name=group_a.display_name,
     )
 
     generic_permissions = GenericPermissionsSupport(ws, [Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
     before = generic_permissions.load_as_dict("serving-endpoints", endpoint.response.id)
-    assert before[group_a.display_name] == PermissionLevel.CAN_MANAGE
+    assert before[group_a.display_name] == PermissionLevel.CAN_QUERY
 
     apply_tasks(
         generic_permissions,
@@ -442,7 +443,7 @@ def test_endpoints(
     )
 
     after = generic_permissions.load_as_dict("serving-endpoints", endpoint.response.id)
-    assert after[group_b.display_name] == PermissionLevel.CAN_MANAGE
+    assert after[group_b.display_name] == PermissionLevel.CAN_QUERY
 
 
 def test_feature_tables(ws: WorkspaceClient, make_feature_table, make_group, make_feature_table_permissions):
