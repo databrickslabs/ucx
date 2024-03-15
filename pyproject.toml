@@ -45,7 +45,7 @@ classifiers = [
 ]
 dependencies = ["databricks-sdk~=0.21.0",
                 "databricks-labs-lsql~=0.2.1",
-                "databricks-labs-blueprint~=0.4.1",
+                "databricks-labs-blueprint~=0.4.2",
                 "PyYAML>=6.0.0,<7.0.0"]
 
 [project.entry-points.databricks]
