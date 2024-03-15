@@ -19,6 +19,7 @@ from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
@@ -463,3 +464,42 @@ def test_check_inventory_database_exists(ws, new_installation):
             },
         )
     assert err.value.args[0] == f"Inventory database '{inventory_database}' already exists in another installation"
+
+
+def test_running_table_migration_job(ws, new_installation, make_catalog, make_schema, make_table, env_or_skip):
+    # create external and managed tables to be migrated
+    src_schema = make_schema(catalog_name="hive_metastore")
+    src_managed_table = make_table(schema_name=src_schema.name)
+    mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=mounted_location)
+    # create destination catalog and schema
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    product_info = ProductInfo.from_class(WorkspaceConfig)
+    install = new_installation(product_info=product_info)
+    # save table mapping for migration before trigger the run
+    installation = product_info.current_installation(ws)
+    migrate_rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_managed_table.name,
+            src_managed_table.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_external_table.name,
+            src_external_table.name,
+        ),
+    ]
+    installation.save(migrate_rules, filename='mapping.csv')
+
+    install.run_workflow("migrate-tables")
+    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
+    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name

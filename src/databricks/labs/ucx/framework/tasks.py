@@ -256,7 +256,7 @@ def run_task(
 
 
 def trigger(*argv):
-    args = parse_args(argv)
+    args = parse_args(*argv)
     config_path = Path(args["config"])
 
     cfg = Installation.load_local(WorkspaceConfig, config_path)
