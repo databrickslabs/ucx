@@ -1,5 +1,5 @@
+from databricks.labs.ucx.code.pyspark import SparkSql
 from databricks.labs.ucx.code.queries import FromTable
-from databricks.labs.ucx.code.spark import SparkSql
 from databricks.labs.ucx.hive_metastore.table_migrate import Index, MigrationStatus
 
 
