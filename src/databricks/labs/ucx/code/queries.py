@@ -1,10 +1,11 @@
 import sqlglot
 from sqlglot.expressions import Table
 
+from databricks.labs.ucx.code.base import Fixer
 from databricks.labs.ucx.hive_metastore.table_migrate import Index
 
 
-class FromTableFixer:
+class FromTable(Fixer):
     def __init__(self, index: Index):
         self._index = index
 

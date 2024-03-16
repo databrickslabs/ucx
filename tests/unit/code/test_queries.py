@@ -1,16 +1,16 @@
-from databricks.labs.ucx.code.queries import FromTableFixer
+from databricks.labs.ucx.code.queries import FromTable
 from databricks.labs.ucx.hive_metastore.table_migrate import Index, MigrationStatus
 
 
 def test_migrates_from_table_no_tables():
-    ftf = FromTableFixer(Index([]))
+    ftf = FromTable(Index([]))
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
     assert not ftf.match(old_query)
 
 
 def test_partially_migrated_queries_dont_match():
-    ftf = FromTableFixer(
+    ftf = FromTable(
         Index(
             [
                 MigrationStatus(
@@ -25,7 +25,7 @@ def test_partially_migrated_queries_dont_match():
 
 
 def test_fully_migrated_queries_match():
-    ftf = FromTableFixer(
+    ftf = FromTable(
         Index(
             [
                 MigrationStatus(
