@@ -115,7 +115,7 @@ def test_run_service_principal(ws):
 
 
 def test_run_unsupported_location(ws, caplog):
-    """test run with service principal based storage credentials"""
+    """test unsupported location will not be migrated"""
 
     # mock crawled HMS external locations with two unsupported locations adl and wasbs
     row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
