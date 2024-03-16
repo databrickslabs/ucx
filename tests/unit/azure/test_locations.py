@@ -16,9 +16,9 @@ from databricks.sdk.service.catalog import (
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from tests.unit.azure import get_az_api_mapping
+from tests.unit.azure import azure_api_client
 
 
 @pytest.fixture
@@ -27,13 +27,7 @@ def ws():
 
 
 def location_migration_for_test(ws, mock_backend, mock_installation):
-    azure_mgmt_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
-    )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azurerm = AzureResources(azure_mgmt_client, graph_client)
-
+    azurerm = AzureResources(azure_api_client(), azure_api_client())
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
 
     return ExternalLocationsMigration(
@@ -120,6 +114,83 @@ def test_run_service_principal(ws):
     )
 
 
+def test_run_unsupported_location(ws, caplog):
+    """test run with service principal based storage credentials"""
+
+    # mock crawled HMS external locations with two unsupported locations adl and wasbs
+    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM location_test.external_locations": [
+                row_factory(["abfss://container1@test.dfs.core.windows.net/one/", 1]),
+                row_factory(["adl://container2@test.dfs.core.windows.net/", 2]),
+                row_factory(["wasbs://container2@test.dfs.core.windows.net/", 2]),
+            ]
+        }
+    )
+
+    # mock listing storage credentials
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            name="credential_sp1",
+            azure_service_principal=AzureServicePrincipal(
+                "directory_id_1",
+                "application_id_1",
+                "test_secret",
+            ),
+        )
+    ]
+
+    # mock listing UC external locations, no HMS external location will be matched
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
+
+    # mock installation with permission mapping
+    mock_installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://container1@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+                {
+                    'prefix': 'adl://container2@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+                {
+                    'prefix': 'wasbs://container2@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+            ],
+        }
+    )
+
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
+    location_migration.run()
+
+    ws.external_locations.create.assert_called_once_with(
+        "container1_test_one",
+        "abfss://container1@test.dfs.core.windows.net/one/",
+        "credential_sp1",
+        comment="Created by UCX",
+        read_only=False,
+        skip_validation=False,
+    )
+    assert "Skip unsupported location: adl://container2@test.dfs.core.windows.net" in caplog.text
+    assert "Skip unsupported location: wasbs://container2@test.dfs.core.windows.net" in caplog.text
+
+
 def test_run_managed_identity(ws, mocker):
     """test run with managed identity based storage credentials"""
 
@@ -176,11 +247,6 @@ def test_run_managed_identity(ws, mocker):
             ],
         }
     )
-
-    # mock Azure resource manager and graph API calls for getting application_id of managed identity
-    # TODO: (qziyuan) use a better way to mock the API calls
-    # pylint: disable-next=prohibited-patch
-    mocker.patch("databricks.sdk.core.ApiClient.do", side_effect=get_az_api_mapping)
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
@@ -399,10 +465,6 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
             ],
         }
     )
-    # return None when getting application_id of managed identity
-    # TODO: (qziyuan) use a better way to mock the API calls
-    # pylint: disable-next=prohibited-patch
-    mocker.patch("databricks.sdk.core.ApiClient.do", return_value={"dummy": "dummy"})
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
