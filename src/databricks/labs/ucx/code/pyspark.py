@@ -1,6 +1,5 @@
 import ast
 
-
 from databricks.labs.ucx.code.base import Fixer
 from databricks.labs.ucx.code.queries import FromTable
 
