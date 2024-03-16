@@ -273,6 +273,27 @@ class TablesMigrate:
         return matched_grants
 
 
+class Index:
+    def __init__(self, tables: list[MigrationStatus]):
+        self._tables = tables
+
+    def is_upgraded(self, schema: str, table: str) -> bool:
+        src_schema = schema.lower()
+        src_table = table.lower()
+        for migration_status in self._tables:
+            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
+                return True
+        return False
+
+    def get(self, schema: str, table: str) -> MigrationStatus | None:
+        src_schema = schema.lower()
+        src_table = table.lower()
+        for migration_status in self._tables:
+            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
+                return migration_status
+        return None
+
+
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
         super().__init__(sbe, "hive_metastore", schema, "migration_status", MigrationStatus)
@@ -281,6 +302,9 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
 
     def snapshot(self) -> Iterable[MigrationStatus]:
         return self._snapshot(self._try_fetch, self._crawl)
+
+    def index(self) -> Index:
+        return Index(list(self.snapshot()))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
@@ -310,12 +334,14 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:
+            src_schema = table.database.lower()
+            src_table = table.name.lower()
             table_migration_status = MigrationStatus(
-                src_schema=table.database,
-                src_table=table.name,
+                src_schema=src_schema,
+                src_table=src_table,
                 update_ts=str(timestamp),
             )
-            if table.key in reverse_seen and self.is_upgraded(table.database, table.name):
+            if table.key in reverse_seen and self.is_upgraded(src_schema, src_table):
                 target_table = reverse_seen[table.key]
                 if len(target_table.split(".")) == 3:
                     table_migration_status.dst_catalog = target_table.split(".")[0]
