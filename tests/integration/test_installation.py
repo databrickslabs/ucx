@@ -96,7 +96,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
         workflows_installation = WorkflowsInstallation(
-            workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=2)
+            workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=3)
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,
