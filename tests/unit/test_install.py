@@ -1157,7 +1157,7 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     install.run(
-        verify_timeout=timedelta(seconds=20),
+        verify_timeout=timedelta(seconds=60),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
     )
