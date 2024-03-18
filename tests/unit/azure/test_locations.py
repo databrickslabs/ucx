@@ -3,7 +3,6 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
-from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
@@ -39,12 +38,11 @@ def test_run_service_principal(ws):
     """test run with service principal based storage credentials"""
 
     # mock crawled HMS external locations
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": [
-                row_factory(["abfss://container1@test.dfs.core.windows.net/one/", 1]),
-                row_factory(["abfss://container2@test.dfs.core.windows.net/", 2]),
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container1@test.dfs.core.windows.net/one/", 1),
+                ("abfss://container2@test.dfs.core.windows.net/", 2),
             ]
         }
     )
@@ -114,17 +112,14 @@ def test_run_service_principal(ws):
     )
 
 
-def test_run_unsupported_location(ws, caplog):
-    """test unsupported location will not be migrated"""
-
+def test_skip_unsupported_location(ws, caplog):
     # mock crawled HMS external locations with two unsupported locations adl and wasbs
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": [
-                row_factory(["abfss://container1@test.dfs.core.windows.net/one/", 1]),
-                row_factory(["adl://container2@test.dfs.core.windows.net/", 2]),
-                row_factory(["wasbs://container2@test.dfs.core.windows.net/", 2]),
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container1@test.dfs.core.windows.net/one/", 1),
+                ("adl://container2@test.dfs.core.windows.net/", 2),
+                ("wasbs://container2@test.dfs.core.windows.net/", 2),
             ]
         }
     )
@@ -195,12 +190,11 @@ def test_run_managed_identity(ws, mocker):
     """test run with managed identity based storage credentials"""
 
     # mock crawled HMS external locations
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": [
-                row_factory(["abfss://container4@test.dfs.core.windows.net/", 4]),
-                row_factory(["abfss://container5@test.dfs.core.windows.net/a/b/", 5]),
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container4@test.dfs.core.windows.net/", 4),
+                ("abfss://container5@test.dfs.core.windows.net/a/b/", 5),
             ]
         }
     )
@@ -286,12 +280,11 @@ def test_location_failed_to_read(ws):
     """If read-only location is empty, READ permission check will fail with PermissionDenied"""
 
     # mock crawled HMS external locations
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": [
-                row_factory(["abfss://empty@test.dfs.core.windows.net/", 1]),
-                row_factory(["abfss://other_permission_denied@test.dfs.core.windows.net/", 2]),
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://empty@test.dfs.core.windows.net/", 1),
+                ("abfss://other_permission_denied@test.dfs.core.windows.net/", 2),
             ]
         }
     )
@@ -354,12 +347,11 @@ def test_overlapping_locations(ws, caplog):
     caplog.set_level(logging.INFO)
 
     # mock crawled HMS external locations
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": [
-                row_factory(["abfss://overlap_location@test.dfs.core.windows.net/a/", 1]),
-                row_factory(["abfss://other_invalid_parameter@test.dfs.core.windows.net/a/", 1]),
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://overlap_location@test.dfs.core.windows.net/a/", 1),
+                ("abfss://other_invalid_parameter@test.dfs.core.windows.net/a/", 1),
             ]
         }
     )
@@ -419,12 +411,11 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
     caplog.set_level(logging.INFO)
 
     # mock crawled HMS external locations
-    row_factory = type("Row", (Row,), {"__columns__": ["location", "table_count"]})
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": [
-                row_factory(["abfss://container1@test.dfs.core.windows.net/", 1]),
-                row_factory(["abfss://container2@test.dfs.core.windows.net/", 2]),
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container1@test.dfs.core.windows.net/", 1),
+                ("abfss://container2@test.dfs.core.windows.net/", 2),
             ]
         }
     )
