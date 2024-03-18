@@ -10,7 +10,7 @@ class Redash:
         self._ws = ws
 
     def fix(self, query: Query):
-        if self._fixer.match(query.query):
+        if self._fixer.analyse(query.query):
             query.query = self._fixer.apply(query.query)
             self._ws.queries.update(
                 query.id,

@@ -19,7 +19,7 @@ class Files:
         fixer = self._languages.fixer(language)
         with open(path, "r") as f:
             code = f.read()
-        if fixer.match(code):
+        if fixer.analyse(code):
             code = fixer.apply(code)
             with open(path, "w") as f:
                 f.write(code)

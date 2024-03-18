@@ -1,14 +1,15 @@
 import ast
+from typing import Iterable
 
-from databricks.labs.ucx.code.base import Fixer
+from databricks.labs.ucx.code.base import Fixer, Diagnostic, Range, Analyser
 from databricks.labs.ucx.code.queries import FromTable
 
 
-class SparkSql(Fixer):
+class SparkSql(Analyser, Fixer):
     def __init__(self, from_table: FromTable):
         self._from_table = from_table
 
-    def match(self, code: str) -> bool:
+    def analyse(self, code: str) -> Iterable[Diagnostic]:
         tree = ast.parse(code)
         for x in ast.walk(tree):
             if not isinstance(x, ast.Call):
@@ -25,8 +26,9 @@ class SparkSql(Fixer):
                 # which makes traversing the AST a bit easier.
                 continue
             query = first_arg.value
-            return self._from_table.match(query)
-        return False
+            for diagnostic in self._from_table.analyse(query):
+                diagnostic.range = Range.make(x.lineno, x.col_offset, x.end_lineno, x.end_col_offset)
+                yield diagnostic
 
     def apply(self, code: str) -> str:
         tree = ast.parse(code)

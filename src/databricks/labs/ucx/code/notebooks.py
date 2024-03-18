@@ -22,7 +22,7 @@ class Notebooks:
         # create backup
         with self._ws.workspace.upload(object_info.path + ".bak", code.encode("utf-8")) as f:
             f.write(code)
-        if fixer.match(code):
+        if fixer.analyse(code):
             code = fixer.apply(code)
             with self._ws.workspace.upload(object_info.path, code.encode("utf-8")) as f:
                 f.write(code)

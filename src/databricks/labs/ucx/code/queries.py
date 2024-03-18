@@ -1,16 +1,18 @@
+from typing import Iterable
+
 import sqlglot
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.code.base import Fixer
+from databricks.labs.ucx.code.base import Fixer, Diagnostic, Position, Range, Severity, Analyser, DiagnosticTag
+
 from databricks.labs.ucx.hive_metastore.table_migrate import Index
 
 
-class FromTable(Fixer):
+class FromTable(Analyser, Fixer):
     def __init__(self, index: Index):
         self._index = index
 
-    def match(self, query: str) -> bool:
-        tables, matched = 0, 0
+    def analyse(self, query: str) -> Iterable[Diagnostic]:
         for statement in sqlglot.parse(query):
             if not statement:
                 continue
@@ -18,17 +20,18 @@ class FromTable(Fixer):
                 catalog = self._catalog(table)
                 if catalog != 'hive_metastore':
                     continue
-                tables += 1
                 if not self._index.is_upgraded(table.db, table.name):
                     continue
-                matched += 1
-        return matched == tables
-
-    def _key(self, table):
-        catalog = self._catalog(table)
-        if catalog != 'hive_metastore':
-            return None
-        return f"{catalog}.{table.db}.{table.name}".lower()
+                dst = self._index.get(table.db, table.name)
+                yield Diagnostic(
+                    # see https://github.com/tobymao/sqlglot/issues/3159
+                    range=Range.make(0, 0, 0, 1024),
+                    code='table-migrate',
+                    source='databricks.labs.ucx',
+                    message=f"Table {table.db}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
+                    severity=Severity.ERROR,
+                    tags=[DiagnosticTag.DEPRECATED],
+                )
 
     @staticmethod
     def _catalog(table):

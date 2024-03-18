@@ -10,7 +10,7 @@ class Views:
         self._ws = ws
 
     def fix(self, view: Table):
-        if self._fixer.match(view.view):
+        if self._fixer.analyse(view.view):
             view.view = self._fixer.apply(view.view)
             # it doesn't belong to this package - it should be in the hive_metastore pacakge
             pass
