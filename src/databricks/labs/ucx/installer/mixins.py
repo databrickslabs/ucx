@@ -18,7 +18,6 @@ class InstallationMixin:
         self._config = config
         self._installation = installation
         self._ws = ws
-        self._this_file = Path(__file__)
 
     @staticmethod
     def sorted_tasks() -> list[Task]:

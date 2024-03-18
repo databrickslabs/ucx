@@ -4,6 +4,7 @@ import sys
 import webbrowser
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from databricks.labs.blueprint.installation import Installation
@@ -118,6 +119,7 @@ class WorkflowsInstallation(InstallationMixin):
         self._prompts = prompts
         self._product_info = product_info
         self._verify_timeout = verify_timeout
+        self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
     @classmethod
