@@ -111,7 +111,17 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_migrate_external_table(ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy) :
+def test_migrate_external_table( # pylint: disable=too-many-arguments
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_catalog,
+    make_schema,
+    make_table,
+    env_or_skip,
+    make_random,
+    make_dbfs_data_copy,
+):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
