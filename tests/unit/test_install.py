@@ -616,9 +616,11 @@ def test_remove_jobs_no_state(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
-    workflow_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = WorkflowsInstallation(
+        config, installation, ws, create_autospec(WheelsV2), prompts, PRODUCT_INFO, timedelta(seconds=1)
+    )
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflow_installer, prompts, PRODUCT_INFO
+        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
     workspace_installation.uninstall()
@@ -1132,7 +1134,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     wheels = create_autospec(WheelsV2)
     installation = mock_installation
     workflows_installer = WorkflowsInstallation(
-        config, installation, ws, wheels, prompts, PRODUCT_INFO, timedelta(seconds=10)
+        config, installation, ws, wheels, prompts, PRODUCT_INFO, timedelta(seconds=1)
     )
     workspace_installation = WorkspaceInstallation(
         config,
