@@ -10,7 +10,6 @@ from typing import Any
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
-from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.upgrades import Upgrades
@@ -383,12 +382,16 @@ class WorkspaceInstallation(InstallationMixin):
                 continue
             job_id = self._workflows_installer.state.jobs[step_name]
             dashboard_link = ""
-            dashboards_per_step = [d for d in self._workflows_installer.state.dashboards.keys() if d.startswith(step_name)]
+            dashboards_per_step = [
+                d for d in self._workflows_installer.state.dashboards.keys() if d.startswith(step_name)
+            ]
             for dash in dashboards_per_step:
                 if len(dashboard_link) == 0:
                     dashboard_link += "Go to the one of the following dashboards after running the job:\n"
                 first, second = dash.replace("_", " ").title().split()
-                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._workflows_installer.state.dashboards[dash]}"
+                dashboard_url = (
+                    f"{self._ws.config.host}/sql/dashboards/{self._workflows_installer.state.dashboards[dash]}"
+                )
                 dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             markdown.append("---\n\n")

@@ -1,7 +1,6 @@
 import logging
 import os
 from datetime import datetime
-from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
