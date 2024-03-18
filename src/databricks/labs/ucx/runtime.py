@@ -168,7 +168,7 @@ def assess_incompatible_submit_runs(
 
 
 @task("assessment")
-def crawl_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend):
+def crawl_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
     """This module scans through all the Cluster Policies and get the necessary information
 
     It looks for:
