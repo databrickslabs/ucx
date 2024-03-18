@@ -230,7 +230,7 @@ def move(
         f"should we delete managed tables & views after moving to the new schema" f" {to_catalog}.{to_schema}"
     )
     logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-    tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table=del_table)
+    tables.move(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table=del_table)
 
 
 @ucx.command

@@ -31,7 +31,7 @@ class TableMove:
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         return cls(ws, sql_backend)
 
-    def move_tables(
+    def move(
         self,
         from_catalog: str,
         from_schema: str,
