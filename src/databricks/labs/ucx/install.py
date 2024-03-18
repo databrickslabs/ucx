@@ -408,7 +408,7 @@ class WorkspaceInstallation:
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
-        if self._prompts.confirm(f"Do you want to trigger assessment job ?"):
+        if self._prompts.confirm("Do you want to trigger assessment job ?"):
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
 

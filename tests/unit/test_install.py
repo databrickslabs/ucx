@@ -1154,7 +1154,6 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         prompts,
         timedelta(seconds=1),
         PRODUCT_INFO,
-
     )
     workspace_installation.run()
 
