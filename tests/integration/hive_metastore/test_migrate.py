@@ -111,7 +111,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_migrate_external_table( # pylint: disable=too-many-arguments
+def test_migrate_external_table(  # pylint: disable=too-many-locals
     ws,
     sql_backend,
     inventory_schema,
