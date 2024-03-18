@@ -467,13 +467,15 @@ def test_check_inventory_database_exists(ws, new_installation):
 
 
 def test_table_migration_job(  # pylint: disable=too-many-locals
-    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip
+    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(schema_name=src_schema.name)
-    mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=mounted_location)
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -525,12 +527,16 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
         assert cluster_spec.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
 
 
-def test_table_migration_job_cluster_override(ws, new_installation, make_catalog, make_schema, make_table, env_or_skip):
+def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
+    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
+):
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(schema_name=src_schema.name)
-    mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=mounted_location)
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
