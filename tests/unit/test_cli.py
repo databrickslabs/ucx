@@ -5,10 +5,12 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
+from databricks.sdk.service.compute import ClusterDetails
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -29,17 +31,14 @@ from databricks.labs.ucx.cli import (
     open_remote_config,
     principal_prefix_access,
     repair_run,
+    revert_cluster_remap,
     revert_migrated_tables,
     skip,
     sync_workspace_info,
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    revert_cluster_remap,
 )
-from databricks.labs.blueprint.installation import Installation
-
-from databricks.sdk.service.compute import ClusterDetails
 
 
 @pytest.fixture

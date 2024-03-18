@@ -54,12 +54,10 @@ class ClusterAccess:
     def revert_cluster_remap(self, cluster_id: str | None = None):
         try:
             if cluster_id is None:
-                msg = "Cluster Id is not Provided. Please provide the cluster id"
-                raise InvalidParameterValue(msg)
+                raise InvalidParameterValue("Cluster Id is not Provided. Please provide the cluster id")
             cluster_details = self._installation.load(ClusterDetails, filename=f'backup/clusters/{cluster_id}.json')
             if cluster_details.spark_version is None:
-                msg = "cluster does not have spark version"
-                raise InvalidParameterValue(msg)
+                raise InvalidParameterValue("cluster does not have spark version")
             self._ws.clusters.edit(
                 cluster_id=cluster_id,
                 cluster_name=cluster_details.cluster_name,
