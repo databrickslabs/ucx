@@ -280,6 +280,7 @@ class WorkspaceInstaller:
 
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -403,8 +404,13 @@ class WorkspaceInstallation:
                 self.create_jobs,
             ],
         )
+
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
+
+        if self._prompts.confirm("Do you want to trigger assessment job ?"):
+            logger.info("Triggering the assessment workflow")
+            self._trigger_workflow("assessment")
 
     def config_file_link(self):
         return self._installation.workspace_link('config.yml')
@@ -1003,6 +1009,14 @@ class WorkspaceInstallation:
     def validate_and_run(self, step: str):
         if not self.validate_step(step):
             self.run_workflow(step)
+
+    def _trigger_workflow(self, step: str):
+        job_id = int(self._state.jobs[step])
+        job_url = f"{self._ws.config.host}#job/{job_id}"
+        logger.debug(f"triggering {step} job: {self._ws.config.host}#job/{job_id}")
+        self._ws.jobs.run_now(job_id)
+        if self._prompts.confirm(f"Open {step} Job url that just triggered ? {job_url}"):
+            webbrowser.open(job_url)
 
 
 if __name__ == "__main__":
