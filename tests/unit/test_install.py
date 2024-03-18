@@ -1130,12 +1130,13 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     )
     config = WorkspaceConfig(inventory_database="ucx", policy_id='123')
     wheels = create_autospec(WheelsV2)
+    installation = mock_installation
     workflows_installer = WorkflowsInstallation(
-        config, mock_installation, ws, wheels, prompts, PRODUCT_INFO, timedelta(seconds=10)
+        config, installation, ws, wheels, prompts, PRODUCT_INFO, timedelta(seconds=10)
     )
     workspace_installation = WorkspaceInstallation(
         config,
-        mock_installation,
+        installation,
         sql_backend,
         ws,
         workflows_installer,

@@ -296,7 +296,6 @@ class WorkspaceInstallation(InstallationMixin):
         self._sql_backend = sql_backend
         self._workflows_installer = workflows_installer
         self._prompts = prompts
-        self._state = InstallState.from_installation(installation)
         self._product_info = product_info
         super().__init__(config, installation, ws)
 
@@ -361,7 +360,7 @@ class WorkspaceInstallation(InstallationMixin):
         local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
-            state=self._state,
+            state=self._workflows_installer.state,
             local_folder=local_query_files,
             remote_folder=f"{self._installation.install_folder()}/queries",
             name_prefix=self._name("UCX "),
@@ -379,17 +378,17 @@ class WorkspaceInstallation(InstallationMixin):
             "All jobs are defined with necessary cluster configurations and DBR versions.\n",
         ]
         for step_name in self.step_list():
-            if step_name not in self._state.jobs:
+            if step_name not in self._workflows_installer.state.jobs:
                 logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
                 continue
-            job_id = self._state.jobs[step_name]
+            job_id = self._workflows_installer.state.jobs[step_name]
             dashboard_link = ""
-            dashboards_per_step = [d for d in self._state.dashboards.keys() if d.startswith(step_name)]
+            dashboards_per_step = [d for d in self._workflows_installer.state.dashboards.keys() if d.startswith(step_name)]
             for dash in dashboards_per_step:
                 if len(dashboard_link) == 0:
                     dashboard_link += "Go to the one of the following dashboards after running the job:\n"
                 first, second = dash.replace("_", " ").title().split()
-                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._state.dashboards[dash]}"
+                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._workflows_installer.state.dashboards[dash]}"
                 dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             markdown.append("---\n\n")
@@ -461,10 +460,10 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
-        if not self._state.jobs:
+        if not self._workflows_installer.state.jobs:
             logger.error("No jobs present or jobs already deleted")
             return
-        for step_name, job_id in self._state.jobs.items():
+        for step_name, job_id in self._workflows_installer.state.jobs.items():
             try:
                 logger.info(f"Deleting {step_name} job_id={job_id}.")
                 self._ws.jobs.delete(job_id)
@@ -482,7 +481,7 @@ class WorkspaceInstallation(InstallationMixin):
             logger.error("Error accessing warehouse details")
 
     def validate_step(self, step: str) -> bool:
-        job_id = int(self._state.jobs[step])
+        job_id = int(self._workflows_installer.state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
@@ -505,7 +504,7 @@ class WorkspaceInstallation(InstallationMixin):
             self._workflows_installer.run_workflow(step)
 
     def _trigger_workflow(self, step: str):
-        job_id = int(self._state.jobs[step])
+        job_id = int(self._workflows_installer.state.jobs[step])
         job_url = f"{self._ws.config.host}#job/{job_id}"
         logger.debug(f"triggering {step} job: {self._ws.config.host}#job/{job_id}")
         self._ws.jobs.run_now(job_id)

@@ -133,6 +133,10 @@ class WorkflowsInstallation(InstallationMixin):
 
         return cls(config, installation, ws, wheels, prompts, product_info, timeout)
 
+    @property
+    def state(self):
+        return self._state
+
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
