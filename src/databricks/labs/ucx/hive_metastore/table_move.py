@@ -20,6 +20,8 @@ from databricks.labs.ucx.hive_metastore.table_migrate import logger
 class TableMove:
     def __init__(self, ws: WorkspaceClient, backend: SqlBackend):
         self._backend = backend
+        self._fetch = backend.fetch
+        self._execute = backend.execute
         self._ws = ws
 
     @classmethod
@@ -232,23 +234,31 @@ class TableMove:
                 f"DEEP CLONE {escape_sql_identifier(from_table_name)}"
             )
             logger.info(f"Creating table {to_table_name}")
-            self._backend.execute(create_table_sql)
+            self._execute(create_table_sql)
             if del_table:
+                row_check = str(
+                    next(
+                        self._fetch(
+                            f"SELECT (SELECT COUNT(*) FROM {escape_sql_identifier(to_table_name)})="
+                            f"(SELECT COUNT(*) FROM {escape_sql_identifier(from_table_name)})"
+                        )
+                    )[0]
+                )
+                if row_check.lower() == "false":
+                    logger.error(f"Number of rows did not match after cloning {from_table_name} to {to_table_name}.")
+                    return
                 logger.info(f"Dropping source table {from_table_name}")
-                drop_table = f"DROP TABLE {escape_sql_identifier(from_table_name)}"
-                self._backend.execute(drop_table)
+                self._execute(drop_table)
         else:
-            create_sql = str(
-                next(self._backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(from_table_name)}"))[0]
-            )
+            create_sql = str(next(self._fetch(f"SHOW CREATE TABLE {escape_sql_identifier(from_table_name)}"))[0])
             logger.info(f"Dropping source table {from_table_name}")
-            self._backend.execute(drop_table)
+            self._execute(drop_table)
             create_table_sql = create_sql.replace(
                 f"CREATE TABLE {escape_sql_identifier(from_table_name)}",
                 f"CREATE TABLE {escape_sql_identifier(to_table_name)}",
             )
             logger.info(f"Creating table {to_table_name}")
-            self._backend.execute(create_table_sql)
+            self._execute(create_table_sql)
 
     def _create_alias_view(self, from_table_name, to_table_name):
         create_view_sql = (
@@ -256,7 +266,7 @@ class TableMove:
             f"AS SELECT * FROM {escape_sql_identifier(from_table_name)}"
         )
         logger.info(f"Creating view {to_table_name} on {from_table_name}")
-        self._backend.execute(create_view_sql)
+        self._execute(create_view_sql)
 
     def _move_view(
         self,
@@ -277,7 +287,7 @@ class TableMove:
             if del_view:
                 logger.info(f"Dropping source view {from_view_name}")
                 drop_sql = f"DROP VIEW {escape_sql_identifier(from_view_name)}"
-                self._backend.execute(drop_sql)
+                self._execute(drop_sql)
             return True
         except NotFound as err:
             if "[TABLE_OR_VIEW_NOT_FOUND]" in str(err):
@@ -289,4 +299,4 @@ class TableMove:
     def _recreate_view(self, to_view_name, view_text):
         create_sql = f"CREATE VIEW {escape_sql_identifier(to_view_name)} AS {view_text}"
         logger.info(f"Creating view {to_view_name}")
-        self._backend.execute(create_sql)
+        self._execute(create_sql)

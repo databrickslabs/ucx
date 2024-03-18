@@ -266,6 +266,13 @@ def test_move_all_tables(del_table: bool):
         TableInfo(
             catalog_name="SrcC",
             schema_name="SrcS",
+            name="table-5",
+            full_name="SrcC.SrcS.table-5",
+            table_type=TableType.MANAGED,
+        ),
+        TableInfo(
+            catalog_name="SrcC",
+            schema_name="SrcS",
             name="view1",
             full_name="SrcC.SrcS.view1",
             table_type=TableType.VIEW,
@@ -296,24 +303,25 @@ def test_move_all_tables(del_table: bool):
         "SrcC.SrcS.table1": perm_list,
         "SrcC.SrcS.table2": perm_none,
         "SrcC.SrcS.table3": perm_none,
+        "SrcC.SrcS.table-5": perm_none,
         "SrcC.SrcS.view1": perm_list,
         "SrcC.SrcS.view2": perm_none,
         "SrcC.SrcS.view3": perm_none,
     }
 
     def target_tables_mapping(full_name):
-        to_migrate = ["TgtC.TgtS.table1", "TgtC.TgtS.table2", "TgtC.TgtS.view1", "TgtC.TgtS.view2"]
+        to_migrate = ["TgtC.TgtS.table1", "TgtC.TgtS.table2", "TgtC.TgtS.view1", "TgtC.TgtS.view2", "TgtC.TgtS.table-5"]
         if full_name in to_migrate:
             raise NotFound()
-
-        not_to_migrate = ["TgtC.TgtS.table3", "TgtC.TgtS.view3"]
-        if full_name in not_to_migrate:
-            return TableInfo()
-        return None
+        return TableInfo()
 
     rows = {
         "SHOW CREATE TABLE SrcC.SrcS.table2": [
-            ["CREATE TABLE SrcC.SrcS.table2 (name string) LOCATION 's3://bucket/path'"],
+            ["CREATE TABLE SrcC.SrcS.table2 (name string) LOCATION 's3://bucket/path'"]
+        ],
+        r"SELECT \(SELECT COUNT\(\*\) FROM TgtC.TgtS.table1\)=\(SELECT COUNT\(\*\) FROM SrcC.SrcS.table1\)": [["true"]],
+        r"SELECT \(SELECT COUNT\(\*\) FROM TgtC.TgtS.`table-5`\)=\(SELECT COUNT\(\*\) FROM SrcC.SrcS.`table-5`\)": [
+            ["false"]
         ],
     }
 
@@ -324,6 +332,7 @@ def test_move_all_tables(del_table: bool):
     table_move = TableMove(client, backend)
     table_move.move_tables("SrcC", "SrcS", "*", "TgtC", "TgtS", del_table=del_table)
     expected_queries = [
+        "CREATE TABLE IF NOT EXISTS TgtC.TgtS.`table-5` DEEP CLONE SrcC.SrcS.`table-5`",
         "CREATE TABLE IF NOT EXISTS TgtC.TgtS.table1 DEEP CLONE SrcC.SrcS.table1",
         "CREATE TABLE TgtC.TgtS.table2 (name string) LOCATION 's3://bucket/path'",
         "CREATE VIEW TgtC.TgtS.view1 AS SELECT * FROM SrcC.SrcS.table1",
@@ -332,12 +341,20 @@ def test_move_all_tables(del_table: bool):
         "DROP TABLE SrcC.SrcS.table2",
         "DROP VIEW SrcC.SrcS.view1",
         "DROP VIEW SrcC.SrcS.view2",
+        "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.`table-5`)=(SELECT COUNT(*) FROM SrcC.SrcS.`table-5`)",
+        "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.table1)=(SELECT COUNT(*) FROM SrcC.SrcS.table1)",
         "SHOW CREATE TABLE SrcC.SrcS.table2",
     ]
     if not del_table:
         expected_queries.remove("DROP TABLE SrcC.SrcS.table1")
         expected_queries.remove("DROP VIEW SrcC.SrcS.view1")
         expected_queries.remove("DROP VIEW SrcC.SrcS.view2")
+        expected_queries.remove(
+            "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.`table-5`)=(SELECT COUNT(*) FROM SrcC.SrcS.`table-5`)"
+        )
+        expected_queries.remove(
+            "SELECT (SELECT COUNT(*) FROM TgtC.TgtS.table1)=(SELECT COUNT(*) FROM SrcC.SrcS.table1)"
+        )
     assert expected_queries == sorted(backend.queries)
 
 
