@@ -40,16 +40,18 @@ def test_cluster_crawler_no_isolation(ws, make_cluster, inventory_schema, sql_ba
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=6))
-def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend):
+def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend, make_random):
+    policy_1 = f"test_policy_check_{make_random(4)}"
+    policy_2 = f"test_policy_check2_{make_random(4)}"
     created_policy = make_cluster_policy(
-        name="test_policy_check",
+        name=f"{policy_1}",
         definition=json.dumps({"spark_version": {'type': 'fixed', 'value': '14.3.x-scala2.12'}}),
     )
     policy_definition = {
         "spark_version": {'type': 'fixed', 'value': '14.3.x-scala2.12'},
         "spark_conf.fs.azure.account.auth.type": {"type": "fixed", "value": "OAuth", "hidden": True},
     }
-    created_policy_2 = make_cluster_policy(name="test_policy_check2", definition=json.dumps(policy_definition))
+    created_policy_2 = make_cluster_policy(name=f"{policy_2}", definition=json.dumps(policy_definition))
     policy_crawler = PoliciesCrawler(ws=ws, sbe=sql_backend, schema=inventory_schema)
     policies = policy_crawler.snapshot()
     results = []
@@ -57,11 +59,11 @@ def test_policy_crawler(ws, make_cluster_policy, inventory_schema, sql_backend):
         if policy.policy_id in (created_policy.policy_id, created_policy_2.policy_id):
             results.append(policy)
 
-    assert results[0].policy_name == "test_policy_check"
+    assert results[0].policy_name == policy_1
     assert results[0].success == 1
     assert results[0].failures == "[]"
     assert results[0].spark_version == json.dumps({'type': 'fixed', 'value': '14.3.x-scala2.12'})
 
-    assert results[1].policy_name == "test_policy_check2"
+    assert results[1].policy_name == policy_2
     assert results[1].success == 0
     assert results[1].failures == '["Uses azure service principal credentials config in policy."]'
