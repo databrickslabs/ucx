@@ -1128,14 +1128,18 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
             r"Open assessment Job url that just triggered ?.*": "yes",
         }
     )
+    config = WorkspaceConfig(inventory_database="ucx", policy_id='123')
+    wheels = create_autospec(WheelsV2)
+    workflows_installer = WorkflowsInstallation(
+        config, mock_installation, ws, wheels, prompts, PRODUCT_INFO, timedelta(seconds=10)
+    )
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
+        config,
         mock_installation,
         sql_backend,
-        create_autospec(WheelsV2),
         ws,
+        workflows_installer,
         prompts,
-        timedelta(seconds=1),
         PRODUCT_INFO,
     )
     workspace_installation.run()
