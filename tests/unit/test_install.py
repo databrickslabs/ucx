@@ -639,7 +639,10 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         }
     )
     config = WorkspaceConfig(inventory_database='ucx')
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    installation = mock_installation_with_jobs
+    workflows_installer = WorkflowsInstallation(
+        config, installation, ws, create_autospec(WheelsV2), prompts, PRODUCT_INFO, timedelta(seconds=1)
+    )
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
