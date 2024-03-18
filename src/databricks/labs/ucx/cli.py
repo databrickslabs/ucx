@@ -501,7 +501,7 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def cluster_remap(w: WorkspaceClient, cluster_id,  prompts: Prompts):
+def cluster_remap(w: WorkspaceClient, cluster_id, prompts: Prompts):
     """Re-mapping the cluster to UC"""
     if not cluster_id:
         raise KeyError("You did not specify --cluster_id")
@@ -512,7 +512,7 @@ def cluster_remap(w: WorkspaceClient, cluster_id,  prompts: Prompts):
 
 
 @ucx.command
-def revert_cluster_remap(w: WorkspaceClient, cluster_id,  prompts: Prompts):
+def revert_cluster_remap(w: WorkspaceClient, cluster_id, prompts: Prompts):
     """Re-mapping the cluster to UC"""
     if not cluster_id:
         raise KeyError("You did not specify --cluster_id")
