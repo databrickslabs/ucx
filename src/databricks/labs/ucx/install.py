@@ -328,10 +328,9 @@ class WorkspaceInstallation(InstallationMixin):
             [
                 self._create_dashboards,
                 self._create_database,
-                self._workflows_installer.create_jobs,
             ],
         )
-
+        self._workflows_installer.create_jobs()
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
