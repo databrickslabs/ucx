@@ -35,8 +35,11 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
+    revert_cluster_remap,
 )
 from databricks.labs.blueprint.installation import Installation
+
+from databricks.sdk.service.compute import ClusterDetails
 
 
 @pytest.fixture
@@ -445,12 +448,19 @@ def test_create_catalogs_schemas(ws):
 
 def test_cluster_remap(ws, caplog):
     prompts = MockPrompts({"Select cluster access mode.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
     installation = create_autospec(Installation)
     installation.save.return_value = "a/b/c"
     cluster_remap(ws, "test_id", prompts)
     assert "Remapping the Cluster: test_id to UC" in caplog.messages
-    # with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
-    #
-    # with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
-    #     with pytest.raises(KeyError):
-    #         cluster_remap(ws, None, prompts)
+    with pytest.raises(KeyError, match='You did not specify --cluster_id'):
+        cluster_remap(ws, None, prompts)
+
+
+def test_revert_cluster_remap(ws, caplog):
+    prompts = MockPrompts({"Select cluster access mode.*": "1"})
+    Installation.current = create_autospec(Installation)
+    revert_cluster_remap(ws, "test_id", prompts)
+    with pytest.raises(KeyError, match='You did not specify --cluster_id'):
+        revert_cluster_remap(ws, None, prompts)

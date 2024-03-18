@@ -60,7 +60,6 @@ class ClusterAccess:
             if cluster_details.spark_version is None:
                 msg = "cluster does not have spark version"
                 raise InvalidParameterValue(msg)
-            assert cluster_details.spark_version is not None
             self._ws.clusters.edit(
                 cluster_id=cluster_id,
                 cluster_name=cluster_details.cluster_name,
