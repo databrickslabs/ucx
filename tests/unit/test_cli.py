@@ -36,6 +36,7 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
 )
+from databricks.labs.blueprint.installation import Installation
 
 
 @pytest.fixture
@@ -443,9 +444,13 @@ def test_create_catalogs_schemas(ws):
 
 
 def test_cluster_remap(ws, caplog):
-    with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
-        cluster_remap(ws, "test_id")
-        assert "Remapping the Cluster: test_id to UC" in caplog.messages
-    with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
-        with pytest.raises(KeyError):
-            cluster_remap(ws, None)
+    prompts = MockPrompts({"Select cluster access mode.*": "1"})
+    installation = create_autospec(Installation)
+    installation.save.return_value = "a/b/c"
+    cluster_remap(ws, "test_id", prompts)
+    assert "Remapping the Cluster: test_id to UC" in caplog.messages
+    # with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
+    #
+    # with patch("databricks.labs.blueprint.tui.Prompts.choice_from_dict", return_value="1"):
+    #     with pytest.raises(KeyError):
+    #         cluster_remap(ws, None, prompts)

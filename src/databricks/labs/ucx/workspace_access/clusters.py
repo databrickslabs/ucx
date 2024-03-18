@@ -1,12 +1,10 @@
 import logging
 
-from dataclasses import dataclass
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InvalidParameterValue
-from databricks.sdk.service.compute import DataSecurityMode, ClusterDetails
-from databricks.labs.blueprint.installation import Installation
-
+from databricks.sdk.service.compute import ClusterDetails, DataSecurityMode
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +57,10 @@ class ClusterAccess:
                 msg = "Cluster Id is not Provided. Please provide the cluster id"
                 raise InvalidParameterValue(msg)
             cluster_details = self._installation.load(ClusterDetails, filename=f'backup/clusters/{cluster_id}.json')
+            if cluster_details.spark_version is None:
+                msg = "cluster does not have spark version"
+                raise InvalidParameterValue(msg)
+            assert cluster_details.spark_version is not None
             self._ws.clusters.edit(
                 cluster_id=cluster_id,
                 cluster_name=cluster_details.cluster_name,
@@ -66,7 +68,7 @@ class ClusterAccess:
                 num_workers=cluster_details.num_workers,
                 spark_conf=cluster_details.spark_conf,
                 spark_env_vars=cluster_details.spark_env_vars,
-                data_security_mode=cluster_details.access_mode,
+                data_security_mode=cluster_details.data_security_mode,
                 node_type_id=cluster_details.node_type_id,
                 autoscale=cluster_details.autoscale,
                 policy_id=cluster_details.policy_id,
