@@ -32,6 +32,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     workspace_start_path: str = "/"
     instance_profile: str | None = None
     spark_conf: dict[str, str] | None = None
+    min_workers: int | None = 1
+    max_workers: int | None = 10
 
     override_clusters: dict[str, str] | None = None
     policy_id: str | None = None
