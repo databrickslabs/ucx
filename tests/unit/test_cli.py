@@ -11,6 +11,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
 from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -446,20 +447,25 @@ def test_create_catalogs_schemas(ws):
 
 
 def test_cluster_remap(ws, caplog):
-    prompts = MockPrompts({"Select cluster access mode.*": "1"})
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
     installation = create_autospec(Installation)
     installation.save.return_value = "a/b/c"
-    cluster_remap(ws, "test_id", prompts)
-    assert "Remapping the Cluster: test_id to UC" in caplog.messages
-    with pytest.raises(KeyError, match='You did not specify --cluster_id'):
-        cluster_remap(ws, None, prompts)
+    cluster_remap(ws, prompts)
+    assert "Remapping the Clusters to UC" in caplog.messages
 
 
-def test_revert_cluster_remap(ws, caplog):
-    prompts = MockPrompts({"Select cluster access mode.*": "1"})
-    Installation.current = create_autospec(Installation)
-    revert_cluster_remap(ws, "test_id", prompts)
-    with pytest.raises(KeyError, match='You did not specify --cluster_id'):
-        revert_cluster_remap(ws, None, prompts)
+def test_revert_cluster_remap(ws, caplog, mocker):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.list.return_value = [ObjectInfo(path='/ucx/backup/clusters/123.json')]
+    with pytest.raises(TypeError):
+        revert_cluster_remap(ws, prompts)
+
+
+def test_revert_cluster_remap_empty(ws, caplog):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    revert_cluster_remap(ws, prompts)
+    assert "There is no cluster files in the backup folder.Skipping the reverting process" in caplog.messages

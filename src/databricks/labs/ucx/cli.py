@@ -526,7 +526,6 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
         for cluster_files in installation.files()
         if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
     ]
-    print(cluster_ids)
     if not cluster_ids:
         logger.info("There is no cluster files in the backup folder.Skipping the reverting process")
         return

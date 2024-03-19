@@ -89,11 +89,12 @@ class ClusterAccess:
                     raise InvalidParameterValue("cluster does not have spark version")
                 if cluster_details.cluster_id is None:
                     raise InvalidParameterValue("cluster Id is not present in the config file")
+                num_workers = cluster_details.num_workers if cluster_details.num_workers else 0
                 self._ws.clusters.edit(
                     cluster_id=cluster_details.cluster_id,
                     cluster_name=cluster_details.cluster_name,
                     spark_version=cluster_details.spark_version,
-                    num_workers=cluster_details.num_workers,
+                    num_workers=num_workers,
                     spark_conf=cluster_details.spark_conf,
                     spark_env_vars=cluster_details.spark_env_vars,
                     data_security_mode=cluster_details.data_security_mode,
