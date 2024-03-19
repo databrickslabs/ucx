@@ -171,7 +171,7 @@ def mock_installation_with_jobs():
 
 
 @pytest.fixture
-def mock_installation_with_extra_jobs():
+def mock_installation_extra_jobs():
     return MockInstallation(
         {
             'state.json': {
@@ -1245,12 +1245,11 @@ def test_fresh_install(ws, mock_installation):
     )
 
 
-def test_remove_jobs(ws, caplog, mock_installation_with_extra_jobs, any_prompt):
-    sql_backend = MockBackend(
-    )
+def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
+    sql_backend = MockBackend()
     workflows_installation = WorkflowsInstallation(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
-        mock_installation_with_extra_jobs,
+        mock_installation_extra_jobs,
         ws,
         create_autospec(WheelsV2),
         any_prompt,
@@ -1260,7 +1259,7 @@ def test_remove_jobs(ws, caplog, mock_installation_with_extra_jobs, any_prompt):
 
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
-        mock_installation_with_extra_jobs,
+        mock_installation_extra_jobs,
         sql_backend,
         ws,
         workflows_installation,
