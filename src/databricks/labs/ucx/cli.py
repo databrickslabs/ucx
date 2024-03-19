@@ -503,15 +503,13 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Re-mapping the cluster to UC"""
-    # if not cluster_id:
-    #     raise KeyError("You did not specify --cluster_id")
-    logger.info(f"Remapping the Clusters to UC")
+    logger.info("Remapping the Clusters to UC")
     installation = Installation.current(w, 'ucx')
     cluster = ClusterAccess(installation, w, prompts)
     cluster_list = cluster.list_cluster()
-    print("{0}\t{1}".format("Cluster Name", "Cluster Id"))
+    print("Cluster Name\tCluster Id")
     for name, cluster_id in cluster_list.items():
-        print("{0}\t{1}".format(name, cluster_id))
+        print(f"{name}\t{cluster_id}")
     cluster_ids = prompts.question(
         "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
     )
@@ -519,14 +517,12 @@ def cluster_remap(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def revert_cluster_remap(w: WorkspaceClient, cluster_id, prompts: Prompts):
-    """Re-mapping the cluster to UC"""
-    if not cluster_id:
-        raise KeyError("You did not specify --cluster_id")
-    logger.info(f"Reverting the Remapping of the Cluster: {cluster_id} from UC")
+def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
+    """Reverting Re-mapping of  clusters from UC"""
+    logger.info("Reverting the Remapping of the Clusters from UC")
     installation = Installation.current(w, 'ucx')
     cluster = ClusterAccess(installation, w, prompts)
-    cluster.revert_cluster_remap(cluster_id)
+    cluster.revert_cluster_remap()
 
 
 if __name__ == "__main__":
