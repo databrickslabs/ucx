@@ -521,8 +521,22 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Reverting Re-mapping of  clusters from UC"""
     logger.info("Reverting the Remapping of the Clusters from UC")
     installation = Installation.current(w, 'ucx')
-    cluster = ClusterAccess(installation, w, prompts)
-    cluster.revert_cluster_remap()
+    cluster_ids = [
+        cluster_files.path.split("/")[-1].split(".")[0]
+        for cluster_files in installation.files()
+        if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
+    ]
+    print(cluster_ids)
+    if not cluster_ids:
+        logger.info("There is no cluster files in the backup folder.Skipping the reverting process")
+        return
+    for cluster in cluster_ids:
+        print(cluster)
+    cluster_list = prompts.question(
+        "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
+    )
+    cluster_class = ClusterAccess(installation, w, prompts)
+    cluster_class.revert_cluster_remap(cluster_list, cluster_ids)
 
 
 if __name__ == "__main__":

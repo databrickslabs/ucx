@@ -76,16 +76,19 @@ class ClusterAccess:
             except InvalidParameterValue as e:
                 logger.warning(f"skipping cluster remapping: {e}")
 
-    def revert_cluster_remap(self):
-        try:
-            files = [x.path.split("/")[-1] for x in self._installation.files() if x.path.find("backup/clusters") > 0]
-            if not files:
-                logger.info("There is no cluster files in the backup folder.Skipping the operation")
-                return
-            for file in files:
-                cluster_details = self._installation.load(ClusterDetails, filename=f"/backup/clusters/{file}")
+    def revert_cluster_remap(self, cluster_ids: str, total_cluster_ids: list):
+        if cluster_ids != "<ALL>":
+            cluster_list = [x.strip() for x in cluster_ids.split(",")]
+        else:
+            cluster_list = total_cluster_ids
+        logger.info(f"Reverting the configurations for the cluster {cluster_list}")
+        for cluster in cluster_list:
+            try:
+                cluster_details = self._installation.load(ClusterDetails, filename=f"/backup/clusters/{cluster}.json")
                 if cluster_details.spark_version is None:
                     raise InvalidParameterValue("cluster does not have spark version")
+                if cluster_details.cluster_id is None:
+                    raise InvalidParameterValue("cluster Id is not present in the config file")
                 self._ws.clusters.edit(
                     cluster_id=cluster_details.cluster_id,
                     cluster_name=cluster_details.cluster_name,
@@ -109,5 +112,5 @@ class ClusterAccess:
                     enable_local_disk_encryption=cluster_details.enable_local_disk_encryption,
                     driver_instance_pool_id=cluster_details.driver_instance_pool_id,
                 )
-        except InvalidParameterValue as e:
-            logger.warning(f"skipping cluster remapping: {e}")
+            except InvalidParameterValue as e:
+                logger.warning(f"skipping cluster remapping: {e}")
