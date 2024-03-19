@@ -69,6 +69,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
 
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+        table_migration_cluster_id = env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
         Threads.strict(
             "ensure clusters running",
             [
@@ -82,7 +83,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
         workspace_config = installer.configure()
         installation = product_info.current_installation(ws)
-        overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id}
+        overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id, "table_migration": table_migration_cluster_id}
         workspace_config.override_clusters = overrides
 
         if workspace_config.workspace_start_path == '/':
@@ -96,7 +97,13 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
         workflows_installation = WorkflowsInstallation(
-            workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=3)
+            workspace_config,
+            installation,
+            ws,
+            product_info.wheels(ws),
+            prompts,
+            product_info,
+            timedelta(minutes=3)
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,
@@ -109,7 +116,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         )
         workspace_installation.run()
         cleanup.append(workspace_installation)
-        return workspace_installation
+        return workspace_installation, workflows_installation
 
     yield factory
 
@@ -119,16 +126,16 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
-    install = new_installation()
+    workspace_installation, workflow_installation = new_installation()
 
-    sql_backend.execute(f"DROP SCHEMA {install.config.inventory_database} CASCADE")
+    sql_backend.execute(f"DROP SCHEMA {workspace_installation.config.inventory_database} CASCADE")
 
     with pytest.raises(NotFound) as failure:
-        install.run_workflow("099-destroy-schema")
+        workflow_installation.run_workflow("099-destroy-schema")
 
     assert "cannot be found" in str(failure.value)
 
-    workflow_run_logs = list(ws.workspace.list(f"{install.folder}/logs"))
+    workflow_run_logs = list(ws.workspace.list(f"{workflow_installation.folder}/logs"))
     assert len(workflow_run_logs) == 1
 
 
