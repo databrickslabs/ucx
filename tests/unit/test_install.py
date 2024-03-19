@@ -204,7 +204,11 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkspaceInstallation(
-        WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
+        WorkspaceConfig(
+            inventory_database='ucx',
+            override_clusters={"main": 'one', "tacl": 'two', "table_migration": "three"},
+            policy_id='123',
+        ),
         mock_installation,
         sql_backend,
         wheels,
@@ -220,6 +224,10 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
     assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
+
+    tasks = created_job_tasks(ws, '[MOCK] migrate-tables')
+    assert tasks['migrate_external_tables_sync'].existing_cluster_id == 'three'
+    assert tasks['migrate_dbfs_root_delta_tables'].existing_cluster_id == 'three'
 
 
 def test_write_protected_dbfs(ws, tmp_path, mock_installation):
@@ -263,6 +271,8 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 10,
+            'max_workers': 10,
+            'min_workers': 1,
             'override_clusters': {'main': '2222-999999-nosecuri', 'tacl': '3333-999999-legacytc'},
             'policy_id': '123',
             'renamed_group_prefix': 'ucx-renamed-',
@@ -293,6 +303,11 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert 'main' in job_clusters
     assert 'tacl' in job_clusters
     assert job_clusters["main"].new_cluster.policy_id == "123"
+
+    job = created_job(ws, '[MOCK] migrate-tables')
+    job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
+    assert 'table_migration' in job_clusters
+    assert job_clusters["table_migration"].new_cluster.policy_id == "123"
 
 
 def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
@@ -468,6 +483,9 @@ def test_save_config(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -500,6 +518,9 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -540,6 +561,9 @@ def test_create_cluster_policy(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo1',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1125,6 +1149,9 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'inventory_database': 'ucx',
             'log_level': 'INFO',
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '200'},
+            'max_workers': 10,
+            'min_workers': 1,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1132,6 +1159,30 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'num_days_submit_runs_history': 30,
         },
     )
+
+
+def test_triggering_assessment_wf(ws, mocker, mock_installation):
+    ws.jobs.run_now = mocker.Mock()
+    mocker.patch("webbrowser.open")
+    sql_backend = MockBackend()
+    prompts = MockPrompts(
+        {
+            r".*": "",
+            r"Do you want to trigger assessment job ?.*": "yes",
+            r"Open assessment Job url that just triggered ?.*": "yes",
+        }
+    )
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database="ucx", policy_id='123'),
+        mock_installation,
+        sql_backend,
+        create_autospec(WheelsV2),
+        ws,
+        prompts,
+        timedelta(seconds=1),
+        PRODUCT_INFO,
+    )
+    workspace_installation.run()
 
 
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
@@ -1189,6 +1240,9 @@ def test_fresh_install(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
             r".*": "",
         }
     )
@@ -1206,6 +1260,73 @@ def test_fresh_install(ws, mock_installation):
             'log_level': 'INFO',
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'max_workers': 20,
+            'min_workers': 2,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+        },
+    )
+
+
+def test_install_with_external_hms_conf(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
+            r".*We have identified one or more cluster.*": "Yes",
+            r".*Choose a cluster policy.*": "0",
+            r".*": "",
+        }
+    )
+    ws.workspace.get_status = not_found
+
+    policy_definition = {
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "driver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "2.3"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar"},
+    }
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(policy_definition),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+
+    install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
+    install.configure()
+
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_days_submit_runs_history': 30,
+            'num_threads': 8,
+            'spark_conf': {
+                'spark.hadoop.javax.jdo.option.ConnectionDriverName': 'driver',
+                'spark.hadoop.javax.jdo.option.ConnectionPassword': 'pwd',
+                'spark.hadoop.javax.jdo.option.ConnectionURL': 'url',
+                'spark.hadoop.javax.jdo.option.ConnectionUserName': 'user',
+                'spark.sql.hive.metastore.jars': 'jar',
+                'spark.sql.hive.metastore.version': '2.3',
+                'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000',
+            },
+            'max_workers': 20,
+            'min_workers': 2,
             'policy_id': 'foo',
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
@@ -1215,12 +1336,17 @@ def test_fresh_install(ws, mock_installation):
 
 
 def test_get_existing_installation_global(ws, mock_installation, mocker):
-    mocker.patch("webbrowser.open")
-    prompts = MockPrompts(
+    base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
+            r".*": "",
+        }
+    )
+
+    first_prompts = base_prompts.extend(
+        {
             r"Inventory Database stored in hive_metastore.*": "ucx_global",
             r".*": "",
         }
@@ -1238,42 +1364,48 @@ def test_get_existing_installation_global(ws, mock_installation, mocker):
         }
     )
 
-    first_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    first_install = WorkspaceInstaller(first_prompts, installation, ws, PRODUCT_INFO)
     workspace_config = first_install.configure()
     assert workspace_config.inventory_database == 'ucx_global'
 
     force_user_environ = {'UCX_FORCE_INSTALL': 'user'}
 
+    second_prompts = base_prompts.extend(
+        {
+            r".*UCX is already installed on this workspace.*": "no",
+        }
+    )
     # test for force user install variable without prompts
-    second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
+    second_install = WorkspaceInstaller(second_prompts, installation, ws, PRODUCT_INFO, force_user_environ)
     with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
         second_install.configure()
 
     # test for force user install variable with prompts
-    prompts = MockPrompts(
+    third_prompts = base_prompts.extend(
         {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
             r".*UCX is already installed on this workspace.*": "yes",
             r"Inventory Database stored in hive_metastore.*": "ucx_user",
-            r".*": "",
         }
     )
-    third_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_user_environ)
+    third_install = WorkspaceInstaller(third_prompts, installation, ws, PRODUCT_INFO, force_user_environ)
     workspace_config = third_install.configure()
     assert workspace_config.inventory_database == 'ucx_user'
 
 
 def test_existing_installation_user(ws, mock_installation):
     # test configure on existing user install
-    prompts = MockPrompts(
+    base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
+            r"Open config file in.*": "no",
+            r".*": "",
+        }
+    )
+
+    first_prompts = base_prompts.extend(
+        {
             r".*UCX is already installed on this workspace.*": "yes",
             r"Inventory Database stored in hive_metastore.*": "ucx_user",
             r".*": "",
@@ -1292,41 +1424,33 @@ def test_existing_installation_user(ws, mock_installation):
         },
         is_global=False,
     )
-    first_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
+    first_install = WorkspaceInstaller(first_prompts, installation, ws, PRODUCT_INFO)
     workspace_config = first_install.configure()
     assert workspace_config.inventory_database == 'ucx_user'
 
     # test for force global install variable without prompts
     # resetting prompts to remove confirmation
-    prompts = MockPrompts(
+    second_prompts = base_prompts.extend(
         {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
-            r".*": "",
+            r".*UCX is already installed on this workspace.*": "no",
         }
     )
 
     force_global_env = {'UCX_FORCE_INSTALL': 'global'}
-    second_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_global_env)
+    second_install = WorkspaceInstaller(second_prompts, installation, ws, PRODUCT_INFO, force_global_env)
     with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
         second_install.configure()
 
     # test for force global install variable with prompts
-    prompts = MockPrompts(
+    third_prompts = base_prompts.extend(
         {
-            r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r"Choose how to map the workspace groups.*": "2",
-            r".*workspace group names.*": "g1, g2, g99",
-            r"Open config file in.*": "yes",
             r".*UCX is already installed on this workspace.*": "yes",
             r"Inventory Database stored in hive_metastore.*": "ucx_user_new",
             r".*": "",
         }
     )
 
-    third_install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO, force_global_env)
+    third_install = WorkspaceInstaller(third_prompts, installation, ws, PRODUCT_INFO, force_global_env)
     with pytest.raises(NotImplemented, match="Migration needed. Not implemented yet."):
         third_install.configure()
 

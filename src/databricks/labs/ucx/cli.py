@@ -23,7 +23,8 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -224,9 +225,13 @@ def move(
         logger.error("please select a different schema or catalog to migrate to")
         return
     tables = TableMove.for_cli(w)
-    del_table = prompts.confirm(f"should we delete tables/view after moving to new schema {to_catalog}.{to_schema}")
+    if not prompts.confirm(f"[WARNING] External tables will be dropped and recreated in the target schema {to_schema}"):
+        return
+    del_table = prompts.confirm(
+        f"should we delete managed tables & views after moving to the new schema" f" {to_catalog}.{to_schema}"
+    )
     logger.info(f"migrating tables {from_table} from {from_catalog}.{from_schema} to {to_catalog}.{to_schema}")
-    tables.move_tables(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table)
+    tables.move(from_catalog, from_schema, from_table, to_catalog, to_schema, del_table=del_table)
 
 
 @ucx.command

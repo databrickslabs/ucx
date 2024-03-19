@@ -5,6 +5,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 from databricks.sdk.service.sql import (
     Dashboard,
@@ -19,8 +20,8 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import WorkspaceInstaller
 
 
-def test_dashboard(mocker):
-    ws = mocker.Mock()
+def test_dashboard():
+    ws = create_autospec(WorkspaceClient)
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.config.host = "https://foo"
     ws.config.is_aws = True

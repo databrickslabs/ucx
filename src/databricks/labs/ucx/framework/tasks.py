@@ -28,7 +28,7 @@ class Task:
     workflow: str
     name: str
     doc: str
-    fn: Callable[[WorkspaceConfig, WorkspaceClient, SqlBackend], None]
+    fn: Callable[[WorkspaceConfig, WorkspaceClient, SqlBackend, Installation], None]
     depends_on: list[str] | None = None
     job_cluster: str = "main"
     notebook: str | None = None
@@ -214,33 +214,36 @@ class TaskLogger(contextlib.AbstractContextManager):
         return f
 
 
-def trigger(*argv):
+def parse_args(*argv) -> dict[str, str]:
     args = dict(a[2:].split("=") for a in argv if a[0:2] == "--")
     if "config" not in args:
         msg = "no --config specified"
         raise KeyError(msg)
+    return args
 
+
+def run_task(
+    args: dict[str, str],
+    install_dir: Path,
+    cfg: WorkspaceConfig,
+    workspace_client: WorkspaceClient,
+    sql_backend: RuntimeBackend,
+    installation: Installation,
+):
     task_name = args.get("task", "not specified")
-    # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
-    workflow_run_id = args.get("parent_run_id", "unknown_run_id")
-    job_id = args.get("job_id")
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
         raise KeyError(msg)
-
     print(f"UCX v{__version__}")
-
     current_task = _TASKS[task_name]
     print(current_task.doc)
 
-    config_path = Path(args["config"])
-
-    cfg = Installation.load_local(WorkspaceConfig, config_path)
-    sql_backend = RuntimeBackend(debug_truncate_bytes=cfg.connect.debug_truncate_bytes)
-    workspace_client = WorkspaceClient(config=cfg.connect, product='ucx', product_version=__version__)
+    # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
+    workflow_run_id = args.get("parent_run_id", "unknown_run_id")
+    job_id = args.get("job_id", "unknown_job_id")
 
     with TaskLogger(
-        config_path.parent,
+        install_dir,
         workflow=current_task.workflow,
         workflow_id=job_id,
         task_name=task_name,
@@ -249,4 +252,16 @@ def trigger(*argv):
     ) as task_logger:
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
-        current_task.fn(cfg, workspace_client, sql_backend)
+        current_task.fn(cfg, workspace_client, sql_backend, installation)
+
+
+def trigger(*argv):
+    args = parse_args(*argv)
+    config_path = Path(args["config"])
+
+    cfg = Installation.load_local(WorkspaceConfig, config_path)
+    sql_backend = RuntimeBackend(debug_truncate_bytes=cfg.connect.debug_truncate_bytes)
+    workspace_client = WorkspaceClient(config=cfg.connect, product='ucx', product_version=__version__)
+    installation = Installation.current(workspace_client, "ucx")
+
+    run_task(args, config_path.parent, cfg, workspace_client, sql_backend, installation)

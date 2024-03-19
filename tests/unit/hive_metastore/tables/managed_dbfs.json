@@ -1,9 +1,9 @@
 {
-  "table": {
+  "src": {
     "catalog": "hive_metastore",
     "database": "db1_src",
     "name": "managed_dbfs",
-    "type": "MANAGED",
+    "object_type": "MANAGED",
     "table_format": "DELTA",
     "location": "dbfs:/some_location"
   },

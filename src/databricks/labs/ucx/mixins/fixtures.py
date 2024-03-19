@@ -280,7 +280,7 @@ def _permissions_mapping():
         (
             "serving_endpoint",
             "serving-endpoints",
-            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE],
+            [PermissionLevel.CAN_VIEW, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_QUERY],
             _simple,
         ),
         (
@@ -1161,3 +1161,15 @@ def make_feature_table(ws, make_random):
             logger.info(f"Can't remove feature table {e}")
 
     yield from factory("Feature table", create, remove)
+
+
+@pytest.fixture
+def make_dbfs_data_copy(ws):
+    def create(*, src_path: str, dst_path: str):
+        ws.dbfs.copy(src_path, dst_path, recursive=True)
+        return dst_path
+
+    def remove(dst_path: str):
+        ws.dbfs.delete(dst_path, recursive=True)
+
+    yield from factory("make_dbfs_data_copy", create, remove)

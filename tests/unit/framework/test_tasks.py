@@ -1,13 +1,20 @@
 import logging
+from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.lsql.backends import RuntimeBackend
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import (
     Task,
     TaskLogger,
+    parse_args,
     remove_extra_indentation,
+    run_task,
+    task,
 )
 
 
@@ -75,3 +82,39 @@ def _log_contents(tmp_path):
             continue
         contents[path.relative_to(tmp_path).as_posix()] = path.read_text()
     return contents
+
+
+def test_parse_args():
+    args = parse_args("--config=foo", "--task=test")
+    assert args["config"] == "foo"
+    assert args["task"] == "test"
+    with pytest.raises(KeyError):
+        parse_args("--foo=bar")
+
+
+def test_run_task(capsys):
+    # mock a task function to be tested
+    @task("migrate-tables", job_cluster="migration_sync")
+    def mock_migrate_external_tables_sync(cfg, workspace_client, sql_backend, installation):
+        """This mock task of migrate-tables"""
+        return f"Hello, World! {cfg} {workspace_client} {sql_backend} {installation}"
+
+    args = parse_args("--config=foo", "--task=mock_migrate_external_tables_sync", "--parent_run_id=abc", "--job_id=123")
+    cfg = WorkspaceConfig("test_db", log_level="INFO")
+
+    # test the task function is called
+    run_task(
+        args, Path("foo"), cfg, create_autospec(WorkspaceClient), create_autospec(RuntimeBackend), MockInstallation()
+    )
+    assert "This mock task of migrate-tables" in capsys.readouterr().out
+
+    # test KeyError if task not found
+    with pytest.raises(KeyError):
+        run_task(
+            parse_args("--config=foo", "--task=not_found"),
+            Path("foo"),
+            cfg,
+            create_autospec(WorkspaceClient),
+            create_autospec(RuntimeBackend),
+            MockInstallation(),
+        )

@@ -278,8 +278,29 @@ class WorkspaceInstaller:
 
         policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
 
+        # Save configurable spark_conf for table migration cluster
+        # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
+        parallelism = self._prompts.question(
+            "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
+        )
+        if not spark_conf_dict:
+            spark_conf_dict = {}
+        spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
+        # mix max workers for auto-scale migration job cluster
+        min_workers = int(
+            self._prompts.question(
+                "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
+            )
+        )
+        max_workers = int(
+            self._prompts.question(
+                "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
+            )
+        )
+
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -293,6 +314,8 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            min_workers=min_workers,
+            max_workers=max_workers,
             policy_id=policy_id,
             is_terraform_used=is_terraform_used,
             include_databases=self._select_databases(),
@@ -403,8 +426,13 @@ class WorkspaceInstallation:
                 self.create_jobs,
             ],
         )
+
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
+
+        if self._prompts.confirm("Do you want to trigger assessment job ?"):
+            logger.info("Triggering the assessment workflow")
+            self._trigger_workflow("assessment")
 
     def config_file_link(self):
         return self._installation.workspace_link('config.yml')
@@ -792,38 +820,59 @@ class WorkspaceInstallation:
             ),
         )
 
+    def _job_cluster_spark_conf(self, cluster_key: str):
+        conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
+        if cluster_key == "main":
+            spark_conf = {
+                "spark.databricks.cluster.profile": "singleNode",
+                "spark.master": "local[*]",
+            }
+            return spark_conf | conf_from_installation
+        if cluster_key == "tacl":
+            return {"spark.databricks.acl.sqlOnly": "true"} | conf_from_installation
+        if cluster_key == "table_migration":
+            return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
+        return conf_from_installation
+
     def _job_clusters(self, names: set[str]):
         clusters = []
-        spark_conf = {
-            "spark.databricks.cluster.profile": "singleNode",
-            "spark.master": "local[*]",
-        }
-        if self._config.spark_conf is not None:
-            spark_conf = spark_conf | self._config.spark_conf
-        spec = compute.ClusterSpec(
-            data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-            spark_conf=spark_conf,
-            custom_tags={"ResourceClass": "SingleNode"},
-            num_workers=0,
-            policy_id=self.config.policy_id,
-        )
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="main",
-                    new_cluster=spec,
+                    new_cluster=compute.ClusterSpec(
+                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+                        spark_conf=self._job_cluster_spark_conf("main"),
+                        custom_tags={"ResourceClass": "SingleNode"},
+                        num_workers=0,
+                        policy_id=self.config.policy_id,
+                    ),
                 )
             )
         if "tacl" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="tacl",
-                    new_cluster=replace(
-                        spec,
+                    new_cluster=compute.ClusterSpec(
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
-                        spark_conf={"spark.databricks.acl.sqlOnly": "true"},
+                        spark_conf=self._job_cluster_spark_conf("tacl"),
                         num_workers=1,  # ShowPermissionsCommand needs a worker
-                        custom_tags={},
+                        policy_id=self.config.policy_id,
+                    ),
+                )
+            )
+        if "table_migration" in names:
+            clusters.append(
+                jobs.JobCluster(
+                    job_cluster_key="table_migration",
+                    new_cluster=compute.ClusterSpec(
+                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
+                        spark_conf=self._job_cluster_spark_conf("table_migration"),
+                        policy_id=self.config.policy_id,
+                        autoscale=compute.AutoScale(
+                            max_workers=self.config.max_workers,
+                            min_workers=self.config.min_workers,
+                        ),
                     ),
                 )
             )
@@ -1003,6 +1052,14 @@ class WorkspaceInstallation:
     def validate_and_run(self, step: str):
         if not self.validate_step(step):
             self.run_workflow(step)
+
+    def _trigger_workflow(self, step: str):
+        job_id = int(self._state.jobs[step])
+        job_url = f"{self._ws.config.host}#job/{job_id}"
+        logger.debug(f"triggering {step} job: {self._ws.config.host}#job/{job_id}")
+        self._ws.jobs.run_now(job_id)
+        if self._prompts.confirm(f"Open {step} Job url that just triggered ? {job_url}"):
+            webbrowser.open(job_url)
 
 
 if __name__ == "__main__":

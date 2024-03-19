@@ -162,11 +162,22 @@ class ExternalLocationsMigration:
         # if no credential found
         return None
 
+    def _filter_unsupported_location(self, location_urls: list[str]) -> list[str]:
+        # remove unsupported external location
+        supported_urls = []
+        for url in location_urls:
+            if url.startswith("abfss://"):
+                supported_urls.append(url)
+                continue
+            logger.warning(f"Skip unsupported location: {url}")
+        return supported_urls
+
     def run(self):
         # list missing external locations in UC
         _, missing_locations = self._hms_locations.match_table_external_locations()
         # Extract the location URLs from the missing locations
         missing_loc_urls = [loc.location for loc in missing_locations]
+        missing_loc_urls = self._filter_unsupported_location(missing_loc_urls)
 
         # get prefix to storage credential name mapping
         prefix_mapping_write, prefix_mapping_read = self._prefix_credential_name_mapping()

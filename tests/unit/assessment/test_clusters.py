@@ -5,7 +5,6 @@ import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import DatabricksError, InternalError, NotFound
-from databricks.sdk.service.compute import AutoScale, ClusterDetails, ClusterSource
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
@@ -53,22 +52,11 @@ def test_cluster_assessment_with_spn_cluster_policy_not_found():
     assert len(crawler) == 1
 
 
-def test_cluster_assessment_with_spn_cluster_policy_exception(mocker):
-    sample_clusters = [
-        ClusterDetails(
-            autoscale=AutoScale(min_workers=1, max_workers=6),
-            cluster_source=ClusterSource.UI,
-            spark_context_id=5134472582179565315,
-            spark_env_vars=None,
-            spark_version="9.3.x-cpu-ml-scala2.12",
-            cluster_id="0810-225833-atlanta69",
-            cluster_name="Tech Summit FY24 Cluster-1",
-            policy_id="bdqwbdqiwd1111",
-        )
-    ]
-    ws = mocker.Mock()
-    ws.clusters.list.return_value = sample_clusters
-    ws.cluster_policies.get.side_effect = InternalError(...)
+def test_cluster_assessment_with_spn_cluster_policy_exception():
+    ws = workspace_client_mock(
+        cluster_ids=['policy-azure-oauth'],
+    )
+    ws.cluster_policies.get = MagicMock(side_effect=InternalError(...))
 
     with pytest.raises(DatabricksError):
         AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
