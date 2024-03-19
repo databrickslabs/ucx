@@ -168,6 +168,43 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_migrate_external_table_failed_sync(
+    ws,
+    caplog,
+    sql_backend,
+    inventory_schema,
+    make_schema,
+    make_table,
+    env_or_skip,
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+
+    src_schema = make_schema(catalog_name="hive_metastore")
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=existing_mounted_location)
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
+    # create a mapping that will fail the SYNC because the target catalog and schema does not exist
+    rules = [
+        Rule(
+            "workspace",
+            "non_existed_catalog",
+            src_schema.name,
+            "existed_schema",
+            src_external_table.name,
+            src_external_table.name,
+        ),
+    ]
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(
+        table_crawler, ws, sql_backend, StaticTableMapping(ws, sql_backend, rules=rules), migration_status_refresher
+    )
+
+    table_migrate.migrate_tables()
+    assert "SYNC command failed to migrate" in caplog.text
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_revert_migrated_table(
     ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog
 ):  # pylint: disable=too-many-locals
