@@ -171,6 +171,20 @@ def mock_installation_with_jobs():
 
 
 @pytest.fixture
+def mock_installation_with_extra_jobs():
+    return MockInstallation(
+        {
+            'state.json': {
+                'resources': {
+                    'jobs': {"assessment": "123", "extra_job": "123"},
+                    'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'},
+                }
+            }
+        }
+    )
+
+
+@pytest.fixture
 def any_prompt():
     return MockPrompts({".*": ""})
 
@@ -1229,6 +1243,33 @@ def test_fresh_install(ws, mock_installation):
             'workspace_start_path': '/',
         },
     )
+
+
+def test_remove_jobs(ws, caplog, mock_installation_with_extra_jobs, any_prompt):
+    sql_backend = MockBackend(
+    )
+    workflows_installation = WorkflowsInstallation(
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        mock_installation_with_extra_jobs,
+        ws,
+        create_autospec(WheelsV2),
+        any_prompt,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+    )
+
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation_with_extra_jobs,
+        sql_backend,
+        ws,
+        workflows_installation,
+        any_prompt,
+        PRODUCT_INFO,
+    )
+
+    workspace_installation.run()
+    ws.jobs.delete.assert_called_with("123")
 
 
 def test_get_existing_installation_global(ws, mock_installation, mocker):
