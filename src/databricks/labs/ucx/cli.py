@@ -501,14 +501,21 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def cluster_remap(w: WorkspaceClient, cluster_id, prompts: Prompts):
+def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Re-mapping the cluster to UC"""
-    if not cluster_id:
-        raise KeyError("You did not specify --cluster_id")
-    logger.info(f"Remapping the Cluster: {cluster_id} to UC")
+    # if not cluster_id:
+    #     raise KeyError("You did not specify --cluster_id")
+    logger.info(f"Remapping the Clusters to UC")
     installation = Installation.current(w, 'ucx')
     cluster = ClusterAccess(installation, w, prompts)
-    cluster.map_cluster_to_uc(cluster_id)
+    cluster_list = cluster.list_cluster()
+    print("{0}\t{1}".format("Cluster Name", "Cluster Id"))
+    for name, cluster_id in cluster_list.items():
+        print("{0}\t{1}".format(name, cluster_id))
+    cluster_ids = prompts.question(
+        "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
+    )
+    cluster.map_cluster_to_uc(cluster_ids)
 
 
 @ucx.command

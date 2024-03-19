@@ -146,9 +146,10 @@ commands:
 
   - name: cluster-remap
     description: Re-mapping the cluster to UC
-    flags:
-      - name: cluster_id
-        description: Id of the cluster to remap
+#    table_template: |-
+#      Cluster Name\tCluster Id
+#      {{range .}}{{.cluster_name}}\t{{.cluster_id}}
+#      {{end}}
 
   - name: revert-cluster-remap
     description: Reverting the Re-mapping of the  cluster from  UC
