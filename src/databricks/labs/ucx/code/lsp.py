@@ -36,7 +36,7 @@ class Lsp:
         analyser = self._languages.analyser(language)
         with file.open('r') as f:
             code = f.read()
-            return AnalyseResponse(analyser.analyse(code))
+            return AnalyseResponse(analyser.lint(code))
 
     def serve(self):
         server_address = ('', 8000)

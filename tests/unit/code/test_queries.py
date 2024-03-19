@@ -6,7 +6,7 @@ def test_migrates_from_table_no_tables():
     ftf = FromTable(Index([]))
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-    assert not list(ftf.analyse(old_query))
+    assert not list(ftf.lint(old_query))
 
 
 def test_partially_migrated_queries_dont_match():
@@ -21,7 +21,7 @@ def test_partially_migrated_queries_dont_match():
     )
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-    assert not list(ftf.analyse(old_query))
+    assert not list(ftf.lint(old_query))
 
 
 def test_fully_migrated_queries_match():

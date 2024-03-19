@@ -69,9 +69,9 @@ class Diagnostic:
         }
 
 
-class Analyser:
+class Linter:
     @abstractmethod
-    def analyse(self, code: str) -> Iterable[Diagnostic]: ...
+    def lint(self, code: str) -> Iterable[Diagnostic]: ...
 
 
 class Fixer:
@@ -79,13 +79,13 @@ class Fixer:
     def apply(self, code: str) -> str: ...
 
 
-class SequentialAnalyser(Analyser):
-    def __init__(self, analysers: list[Analyser]):
+class SequentialLinter(Linter):
+    def __init__(self, analysers: list[Linter]):
         self._analysers = analysers
 
-    def analyse(self, code: str) -> Iterable[Diagnostic]:
+    def lint(self, code: str) -> Iterable[Diagnostic]:
         for analyser in self._analysers:
-            yield from analyser.analyse(code)
+            yield from analyser.lint(code)
 
 
 class SequentialFixer(Fixer):

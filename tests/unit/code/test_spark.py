@@ -8,7 +8,7 @@ def test_spark_not_sql():
 
     sqf = SparkSql(ftf)
 
-    assert not sqf.analyse("print(1)")
+    assert not sqf.lint("print(1)")
 
 
 def test_spark_sql_no_match():
@@ -16,7 +16,7 @@ def test_spark_sql_no_match():
 
     sqf = SparkSql(ftf)
 
-    assert not sqf.analyse(
+    assert not sqf.lint(
         """
 spark.read.csv("s3://bucket/path")
 for i in range(10):
@@ -31,7 +31,7 @@ def test_spark_sql_match():
 
     sqf = SparkSql(ftf)
 
-    assert list(sqf.analyse(
+    assert list(sqf.lint(
         """
 spark.read.csv("s3://bucket/path")
 for i in range(10):
