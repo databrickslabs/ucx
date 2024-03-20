@@ -1,8 +1,10 @@
 from pathlib import Path
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.code.languages import Languages
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
 
 class Files:
@@ -11,6 +13,13 @@ class Files:
     def __init__(self, languages: Languages):
         self._languages = languages
         self._extensions = {"py": Language.PYTHON, "sql": Language.SQL}
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient):
+        tables_migrate = TablesMigrate.for_cli(ws)
+        index = tables_migrate.index()
+        languages = Languages(index)
+        return cls(languages)
 
     def fix(self, path: Path) -> bool:
         """
