@@ -221,6 +221,20 @@ class WorkflowsInstallation(InstallationMixin):
     def _config_file(self):
         return f"{self._installation.install_folder()}/config.yml"
 
+    def _job_cluster_spark_conf(self, cluster_key: str):
+        conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
+        if cluster_key == "main":
+            spark_conf = {
+                "spark.databricks.cluster.profile": "singleNode",
+                "spark.master": "local[*]",
+            }
+            return spark_conf | conf_from_installation
+        if cluster_key == "tacl":
+            return {"spark.databricks.acl.sqlOnly": "true"} | conf_from_installation
+        if cluster_key == "table_migration":
+            return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
+        return conf_from_installation
+
     def _deploy_workflow(self, step_name: str, settings):
         if step_name in self._state.jobs:
             try:
