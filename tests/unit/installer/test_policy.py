@@ -34,6 +34,7 @@ def common():
         {
             r".*We have identified one or more cluster.*": "Yes",
             r".*Choose a cluster policy.*": "0",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     return w, prompts
@@ -252,6 +253,7 @@ def test_cluster_policy_definition_azure_hms_warehouse():
         {
             r".*We have identified one or more cluster.*": "No",
             r".*We have identified the workspace warehouse.*": "Yes",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
@@ -303,6 +305,7 @@ def test_cluster_policy_definition_aws_glue_warehouse():
         {
             r".*We have identified one or more cluster.*": "No",
             r".*We have identified the workspace warehouse.*": "Yes",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
@@ -357,6 +360,7 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
         {
             r".*We have identified one or more cluster.*": "No",
             r".*We have identified the workspace warehouse.*": "Yes",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
