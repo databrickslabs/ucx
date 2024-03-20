@@ -30,6 +30,15 @@ class AzureServicePrincipalInfo:
     storage_account: str | None = None
 
 
+@dataclass()
+class AzureServicePrincipalClusterMapping:
+    # this class is created separately as we need cluster to spn mapping
+    # Cluster id where the spn is used
+    cluster_id: str
+    # spn info data class
+    spn_info: set[AzureServicePrincipalInfo]
+
+
 class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsMixin, SecretsMixin):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
         super().__init__(sbe, "hive_metastore", schema, "azure_service_principals", AzureServicePrincipalInfo)
@@ -171,3 +180,18 @@ class AzureServicePrincipalCrawler(CrawlerBase[AzureServicePrincipalInfo], JobsM
                 )
             )
         return set_service_principals
+
+    def get_cluster_to_storage_mapping(self):
+        # this function gives a mapping between an interactive cluster and the spn used by it
+        # either directly or through a cluster policy.
+        set_service_principals = set[AzureServicePrincipalInfo]()
+        spn_cluster_mapping = []
+        for cluster in self._ws.clusters.list():
+            if cluster.cluster_source != ClusterSource.JOB and (
+                cluster.data_security_mode.LEGACY_SINGLE_USER or cluster.data_security_mode.NONE
+            ):
+                set_service_principals = self._get_azure_spn_from_cluster_config(cluster)
+                spn_cluster_mapping.append(
+                    AzureServicePrincipalClusterMapping(cluster.cluster_id, set_service_principals)
+                )
+        return spn_cluster_mapping

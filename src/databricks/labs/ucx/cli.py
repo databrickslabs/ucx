@@ -23,6 +23,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.table_acl_migrate import TableACLMigrate
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
@@ -502,6 +503,24 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     installation = Installation.current(w, 'ucx')
     catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
     catalog_schema.create_catalog_schema()
+
+
+@ucx.command
+def migrate_table_acl(w: WorkspaceClient, prompts: Prompts):
+    """This command migrates legacy ACL on pre-uc clusters to the new UC ACL model. Interactive clusters reading/writing
+    to external storage use service principal / instance profiles to access the underlying data. Users get access to
+    the data by having permission to the cluster. This command will convert those access to UC ACL for the identified
+    tables and users groups.
+    """
+    installation = Installation.current(w, 'ucx')
+    if w.config.is_azure:
+        logger.info("Running migrate_table_acl for Azure")
+        table_acl_migrate = TableACLMigrate.for_cli(w, installation, prompts)
+        table_acl_migrate.migrate_cluster_acl()
+    if w.config.is_aws:
+        logger.error("Running migrate_table_acl for AWS")
+    if w.config.is_gcp:
+        logger.error("migrate_table_acl is not yet supported in GCP")
 
 
 if __name__ == "__main__":
