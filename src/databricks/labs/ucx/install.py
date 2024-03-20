@@ -23,7 +23,6 @@ from databricks.sdk.errors import (
     InvalidParameterValue,
     NotFound,
 )
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     EndpointInfoWarehouseType,

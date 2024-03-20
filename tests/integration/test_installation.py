@@ -39,12 +39,12 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
     cleanup = []
 
     def factory(
-            config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
-            installation: Installation | None = None,
-            product_info: ProductInfo | None = None,
-            environ: dict[str, str] | None = None,
-            extend_prompts: dict[str, str] | None = None,
-            inventory_schema_suffix: str = "",
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+        installation: Installation | None = None,
+        product_info: ProductInfo | None = None,
+        environ: dict[str, str] | None = None,
+        extend_prompts: dict[str, str] | None = None,
+        inventory_schema_suffix: str = "",
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
@@ -97,13 +97,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
         workflows_installation = WorkflowsInstallation(
-            workspace_config,
-            installation,
-            ws,
-            product_info.wheels(ws),
-            prompts,
-            product_info,
-            timedelta(minutes=3)
+            workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=3)
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,
@@ -152,8 +146,8 @@ def test_job_cluster_policy(ws, new_installation):
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
     if ws.config.is_azure:
         assert (
-                policy_definition["azure_attributes.availability"]["value"]
-                == compute.AzureAvailability.ON_DEMAND_AZURE.value
+            policy_definition["azure_attributes.availability"]["value"]
+            == compute.AzureAvailability.ON_DEMAND_AZURE.value
         )
     if ws.config.is_aws:
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
@@ -162,7 +156,7 @@ def test_job_cluster_policy(ws, new_installation):
 @pytest.mark.skip
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_new_job_cluster_with_policy_assessment(
-        ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = make_ucx_group()
     cluster_policy = make_cluster_policy()
@@ -182,7 +176,7 @@ def test_new_job_cluster_with_policy_assessment(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
-        ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = make_ucx_group()
 
@@ -203,7 +197,7 @@ def test_running_real_assessment_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
-        ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, acc_group_a = make_ucx_group()
 
@@ -236,7 +230,7 @@ def test_running_real_migrate_groups_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job(
-        ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
+    ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
 ):
     ws_group_a = make_group()
 
@@ -253,8 +247,7 @@ def test_running_real_validate_groups_permissions_job(
     )
 
     install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    permission_manager = PermissionManager(sql_backend, install.config.inventory_database,
-                                           [redash_permissions])
+    permission_manager = PermissionManager(sql_backend, install.config.inventory_database, [redash_permissions])
     permission_manager.inventorize_permissions()
 
     # assert the job does not throw any exception
@@ -263,7 +256,7 @@ def test_running_real_validate_groups_permissions_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job_fails(
-        ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a = make_group()
 
@@ -378,7 +371,7 @@ def test_global_installation_on_existing_global_install(ws, new_installation):
         installation=Installation.assume_global(ws, product_info.product_name()),
     )
     assert existing_global_installation.folder == f"/Applications/{product_info.product_name()}"
-    reinstall_global,_ = new_installation(
+    reinstall_global, _ = new_installation(
         product_info=product_info,
         installation=Installation.assume_global(ws, product_info.product_name()),
     )
@@ -428,7 +421,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
         product_info=product_info, installation=Installation.assume_user_home(ws, product_info.product_name())
     )
     assert (
-            existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
@@ -480,7 +473,7 @@ def test_check_inventory_database_exists(ws, new_installation):
 @pytest.mark.skip
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_table_migration_job(  # pylint: disable=too-many-locals
-        ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
+    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore")
@@ -494,7 +487,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    install, workflows_install = new_installation(
+    _, workflows_install = new_installation(
         product_info=product_info,
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
@@ -542,7 +535,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
-        ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
+    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore")
@@ -556,7 +549,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    install, workflows_install = new_installation(
+    _, workflows_install = new_installation(
         lambda wc: replace(wc, override_clusters={"table_migration": env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")}),
         product_info=product_info,
     )
