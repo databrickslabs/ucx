@@ -1,9 +1,10 @@
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, create_autospec
+from unittest.mock import Mock, create_autospec
+
 from databricks.sdk.service.workspace import Language
-from databricks.labs.ucx.code.languages import Languages
+
 from databricks.labs.ucx.code.files import Files
+from databricks.labs.ucx.code.languages import Languages
 
 
 def test_files_fix_ignores_unsupported_extensions():
@@ -38,4 +39,3 @@ def test_files_supported_language_no_fixer():
     path = Path(__file__)
     files.fix(path)
     languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
-

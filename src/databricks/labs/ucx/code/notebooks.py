@@ -15,14 +15,14 @@ class Notebooks:
         with self._ws.workspace.upload(object_info.path, code.encode("utf-8")) as f:
             f.write(code)
 
-    def apply(self, object_info: ObjectInfo):
-        fixer = self._languages.fixer(object_info.language)
+    def apply(self, object_info: ObjectInfo) -> bool:
+        if not self._languages.is_supported(object_info.language):
+            return False
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
-            code = f.read().decode("utf-8")
-        # create backup
-        with self._ws.workspace.upload(object_info.path + ".bak", code.encode("utf-8")) as f:
-            f.write(code)
-        if fixer.analyse(code):
-            code = fixer.apply(code)
-            with self._ws.workspace.upload(object_info.path, code.encode("utf-8")) as f:
-                f.write(code)
+            original_code = f.read().decode("utf-8")
+            new_code = self._languages.apply_fixes(object_info.language, original_code)
+            if new_code == original_code:
+                return False
+            self._ws.workspace.upload(object_info.path + ".bak", original_code.encode("utf-8"))
+            self._ws.workspace.upload(object_info.path, new_code.encode("utf-8"))
+            return True

@@ -4,6 +4,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.code.languages import Languages
 
+
 class Files:
     """The Files class is responsible for fixing code files based on their language."""
 

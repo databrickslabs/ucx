@@ -19,6 +19,9 @@ class Languages:
             Language.SQL: [from_table],
         }
 
+    def is_supported(self, language: Language) -> bool:
+        return language in self._analysers and language in self._fixers
+
     def linter(self, language: Language) -> Linter:
         if language not in self._analysers:
             raise ValueError(f"Unsupported language: {language}")
@@ -31,3 +34,11 @@ class Languages:
             if fixer.name() == diagnostic_code:
                 return fixer
         return None
+
+    def apply_fixes(self, language: Language, code: str) -> str:
+        linter = self.linter(language)
+        for diagnostic in linter.lint(code):
+            fixer = self.fixer(language, diagnostic.code)
+            if fixer:
+                code = fixer.apply(code)
+        return code

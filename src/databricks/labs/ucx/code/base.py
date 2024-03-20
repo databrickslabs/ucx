@@ -77,6 +77,7 @@ class Deprecation(Message):
 def x():
     Deprecation("a", "b", 1, 2, 3, 4)
 
+
 @dataclass
 class Diagnostic:
     # the range at which the message applies.
