@@ -86,9 +86,9 @@ class ClusterAccess:
             try:
                 cluster_details = self._installation.load(ClusterDetails, filename=f"/backup/clusters/{cluster}.json")
                 if cluster_details.spark_version is None:
-                    raise InvalidParameterValue("cluster does not have spark version")
+                    raise InvalidParameterValue(f"Spark version is nt present in the cluster: {cluster}")
                 if cluster_details.cluster_id is None:
-                    raise InvalidParameterValue("cluster Id is not present in the config file")
+                    raise InvalidParameterValue(f"cluster Id is not present in the config file for the cluster:{cluster}")
                 num_workers = cluster_details.num_workers if cluster_details.num_workers else 0
                 self._ws.clusters.edit(
                     cluster_id=cluster_details.cluster_id,

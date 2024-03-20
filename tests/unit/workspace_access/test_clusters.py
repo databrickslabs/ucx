@@ -90,7 +90,7 @@ def test_revert_all_cluster_to_uc(caplog):
     cluster = ClusterAccess(installation, ws, prompts)
     with caplog.at_level('INFO'):
         cluster.revert_cluster_remap(cluster_ids="<ALL>", total_cluster_ids=["123", "234"])
-        assert 'skipping cluster remapping: cluster does not have spark version' in caplog.messages
+        assert 'skipping cluster remapping: Spark version is nt present in the cluster: 123' in caplog.messages
 
 
 def test_revert_cluster_to_uc_empty_cluster(caplog):
@@ -103,4 +103,4 @@ def test_revert_cluster_to_uc_empty_cluster(caplog):
     cluster = ClusterAccess(installation, ws, prompts)
     with caplog.at_level('INFO'):
         cluster.revert_cluster_remap(cluster_ids="123", total_cluster_ids=["123"])
-        assert 'skipping cluster remapping: cluster Id is not present in the config file' in caplog.messages
+        assert 'skipping cluster remapping: cluster Id is not present in the config file for the cluster:123' in caplog.messages
