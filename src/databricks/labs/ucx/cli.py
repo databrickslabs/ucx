@@ -515,9 +515,9 @@ def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     if not cluster_list:
         logger.info("No cluster information present in the workspace")
         return
-    print(f"{'Cluster Name':<80}\t{'Cluster Id':<80}")
+    print(f"{'Cluster Name':<50}\t{'Cluster Id':<50}")
     for cluster_details in cluster_list:
-        print(f"{cluster_details.cluster_name:<80}\t{cluster_details.cluster_id:<80}")
+        print(f"{cluster_details.cluster_name:<50}\t{cluster_details.cluster_id:<50}")
     cluster_ids = prompts.question(
         "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
     )
@@ -535,7 +535,7 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
         if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
     ]
     if not cluster_ids:
-        logger.info("There is no cluster files in the backup folder.Skipping the reverting process")
+        logger.info("There is no cluster files in the backup folder. Skipping the reverting process")
         return
     for cluster in cluster_ids:
         logger.info(cluster)

@@ -482,4 +482,4 @@ def test_revert_cluster_remap_empty(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     revert_cluster_remap(ws, prompts)
-    assert "There is no cluster files in the backup folder.Skipping the reverting process" in caplog.messages
+    assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages

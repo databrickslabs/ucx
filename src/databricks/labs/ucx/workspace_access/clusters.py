@@ -41,7 +41,7 @@ class ClusterAccess:
                 if cluster.data_security_mode is None:
                     raise InvalidParameterValue(f"Data security Mode is None for the cluster {cluster.cluster_id}")
                 access_mode = self._get_access_mode(cluster.data_security_mode.name)
-                self._installation.save(cluster_details, filename=f'backup/clusters/{cluster.cluster_id}.json')
+                self._installation.save(cluster, filename=f'backup/clusters/{cluster.cluster_id}.json')
                 logger.info(f"Editing the cluster of cluster: {cluster.cluster_id} with access_mode as {access_mode}")
                 self._ws.clusters.edit(
                     cluster_id=cluster.cluster_id,
@@ -77,9 +77,11 @@ class ClusterAccess:
         logger.info(f"Reverting the configurations for the cluster {cluster_list}")
         for cluster in cluster_list:
             try:
-                cluster_details = self._installation.load(ClusterDetails, filename=f"/backup/clusters/{cluster}.json")
+                cluster_details = self._installation.load(ClusterDetails, filename=f"backup/clusters/{cluster}.json")
                 if cluster_details.spark_version is None:
-                    raise InvalidParameterValue(f"Spark version is nt present in the cluster: {cluster}")
+                    raise InvalidParameterValue(
+                        f"Spark Version is not present in the config file for the cluster:{cluster}"
+                    )
                 if cluster_details.cluster_id is None:
                     raise InvalidParameterValue(
                         f"cluster Id is not present in the config file for the cluster:{cluster}"
