@@ -460,6 +460,16 @@ def test_cluster_remap(ws, caplog):
     assert "Remapping the Clusters to UC" in caplog.messages
 
 
+def test_cluster_remap_error(ws, caplog):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    ws.clusters.list.return_value = []
+    installation = create_autospec(Installation)
+    installation.save.return_value = "a/b/c"
+    cluster_remap(ws, prompts)
+    assert "No cluster information present in the workspace" in caplog.messages
+
+
 def test_revert_cluster_remap(ws, caplog, mocker):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)

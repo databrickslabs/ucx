@@ -14,26 +14,38 @@ from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 def test_map_cluster_to_uc(caplog):
     ws = create_autospec(WorkspaceClient)
-    ws.clusters.get.return_value = ClusterDetails(
-        cluster_id="123", cluster_name="test_cluster", data_security_mode=DataSecurityMode.LEGACY_SINGLE_USER
-    )
+    cluster_details = [
+        ClusterDetails(
+            cluster_id="123", cluster_name="test_cluster", data_security_mode=DataSecurityMode.LEGACY_SINGLE_USER
+        )
+    ]
     prompts = MockPrompts({})
     installation = create_autospec(Installation)
     installation.save.return_value = "a/b/c"
     cluster = ClusterAccess(installation, ws, prompts)
-    cluster.map_cluster_to_uc(cluster_id="123")
     with caplog.at_level('INFO'):
-        cluster.map_cluster_to_uc(cluster_id="123")
-        assert 'Editing the cluster 123 with access_mode as DataSecurityMode.SINGLE_USER' in caplog.messages
+        cluster.map_cluster_to_uc(cluster_id="123", cluster_details=cluster_details)
+        assert 'Editing the cluster of cluster: 123 with access_mode as DataSecurityMode.SINGLE_USER' in caplog.messages
 
 
 def test_map_cluster_to_uc_shared(caplog):
     ws = create_autospec(WorkspaceClient)
-    ws.clusters.get.return_value = ClusterDetails(
-        cluster_id="123", cluster_name="test_cluster", data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL
-    )
     ws.clusters.list.return_value = [
-        ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
+        ClusterDetails(
+            cluster_id="123",
+            cluster_name="test_cluster",
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL,
+        ),
+        ClusterDetails(cluster_id="1234", cluster_name="test_cluster", cluster_source=ClusterSource.JOB),
+    ]
+    cluster_details = [
+        ClusterDetails(
+            cluster_id="123",
+            cluster_name="test_cluster",
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL,
+        ),
         ClusterDetails(cluster_id="1234", cluster_name="test_cluster", cluster_source=ClusterSource.JOB),
     ]
     prompts = MockPrompts({})
@@ -41,8 +53,10 @@ def test_map_cluster_to_uc_shared(caplog):
     installation.save.return_value = "a/b/c"
     cluster = ClusterAccess(installation, ws, prompts)
     with caplog.at_level('INFO'):
-        cluster.map_cluster_to_uc(cluster_id="<ALL>")
-        assert 'Editing the cluster 123 with access_mode as DataSecurityMode.USER_ISOLATION' in caplog.messages
+        cluster.map_cluster_to_uc(cluster_id="<ALL>", cluster_details=cluster_details)
+        assert (
+            'Editing the cluster of cluster: 123 with access_mode as DataSecurityMode.USER_ISOLATION' in caplog.messages
+        )
 
 
 def test_list_clusters():
@@ -56,18 +70,19 @@ def test_list_clusters():
     installation.save.return_value = "a/b/c"
     cluster = ClusterAccess(installation, ws, prompts)
     cluster_list = cluster.list_cluster()
-    assert cluster_list.get("test_cluster") == "123"
+    assert cluster_list[0].cluster_id == "123"
+    assert len(cluster_list) == 1
 
 
 def test_map_cluster_to_uc_error(caplog):
     ws = create_autospec(WorkspaceClient)
-    ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
+    cluster_details = [ClusterDetails(cluster_id="123", cluster_name="test_cluster")]
     prompts = MockPrompts({})
     installation = create_autospec(Installation)
     installation.save.return_value = "a/b/c"
     cluster = ClusterAccess(installation, ws, prompts)
     with caplog.at_level('INFO'):
-        cluster.map_cluster_to_uc("123")
+        cluster.map_cluster_to_uc(cluster_id="123", cluster_details=cluster_details)
         assert 'skipping cluster remapping: Data security Mode is None for the cluster 123' in caplog.messages
 
 

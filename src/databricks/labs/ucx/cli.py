@@ -512,13 +512,16 @@ def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     installation = Installation.current(w, 'ucx')
     cluster = ClusterAccess(installation, w, prompts)
     cluster_list = cluster.list_cluster()
+    if not cluster_list:
+        logger.info("No cluster information present in the workspace")
+        return
     print(f"{'Cluster Name':<80}\t{'Cluster Id':<80}")
-    for name, cluster_id in cluster_list.items():
-        print(f"{name:<80}\t{cluster_id:<80}")
+    for cluster_details in cluster_list:
+        print(f"{cluster_details.cluster_name:<80}\t{cluster_details.cluster_id:<80}")
     cluster_ids = prompts.question(
         "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
     )
-    cluster.map_cluster_to_uc(cluster_ids)
+    cluster.map_cluster_to_uc(cluster_ids, cluster_list)
 
 
 @ucx.command
