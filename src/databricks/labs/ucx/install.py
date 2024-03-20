@@ -483,27 +483,8 @@ class WorkspaceInstallation(InstallationMixin):
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
 
-    def validate_step(self, step: str) -> bool:
-        job_id = int(self._workflows_installer.state.jobs[step])
-        logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
-        current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
-        for run in current_runs:
-            if run.state and run.state.result_state == RunResultState.SUCCESS:
-                return True
-        for run in current_runs:
-            if (
-                run.run_id
-                and run.state
-                and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
-            ):
-                logger.info("Identified a run in progress waiting for run completion")
-                self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run.run_id)
-                run_new_state = self._ws.jobs.get_run(run_id=run.run_id).state
-                return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
-        return False
-
     def validate_and_run(self, step: str):
-        if not self.validate_step(step):
+        if not self._workflows_installer.validate_step(step):
             self._workflows_installer.run_workflow(step)
 
     def _trigger_workflow(self, step: str):

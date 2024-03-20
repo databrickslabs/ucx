@@ -37,6 +37,7 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.jobs import RunResultState, RunLifeCycleState
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -216,6 +217,25 @@ class WorkflowsInstallation(InstallationMixin):
                 }
             )
         return latest_status
+
+    def validate_step(self, step: str) -> bool:
+        job_id = int(self.state.jobs[step])
+        logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
+        current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
+        for run in current_runs:
+            if run.state and run.state.result_state == RunResultState.SUCCESS:
+                return True
+        for run in current_runs:
+            if (
+                run.run_id
+                and run.state
+                and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
+            ):
+                logger.info("Identified a run in progress waiting for run completion")
+                self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run.run_id)
+                run_new_state = self._ws.jobs.get_run(run_id=run.run_id).state
+                return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
+        return False
 
     @property
     def _config_file(self):
