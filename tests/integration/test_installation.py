@@ -466,6 +466,7 @@ def test_check_inventory_database_exists(ws, new_installation):
     assert err.value.args[0] == f"Inventory database '{inventory_database}' already exists in another installation"
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_table_migration_job(  # pylint: disable=too-many-locals
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
@@ -527,6 +528,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
         assert cluster_spec.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
