@@ -512,9 +512,9 @@ def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     installation = Installation.current(w, 'ucx')
     cluster = ClusterAccess(installation, w, prompts)
     cluster_list = cluster.list_cluster()
-    print(f"{'Cluster Name':<100}\t{'Cluster Id':<100}")
+    print(f"{'Cluster Name':<80}\t{'Cluster Id':<80}")
     for name, cluster_id in cluster_list.items():
-        print(f"{name:<100}\t{cluster_id:<100}")
+        print(f"{name:<80}\t{cluster_id:<80}")
     cluster_ids = prompts.question(
         "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
     )

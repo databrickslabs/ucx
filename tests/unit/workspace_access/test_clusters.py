@@ -103,4 +103,7 @@ def test_revert_cluster_to_uc_empty_cluster(caplog):
     cluster = ClusterAccess(installation, ws, prompts)
     with caplog.at_level('INFO'):
         cluster.revert_cluster_remap(cluster_ids="123", total_cluster_ids=["123"])
-        assert 'skipping cluster remapping: cluster Id is not present in the config file for the cluster:123' in caplog.messages
+        assert (
+            'skipping cluster remapping: cluster Id is not present in the config file for the cluster:123'
+            in caplog.messages
+        )
