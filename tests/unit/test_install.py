@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, create_autospec, patch
 import pytest
 import yaml
 from databricks.labs.blueprint.installation import Installation, MockInstallation
-from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.installer import InstallState, RawState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import (
@@ -1452,3 +1452,48 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
     with pytest.raises(PermissionError) as failure:
         workspace_installation.create_jobs()
     assert "Current user is not a workspace admin" in str(failure.value)
+
+
+@pytest.mark.parametrize(
+    "result_state,expected",
+    [
+        (RunState(result_state=RunResultState.SUCCESS, life_cycle_state=RunLifeCycleState.TERMINATED), True),
+        (RunState(result_state=RunResultState.FAILED, life_cycle_state=RunLifeCycleState.TERMINATED), False),
+    ],
+)
+def test_validate_step(ws, any_prompt, result_state, expected):
+    installation = create_autospec(Installation)
+    installation.load.return_value = RawState({'jobs': {'assessment': '123'}})
+    workflows_installer = WorkflowsInstallation(
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        installation,
+        ws,
+        create_autospec(WheelsV2),
+        any_prompt,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+    )
+    ws.jobs.list_runs.return_value = [
+        BaseRun(
+            job_id=123,
+            run_id=456,
+            run_name="assessment",
+            state=RunState(result_state=None, life_cycle_state=RunLifeCycleState.RUNNING),
+        )
+    ]
+
+    ws.jobs.wait_get_run_job_terminated_or_skipped.return_value = BaseRun(
+        job_id=123,
+        run_id=456,
+        run_name="assessment",
+        state=RunState(result_state=RunResultState.SUCCESS, life_cycle_state=RunLifeCycleState.TERMINATED),
+    )
+
+    ws.jobs.get_run.return_value = BaseRun(
+        job_id=123,
+        run_id=456,
+        run_name="assessment",
+        state=result_state,
+    )
+
+    assert workflows_installer.validate_step("assessment") == expected
