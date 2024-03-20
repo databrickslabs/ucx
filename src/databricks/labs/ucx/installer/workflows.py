@@ -432,36 +432,43 @@ class WorkflowsInstallation(InstallationMixin):
 
     def _job_clusters(self, names: set[str]):
         clusters = []
-        spark_conf = {
-            "spark.databricks.cluster.profile": "singleNode",
-            "spark.master": "local[*]",
-        }
-        if self._config.spark_conf is not None:
-            spark_conf = spark_conf | self._config.spark_conf
-        spec = compute.ClusterSpec(
-            data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
-            spark_conf=spark_conf,
-            custom_tags={"ResourceClass": "SingleNode"},
-            num_workers=0,
-            policy_id=self._config.policy_id,
-        )
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="main",
-                    new_cluster=spec,
+                    new_cluster=compute.ClusterSpec(
+                        data_security_mode=compute.DataSecurityMode.LEGACY_SINGLE_USER,
+                        spark_conf=self._job_cluster_spark_conf("main"),
+                        custom_tags={"ResourceClass": "SingleNode"},
+                        num_workers=0,
+                        policy_id=self._config.policy_id,
+                    ),
                 )
             )
         if "tacl" in names:
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="tacl",
-                    new_cluster=replace(
-                        spec,
+                    new_cluster=compute.ClusterSpec(
                         data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
-                        spark_conf={"spark.databricks.acl.sqlOnly": "true"},
+                        spark_conf=self._job_cluster_spark_conf("tacl"),
                         num_workers=1,  # ShowPermissionsCommand needs a worker
-                        custom_tags={},
+                        policy_id=self._config.policy_id,
+                    ),
+                )
+            )
+        if "table_migration" in names:
+            clusters.append(
+                jobs.JobCluster(
+                    job_cluster_key="table_migration",
+                    new_cluster=compute.ClusterSpec(
+                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
+                        spark_conf=self._job_cluster_spark_conf("table_migration"),
+                        policy_id=self._config.policy_id,
+                        autoscale=compute.AutoScale(
+                            max_workers=self._config.max_workers,
+                            min_workers=self._config.min_workers,
+                        ),
                     ),
                 )
             )
