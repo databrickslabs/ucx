@@ -10,7 +10,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
-from databricks.sdk.service.compute import ClusterDetails
+from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.labs.ucx.assessment.aws import AWSResources
@@ -450,6 +450,10 @@ def test_cluster_remap(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
+        ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
+    ]
     installation = create_autospec(Installation)
     installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)

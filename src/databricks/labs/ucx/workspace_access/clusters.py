@@ -46,10 +46,10 @@ class ClusterAccess:
             try:
                 cluster_details = self._ws.clusters.get(cluster)
                 if cluster_details.data_security_mode is None:
-                    logger.info(f"Data security Mode is None. Skipping the remapping for the cluster: {cluster}")
-                    continue
+                    raise InvalidParameterValue(f"Data security Mode is None for the cluster {cluster}")
                 access_mode = self._get_access_mode(cluster_details.data_security_mode.name)
                 self._installation.save(cluster_details, filename=f'backup/clusters/{cluster_details.cluster_id}.json')
+                logger.info(f"Editing the cluster {cluster} with access_mode as {access_mode}")
                 self._ws.clusters.edit(
                     cluster_id=cluster,
                     cluster_name=cluster_details.cluster_name,
