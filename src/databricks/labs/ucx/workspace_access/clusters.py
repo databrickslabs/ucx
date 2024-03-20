@@ -41,7 +41,7 @@ class ClusterAccess:
     def map_cluster_to_uc(self, cluster_id: str):
 
         cluster_id_list = self._get_cluster_id(cluster_id)
-        spark_version = self._ws.clusters.select_spark_version(latest=True)
+        spark_version = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
         for cluster in cluster_id_list:
             try:
                 cluster_details = self._ws.clusters.get(cluster)
