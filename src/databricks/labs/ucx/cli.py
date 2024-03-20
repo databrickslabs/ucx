@@ -26,6 +26,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
+from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
@@ -502,6 +503,47 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     installation = Installation.current(w, 'ucx')
     catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
     catalog_schema.create_catalog_schema()
+
+
+@ucx.command
+def cluster_remap(w: WorkspaceClient, prompts: Prompts):
+    """Re-mapping the cluster to UC"""
+    logger.info("Remapping the Clusters to UC")
+    installation = Installation.current(w, 'ucx')
+    cluster = ClusterAccess(installation, w, prompts)
+    cluster_list = cluster.list_cluster()
+    if not cluster_list:
+        logger.info("No cluster information present in the workspace")
+        return
+    print(f"{'Cluster Name':<50}\t{'Cluster Id':<50}")
+    for cluster_details in cluster_list:
+        print(f"{cluster_details.cluster_name:<50}\t{cluster_details.cluster_id:<50}")
+    cluster_ids = prompts.question(
+        "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
+    )
+    cluster.map_cluster_to_uc(cluster_ids, cluster_list)
+
+
+@ucx.command
+def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
+    """Reverting Re-mapping of  clusters from UC"""
+    logger.info("Reverting the Remapping of the Clusters from UC")
+    installation = Installation.current(w, 'ucx')
+    cluster_ids = [
+        cluster_files.path.split("/")[-1].split(".")[0]
+        for cluster_files in installation.files()
+        if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
+    ]
+    if not cluster_ids:
+        logger.info("There is no cluster files in the backup folder. Skipping the reverting process")
+        return
+    for cluster in cluster_ids:
+        logger.info(cluster)
+    cluster_list = prompts.question(
+        "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
+    )
+    cluster_details = ClusterAccess(installation, w, prompts)
+    cluster_details.revert_cluster_remap(cluster_list, cluster_ids)
 
 
 if __name__ == "__main__":
