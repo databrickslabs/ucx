@@ -28,6 +28,11 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate, Index, MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migrate import (
+    Index,
+    MigrationStatus,
+    TablesMigrate,
+)
 from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
@@ -548,7 +553,6 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     )
     cluster_details = ClusterAccess(installation, w, prompts)
     cluster_details.revert_cluster_remap(cluster_list, cluster_ids)
-
 
 if __name__ == "__main__":
     ucx()

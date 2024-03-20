@@ -1,13 +1,17 @@
 import ast
 from typing import Iterable
 
-from databricks.labs.ucx.code.base import Fixer, Diagnostic, Range, Linter
+from databricks.labs.ucx.code.base import Diagnostic, Fixer, Linter, Range
 from databricks.labs.ucx.code.queries import FromTable
 
 
 class SparkSql(Linter, Fixer):
     def __init__(self, from_table: FromTable):
         self._from_table = from_table
+
+    def name(self) -> str:
+        # this is the same fixer, just in a different language context
+        return self._from_table.name()
 
     def lint(self, code: str) -> Iterable[Diagnostic]:
         tree = ast.parse(code)

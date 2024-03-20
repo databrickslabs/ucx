@@ -31,14 +31,16 @@ def test_spark_sql_match():
 
     sqf = SparkSql(ftf)
 
-    assert list(sqf.lint(
-        """
+    assert list(
+        sqf.lint(
+            """
 spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
-    ))
+        )
+    )
 
 
 def test_spark_sql_fix():

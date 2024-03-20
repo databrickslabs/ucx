@@ -1,7 +1,7 @@
 import enum
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable
 
 
 @dataclass
@@ -12,6 +12,10 @@ class Position:
     def as_dict(self) -> dict:
         return {"line": self.line, "character": self.character}
 
+    @classmethod
+    def from_dict(cls, d: dict) -> 'Position':
+        return cls(d['line'], d['character'])
+
 
 @dataclass
 class Range:
@@ -19,11 +23,29 @@ class Range:
     end: Position
 
     @classmethod
+    def from_dict(cls, d: dict) -> 'Range':
+        return cls(Position.from_dict(d['start']), Position.from_dict(d['end']))
+
+    @classmethod
     def make(cls, start_line: int, start_character: int, end_line: int, end_character: int) -> 'Range':
-        return cls(start=Position(start_line-1, start_character), end=Position(end_line-1, end_character))
+        return cls(start=Position(start_line - 1, start_character), end=Position(end_line - 1, end_character))
 
     def as_dict(self) -> dict:
         return {"start": self.start.as_dict(), "end": self.end.as_dict()}
+
+    def fragment(self, code: str) -> str:
+        out = []
+        splitlines = code.splitlines()
+        for line, part in enumerate(splitlines):
+            if line == self.start.line and line == self.end.line:
+                out.append(part[self.start.character : self.end.character])
+            elif line == self.start.line:
+                out.append(part[self.start.character :])
+            elif line == self.end.line:
+                out.append(part[: self.end.character])
+            elif self.start.line < line < self.end.line:
+                out.append(part)
+        return "".join(out)
 
 
 class Severity(enum.IntEnum):
@@ -37,6 +59,23 @@ class DiagnosticTag(enum.IntEnum):
     UNNECESSARY = 1
     DEPRECATED = 2
 
+
+@dataclass
+class Message:
+    code: str
+    message: str
+    start_line: int
+    start_col: int
+    end_line: int
+    end_col: int
+
+
+class Deprecation(Message):
+    pass
+
+
+def x():
+    Deprecation("a", "b", 1, 2, 3, 4)
 
 @dataclass
 class Diagnostic:
@@ -65,7 +104,7 @@ class Diagnostic:
             "source": self.source,
             "message": self.message,
             "severity": self.severity.value if self.severity else Severity.WARN,
-            "tags": [t.value for t in self.tags] if self.tags else []
+            "tags": [t.value for t in self.tags] if self.tags else [],
         }
 
 
@@ -75,6 +114,9 @@ class Linter:
 
 
 class Fixer:
+    @abstractmethod
+    def name(self) -> str: ...
+
     @abstractmethod
     def apply(self, code: str) -> str: ...
 
