@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import sqlglot
 from sqlglot.expressions import Table
@@ -14,8 +14,8 @@ class FromTable(Linter, Fixer):
     def name(self) -> str:
         return 'table-migrate'
 
-    def lint(self, query: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(query):
+    def lint(self, code: str) -> Iterable[Advice]:
+        for statement in sqlglot.parse(code):
             if not statement:
                 continue
             for table in statement.find_all(Table):
@@ -41,9 +41,9 @@ class FromTable(Linter, Fixer):
             return table.catalog
         return 'hive_metastore'
 
-    def apply(self, query: str) -> str:
+    def apply(self, code: str) -> str:
         new_statements = []
-        for statement in sqlglot.parse(query):
+        for statement in sqlglot.parse(code):
             if not statement:
                 continue
             for old_table in statement.find_all(Table):

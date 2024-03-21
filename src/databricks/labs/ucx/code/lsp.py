@@ -3,9 +3,11 @@ import functools
 import http.server
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
+from urllib.parse import parse_qsl
 
 from databricks.labs.blueprint.logger import install_logger
 from databricks.sdk.service.workspace import Language
@@ -32,8 +34,8 @@ class Position:
         return {"line": self.line, "character": self.character}
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'Position':
-        return cls(d['line'], d['character'])
+    def from_dict(cls, raw: dict) -> 'Position':
+        return cls(raw['line'], raw['character'])
 
 
 @dataclass
@@ -42,8 +44,8 @@ class Range:
     end: Position
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'Range':
-        return cls(Position.from_dict(d['start']), Position.from_dict(d['end']))
+    def from_dict(cls, raw: dict) -> 'Range':
+        return cls(Position.from_dict(raw['start']), Position.from_dict(raw['end']))
 
     @classmethod
     def make(cls, start_line: int, start_character: int, end_line: int, end_character: int) -> 'Range':
@@ -101,18 +103,7 @@ class Diagnostic:
 
     @classmethod
     def from_advice(cls, advice: Advice) -> 'Diagnostic':
-        tags = []
-        severity = Severity.INFO
-        if isinstance(advice, Convention):
-            severity = Severity.HINT
-            tags.append(DiagnosticTag.UNNECESSARY)
-        elif isinstance(advice, Deprecation):
-            severity = Severity.WARN
-            tags.append(DiagnosticTag.DEPRECATED)
-        elif isinstance(advice, Advisory):
-            severity = Severity.WARN
-        elif isinstance(advice, Failure):
-            severity = Severity.ERROR
+        severity, tags = cls._severity_and_tags(advice)
         return cls(
             range=Range.make(advice.start_line, advice.start_col, advice.end_line, advice.end_col),
             code=advice.code,
@@ -121,6 +112,18 @@ class Diagnostic:
             severity=severity,
             tags=tags,
         )
+
+    @classmethod
+    def _severity_and_tags(cls, advice):
+        if isinstance(advice, Convention):
+            return Severity.HINT, [DiagnosticTag.UNNECESSARY]
+        if isinstance(advice, Deprecation):
+            return Severity.WARN, [DiagnosticTag.DEPRECATED]
+        if isinstance(advice, Advisory):
+            return Severity.WARN, []
+        if isinstance(advice, Failure):
+            return Severity.ERROR, []
+        return Severity.INFO, []
 
     def as_dict(self) -> dict:
         return {
@@ -206,7 +209,7 @@ class CodeAction:
 
 @dataclass
 class AnalyseResponse:
-    diagnostics: Iterable[Diagnostic]
+    diagnostics: list[Diagnostic]
 
     def as_dict(self):
         return {"diagnostics": [d.as_dict() for d in self.diagnostics]}
@@ -214,15 +217,15 @@ class AnalyseResponse:
 
 @dataclass
 class QuickFixResponse:
-    code_actions: Iterable[CodeAction]
+    code_actions: list[CodeAction]
 
     def as_dict(self):
         return {"code_actions": [ca.as_dict() for ca in self.code_actions]}
 
 
-class Lsp:
-    def __init__(self, languages: Languages):
-        self._languages = languages
+class LspServer:
+    def __init__(self, language_support: Languages):
+        self._languages = language_support
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
     def _read(self, file_uri: str):
@@ -230,7 +233,7 @@ class Lsp:
         if file.suffix not in self._extensions:
             raise KeyError(f"no language for {file.suffix}")
         language = self._extensions[file.suffix]
-        with file.open('r') as f:
+        with file.open('r', encoding='utf8') as f:
             return f.read(), language
 
     def lint(self, file_uri: str):
@@ -271,14 +274,14 @@ class Lsp:
 
 
 class _RequestHandler(http.server.BaseHTTPRequestHandler):
-    def __init__(self, lsp: Lsp, *args):
-        self._lsp = lsp
+    def __init__(self, lsp_server: LspServer, *args):
+        self._lsp_server = lsp_server
         super().__init__(*args)
 
-    def log_message(self, fmt: str, *args: Any) -> None:
-        logger.debug(fmt % args)
+    def log_message(self, fmt: str, *args: Any):  # pylint: disable=arguments-differ
+        logger.debug(fmt % args)  # pylint: disable=logging-not-lazy
 
-    def do_POST(self):
+    def do_POST(self):  # pylint: disable=invalid-name
         if not self.path.startswith('/quickfix'):
             self.send_error(400, 'Wrong input')
             return
@@ -291,25 +294,23 @@ class _RequestHandler(http.server.BaseHTTPRequestHandler):
         logger.debug(f"Received:\n{raw}")
 
         rng = Range.from_dict(raw['range'])
-        response = self._lsp.quickfix(raw['file_uri'], rng, raw['code'])
+        response = self._lsp_server.quickfix(raw['file_uri'], rng, raw['code'])
 
         raw = json.dumps(response.as_dict()).encode('utf-8')
         self.wfile.write(raw)
         # self.wfile.flush()
 
-    def do_GET(self):
+    def do_GET(self):  # pylint: disable=invalid-name
         if not self.path.startswith('/lint'):
             self.send_error(400, 'Wrong input')
             return
-        from urllib.parse import parse_qsl
-
         parts = self.path.split('?')
         if len(parts) != 2:
             self.send_error(400, 'Missing Query')
             return
-        path, query_string = parts
+        _, query_string = parts
         query = dict(parse_qsl(query_string))
-        response = self._lsp.lint(query['file_uri'])
+        response = self._lsp_server.lint(query['file_uri'])
         if not response:
             self.send_error(404, 'no analyser for file type')
             return
@@ -340,5 +341,5 @@ if __name__ == '__main__':
             ]
         )
     )
-    lsp = Lsp(languages)
+    lsp = LspServer(languages)
     lsp.serve()

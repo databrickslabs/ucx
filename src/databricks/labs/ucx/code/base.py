@@ -1,6 +1,6 @@
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -56,25 +56,17 @@ class Advice:
 class Advisory(Advice):
     """A warning that does not prevent the code from running."""
 
-    pass
-
 
 class Failure(Advisory):
     """An error that prevents the code from running."""
-
-    pass
 
 
 class Deprecation(Advisory):
     """An advisory that suggests to replace the code with a newer version."""
 
-    pass
-
 
 class Convention(Advice):
     """A suggestion for a better way to write the code."""
-
-    pass
 
 
 class Linter:
@@ -97,13 +89,3 @@ class SequentialLinter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint(code)
-
-
-class SequentialFixer(Fixer):
-    def __init__(self, fixes: list[Fixer]):
-        self._fixes = fixes
-
-    def apply(self, code: str) -> str:
-        for fix in self._fixes:
-            code = fix.apply(code)
-        return code
