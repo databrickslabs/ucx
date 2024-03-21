@@ -13,7 +13,12 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.upgrades import Upgrades
-from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
+from databricks.labs.blueprint.wheels import (
+    ProductInfo,
+    Version,
+    WheelsV2,
+    find_project_root,
+)
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient
@@ -144,6 +149,18 @@ class WorkspaceInstaller:
                 raise err.errs[0] from None
             raise err
 
+    def _check_remote_local_versions(self):
+        try:
+            local_version = self._product_info.version()
+            remote_version = self._installation.load(Version).version
+            if remote_version == local_version:
+                logger.info(f"UCX v{self._product_info.version()} is already installed on this workspace")
+                msg = "Do you want to change the existing installation?"
+                if not self._prompts.confirm(msg):
+                    raise RuntimeWarning("Remote and Local versions are same and no override is requested. Exiting...")
+        except NotFound as err:
+            logger.warning(f"Remote version not found: {err}")
+
     def _new_wheel_builder(self):
         return WheelsV2(self._installation, self._product_info)
 
@@ -171,6 +188,7 @@ class WorkspaceInstaller:
     def configure(self) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
+            self._check_remote_local_versions()
             if self._confirm_force_install():
                 return self._configure_new_installation()
             self._apply_upgrades()
