@@ -435,9 +435,8 @@ def test_cluster_policy_instance_pool():
 
     policy_expected = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
-        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
-        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
         "instance_pool_id": {"type": "fixed", "value": "instance_pool_1"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
     }
     # test the instance pool is added to the cluster policy
     ws.cluster_policies.create.assert_called_with(
@@ -448,7 +447,11 @@ def test_cluster_policy_instance_pool():
 
     # test the instance pool is not found
     ws.instance_pools.get.side_effect = NotFound()
-    policy_expected.pop("instance_pool_id")
+    policy_expected = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
+    }
     policy_installer.create('ucx')
     ws.cluster_policies.create.assert_called_with(
         name="Unity Catalog Migration (ucx) (me@example.com)",

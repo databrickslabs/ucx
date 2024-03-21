@@ -491,6 +491,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
             r"Max workers for auto-scale.*": "20",
+            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
         },
     )
     # save table mapping for migration before trigger the run

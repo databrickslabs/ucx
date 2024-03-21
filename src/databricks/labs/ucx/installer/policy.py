@@ -91,6 +91,10 @@ class ClusterPolicyInstaller:
             "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
             "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
         }
+        if instance_pool_id:
+            policy_definition["instance_pool_id"] = self._policy_config(instance_pool_id)
+            # 'node_type_id' cannot be supplied when an instance pool ID is provided
+            policy_definition.pop("node_type_id")
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
@@ -107,8 +111,6 @@ class ClusterPolicyInstaller:
             policy_definition["gcp_attributes.availability"] = self._policy_config(
                 compute.GcpAvailability.ON_DEMAND_GCP.value
             )
-        if instance_pool_id:
-            policy_definition["instance_pool_id"] = self._policy_config(instance_pool_id)
         return json.dumps(policy_definition)
 
     @staticmethod
