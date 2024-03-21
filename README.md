@@ -737,6 +737,9 @@ config will be stored in backup folder inside the installed location(backup/clus
 to revert the cluster remapping.
 
 
+[[back to top](#databricks-labs-ucx)]
+
+
 ## `revert-cluster-remap` command
 
 ```text
