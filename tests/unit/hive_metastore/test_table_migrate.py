@@ -612,14 +612,16 @@ GROUPS = MockBackend.rows(
 )
 
 
-def test_migrate_acls_should_produce_proper_queries(ws):
+def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     errors = {}
     rows = {
         'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
             ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
             ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
             ("workspace_group", "OWN", "", "db1_src", "managed_other", ""),
+            ("workspace_group", "INVALID", "", "db1_src", "managed_other", ""),
             ("workspace_group", "SELECT", "", "db1_src", "view_src", ""),
+            ("workspace_group", "SELECT", "", "db1_random", "view_src", ""),
         ],
         r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")],
         'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
@@ -642,3 +644,5 @@ def test_migrate_acls_should_produce_proper_queries(ws):
     assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" in backend.queries
     assert "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`" in backend.queries
     assert "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`" in backend.queries
+
+    assert "Cannot identify UC grant" in caplog.text

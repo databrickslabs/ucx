@@ -146,7 +146,7 @@ class TablesMigrate:
         for grant in grants:
             acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
             if acl_migrate_sql is None:
-                logger.debug(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
+                logger.warning(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
                 continue
             logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
