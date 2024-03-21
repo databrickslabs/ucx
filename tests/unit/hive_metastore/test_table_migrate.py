@@ -26,6 +26,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 from .. import table_mapping_mock, workspace_client_mock
 
@@ -47,8 +48,11 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
 
     assert (
@@ -77,8 +81,11 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["managed_dbfs"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
@@ -93,8 +100,11 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["external_src"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
 
     assert backend.queries == [
@@ -111,10 +121,16 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     errors = {}
     rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("LOCATION_OVERLAP", "test")]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
+    crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(crawler_backend, "inventory_database")
+    udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["external_src"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
     assert "SYNC command failed to migrate" in caplog.text
 
@@ -148,8 +164,11 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
             Rule("workspace", "cat1", "db1_src", "schema1", "external_src", "dest1"),
         )
     ]
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
 
     assert len(backend.queries) == 0
@@ -164,8 +183,11 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["external_src_unsupported"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
 
     assert len(backend.queries) == 0
@@ -179,8 +201,11 @@ def test_migrate_view_should_produce_proper_queries(ws):
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["view"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
 
     assert "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;" in backend.queries
@@ -281,10 +306,11 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
         ),
     ]
     table_crawler.snapshot.return_value = test_tables
+    group_manager = GroupManager(backend, client, "inventory_database")
     table_mapping = table_mapping_mock()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     table_migrate = TablesMigrate(
-        table_crawler, grant_crawler, client, backend, table_mapping, migration_status_refresher
+        table_crawler, grant_crawler, client, backend, table_mapping, group_manager, migration_status_refresher
     )
     return table_migrate
 
@@ -344,8 +370,11 @@ def test_no_migrated_tables(ws):
     table_mapping.load.return_value = [
         Rule("workspace", "catalog_1", "db1", "db1", "managed", "managed"),
     ]
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
     table_migrate.revert_migrated_tables("test_schema1", "test_table1")
     ws.catalogs.list.assert_called()
@@ -375,8 +404,11 @@ def test_empty_revert_report(ws):
     grant_crawler = create_autospec(GrantsCrawler)
     ws.tables.list.side_effect = []
     table_mapping = table_mapping_mock()
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
     assert not table_migrate.print_revert_report(delete_managed=False)
 
@@ -395,8 +427,11 @@ def test_is_upgraded(ws):
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)
     table_mapping = table_mapping_mock()
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables()
     assert table_migrate.is_upgraded("schema1", "table1")
     assert not table_migrate.is_upgraded("schema1", "table2")
@@ -565,28 +600,45 @@ def test_table_status_seen_tables():
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
+GROUPS = MockBackend.rows(
+    "id_in_workspace",
+    "name_in_workspace",
+    "name_in_account",
+    "temporary_name",
+    "members",
+    "entitlements",
+    "external_id",
+    "roles",
+)
 
 
 def test_migrate_acls_should_produce_proper_queries(ws):
     errors = {}
     rows = {
         'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
-            ("user", "SELECT", "", "db1_src", "managed_dbfs", ""),
-            ("user", "MODIFY", "", "db1_src", "managed_mnt", ""),
-            ("user", "OWN", "", "db1_src", "managed_other", ""),
-            ("user", "SELECT", "", "db1_src", "view_src", ""),
-        ]
+            ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
+            ("workspace_group", "MODIFY", "", "db1_src", "managed_mnt", ""),
+            ("workspace_group", "OWN", "", "db1_src", "managed_other", ""),
+            ("workspace_group", "SELECT", "", "db1_src", "view_src", ""),
+        ],
+        r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")],
+        'SELECT \\* FROM hive_metastore.inventory_database.groups': GROUPS[
+            ("11", "workspace_group", "account group", "temp", "", "", "", ""),
+        ],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrate(table_crawler, grant_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate = TablesMigrate(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
     table_migrate.migrate_tables(acl_strategy=AclMigrationWhat.LEGACY_TACL)
 
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `user`" in backend.queries
-    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `user`" in backend.queries
-    assert "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `user`" in backend.queries
-    assert "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `user`" in backend.queries
+    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
+    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" in backend.queries
+    assert "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`" in backend.queries
+    assert "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`" in backend.queries

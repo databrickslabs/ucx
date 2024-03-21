@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import logging
 from collections import defaultdict
@@ -23,6 +24,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class TablesMigrate:
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
+        group_manager: GroupManager,
         migration_status_refresher,
     ):
         self._tc = table_crawler
@@ -52,6 +55,7 @@ class TablesMigrate:
         self._backend = backend
         self._ws = ws
         self._tm = table_mapping
+        self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
 
@@ -64,13 +68,18 @@ class TablesMigrate:
         udfs_crawler = UdfsCrawler(sql_backend, config.inventory_database)
         grants_crawler = GrantsCrawler(table_crawler, udfs_crawler)
         table_mapping = TableMapping(installation, ws, sql_backend)
+        group_manager = GroupManager(sql_backend, ws, config.inventory_database)
         migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
-        return cls(table_crawler, grants_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
+        return cls(
+            table_crawler, grants_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
+        )
 
     def migrate_tables(self, *, what: What | None = None, acl_strategy: AclMigrationWhat | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
-        grants_to_migrate = self._gc.snapshot()
+        if acl_strategy is not None:
+            grants_to_migrate = self._gc.snapshot()
+            migrated_groups = self._group.snapshot()
         tasks = []
         for table in tables_to_migrate:
             if what is not None and table.src.what != what:
@@ -79,27 +88,27 @@ class TablesMigrate:
                 case None:
                     tasks.append(partial(self._migrate_table, table.src, table.rule))
                 case AclMigrationWhat.LEGACY_TACL:
-                    grant = self._match_grant(table.src, grants_to_migrate)
-                    tasks.append(partial(self._migrate_table, table.src, table.rule, grant))
+                    grants = self._match_grants(table.src, grants_to_migrate, migrated_groups)
+                    tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
                 case AclMigrationWhat.PRINCIPAL:
-                    grant = self._approximate_grant(table.src)
-                    tasks.append(partial(self._migrate_table, table.src, table.rule, grant))
+                    # TODO: Implement principal-based ACL migration
+                    pass
         Threads.strict("migrate tables", tasks)
 
-    def _migrate_table(self, src_table: Table, rule: Rule, grant: Grant | None = None):
+    def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
         if src_table.what == What.DBFS_ROOT_DELTA:
-            return self._migrate_dbfs_root_table(src_table, rule, grant)
+            return self._migrate_dbfs_root_table(src_table, rule, grants)
         if src_table.what == What.EXTERNAL_SYNC:
-            return self._migrate_external_table(src_table, rule, grant)
+            return self._migrate_external_table(src_table, rule, grants)
         if src_table.what == What.VIEW:
-            return self._migrate_view(src_table, rule, grant)
+            return self._migrate_view(src_table, rule, grants)
         logger.info(f"Table {src_table.key} is not supported for migration")
         return True
 
-    def _migrate_external_table(self, src_table: Table, rule: Rule, grant: Grant | None = None):
+    def _migrate_external_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
@@ -111,35 +120,36 @@ class TablesMigrate:
             )
             return False
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grant)
+        return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grant: Grant | None = None):
+    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grant)
+        return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_view(self, src_table: Table, rule: Rule, grant: Grant | None = None):
+    def _migrate_view(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_view(target_table_key)
         logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grant)
+        return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_acl(self, src: Table, rule: Rule, grant: Grant | None):
-        if grant is None:
+    def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
+        if grants is None:
             return True
-        acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
-        if acl_migrate_sql is None:
-            logger.debug(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
-            return False
-        logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
-        self._backend.execute(acl_migrate_sql)
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
+            if acl_migrate_sql is None:
+                logger.debug(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
+            self._backend.execute(acl_migrate_sql)
         return True
 
     def _table_already_upgraded(self, target) -> bool:
@@ -247,6 +257,20 @@ class TablesMigrate:
 
     def _init_seen_tables(self):
         self._seen_tables = self._migration_status_refresher.get_seen_tables()
+
+    @staticmethod
+    def _match_grants(table: Table, grants: Iterable[Grant], migrated_groups: list[MigratedGroup]) -> list[Grant]:
+        matched_grants = []
+        for grant in grants:
+            if grant.database != table.database:
+                continue
+            if table.name not in (grant.table, grant.view):
+                continue
+            matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
+            if len(matched_group) > 0:
+                grant = dataclasses.replace(grant, principal=matched_group[0])
+            matched_grants.append(grant)
+        return matched_grants
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
