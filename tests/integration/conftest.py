@@ -15,7 +15,8 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
@@ -145,6 +146,28 @@ class StaticUdfsCrawler(UdfsCrawler):
 
     def snapshot(self) -> list[Udf]:
         return self._udfs
+
+
+class StaticGrantsCrawler(GrantsCrawler):
+    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, grants: list[Grant]):
+        super().__init__(tc, udf)
+        self._grants = [
+            Grant(
+                principal=_.principal,
+                action_type=_.action_type,
+                catalog=_.catalog,
+                database=_.database,
+                table=_.table,
+                view=_.view,
+                udf=_.udf,
+                any_file=_.any_file,
+                anonymous_function=_.anonymous_function,
+            )
+            for _ in grants
+        ]
+
+    def snapshot(self) -> list[Grant]:
+        return self._grants
 
 
 class StaticTableMapping(TableMapping):
