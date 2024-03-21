@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
@@ -5,6 +6,8 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.code.languages import Languages
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+
+logger = logging.getLogger(__name__)
 
 
 class Files:
@@ -40,6 +43,7 @@ class Files:
         # If the language is not supported, return
         if not language:
             return False
+        logger.info(f"Analysing {path}")
         # Get the linter for the language
         linter = self._languages.linter(language)
         # Open the file and read the code
@@ -48,14 +52,17 @@ class Files:
             applied = False
             # Lint the code and apply fixes
             for advice in linter.lint(code):
+                logger.info(f"Found: {advice}")
                 fixer = self._languages.fixer(language, advice.code)
                 if not fixer:
                     continue
+                logger.info(f"Applying fix for {advice}")
                 code = fixer.apply(code)
                 applied = True
             if not applied:
                 return False
             # Write the fixed code back to the file
             with path.open("w") as f:
+                logger.info(f"Overwriting {path}")
                 f.write(code)
                 return True

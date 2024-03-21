@@ -3,6 +3,7 @@ import os
 import shutil
 import webbrowser
 from collections.abc import Callable
+from pathlib import Path
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
@@ -555,10 +556,11 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def code_fix(w: WorkspaceClient, prompts: Prompts):
+def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     """Fix the code files based on their language."""
     files = Files.for_cli(w)
-    files.apply(files.path)
+    working_directory = Path.cwd()
+    files.apply(working_directory)
 
 
 if __name__ == "__main__":

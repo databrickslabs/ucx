@@ -149,3 +149,6 @@ commands:
 
   - name: revert-cluster-remap
     description: Reverting the Re-mapping of the  cluster from  UC
+
+  - name: migrate-local-code
+    description: (Experimental) Migrate files in the current directory to be more compatible with Unity Catalog.
