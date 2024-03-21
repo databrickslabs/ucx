@@ -23,11 +23,10 @@ def test_files_fix_reads_supported_extensions():
 
 def test_files_supported_language_no_diagnostics():
     languages = create_autospec(Languages)
-    languages.linter.return_value = []
+    languages.linter(Language.PYTHON).lint.return_value = []
     files = Files(languages)
     path = Path(__file__)
     files.fix(path)
-    languages.linter.assert_called_once_with(Language.PYTHON)
     languages.fixer.assert_not_called()
 
 

@@ -10,7 +10,7 @@ class Languages:
     def __init__(self, index: Index):
         self._index = index
         from_table = FromTable(index)
-        self._analysers = {
+        self._linters = {
             Language.PYTHON: SequentialLinter([SparkSql(from_table)]),
             Language.SQL: SequentialLinter([from_table]),
         }
@@ -20,12 +20,12 @@ class Languages:
         }
 
     def is_supported(self, language: Language) -> bool:
-        return language in self._analysers and language in self._fixers
+        return language in self._linters and language in self._fixers
 
     def linter(self, language: Language) -> Linter:
-        if language not in self._analysers:
+        if language not in self._linters:
             raise ValueError(f"Unsupported language: {language}")
-        return self._analysers[language]
+        return self._linters[language]
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
         if language not in self._fixers:

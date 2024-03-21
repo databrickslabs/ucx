@@ -12,7 +12,7 @@ class Files:
 
     def __init__(self, languages: Languages):
         self._languages = languages
-        self._extensions = {"py": Language.PYTHON, "sql": Language.SQL}
+        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient):
@@ -26,10 +26,10 @@ class Files:
         The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
         """
         # Check if the file extension is in the list of supported extensions
-        if path.suffix[1:] not in self._extensions:
+        if path.suffix not in self._extensions:
             return False
         # Get the language corresponding to the file extension
-        language = self._extensions[path.suffix[1:]]
+        language = self._extensions[path.suffix]
         # If the language is not supported, return
         if not language:
             return False
@@ -40,8 +40,8 @@ class Files:
             code = f.read()
             applied = False
             # Lint the code and apply fixes
-            for diagnostic in linter.lint(code):
-                fixer = self._languages.fixer(language, diagnostic.code)
+            for advice in linter.lint(code):
+                fixer = self._languages.fixer(language, advice.code)
                 if not fixer:
                     continue
                 code = fixer.apply(code)
