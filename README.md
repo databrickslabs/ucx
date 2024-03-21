@@ -48,6 +48,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
+* [Code migration commands](#code-migration-commands)
+  * [`migrate-local-code` command](#migrate-local-code-command)
 * [Cross-workspace installations](#cross-workspace-installations)
   * [`sync-workspace-info` command](#sync-workspace-info-command)
   * [`manual-workspace-info` command](#manual-workspace-info-command)
@@ -622,6 +624,23 @@ This command aliases a UC table/tables from one schema to another schema in the 
 It takes a `WorkspaceClient` object and `from` and `to` parameters as parameters and aliases the tables using 
 the `TableMove` class. This command is useful for developers and administrators who want to create an alias for a table. 
 It can also be used to debug issues related to table aliasing.
+
+[[back to top](#databricks-labs-ucx)]
+
+# Code migration commands
+
+[[back to top](#databricks-labs-ucx)]
+
+## `migrate-local-code` command
+
+```text
+databricks labs ucx migrate-local-code
+```
+
+**(Experimental)** Once [table migration](#table-migration-commands) is complete, you can run this command to 
+migrate all python and SQL files in the current working directory. This command is highly experimental and
+at the moment only supports Python and SQL files and discards code comments and formatting during 
+the automated transformation process.
 
 [[back to top](#databricks-labs-ucx)]
 

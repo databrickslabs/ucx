@@ -27,12 +27,6 @@ from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
-from databricks.labs.ucx.hive_metastore.table_migrate import TableMove, TablesMigrate, Index, MigrationStatus
-from databricks.labs.ucx.hive_metastore.table_migrate import (
-    Index,
-    MigrationStatus,
-    TablesMigrate,
-)
 from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
@@ -560,6 +554,8 @@ def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     """Fix the code files based on their language."""
     files = Files.for_cli(w)
     working_directory = Path.cwd()
+    if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
+        return
     files.apply(working_directory)
 
 
