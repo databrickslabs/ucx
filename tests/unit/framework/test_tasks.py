@@ -104,12 +104,12 @@ def test_run_task(capsys):
     cfg = WorkspaceConfig("test_db", log_level="INFO")
 
     # test the task function is called
-    log_path = run_task(
-        args, Path("foo"), cfg, create_autospec(WorkspaceClient), create_autospec(RuntimeBackend), MockInstallation()
+    test_install_dir = Path("foo")
+    run_task(
+        args, test_install_dir, cfg, create_autospec(WorkspaceClient), create_autospec(RuntimeBackend), MockInstallation()
     )
     # clean up the log folder created by TaskLogger
-    log_root_dir = Path(log_path).parents[-2]
-    shutil.rmtree(log_root_dir)
+    shutil.rmtree(test_install_dir)
 
     assert "This mock task of migrate-tables" in capsys.readouterr().out
 
