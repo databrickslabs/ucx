@@ -466,11 +466,13 @@ def test_check_inventory_database_exists(ws, new_installation):
     assert err.value.args[0] == f"Inventory database '{inventory_database}' already exists in another installation"
 
 
-@pytest.mark.skip
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_table_migration_job(  # pylint: disable=too-many-locals
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
+    # skip this test if not in nightly test job: TEST_NIGHTLY is missing or is not set to "true"
+    if env_or_skip("TEST_NIGHTLY").lower() != "true":
+        pytest.skip("TEST_NIGHTLY is not true")
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(schema_name=src_schema.name)
@@ -489,6 +491,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
             r"Max workers for auto-scale.*": "20",
+            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
         },
     )
     # save table mapping for migration before trigger the run

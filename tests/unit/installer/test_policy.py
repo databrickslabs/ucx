@@ -7,7 +7,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
-from databricks.sdk.service.compute import ClusterSpec, Policy
+from databricks.sdk.service.compute import ClusterSpec, GetInstancePool, Policy
 from databricks.sdk.service.jobs import Job, JobCluster, JobSettings
 from databricks.sdk.service.sql import (
     EndpointConfPair,
@@ -34,6 +34,7 @@ def common():
         {
             r".*We have identified one or more cluster.*": "Yes",
             r".*Choose a cluster policy.*": "0",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     return w, prompts
@@ -252,6 +253,7 @@ def test_cluster_policy_definition_azure_hms_warehouse():
         {
             r".*We have identified one or more cluster.*": "No",
             r".*We have identified the workspace warehouse.*": "Yes",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
@@ -303,6 +305,7 @@ def test_cluster_policy_definition_aws_glue_warehouse():
         {
             r".*We have identified one or more cluster.*": "No",
             r".*We have identified the workspace warehouse.*": "Yes",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
@@ -357,6 +360,7 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
         {
             r".*We have identified one or more cluster.*": "No",
             r".*We have identified the workspace warehouse.*": "Yes",
+            r".*Instance pool id to be set in cluster policy.*": "",
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
@@ -412,5 +416,45 @@ def test_cluster_policy_definition_empty_config():
     ws.cluster_policies.create.assert_called_with(
         name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps(policy_definition_actual),
+        description="Custom cluster policy for Unity Catalog Migration (UCX)",
+    )
+
+
+def test_cluster_policy_instance_pool():
+    ws, prompts = common()
+    prompts = prompts.extend({r".*Instance pool id to be set in cluster policy.*": "instance_pool_1"})
+
+    ws.instance_pools.get.return_value = GetInstancePool("instance_pool_1")
+    ws.cluster_policies.list.return_value = []
+    ws.config.is_aws = True
+    ws.config.is_azure = False
+    ws.config.is_gcp = False
+
+    policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
+    policy_installer.create('ucx')
+
+    policy_expected = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "instance_pool_id": {"type": "fixed", "value": "instance_pool_1"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
+    }
+    # test the instance pool is added to the cluster policy
+    ws.cluster_policies.create.assert_called_with(
+        name="Unity Catalog Migration (ucx) (me@example.com)",
+        definition=json.dumps(policy_expected),
+        description="Custom cluster policy for Unity Catalog Migration (UCX)",
+    )
+
+    # test the instance pool is not found
+    ws.instance_pools.get.side_effect = NotFound()
+    policy_expected = {
+        "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
+        "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
+        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
+    }
+    policy_installer.create('ucx')
+    ws.cluster_policies.create.assert_called_with(
+        name="Unity Catalog Migration (ucx) (me@example.com)",
+        definition=json.dumps(policy_expected),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
