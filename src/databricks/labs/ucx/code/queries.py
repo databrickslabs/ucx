@@ -3,14 +3,7 @@ from typing import Iterable
 import sqlglot
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.code.base import (
-    Diagnostic,
-    DiagnosticTag,
-    Fixer,
-    Linter,
-    Range,
-    Severity,
-)
+from databricks.labs.ucx.code.base import Advice, Deprecation, Fixer, Linter
 from databricks.labs.ucx.hive_metastore.table_migrate import Index
 
 
@@ -21,7 +14,7 @@ class FromTable(Linter, Fixer):
     def name(self) -> str:
         return 'table-migrate'
 
-    def lint(self, query: str) -> Iterable[Diagnostic]:
+    def lint(self, query: str) -> Iterable[Advice]:
         for statement in sqlglot.parse(query):
             if not statement:
                 continue
@@ -29,25 +22,24 @@ class FromTable(Linter, Fixer):
                 catalog = self._catalog(table)
                 if catalog != 'hive_metastore':
                     continue
-                if not self._index.is_upgraded(table.db, table.name):
-                    continue
                 dst = self._index.get(table.db, table.name)
-                yield Diagnostic(
-                    # see https://github.com/tobymao/sqlglot/issues/3159
-                    range=Range.make(0, 0, 0, 1024),
+                if not dst:
+                    continue
+                yield Deprecation(
                     code='table-migrate',
-                    source='databricks.labs.ucx',
                     message=f"Table {table.db}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
-                    severity=Severity.ERROR,
-                    tags=[DiagnosticTag.DEPRECATED],
+                    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=1024,
                 )
 
     @staticmethod
     def _catalog(table):
-        catalog = table.catalog
-        if not catalog:
-            catalog = 'hive_metastore'
-        return catalog
+        if table.catalog:
+            return table.catalog
+        return 'hive_metastore'
 
     def apply(self, query: str) -> str:
         new_statements = []

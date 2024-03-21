@@ -10,12 +10,16 @@ class Notebooks:
         self._languages = languages
 
     def revert(self, object_info: ObjectInfo):
+        if not object_info.path:
+            return False
         with self._ws.workspace.download(object_info.path + ".bak", format=ExportFormat.SOURCE) as f:
             code = f.read().decode("utf-8")
-        with self._ws.workspace.upload(object_info.path, code.encode("utf-8")) as f:
-            f.write(code)
+        self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
+        return True
 
     def apply(self, object_info: ObjectInfo) -> bool:
+        if not object_info.language or not object_info.path:
+            return False
         if not self._languages.is_supported(object_info.language):
             return False
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:

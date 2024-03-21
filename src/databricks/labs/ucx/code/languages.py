@@ -14,7 +14,7 @@ class Languages:
             Language.PYTHON: SequentialLinter([SparkSql(from_table)]),
             Language.SQL: SequentialLinter([from_table]),
         }
-        self._fixers = {
+        self._fixers: dict[Language, list[Fixer]] = {
             Language.PYTHON: [SparkSql(from_table)],
             Language.SQL: [from_table],
         }
@@ -37,8 +37,8 @@ class Languages:
 
     def apply_fixes(self, language: Language, code: str) -> str:
         linter = self.linter(language)
-        for diagnostic in linter.lint(code):
-            fixer = self.fixer(language, diagnostic.code)
+        for advice in linter.lint(code):
+            fixer = self.fixer(language, advice.code)
             if fixer:
                 code = fixer.apply(code)
         return code

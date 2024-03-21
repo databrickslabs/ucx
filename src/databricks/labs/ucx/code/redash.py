@@ -10,14 +10,15 @@ class Redash:
         self._ws = ws
 
     def fix(self, query: Query):
-        if self._fixer.analyse(query.query):
-            query.query = self._fixer.apply(query.query)
-            self._ws.queries.update(
-                query.id,
-                data_source_id=query.data_source_id,
-                description=query.description,
-                name=query.name,
-                options=query.options,
-                query=query.query,
-                run_as_role=query.run_as_role,
-            )
+        assert query.id is not None
+        assert query.query is not None
+        query.query = self._fixer.apply(query.query)
+        self._ws.queries.update(
+            query.id,
+            data_source_id=query.data_source_id,
+            description=query.description,
+            name=query.name,
+            options=query.options,
+            query=query.query,
+            run_as_role=query.run_as_role,
+        )
