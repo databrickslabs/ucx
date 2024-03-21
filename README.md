@@ -53,8 +53,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`manual-workspace-info` command](#manual-workspace-info-command)
   * [`create-account-groups` command](#create-account-groups-command)
   * [`validate-groups-membership` command](#validate-groups-membership-command)
-  * [`cluster-remap` command](#cluster-remap)
-  * [`revert-cluster-remap` command](#revert-cluster-remap)
+  * [`validate-groups-membership` command](#cluster-remap-command)
+  * [`revert-cluster-remap` command](#revert-cluster-remap-command)
 * [Star History](#star-history)
 * [Project Support](#project-support)
 <!-- TOC -->
