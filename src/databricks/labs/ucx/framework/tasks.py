@@ -229,7 +229,7 @@ def run_task(
     workspace_client: WorkspaceClient,
     sql_backend: RuntimeBackend,
     installation: Installation,
-):
+) -> str:
     task_name = args.get("task", "not specified")
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
@@ -253,6 +253,7 @@ def run_task(
         ucx_logger = logging.getLogger("databricks.labs.ucx")
         ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
         current_task.fn(cfg, workspace_client, sql_backend, installation)
+        return str(task_logger)
 
 
 def trigger(*argv):
