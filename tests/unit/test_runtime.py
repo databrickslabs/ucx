@@ -1,6 +1,6 @@
 import os.path
 import sys
-from unittest.mock import create_autospec, patch
+from unittest.mock import call, create_autospec, patch
 
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
@@ -13,6 +13,7 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     Task,
 )
 from databricks.labs.ucx.runtime import (
+    apply_permissions_to_account_groups,
     assess_azure_service_principals,
     crawl_grants,
     migrate_dbfs_root_delta_tables,
@@ -27,6 +28,7 @@ def azure_mock_config() -> WorkspaceConfig:
             token="dapifaketoken",
         ),
         inventory_database="ucx",
+        use_permission_migration_api=True,
     )
     return config
 
@@ -104,3 +106,34 @@ def test_migrate_dbfs_root_delta_tables():
     ws = create_autospec(WorkspaceClient)
     migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
     ws.catalogs.list.assert_called_once()
+
+
+GROUPS = MockBackend.rows(
+    "id_in_workspace",
+    "name_in_workspace",
+    "name_in_account",
+    "temporary_name",
+    "members",
+    "entitlements",
+    "external_id",
+    "roles",
+)
+
+
+def test_migrate_permissions_private_api():
+    rows = {
+        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+            ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
+            ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
+            ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
+        ],
+    }
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = "12345678"
+    apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+    calls = [
+        call("12345678", "workspace_group_1", "account_group_1"),
+        call("12345678", "workspace_group_2", "account_group_2"),
+        call("12345678", "workspace_group_3", "account_group_3"),
+    ]
+    ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)

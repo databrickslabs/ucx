@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from collections.abc import Callable, Iterable, Iterator, Sequence
+from functools import partial
 from itertools import groupby
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -25,9 +26,10 @@ logger = logging.getLogger(__name__)
 
 
 class PermissionManager(CrawlerBase[Permissions]):
-    def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
+    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
+        self._ws = ws
 
     @classmethod
     def factory(
@@ -80,7 +82,10 @@ class PermissionManager(CrawlerBase[Permissions]):
         grants_crawler = GrantsCrawler(tables_crawler, udfs_crawler)
         tacl_support = TableAclSupport(grants_crawler, sql_backend)
         return cls(
-            sql_backend, inventory_database, [generic_support, sql_support, secrets_support, scim_support, tacl_support]
+            ws,
+            sql_backend,
+            inventory_database,
+            [generic_support, sql_support, secrets_support, scim_support, tacl_support],
         )
 
     def inventorize_permissions(self):
@@ -139,6 +144,35 @@ class PermissionManager(CrawlerBase[Permissions]):
         _, errors = Threads.gather("apply account group permissions", applier_tasks)
         if len(errors) > 0:
             # TODO: https://github.com/databrickslabs/ucx/issues/406
+            logger.error(f"Detected {len(errors)} while applying permissions")
+            raise ManyError(errors)
+        logger.info("Permissions were applied")
+        return True
+
+    def apply_group_permissions_private_preview_api(self, migration_state: MigrationState) -> bool:
+        if len(migration_state) == 0:
+            logger.info("No valid groups selected, nothing to do.")
+            return True
+        logger.info(
+            f"Applying the permissions to account groups. "
+            f"Total groups to apply permissions: {len(migration_state)}."
+        )
+
+        def migrate_permission(workspace_id, workspace_group_name, account_group_name):
+            self._ws.permission_migration.migrate_permissions(workspace_id, workspace_group_name, account_group_name)
+
+        applier_tasks: list[Callable[..., None]] = []
+        for migrated_group in migration_state.groups:
+            applier_tasks.append(
+                partial(
+                    migrate_permission,
+                    self._ws.get_workspace_id(),
+                    migrated_group.name_in_workspace,
+                    migrated_group.name_in_account,
+                )
+            )
+        _, errors = Threads.gather("apply account group permissions", applier_tasks)
+        if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while applying permissions")
             raise ManyError(errors)
         logger.info("Permissions were applied")

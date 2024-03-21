@@ -376,7 +376,10 @@ def apply_permissions_to_account_groups(
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
-    permission_manager.apply_group_permissions(migration_state)
+    if cfg.use_permission_migration_api:
+        permission_manager.apply_group_permissions_private_preview_api(migration_state)
+    else:
+        permission_manager.apply_group_permissions(migration_state)
 
 
 @task("validate-groups-permissions", job_cluster="tacl")

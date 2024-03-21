@@ -3,7 +3,7 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 
 def test_permissions_save_and_load(ws, sql_backend, inventory_schema, env_or_skip):
-    permission_manager = PermissionManager(sql_backend, inventory_schema, [])
+    permission_manager = PermissionManager(ws, sql_backend, inventory_schema, [])
 
     saved = [
         Permissions(object_id="abc", object_type="bcd", raw="def"),

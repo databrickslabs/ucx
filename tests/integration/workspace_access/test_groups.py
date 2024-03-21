@@ -257,7 +257,7 @@ def test_replace_workspace_groups_with_account_groups(  # pylint: disable=too-ma
     )
 
     tacl = TableAclSupport(grants, sql_backend)
-    permission_manager = PermissionManager(sql_backend, inventory_schema, [generic_permissions, tacl])
+    permission_manager = PermissionManager(ws, sql_backend, inventory_schema, [generic_permissions, tacl])
 
     permission_manager.inventorize_permissions()
 
