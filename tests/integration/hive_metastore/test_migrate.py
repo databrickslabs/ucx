@@ -119,14 +119,26 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_migrate_external_table(
-    ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, env_or_skip
-):  # pylint: disable=too-many-locals
+def test_migrate_external_table(  # pylint: disable=too-many-locals
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_catalog,
+    make_schema,
+    make_table,
+    env_or_skip,
+    make_random,
+    make_dbfs_data_copy,
+):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
-    mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=mounted_location)
+    # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
+    # external table migration tests
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
@@ -168,6 +180,43 @@ def test_migrate_external_table(
     assert migration_status[0].dst_catalog == dst_catalog.name
     assert migration_status[0].dst_schema == dst_schema.name
     assert migration_status[0].dst_table == src_external_table.name
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_migrate_external_table_failed_sync(
+    ws,
+    caplog,
+    sql_backend,
+    inventory_schema,
+    make_schema,
+    make_table,
+    env_or_skip,
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+
+    src_schema = make_schema(catalog_name="hive_metastore")
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=existing_mounted_location)
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
+    # create a mapping that will fail the SYNC because the target catalog and schema does not exist
+    rules = [
+        Rule(
+            "workspace",
+            "non_existed_catalog",
+            src_schema.name,
+            "existed_schema",
+            src_external_table.name,
+            src_external_table.name,
+        ),
+    ]
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    table_migrate = TablesMigrate(
+        table_crawler, ws, sql_backend, StaticTableMapping(ws, sql_backend, rules=rules), migration_status_refresher
+    )
+
+    table_migrate.migrate_tables()
+    assert "SYNC command failed to migrate" in caplog.text
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))

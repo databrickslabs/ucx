@@ -5,16 +5,20 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
+from databricks.sdk.service.compute import ClusterDetails, ClusterSource
+from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.cli import (
     alias,
+    cluster_remap,
     create_account_groups,
     create_catalogs_schemas,
     create_table_mapping,
@@ -28,6 +32,7 @@ from databricks.labs.ucx.cli import (
     open_remote_config,
     principal_prefix_access,
     repair_run,
+    revert_cluster_remap,
     revert_migrated_tables,
     skip,
     sync_workspace_info,
@@ -439,3 +444,42 @@ def test_create_catalogs_schemas(ws):
     prompts = MockPrompts({'.*': 's3://test'})
     create_catalogs_schemas(ws, prompts)
     ws.catalogs.list.assert_called_once()
+
+
+def test_cluster_remap(ws, caplog):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    ws.clusters.get.return_value = ClusterDetails(cluster_id="123", cluster_name="test_cluster")
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
+        ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
+    ]
+    installation = create_autospec(Installation)
+    installation.save.return_value = "a/b/c"
+    cluster_remap(ws, prompts)
+    assert "Remapping the Clusters to UC" in caplog.messages
+
+
+def test_cluster_remap_error(ws, caplog):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    ws.clusters.list.return_value = []
+    installation = create_autospec(Installation)
+    installation.save.return_value = "a/b/c"
+    cluster_remap(ws, prompts)
+    assert "No cluster information present in the workspace" in caplog.messages
+
+
+def test_revert_cluster_remap(ws, caplog, mocker):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.list.return_value = [ObjectInfo(path='/ucx/backup/clusters/123.json')]
+    with pytest.raises(TypeError):
+        revert_cluster_remap(ws, prompts)
+
+
+def test_revert_cluster_remap_empty(ws, caplog):
+    prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
+    ws = create_autospec(WorkspaceClient)
+    revert_cluster_remap(ws, prompts)
+    assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages

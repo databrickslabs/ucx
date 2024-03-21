@@ -143,3 +143,9 @@ commands:
   - name: create-catalogs-schemas
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
       This command is supposed to be run before migrating tables to UC.
+
+  - name: cluster-remap
+    description: Re-mapping the cluster to UC
+
+  - name: revert-cluster-remap
+    description: Reverting the Re-mapping of the  cluster from  UC

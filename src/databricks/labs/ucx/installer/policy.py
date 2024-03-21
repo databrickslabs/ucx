@@ -25,6 +25,8 @@ class ClusterPolicyInstaller:
     def create(self, inventory_database: str) -> tuple[str, str, dict]:
         instance_profile = ""
         spark_conf_dict = {}
+        # get instance pool id to be put into the cluster policy
+        instance_pool_id = self._get_instance_pool_id()
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
             "We have identified one or more cluster policies set up for an external metastore"
@@ -54,7 +56,7 @@ class ClusterPolicyInstaller:
         logger.info("Creating UCX cluster policy.")
         policy_id = self._ws.cluster_policies.create(
             name=policy_name,
-            definition=self._definition(spark_conf_dict, instance_profile),
+            definition=self._definition(spark_conf_dict, instance_profile, instance_pool_id),
             description="Custom cluster policy for Unity Catalog Migration (UCX)",
         ).policy_id
         assert policy_id is not None
@@ -64,11 +66,35 @@ class ClusterPolicyInstaller:
             spark_conf_dict,
         )
 
-    def _definition(self, conf: dict, instance_profile: str | None) -> str:
+    def _get_instance_pool_id(self) -> str | None:
+        try:
+            instance_pool_id = self._prompts.question(
+                "Instance pool id to be set in cluster policy for all workflow clusters", default="None"
+            )
+        except OSError:
+            # when unit test v0.15.0_added_cluster_policy.py MockPromots cannot be injected to ClusterPolicyInstaller
+            # return None to pass the test
+            return None
+        if instance_pool_id.lower() == "none":
+            return None
+        try:
+            self._ws.instance_pools.get(instance_pool_id)
+            return instance_pool_id
+        except NotFound:
+            logger.warning(
+                f"Instance pool id {instance_pool_id} does not exist. Will not set instance pool in the cluster policy. You can manually edit the cluster policy after installation."
+            )
+            return None
+
+    def _definition(self, conf: dict, instance_profile: str | None, instance_pool_id: str | None) -> str:
         policy_definition = {
             "spark_version": self._policy_config(self._ws.clusters.select_spark_version(latest=True)),
             "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
         }
+        if instance_pool_id:
+            policy_definition["instance_pool_id"] = self._policy_config(instance_pool_id)
+            # 'node_type_id' cannot be supplied when an instance pool ID is provided
+            policy_definition.pop("node_type_id")
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:

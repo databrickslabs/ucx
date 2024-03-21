@@ -41,7 +41,7 @@ def ws() -> WorkspaceClient:
 
 def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     errors = {}
-    rows = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
@@ -86,7 +86,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
 
 def test_migrate_external_tables_should_produce_proper_queries(ws):
     errors = {}
-    rows = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     crawler_backend = MockBackend(fails_on_first=errors, rows=rows)
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
@@ -105,6 +105,18 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
             f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
         ),
     ]
+
+
+def test_migrate_external_table_failed_sync(ws, caplog):
+    errors = {}
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("LOCATION_OVERLAP", "test")]}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    table_mapping = table_mapping_mock(["external_src"])
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    table_migrate = TablesMigrate(table_crawler, ws, backend, table_mapping, migration_status_refresher)
+    table_migrate.migrate_tables()
+    assert "SYNC command failed to migrate" in caplog.text
 
 
 def test_migrate_already_upgraded_table_should_produce_no_queries(ws):

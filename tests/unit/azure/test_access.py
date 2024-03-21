@@ -189,7 +189,7 @@ def test_create_global_spn_no_storage():
     assert not azure_resource_permission.create_uber_principal(prompts)
 
 
-def test_create_global_spn_cluster_policy_not_found(mocker):
+def test_create_global_spn_cluster_policy_not_found():
     w = create_autospec(WorkspaceClient)
     w.cluster_policies.get.side_effect = NotFound()
     rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
@@ -215,7 +215,7 @@ def test_create_global_spn_cluster_policy_not_found(mocker):
         azure_resource_permission.create_uber_principal(prompts)
 
 
-def test_create_global_spn(mocker):
+def test_create_global_spn():
     w = create_autospec(WorkspaceClient)
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})

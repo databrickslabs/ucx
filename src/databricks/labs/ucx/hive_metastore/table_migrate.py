@@ -103,7 +103,13 @@ class TablesMigrate:
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
-        self._backend.execute(table_migrate_sql)
+        # have to wrap the fetch result with iter() for now, because StatementExecutionBackend returns iterator but RuntimeBackend returns list.
+        sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
+        if sync_result.status_code != "SUCCESS":
+            logger.warning(
+                f"SYNC command failed to migrate {src_table.key} to {target_table_key}. Status code: {sync_result.status_code}. Description: {sync_result.description}"
+            )
+            return False
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grant)
 
@@ -241,30 +247,6 @@ class TablesMigrate:
 
     def _init_seen_tables(self):
         self._seen_tables = self._migration_status_refresher.get_seen_tables()
-
-    @staticmethod
-    def _match_grant(table: Table, grants: Iterable[Grant]) -> Grant | None:
-        for grant in grants:
-            if grant.database != table.database:
-                continue
-            if table.name in (grant.table, grant.view):
-                return grant
-        return None
-
-    def _approximate_grant(self, table: Table) -> Grant | None:
-        if self._ws.config.is_aws:
-            return self._approximate_grant_aws(table)
-        if self._ws.config.is_azure:
-            return self._approximate_grant_azure(table)
-        return None
-
-    def _approximate_grant_aws(self, table):
-        # TODO migrate acls based on prefix principals mappings
-        pass
-
-    def _approximate_grant_azure(self, table):
-        # TODO migrate acls based on prefix principals mappings
-        pass
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):

@@ -63,7 +63,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
 - Network access to your Databricks Workspace used for the [installation process](#install-ucx).
 - Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
-- Databricks Workspace Administrator privileges for the user, that runs the installation.
+- Databricks Workspace Administrator privileges for the user, that runs the installation. Running UCX as a Service Principal is not supported.
 - Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
 - Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
 - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [this guide](docs/external_hms_glue.md).
@@ -592,10 +592,21 @@ This command is supposed to be run before migrating tables to UC.
 databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E  
 ```
 
-This command moves a UC table/tables from one schema to another schema in the same or different catalog during
-the [table upgrade](docs/table_upgrade.md) process. This command is useful for developers and administrators who want 
-to move tables between schemas. It can also be used to debug issues related to table movement.
-This command also keeps permissions of the source tables when moved to a new schema or catalog.
+This command moves a UC table/tables from one schema to another schema after
+the [table upgrade](docs/table_upgrade.md) process. This is useful for developers and administrators who want 
+to adjust their catalog structure after tables upgrade.
+
+Users will be prompted whether tables/view are dropped after moving to new schema. This only applies to `MANAGED` tables and views.
+
+This command moves different table types differently:
+- `MANAGED` tables are deep-cloned to the new schema. 
+- `EXTERNAL` tables are dropped from the original schema, then created in the target schema using the same location. 
+This is due to Unity Catalog not supporting multiple tables with overlapping paths
+- `VIEW` are recreated using the same view definition.
+
+[[back to top](#databricks-labs-ucx)]
+
+This command supports moving multiple tables at once, by specifying `*` as the table name.
 
 [[back to top](#databricks-labs-ucx)]
 
