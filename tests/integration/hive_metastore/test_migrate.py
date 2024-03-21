@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import SecurableType, Privilege
+from databricks.sdk.service.catalog import Privilege, SecurableType
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -456,10 +456,10 @@ def test_migrate_managed_tables_with_acl(
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
-    src_grant = [Grant(principal=user.user_name, action_type="SELECT",
-                      table=src_managed_table.name, database = src_schema.name),
-                 Grant(principal=user.user_name, action_type="MODIFY",
-                      table=src_managed_table.name, database = src_schema.name)]
+    src_grant = [
+        Grant(principal=user.user_name, action_type="SELECT", table=src_managed_table.name, database=src_schema.name),
+        Grant(principal=user.user_name, action_type="MODIFY", table=src_managed_table.name, database=src_schema.name),
+    ]
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -496,4 +496,4 @@ def test_migrate_managed_tables_with_acl(
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     assert target_table_grants.privilege_assignments[0].principal == user.user_name
-    assert target_table_grants.privilege_assignments[0].privileges == [Privilege.SELECT, Privilege.MODIFY]
+    assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
