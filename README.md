@@ -53,6 +53,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`manual-workspace-info` command](#manual-workspace-info-command)
   * [`create-account-groups` command](#create-account-groups-command)
   * [`validate-groups-membership` command](#validate-groups-membership-command)
+  * [`cluster-remap` command](#cluster-remap-command)
+  * [`revert-cluster-remap` command](#revert-cluster-remap-command)
 * [Star History](#star-history)
 * [Project Support](#project-support)
 <!-- TOC -->
@@ -714,6 +716,46 @@ This command validates the groups to see if the groups at the account level and 
 This command is useful for administrators who want to ensure that the groups have the correct membership. It can also be
 used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and 
 [group migration](#group-migration-workflow) for more details.
+
+## `cluster-remap` command
+
+```text
+$ databricks labs ucx cluster-remap 
+21:29:38  INFO [d.labs.ucx] Remapping the Clusters to UC
+Cluster Name                                            Cluster Id                                        
+Field Eng Shared UC LTS Cluster                         0601-182128-dcbte59m                              
+Shared Autoscaling Americas cluster                     0329-145545-rugby794
+```
+```text
+Please provide the cluster id's as comma separated value from the above list (default: <ALL>): 
+```
+
+This command will remap the cluster to uc enabled one.When we run this command it will list all the clusters 
+and its id's and asks to provide the cluster id's as comma separated value which has to be remapped, by default it will take all cluster ids.
+Once we provide the cluster id's it will update these clusters to UC enabled.Back up of the existing cluster 
+config will be stored in backup folder inside the installed location(backup/clusters/cluster_id.json) as a json file.This will help 
+to revert the cluster remapping.
+
+
+[[back to top](#databricks-labs-ucx)]
+
+
+## `revert-cluster-remap` command
+
+```text
+$ databricks labs ucx revert-cluster-remap
+21:31:29  INFO [d.labs.ucx] Reverting the Remapping of the Clusters from UC
+21:31:33  INFO [d.labs.ucx] 0301-055912-4ske39iq
+21:31:33  INFO [d.labs.ucx] 0306-121015-v1llqff6
+Please provide the cluster id's as comma separated value from the above list (default: <ALL>):
+```
+
+If a customer want's to revert the cluster remap done using the `cluster-remap` command  they can use this command to revert 
+its configuration from UC to original one.It will iterate through the list of clusters from the back up folder and reverts the 
+cluster configurations to original one.This will also ask the user to provide the list of clusters that has to be reverted as a prompt.
+By default it will revert all the clusters present in the back up folder
+
+
 
 [[back to top](#databricks-labs-ucx)]
 
