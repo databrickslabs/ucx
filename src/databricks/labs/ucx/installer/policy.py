@@ -72,7 +72,7 @@ class ClusterPolicyInstaller:
                 "Instance pool id to be set in cluster policy for all workflow clusters", default="None"
             )
         except OSError:
-            # when unit test v0.15.0_added_cluster_policy.py MockPromots cannot be injected to ClusterPolicyInstaller
+            # when unit test v0.15.0_added_cluster_policy.py MockPrompts cannot be injected to ClusterPolicyInstaller
             # return None to pass the test
             return None
         if instance_pool_id.lower() == "none":
