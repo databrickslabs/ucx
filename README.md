@@ -731,9 +731,10 @@ Please provide the cluster id's as comma separated value from the above list (de
 ```
 
 This command will remap the cluster to uc enabled one.When we run this command it will list all the clusters 
-and its id's and asks to provide the cluster id's as comma separated value which has to be remapped, by default it will take all.
+and its id's and asks to provide the cluster id's as comma separated value which has to be remapped, by default it will take all cluster ids.
 Once we provide the cluster id's it will update these clusters to UC enabled.Back up of the existing cluster 
-config will be stored in backup folder inside the installed location(backup/clusters/cluster_id.json) as a json.
+config will be stored in backup folder inside the installed location(backup/clusters/cluster_id.json) as a json file.This will help 
+to revert the cluster remapping.
 
 
 ## `revert-cluster-remap` command
@@ -747,8 +748,8 @@ Please provide the cluster id's as comma separated value from the above list (de
 ```
 
 If a customer want's to revert the cluster remap done using the `cluster-remap` command  they can use this command to revert 
-its configuration from UC to original one.It will iterate through the list of clusters from back up folder and reverts the 
-cluster configurations to original one.This will als ask the user to provide the list of clusters that has to be reverted as a prompt.
+its configuration from UC to original one.It will iterate through the list of clusters from the back up folder and reverts the 
+cluster configurations to original one.This will also ask the user to provide the list of clusters that has to be reverted as a prompt.
 By default it will revert all the clusters present in the back up folder
 
 
