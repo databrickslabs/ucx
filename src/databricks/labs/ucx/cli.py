@@ -19,6 +19,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
@@ -551,6 +552,14 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     )
     cluster_details = ClusterAccess(installation, w, prompts)
     cluster_details.revert_cluster_remap(cluster_list, cluster_ids)
+
+
+@ucx.command
+def code_fix(w: WorkspaceClient, prompts: Prompts):
+    """Fix the code files based on their language."""
+    files = Files.for_cli(w)
+    files.apply(files.path)
+
 
 if __name__ == "__main__":
     ucx()

@@ -21,7 +21,14 @@ class Files:
         languages = Languages(index)
         return cls(languages)
 
-    def fix(self, path: Path) -> bool:
+    def apply(self, path: Path) -> bool:
+        if path.is_dir():
+            for folder in path.iterdir():
+                self.apply(folder)
+            return True
+        return self._apply_file_fix(path)
+
+    def _apply_file_fix(self, path):
         """
         The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
         """
