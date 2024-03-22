@@ -117,7 +117,10 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             job_name = job_settings.name
             if not job_name:
                 job_name = "Unknown"
-            spark_jar_job = [task for task in job.settings.tasks if task.spark_jar_task is not None]
+            if job.settings.tasks:
+                spark_jar_job = [task for task in job.settings.tasks if task.spark_jar_task is not None]
+            else:
+                spark_jar_job = None
             jar_fg = 1 if spark_jar_job else 0
             job_details[job.job_id] = JobInfo(
                 job_id=str(job.job_id),
@@ -125,7 +128,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
                 creator=job.creator_user_name,
                 success=1,
                 failures="[]",
-                has_jar_task=jar_fg
+                has_jar_task=jar_fg,
             )
         return job_assessment, job_details
 
