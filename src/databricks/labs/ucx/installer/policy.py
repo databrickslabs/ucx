@@ -22,7 +22,7 @@ class ClusterPolicyInstaller:
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
 
-    def create(self, inventory_database: str) -> tuple[str, str, dict]:
+    def create(self, inventory_database: str) -> tuple[str, str, dict, str | None]:
         instance_profile = ""
         spark_conf_dict = {}
         # get instance pool id to be put into the cluster policy
@@ -52,7 +52,7 @@ class ClusterPolicyInstaller:
                 logger.info(f"Cluster policy {policy_name} already present, reusing the same.")
                 policy_id = policy.policy_id
                 assert policy_id is not None
-                return policy_id, instance_profile, spark_conf_dict
+                return policy_id, instance_profile, spark_conf_dict, instance_pool_id
         logger.info("Creating UCX cluster policy.")
         policy_id = self._ws.cluster_policies.create(
             name=policy_name,
@@ -64,6 +64,7 @@ class ClusterPolicyInstaller:
             policy_id,
             instance_profile,
             spark_conf_dict,
+            instance_pool_id,
         )
 
     def _get_instance_pool_id(self) -> str | None:
@@ -72,7 +73,7 @@ class ClusterPolicyInstaller:
                 "Instance pool id to be set in cluster policy for all workflow clusters", default="None"
             )
         except OSError:
-            # when unit test v0.15.0_added_cluster_policy.py MockPromots cannot be injected to ClusterPolicyInstaller
+            # when unit test v0.15.0_added_cluster_policy.py MockPrompts cannot be injected to ClusterPolicyInstaller
             # return None to pass the test
             return None
         if instance_pool_id.lower() == "none":

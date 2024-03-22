@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def upgrade(installation: Installation, ws: WorkspaceClient):
     config = installation.load(WorkspaceConfig)
     policy_installer = ClusterPolicyInstaller(installation, ws, Prompts())
-    config.policy_id, _, _ = policy_installer.create(config.inventory_database)
+    config.policy_id, _, _, _ = policy_installer.create(config.inventory_database)
     installation.save(config)
     states = InstallState.from_installation(installation)
     assert config.policy_id is not None

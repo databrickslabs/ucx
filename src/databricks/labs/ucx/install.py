@@ -201,7 +201,9 @@ class WorkspaceInstaller:
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
 
-        policy_id, instance_profile, spark_conf_dict = self._policy_installer.create(inventory_database)
+        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self._policy_installer.create(
+            inventory_database
+        )
 
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
@@ -220,6 +222,7 @@ class WorkspaceInstaller:
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             policy_id=policy_id,
+            instance_pool_id=instance_pool_id,
             is_terraform_used=is_terraform_used,
             include_databases=self._select_databases(),
         )
