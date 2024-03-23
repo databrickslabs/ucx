@@ -77,6 +77,7 @@ jobs:
           echo "CHEAT: ${CHEAT}\n NEW_CODE: ${NEW_CODE}"
           if [[ -z "${CHEAT}" ]]; then
             exit 0
+          else
+            echo "Do not cheat the linter: ${CHEAT}"
+            exit 1
           fi
-          echo "Do not cheat the linter: ${CHEAT}"
-          exit 1
