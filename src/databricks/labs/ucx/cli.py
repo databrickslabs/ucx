@@ -115,8 +115,12 @@ def create_account_groups(
     - Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the
     account
     """
+
     logger.info(f"Account ID: {a.config.account_id}")
-    workspace_id_list = [int(x.strip()) for x in workspace_ids.split(",")]
+    if workspace_ids is not None:
+        workspace_id_list = [int(x.strip()) for x in workspace_ids.split(",")]
+    else:
+        workspace_id_list = None
     workspaces = AccountWorkspaces(a, new_workspace_client)
     workspaces.create_account_level_groups(prompts, workspace_id_list)
 
