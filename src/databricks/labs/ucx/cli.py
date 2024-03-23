@@ -3,6 +3,7 @@ import os
 import shutil
 import webbrowser
 from collections.abc import Callable
+from pathlib import Path
 
 from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
@@ -19,14 +20,16 @@ from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_acl_migrate import TableACLMigrate
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
+from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
@@ -41,7 +44,7 @@ CANT_FIND_UCX_MSG = (
 @ucx.command
 def workflows(w: WorkspaceClient):
     """Show deployed workflows and their state"""
-    installation = WorkspaceInstallation.current(w)
+    installation = WorkflowsInstallation.current(w)
     logger.info("Fetching deployed jobs...")
     print(json.dumps(installation.latest_job_status()))
 
@@ -162,7 +165,7 @@ def repair_run(w: WorkspaceClient, step):
     """Repair Run the Failed Job"""
     if not step:
         raise KeyError("You did not specify --step")
-    installation = WorkspaceInstallation.current(w)
+    installation = WorkflowsInstallation.current(w)
     logger.info(f"Repair Running {step} Job")
     installation.repair_run(step)
 
@@ -506,21 +509,54 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def migrate_table_acl(w: WorkspaceClient, prompts: Prompts):
-    """This command migrates legacy ACL on pre-uc clusters to the new UC ACL model. Interactive clusters reading/writing
-    to external storage use service principal / instance profiles to access the underlying data. Users get access to
-    the data by having permission to the cluster. This command will convert those access to UC ACL for the identified
-    tables and users groups.
-    """
+def cluster_remap(w: WorkspaceClient, prompts: Prompts):
+    """Re-mapping the cluster to UC"""
+    logger.info("Remapping the Clusters to UC")
     installation = Installation.current(w, 'ucx')
-    if w.config.is_azure:
-        logger.info("Running migrate_table_acl for Azure")
-        table_acl_migrate = TableACLMigrate.for_cli(w, installation, prompts)
-        table_acl_migrate.migrate_cluster_acl()
-    if w.config.is_aws:
-        logger.error("Running migrate_table_acl for AWS")
-    if w.config.is_gcp:
-        logger.error("migrate_table_acl is not yet supported in GCP")
+    cluster = ClusterAccess(installation, w, prompts)
+    cluster_list = cluster.list_cluster()
+    if not cluster_list:
+        logger.info("No cluster information present in the workspace")
+        return
+    print(f"{'Cluster Name':<50}\t{'Cluster Id':<50}")
+    for cluster_details in cluster_list:
+        print(f"{cluster_details.cluster_name:<50}\t{cluster_details.cluster_id:<50}")
+    cluster_ids = prompts.question(
+        "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
+    )
+    cluster.map_cluster_to_uc(cluster_ids, cluster_list)
+
+
+@ucx.command
+def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
+    """Reverting Re-mapping of  clusters from UC"""
+    logger.info("Reverting the Remapping of the Clusters from UC")
+    installation = Installation.current(w, 'ucx')
+    cluster_ids = [
+        cluster_files.path.split("/")[-1].split(".")[0]
+        for cluster_files in installation.files()
+        if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
+    ]
+    if not cluster_ids:
+        logger.info("There is no cluster files in the backup folder. Skipping the reverting process")
+        return
+    for cluster in cluster_ids:
+        logger.info(cluster)
+    cluster_list = prompts.question(
+        "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
+    )
+    cluster_details = ClusterAccess(installation, w, prompts)
+    cluster_details.revert_cluster_remap(cluster_list, cluster_ids)
+
+
+@ucx.command
+def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
+    """Fix the code files based on their language."""
+    files = Files.for_cli(w)
+    working_directory = Path.cwd()
+    if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
+        return
+    files.apply(working_directory)
 
 
 if __name__ == "__main__":

@@ -152,3 +152,4 @@ dev/cleanup.py
 .python-version
 .databricks-login.json
 *.out
+foo

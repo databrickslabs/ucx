@@ -144,7 +144,11 @@ commands:
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
       This command is supposed to be run before migrating tables to UC.
 
-  - name: migrate-table-acl
-    description: Migrates legacy ACL on pre-uc clusters to the new UC ACL model. Interactive clusters reading/writing to external storage
-      use service principal / instance profiles to access the underlying data. Users get access to the data by having permission to the cluster.
-      This command will convert those access to UC ACL for the identified tables and users groups.
+  - name: cluster-remap
+    description: Re-mapping the cluster to UC
+
+  - name: revert-cluster-remap
+    description: Reverting the Re-mapping of the  cluster from  UC
+
+  - name: migrate-local-code
+    description: (Experimental) Migrate files in the current directory to be more compatible with Unity Catalog.

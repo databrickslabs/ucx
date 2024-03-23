@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import logging
 from collections import defaultdict
@@ -13,9 +14,17 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import MigrationCount, Table, What
+from databricks.labs.ucx.hive_metastore.tables import (
+    AclMigrationWhat,
+    MigrationCount,
+    Table,
+    What,
+)
+from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +38,27 @@ class MigrationStatus:
     dst_table: str | None = None
     update_ts: str | None = None
 
+    def destination(self):
+        return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
+
 
 class TablesMigrate:
     def __init__(
         self,
-        tables_crawler: TablesCrawler,
+        table_crawler: TablesCrawler,
+        grant_crawler: GrantsCrawler,
         ws: WorkspaceClient,
         backend: SqlBackend,
         table_mapping: TableMapping,
+        group_manager: GroupManager,
         migration_status_refresher,
     ):
-        self._tc = tables_crawler
+        self._tc = table_crawler
+        self._gc = grant_crawler
         self._backend = backend
         self._ws = ws
         self._tm = table_mapping
+        self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
 
@@ -52,56 +68,94 @@ class TablesMigrate:
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        udfs_crawler = UdfsCrawler(sql_backend, config.inventory_database)
+        grants_crawler = GrantsCrawler(table_crawler, udfs_crawler)
         table_mapping = TableMapping(installation, ws, sql_backend)
+        group_manager = GroupManager(sql_backend, ws, config.inventory_database)
         migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
-        return cls(table_crawler, ws, sql_backend, table_mapping, migration_status_refresher)
+        return cls(
+            table_crawler, grants_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
+        )
 
-    def migrate_tables(self, *, what: What | None = None):
+    def index(self):
+        return self._migration_status_refresher.index()
+
+    def migrate_tables(self, *, what: What | None = None, acl_strategy: AclMigrationWhat | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        if acl_strategy is not None:
+            grants_to_migrate = self._gc.snapshot()
+            migrated_groups = self._group.snapshot()
         tasks = []
         for table in tables_to_migrate:
-            if not what or table.src.what == what:
-                tasks.append(partial(self._migrate_table, table.src, table.rule))
+            if what is not None and table.src.what != what:
+                continue
+            match acl_strategy:
+                case None:
+                    tasks.append(partial(self._migrate_table, table.src, table.rule))
+                case AclMigrationWhat.LEGACY_TACL:
+                    grants = self._match_grants(table.src, grants_to_migrate, migrated_groups)
+                    tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
+                case AclMigrationWhat.PRINCIPAL:
+                    # TODO: Implement principal-based ACL migration
+                    pass
         Threads.strict("migrate tables", tasks)
 
-    def _migrate_table(self, src_table: Table, rule: Rule):
+    def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         if self._table_already_upgraded(rule.as_uc_table_key):
             logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
             return True
         if src_table.what == What.DBFS_ROOT_DELTA:
-            return self._migrate_dbfs_root_table(src_table, rule)
+            return self._migrate_dbfs_root_table(src_table, rule, grants)
         if src_table.what == What.EXTERNAL_SYNC:
-            return self._migrate_external_table(src_table, rule)
+            return self._migrate_external_table(src_table, rule, grants)
         if src_table.what == What.VIEW:
-            return self._migrate_view(src_table, rule)
+            return self._migrate_view(src_table, rule, grants)
         logger.info(f"Table {src_table.key} is not supported for migration")
         return True
 
-    def _migrate_external_table(self, src_table: Table, rule: Rule):
+    def _migrate_external_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_external(target_table_key)
         logger.debug(f"Migrating external table {src_table.key} to using SQL query: {table_migrate_sql}")
-        self._backend.execute(table_migrate_sql)
+        # have to wrap the fetch result with iter() for now, because StatementExecutionBackend returns iterator but RuntimeBackend returns list.
+        sync_result = next(iter(self._backend.fetch(table_migrate_sql)))
+        if sync_result.status_code != "SUCCESS":
+            logger.warning(
+                f"SYNC command failed to migrate {src_table.key} to {target_table_key}. Status code: {sync_result.status_code}. Description: {sync_result.description}"
+            )
+            return False
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return True
+        return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule):
+    def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return True
+        return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_view(self, src_table: Table, rule: Rule):
+    def _migrate_view(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_view(target_table_key)
         logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_acl(src_table, rule, grants)
+
+    def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
+        if grants is None:
+            return True
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql(src.kind, rule.as_uc_table_key)
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
+            self._backend.execute(acl_migrate_sql)
         return True
 
     def _table_already_upgraded(self, target) -> bool:
@@ -186,7 +240,7 @@ class TablesMigrate:
             table_sub_header = "                    |"
             for what in list(What):
                 if len(what.name.split("_")) - 1 < header:
-                    table_sub_header += f"{' '*12}|"
+                    table_sub_header += f"{' ' * 12}|"
                     continue
                 table_sub_header += f" {what.name.split('_')[header]:<10} |"
             print(table_sub_header)
@@ -210,6 +264,41 @@ class TablesMigrate:
     def _init_seen_tables(self):
         self._seen_tables = self._migration_status_refresher.get_seen_tables()
 
+    @staticmethod
+    def _match_grants(table: Table, grants: Iterable[Grant], migrated_groups: list[MigratedGroup]) -> list[Grant]:
+        matched_grants = []
+        for grant in grants:
+            if grant.database != table.database:
+                continue
+            if table.name not in (grant.table, grant.view):
+                continue
+            matched_group = [g.name_in_account for g in migrated_groups if g.name_in_workspace == grant.principal]
+            if len(matched_group) > 0:
+                grant = dataclasses.replace(grant, principal=matched_group[0])
+            matched_grants.append(grant)
+        return matched_grants
+
+
+class Index:
+    def __init__(self, tables: list[MigrationStatus]):
+        self._tables = tables
+
+    def is_upgraded(self, schema: str, table: str) -> bool:
+        src_schema = schema.lower()
+        src_table = table.lower()
+        for migration_status in self._tables:
+            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
+                return True
+        return False
+
+    def get(self, schema: str, table: str) -> MigrationStatus | None:
+        src_schema = schema.lower()
+        src_table = table.lower()
+        for migration_status in self._tables:
+            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
+                return migration_status
+        return None
+
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
@@ -219,6 +308,9 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
 
     def snapshot(self) -> Iterable[MigrationStatus]:
         return self._snapshot(self._try_fetch, self._crawl)
+
+    def index(self) -> Index:
+        return Index(list(self.snapshot()))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
@@ -235,7 +327,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         return seen_tables
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema+'.'+table)}")
+        result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)}")
         for value in result:
             if value["key"] == "upgraded_to":
                 logger.info(f"{schema}.{table} is set as upgraded")
@@ -248,12 +340,14 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
         timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for table in all_tables:
+            src_schema = table.database.lower()
+            src_table = table.name.lower()
             table_migration_status = MigrationStatus(
-                src_schema=table.database,
-                src_table=table.name,
+                src_schema=src_schema,
+                src_table=src_table,
                 update_ts=str(timestamp),
             )
-            if table.key in reverse_seen and self.is_upgraded(table.database, table.name):
+            if table.key in reverse_seen and self.is_upgraded(src_schema, src_table):
                 target_table = reverse_seen[table.key]
                 if len(target_table.split(".")) == 3:
                     table_migration_status.dst_catalog = target_table.split(".")[0]
