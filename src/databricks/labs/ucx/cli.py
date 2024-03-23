@@ -102,7 +102,7 @@ def sync_workspace_info(a: AccountClient):
 
 @ucx.command(is_account=True)
 def create_account_groups(
-    a: AccountClient, prompts: Prompts, workspace_ids: list[int] | None = None, new_workspace_client=WorkspaceClient
+    a: AccountClient, prompts: Prompts, workspace_ids: str | None = None, new_workspace_client=WorkspaceClient
 ):
     """
     Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present
@@ -116,8 +116,9 @@ def create_account_groups(
     account
     """
     logger.info(f"Account ID: {a.config.account_id}")
+    workspace_id_list = [int(x.strip()) for x in workspace_ids.split(",")]
     workspaces = AccountWorkspaces(a, new_workspace_client)
-    workspaces.create_account_level_groups(prompts, workspace_ids)
+    workspaces.create_account_level_groups(prompts, workspace_id_list)
 
 
 @ucx.command
