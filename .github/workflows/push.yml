@@ -78,3 +78,4 @@ jobs:
             echo "Do not cheat the linter: ${CHEAT}"
             exit 1
           fi
+          echo "No lint disabled in the new code"
