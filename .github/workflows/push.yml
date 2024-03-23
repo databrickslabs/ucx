@@ -71,4 +71,4 @@ jobs:
           fetch-depth: 0
 
       - name: Verify no lint disabled in the new code
-        run: sh no-cheat.sh
+        run: sh .github/workflows/no-cheat.sh
