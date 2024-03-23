@@ -34,7 +34,6 @@ class JobInfo:
     job_id: str
     success: int
     failures: str
-    has_jar_task: int
     job_name: str | None = None
     creator: str | None = None
 
