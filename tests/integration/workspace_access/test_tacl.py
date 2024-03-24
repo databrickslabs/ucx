@@ -2,6 +2,7 @@ import json
 import logging
 from collections import defaultdict
 
+
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup

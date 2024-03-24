@@ -3,16 +3,19 @@ import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import partial
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.dbutils import FileInfo
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from src.databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
 
@@ -248,3 +251,89 @@ class Mounts(CrawlerBase[Mount]):
             f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
         ):
             yield Mount(*row)
+
+
+class TableInMounts(CrawlerBase[Table]):
+
+    def __init__(
+        self,
+        backend: SqlBackend,
+        ws: WorkspaceClient,
+        inventory_database: str,
+        mc: Mounts,
+        include_mounts: list[str] | None = None,
+    ):
+        super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
+        self._dbutils = ws.dbutils
+        self._mc = mc
+        self._include_mounts = include_mounts
+
+    def snapshot(self) -> list[Table]:
+        """
+        Takes a snapshot of tables in the specified catalog and database.
+
+        Returns:
+            list[Table]: A list of Table objects representing the snapshot of tables.
+        """
+        return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    def _try_load(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
+            yield Table(*row)
+
+    def _crawl(self):
+        all_mounts = self._mc.snapshot()
+        all_tables = []
+        for mount in all_mounts:
+            if self._include_mounts and mount.name not in self._include_mounts:
+                continue
+            table_paths = self._find_delta_log_folders(mount.name)
+            for path in table_paths:
+                table = Table(
+                    catalog="hive_metastore",
+                    database="",
+                    name=re.search("([^/]+)/?$", path, re.IGNORECASE).group(1),
+                    object_type="EXTERNAL",
+                    table_format="DELTA",
+                    location=path,
+                )
+                all_tables.append(table)
+        return all_tables
+
+    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> [str]:
+        if delta_log_folders is None:
+            delta_log_folders = []
+        try:
+            entries: [FileInfo] = self._dbutils.fs.ls(root_dir)
+            if not len(entries) == 0:
+                for entry in entries:
+                    # Azure only. there's this technical folder which contains a lot of useless data.
+                    if "_$azuretmpfolder$" in entry.path:
+                        continue
+                    # This means that we're in an empty folder
+                    if entry.path == root_dir:
+                        continue
+                    # We're under a partitioned folder
+                    if "=" in entry.name:
+                        continue
+                    # We're under a folder with parquet files
+                    if "_SUCCESS" in entry.name:
+                        continue
+                    if "_committed_" in entry.name:
+                        continue
+                    if "_started_" in entry.name:
+                        continue
+                    # Since isDir() is not present in SDK dbutils, we assume that a folder is anything
+                    # that doesn't contains a "." in it's name
+                    if "." not in entry.name:
+                        if entry.name == "_delta_log":
+                            logger.debug(f"Found {entry.path}")
+                            delta_log_folders.append(entry.path.replace("/_delta_log", ""))
+                        else:
+                            self._find_delta_log_folders(entry.path, delta_log_folders)
+        except Exception as e:
+            logger.warning(f"Trouble when listing folder {root_dir} : {e}")
+            pass
+
+        return delta_log_folders

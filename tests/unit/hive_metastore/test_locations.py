@@ -4,7 +4,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.dbutils import MountInfo
+from databricks.sdk.dbutils import FileInfo, MountInfo
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -12,6 +12,8 @@ from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
     Mounts,
 )
+from src.databricks.labs.ucx.hive_metastore.locations import TableInMounts
+from src.databricks.labs.ucx.hive_metastore.tables import Table
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
@@ -150,6 +152,7 @@ def test_external_locations():
 
 
 LOCATION_STORAGE = MockBackend.rows("location", "storage_properties")
+MOUNT_STORAGE = MockBackend.rows("name", "source")
 
 
 def test_save_external_location_mapping_missing_location():
@@ -226,3 +229,21 @@ def test_match_table_external_locations():
     assert len(matching_locations) == 1
     assert ExternalLocation("gcs://test_location2/a/b/", 1) in missing_locations
     assert ExternalLocation("abfss://cont1@storagetest1/a/", 2) in missing_locations
+
+
+def test_mount_listing_one_table():
+    client = create_autospec(WorkspaceClient)
+    client.dbutils.fs.ls.return_value = [
+        FileInfo("/mnt/lmao/_delta_log", "_delta_log", "", ''),
+        FileInfo("/mnt/lmao/xxx.parquet", "xxx.parquet", "", ''),
+        FileInfo("/mnt/lmao/yyy.parquet", "yyy.parquet", "", ''),
+    ]
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/lmao", "")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TableInMounts(backend, client, "test", mounts).snapshot()
+    assert results == [Table("hive_metastore", "", "lmao", "EXTERNAL", "DELTA", "/mnt/lmao")]
