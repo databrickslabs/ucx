@@ -15,7 +15,7 @@ from databricks.sdk.service.catalog import ExternalLocationInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from src.databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +253,7 @@ class Mounts(CrawlerBase[Mount]):
             yield Mount(*row)
 
 
-class TableInMounts(CrawlerBase[Table]):
+class TablesInMounts(CrawlerBase[Table]):
 
     def __init__(
         self,
@@ -301,39 +301,30 @@ class TableInMounts(CrawlerBase[Table]):
                 all_tables.append(table)
         return all_tables
 
-    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> [str]:
+    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> list[str]:
         if delta_log_folders is None:
             delta_log_folders = []
-        try:
-            entries: [FileInfo] = self._dbutils.fs.ls(root_dir)
-            if not len(entries) == 0:
-                for entry in entries:
-                    # Azure only. there's this technical folder which contains a lot of useless data.
-                    if "_$azuretmpfolder$" in entry.path:
-                        continue
-                    # This means that we're in an empty folder
-                    if entry.path == root_dir:
-                        continue
-                    # We're under a partitioned folder
-                    if "=" in entry.name:
-                        continue
-                    # We're under a folder with parquet files
-                    if "_SUCCESS" in entry.name:
-                        continue
-                    if "_committed_" in entry.name:
-                        continue
-                    if "_started_" in entry.name:
-                        continue
-                    # Since isDir() is not present in SDK dbutils, we assume that a folder is anything
-                    # that doesn't contains a "." in it's name
-                    if "." not in entry.name:
-                        if entry.name == "_delta_log":
-                            logger.debug(f"Found {entry.path}")
-                            delta_log_folders.append(entry.path.replace("/_delta_log", ""))
-                        else:
-                            self._find_delta_log_folders(entry.path, delta_log_folders)
-        except Exception as e:
-            logger.warning(f"Trouble when listing folder {root_dir} : {e}")
-            pass
+
+        entries: list[FileInfo] = self._dbutils.fs.ls(root_dir)
+        if len(entries) == 0:
+            return delta_log_folders
+        for entry in entries:
+            if self._is_irrelevant(entry.name):
+                continue
+
+            # Since isDir() is not present in SDK dbutils, we assume that a folder is anything
+            # that doesn't contains a "." in it's name
+            if "." not in entry.name and entry.name == "_delta_log":
+                logger.debug(f"Found {entry.path}")
+                delta_log_folders.append(entry.path.replace("/_delta_log", ""))
+            else:
+                self._find_delta_log_folders(entry.path, delta_log_folders)
 
         return delta_log_folders
+
+    def _is_irrelevant(self, entry: str) -> bool:
+        patterns = [r'_SUCCESS', r'_committed_', r'_started_', r'=', r'\.']
+        for pattern in patterns:
+            if bool(re.search(pattern, entry)):
+                return True
+        return False

@@ -11,9 +11,9 @@ from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocation,
     ExternalLocations,
     Mounts,
+    TablesInMounts,
 )
-from src.databricks.labs.ucx.hive_metastore.locations import TableInMounts
-from src.databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 def test_list_mounts_should_return_a_list_of_mount_without_encryption_type():
@@ -245,5 +245,5 @@ def test_mount_listing_one_table():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TableInMounts(backend, client, "test", mounts).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [Table("hive_metastore", "", "lmao", "EXTERNAL", "DELTA", "/mnt/lmao")]

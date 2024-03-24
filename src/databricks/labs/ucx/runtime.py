@@ -19,6 +19,7 @@ from databricks.labs.ucx.hive_metastore import (
     Mounts,
     TablesCrawler,
 )
+from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
@@ -459,6 +460,12 @@ def migrate_dbfs_root_delta_tables(
     TablesMigrate(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     ).migrate_tables(what=What.DBFS_ROOT_DELTA)
+
+
+@task("migrate-tables-in-mounts")
+def scan_tables_in_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
+    mounts = Mounts(sql_backend, ws, cfg.inventory_database)
+    TablesInMounts(sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts).snapshot()
 
 
 def main(*argv):
