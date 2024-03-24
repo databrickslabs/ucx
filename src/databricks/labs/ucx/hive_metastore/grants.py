@@ -4,12 +4,27 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.sdk.service.catalog import SchemaInfo, TableInfo
+from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
 
+from databricks.labs.ucx.assessment.azure import (
+    AzureServicePrincipalCrawler,
+    AzureServicePrincipalInfo,
+)
+from databricks.labs.ucx.azure.access import (
+    AzureResourcePermissions,
+    Privilege,
+    StoragePermissionMapping,
+)
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore.tables import TablesCrawler
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
 logger = logging.getLogger(__name__)
@@ -307,3 +322,156 @@ class GrantsCrawler(CrawlerBase[Grant]):
             # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []
+
+
+class PrincipalACL:
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+        installation: Installation,
+        spn_crawler: AzureServicePrincipalCrawler,
+        resource_permission: AzureResourcePermissions,
+        table_crawler: TablesCrawler,
+    ):
+        self._backend = backend
+        self._ws = ws
+        self._spn_crawler = spn_crawler
+        self._installation = installation
+        self._resource_permission = resource_permission
+        self._table_crawler = table_crawler
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
+
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        azure_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_client, graph_client)
+        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
+        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
+
+        return cls(ws, sql_backend, installation, spn_crawler, resource_permissions, table_crawler)
+
+    def get_interactive_cluster_grants(self) -> list[Grant]:
+        spn_cluster_mapping = self._spn_crawler.get_cluster_to_storage_mapping()
+        external_locations = list(self._ws.external_locations.list())
+        permission_mappings = self._resource_permission.load()
+        tables = self._table_crawler.snapshot()
+        grants = []
+
+        if len(spn_cluster_mapping) == 0:
+            return []
+        for cluster_spn in spn_cluster_mapping:
+            principals = self._get_cluster_principal_mapping(cluster_spn.cluster_id)
+            if len(principals) == 0:
+                continue
+            for spn in cluster_spn.spn_info:
+                eligible_locations = self._get_external_location(spn, external_locations, permission_mappings)
+                if len(eligible_locations) == 0:
+                    continue
+                grant = self._get_grants(eligible_locations, principals, tables)
+                grants.extend(grant)
+        return grants
+
+    def _get_privilege(self, location: str | None, locations: dict[ExternalLocationInfo, str]):
+        if location is None:
+            return None
+        for loc, privilege in locations.items():
+            if loc.url is not None and location.startswith(loc.url):
+                return privilege
+        return None
+
+    def _get_database_grants(self, tables: list[Table], principals: list[str]):
+        databases = []
+        for table in tables:
+            if table.database not in databases:
+                databases.append(table.database)
+        return [
+            Grant(principal, "USE", "hive_metastore", database) for database in databases for principal in principals
+        ]
+
+    def _get_grants(
+        self,
+        locations: dict[ExternalLocationInfo, str],
+        principals: list[str],
+        tables: list[Table],
+    ) -> list[Grant]:
+        grants = []
+        for table in tables:
+            if self._get_privilege(table.location, locations) is not None:
+                privilege = self._get_privilege(table.location, locations)
+                if privilege == Privilege.READ_FILES:
+                    grants.extend(
+                        [
+                            Grant(principal, "SELECT", table.catalog, table.database, table.name)
+                            for principal in principals
+                        ]
+                    )
+                if privilege == Privilege.WRITE_FILES:
+                    grants.extend(
+                        [
+                            Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, table.name)
+                            for principal in principals
+                        ]
+                    )
+            if table.location is None:
+                grants.extend(
+                    [
+                        Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, view=table.name)
+                        for principal in principals
+                    ]
+                )
+            if table.view_text is not None:
+                grants.extend(
+                    [
+                        Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, view=table.name)
+                        for principal in principals
+                    ]
+                )
+        database_grants = self._get_database_grants(tables, principals)
+        catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
+        grants.extend(database_grants)
+        grants.extend(catalog_grants)
+        return grants
+
+    def _get_external_location(
+        self,
+        spn: AzureServicePrincipalInfo,
+        external_locations: list[ExternalLocationInfo],
+        permission_mappings: list[StoragePermissionMapping],
+    ) -> dict[ExternalLocationInfo, str]:
+        matching_location = {}
+        for location in external_locations:
+            if location.url is None:
+                continue
+            for permission_mapping in permission_mappings:
+                if (
+                    location.url.startswith(permission_mapping.prefix)
+                    and permission_mapping.client_id == spn.application_id
+                    and spn.storage_account is not None
+                    and spn.storage_account in permission_mapping.prefix
+                ):
+                    matching_location[location] = permission_mapping.privilege
+        return matching_location
+
+    def _get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
+        # gets all the users,groups,spn which have access to the clusters and returns a dataclass of that mapping
+        principal_list = []
+        cluster_permission = self._ws.permissions.get("clusters", cluster_id)
+        if cluster_permission.access_control_list is None:
+            return []
+        for acl in cluster_permission.access_control_list:
+            if acl.user_name is not None:
+                principal_list.append(acl.user_name)
+            if acl.group_name is not None:
+                principal_list.append(acl.group_name)
+            if acl.service_principal_name is not None:
+                principal_list.append(acl.service_principal_name)
+        return principal_list
