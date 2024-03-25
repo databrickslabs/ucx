@@ -343,7 +343,6 @@ class PrincipalACL:
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
-
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         azure_client = AzureAPIClient(
@@ -356,18 +355,25 @@ class PrincipalACL:
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
         resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
         spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-
         return cls(ws, sql_backend, installation, spn_crawler, resource_permissions, table_crawler)
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         spn_cluster_mapping = self._spn_crawler.get_cluster_to_storage_mapping()
-        external_locations = list(self._ws.external_locations.list())
-        permission_mappings = self._resource_permission.load()
-        tables = self._table_crawler.snapshot()
-        grants = []
-
         if len(spn_cluster_mapping) == 0:
+            logger.info("No interactive cluster found with spn configured")
             return []
+        external_locations = list(self._ws.external_locations.list())
+        if len(external_locations) == 0:
+            logger.warning("No external location found, If hive metastore tables are created in external storage, "
+                        "ensure migrate_locations cli cmd is run to create the required locations.")
+            return []
+        permission_mappings = self._resource_permission.load()
+        if len(permission_mappings) == 0:
+            logger.warning("Please ensure principal_prefix_access cli cmd is run to create the access permission file.")
+        tables = self._table_crawler.snapshot()
+        grants: list[Grant] = []
+
+
         for cluster_spn in spn_cluster_mapping:
             principals = self._get_cluster_principal_mapping(cluster_spn.cluster_id)
             if len(principals) == 0:
@@ -377,6 +383,8 @@ class PrincipalACL:
                 if len(eligible_locations) == 0:
                     continue
                 grant = self._get_grants(eligible_locations, principals, tables)
+                if len(grants) == 0:
+                    continue
                 grants.extend(grant)
         return grants
 
@@ -388,7 +396,7 @@ class PrincipalACL:
                 return privilege
         return None
 
-    def _get_database_grants(self, tables: list[Table], principals: list[str]):
+    def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
         databases = []
         for table in tables:
             if table.database not in databases:

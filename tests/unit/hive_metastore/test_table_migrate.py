@@ -310,7 +310,13 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
     table_mapping = table_mapping_mock()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     table_migrate = TablesMigrate(
-        table_crawler, grant_crawler, client, backend, table_mapping, group_manager, migration_status_refresher
+        table_crawler,
+        grant_crawler,
+        client,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
     )
     return table_migrate
 
