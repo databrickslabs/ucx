@@ -234,36 +234,38 @@ def test_match_table_external_locations():
 def test_mount_listing_one_table():
     client = create_autospec(WorkspaceClient)
     client.dbutils.fs.ls.return_value = [
-        FileInfo("/mnt/lmao/_delta_log", "_delta_log", "", ''),
-        FileInfo("/mnt/lmao/xxx.parquet", "xxx.parquet", "", ''),
-        FileInfo("/mnt/lmao/yyy.parquet", "yyy.parquet", "", ''),
+        FileInfo("/mnt/test_mount/_delta_log", "_delta_log", "", ''),
+        FileInfo("/mnt/test_mount/xxx.parquet", "xxx.parquet", "", ''),
+        FileInfo("/mnt/test_mount/yyy.parquet", "yyy.parquet", "", ''),
     ]
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/lmao", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
-    assert results == [Table("hive_metastore", "tables_in_mounts", "lmao", "EXTERNAL", "DELTA", "/mnt/lmao")]
+    assert results == [
+        Table("hive_metastore", "tables_in_mounts", "test_mount", "EXTERNAL", "DELTA", "/mnt/test_mount/")
+    ]
 
 
 def test_mount_listing_multiple_folders():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/lmao/table1", "table1", "", "")
-    second_folder = FileInfo("/mnt/lmao/table2", "table2", "", "")
-    folder_table1 = FileInfo("/mnt/lmao/table1/_delta_log", "_delta_log", "", "")
-    folder_table2 = FileInfo("/mnt/lmao/table2/_SUCCESS", "_SUCCESS", "", "")
-    folder_table3 = FileInfo("/mnt/lmao/table2/1.snappy.parquet", "1.snappy.parquet", "", "")
+    first_folder = FileInfo("/mnt/test_mount/table1", "table1", "", "")
+    second_folder = FileInfo("/mnt/test_mount/table2", "table2", "", "")
+    folder_table1 = FileInfo("/mnt/test_mount/table1/_delta_log", "_delta_log", "", "")
+    folder_table2 = FileInfo("/mnt/test_mount/table2/_SUCCESS", "_SUCCESS", "", "")
+    folder_table3 = FileInfo("/mnt/test_mount/table2/1.snappy.parquet", "1.snappy.parquet", "", "")
 
     def my_side_effect(path, **_):
-        if path == "/mnt/lmao":
+        if path == "/mnt/test_mount":
             return [first_folder, second_folder]
-        if path == "/mnt/lmao/table1":
+        if path == "/mnt/test_mount/table1":
             return [folder_table1]
-        if path == "/mnt/lmao/table2":
+        if path == "/mnt/test_mount/table2":
             return [folder_table2, folder_table3]
         return None
 
@@ -271,31 +273,34 @@ def test_mount_listing_multiple_folders():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/lmao", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
-    assert results == [Table("hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/lmao/table1")]
+    assert results == [
+        Table("hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1/"),
+        Table("hive_metastore", "tables_in_mounts", "table2", "EXTERNAL", "PARQUET", "/mnt/test_mount/table2/"),
+    ]
 
 
 def test_mount_listing_sub_folders():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/lmao/entity", "entity", "", "")
-    second_folder = FileInfo("/mnt/lmao/entity/domain", "domain", "", "")
-    third_folder = FileInfo("/mnt/lmao/entity/domain/table1", "table1", "", "")
-    fourth_folder = FileInfo("/mnt/lmao/entity/domain/table1/_delta_log", "_delta_log", "", "")
-    fourth_folder_parquet = FileInfo("/mnt/lmao/entity/domain/table1/1.parquet", "1.parquet", "", "")
+    first_folder = FileInfo("/mnt/test_mount/entity", "entity", "", "")
+    second_folder = FileInfo("/mnt/test_mount/entity/domain", "domain", "", "")
+    third_folder = FileInfo("/mnt/test_mount/entity/domain/table1", "table1", "", "")
+    fourth_folder = FileInfo("/mnt/test_mount/entity/domain/table1/_delta_log", "_delta_log", "", "")
+    fourth_folder_parquet = FileInfo("/mnt/test_mount/entity/domain/table1/1.parquet", "1.parquet", "", "")
 
     def my_side_effect(path, **_):
-        if path == "/mnt/lmao":
+        if path == "/mnt/test_mount":
             return [first_folder]
-        if path == "/mnt/lmao/entity":
+        if path == "/mnt/test_mount/entity":
             return [second_folder]
-        if path == "/mnt/lmao/entity/domain":
+        if path == "/mnt/test_mount/entity/domain":
             return [third_folder]
-        if path == "/mnt/lmao/entity/domain/table1":
+        if path == "/mnt/test_mount/entity/domain/table1":
             return [fourth_folder, fourth_folder_parquet]
         return None
 
@@ -303,11 +308,13 @@ def test_mount_listing_sub_folders():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/lmao", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
-        Table("hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/lmao/entity/domain/table1")
+        Table(
+            "hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/entity/domain/table1/"
+        )
     ]

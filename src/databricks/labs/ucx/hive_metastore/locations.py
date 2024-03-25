@@ -10,7 +10,6 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.dbutils import FileInfo
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
@@ -253,6 +252,13 @@ class Mounts(CrawlerBase[Mount]):
             yield Mount(*row)
 
 
+@dataclass
+class TableInMount:
+    is_delta: bool
+    is_parquet: bool
+    is_partitioned: bool
+
+
 class TablesInMounts(CrawlerBase[Table]):
 
     def __init__(
@@ -289,42 +295,62 @@ class TablesInMounts(CrawlerBase[Table]):
             if self._include_mounts and mount.name not in self._include_mounts:
                 continue
             table_paths = self._find_delta_log_folders(mount.name)
-            for path in table_paths:
+            for path, entry in table_paths.items():
                 table = Table(
                     catalog="hive_metastore",
                     database="tables_in_mounts",
-                    name=re.search("([^/]+)/?$", path, re.IGNORECASE).group(1),
+                    name=self._get_table_name(path),
                     object_type="EXTERNAL",
-                    table_format="DELTA",
+                    table_format="DELTA" if entry.is_delta else "PARQUET",
                     location=path,
                 )
                 all_tables.append(table)
         return all_tables
 
-    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> list[str]:
+    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> dict:
         if delta_log_folders is None:
-            delta_log_folders = []
+            delta_log_folders = {}
 
-        entries: list[FileInfo] = self._dbutils.fs.ls(root_dir)
-        if len(entries) == 0:
-            return delta_log_folders
+        entries = self._dbutils.fs.ls(root_dir)
         for entry in entries:
             if self._is_irrelevant(entry.name):
                 continue
 
-            # Since isDir() is not present in SDK dbutils, we assume that a folder is anything
-            # that doesn't contains a "." in it's name
-            if entry.name == "_delta_log":
-                logger.debug(f"Found {entry.path}")
-                delta_log_folders.append(entry.path.replace("/_delta_log", ""))
+            path = self._get_absolute_directory(entry.path)
+
+            if self._is_parquet(entry.path):
+                if self._path_is_delta(delta_log_folders, path):
+                    continue
+                delta_log_folders[path] = TableInMount(is_delta=False, is_parquet=True, is_partitioned=False)
+            elif entry.name == "_delta_log":
+                logger.debug(f"Found delta table {path}")
+                delta_log_folders[path] = TableInMount(is_delta=True, is_parquet=False, is_partitioned=False)
             else:
                 self._find_delta_log_folders(entry.path, delta_log_folders)
 
         return delta_log_folders
 
+    def _get_absolute_directory(self, path):
+        """
+        Returns the absolute directory of a given path.
+        Example: _get_absolute_directory('/mnt/test/123/dxs/aaa.parquet') -> /mnt/test/123/dxs/
+        """
+        return re.search(r'^(.*/)[^/]+/?', path).group(1)
+
+    def _get_table_name(self, path):
+        """
+        Returns the parent directory of a given path.
+        Example: _get_table_name('/mnt/test/123/dxs/aaa.parquet') -> dxs
+        """
+        return re.search("([^/]+)/?$", path, re.IGNORECASE).group(1)
+
+    def _path_is_delta(self, delta_log_folders, path):
+        return delta_log_folders.get(path, {}) and delta_log_folders.get(path, {}).is_delta
+
+    def _is_parquet(self, entry: str) -> bool:
+        parquet_patterns = {'.parquet'}
+        return any(pattern in entry for pattern in parquet_patterns)
+
     def _is_irrelevant(self, entry: str) -> bool:
-        patterns = {'_SUCCESS', '_committed_', '_started_', '=', '.'}
-        for pattern in patterns:
-            if pattern in entry:
-                return True
-        return False
+        patterns = {'_SUCCESS', '_committed_', '_started_', '='}
+        return any(pattern in entry for pattern in patterns)
