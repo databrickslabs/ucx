@@ -21,6 +21,7 @@ from databricks.labs.ucx.runtime import (
     migrate_dbfs_root_delta_tables,
     migrate_external_tables_sync,
 )
+from tests.unit import GROUPS
 
 
 def azure_mock_config() -> WorkspaceConfig:
@@ -108,18 +109,6 @@ def test_migrate_dbfs_root_delta_tables():
     ws = create_autospec(WorkspaceClient)
     migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
     ws.catalogs.list.assert_called_once()
-
-
-GROUPS = MockBackend.rows(
-    "id_in_workspace",
-    "name_in_workspace",
-    "name_in_account",
-    "temporary_name",
-    "members",
-    "entitlements",
-    "external_id",
-    "roles",
-)
 
 
 def test_migrate_permissions_private_api():
