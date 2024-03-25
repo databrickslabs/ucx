@@ -46,6 +46,8 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat
 
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
+
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
@@ -143,6 +145,11 @@ def ws(product_info, debug_env) -> WorkspaceClient:
     # See https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html
     product_name, product_version = product_info
     return WorkspaceClient(host=debug_env["DATABRICKS_HOST"], product=product_name, product_version=product_version)
+
+
+@pytest.fixture
+def permission_manager(ws, sql_backend, inventory_schema) -> PermissionManager:
+    return PermissionManager(ws, sql_backend, inventory_schema, [])
 
 
 @pytest.fixture
