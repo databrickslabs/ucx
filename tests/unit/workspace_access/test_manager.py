@@ -329,3 +329,15 @@ def test_manager_verify_no_tasks(mock_ws):
     result = permission_manager.verify_group_permissions()
 
     assert result
+
+
+def test_manager_verify_api_no_tasks(mock_ws, caplog):
+    sql_backend = MockBackend()
+
+    group_migration_state = MigrationState([])
+
+    permission_manager = PermissionManager(mock_ws, sql_backend, "test_database", [])
+
+    with caplog.at_level("INFO"):
+        permission_manager.apply_group_permissions_private_preview_api(group_migration_state)
+        assert "No valid groups selected, nothing to do." in caplog.messages
