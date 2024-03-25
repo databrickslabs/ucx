@@ -466,6 +466,7 @@ class WorkflowsInstallation(InstallationMixin):
 
     def _job_clusters(self, names: set[str]):
         clusters = []
+        latest_spark_version = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -476,6 +477,7 @@ class WorkflowsInstallation(InstallationMixin):
                         custom_tags={"ResourceClass": "SingleNode"},
                         num_workers=0,
                         policy_id=self._config.policy_id,
+                        spark_version=latest_spark_version,
                     ),
                 )
             )
@@ -488,6 +490,7 @@ class WorkflowsInstallation(InstallationMixin):
                         spark_conf=self._job_cluster_spark_conf("tacl"),
                         num_workers=1,  # ShowPermissionsCommand needs a worker
                         policy_id=self._config.policy_id,
+                        spark_version=latest_spark_version,
                     ),
                 )
             )
@@ -503,6 +506,7 @@ class WorkflowsInstallation(InstallationMixin):
                             max_workers=self._config.max_workers,
                             min_workers=self._config.min_workers,
                         ),
+                        spark_version=latest_spark_version,
                     ),
                 )
             )
