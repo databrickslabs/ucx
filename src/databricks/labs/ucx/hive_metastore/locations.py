@@ -292,7 +292,7 @@ class TablesInMounts(CrawlerBase[Table]):
             for path in table_paths:
                 table = Table(
                     catalog="hive_metastore",
-                    database="",
+                    database="tables_in_mounts",
                     name=re.search("([^/]+)/?$", path, re.IGNORECASE).group(1),
                     object_type="EXTERNAL",
                     table_format="DELTA",
@@ -314,7 +314,7 @@ class TablesInMounts(CrawlerBase[Table]):
 
             # Since isDir() is not present in SDK dbutils, we assume that a folder is anything
             # that doesn't contains a "." in it's name
-            if "." not in entry.name and entry.name == "_delta_log":
+            if entry.name == "_delta_log":
                 logger.debug(f"Found {entry.path}")
                 delta_log_folders.append(entry.path.replace("/_delta_log", ""))
             else:
@@ -323,8 +323,8 @@ class TablesInMounts(CrawlerBase[Table]):
         return delta_log_folders
 
     def _is_irrelevant(self, entry: str) -> bool:
-        patterns = [r'_SUCCESS', r'_committed_', r'_started_', r'=', r'\.']
+        patterns = {'_SUCCESS', '_committed_', '_started_', '=', '.'}
         for pattern in patterns:
-            if bool(re.search(pattern, entry)):
+            if pattern in entry:
                 return True
         return False

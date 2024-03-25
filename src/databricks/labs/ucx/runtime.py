@@ -464,6 +464,9 @@ def migrate_dbfs_root_delta_tables(
 
 @task("migrate-tables-in-mounts")
 def scan_tables_in_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
+    """This workflow scans for Delta tables inside all mount points captured during the assessment.
+    It will store the results under the `tables` table located under the assessment.
+    """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     TablesInMounts(sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts).snapshot()
 

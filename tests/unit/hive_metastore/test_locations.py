@@ -246,4 +246,68 @@ def test_mount_listing_one_table():
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
-    assert results == [Table("hive_metastore", "", "lmao", "EXTERNAL", "DELTA", "/mnt/lmao")]
+    assert results == [Table("hive_metastore", "tables_in_mounts", "lmao", "EXTERNAL", "DELTA", "/mnt/lmao")]
+
+
+def test_mount_listing_multiple_folders():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("/mnt/lmao/table1", "table1", "", "")
+    second_folder = FileInfo("/mnt/lmao/table2", "table2", "", "")
+    folder_table1 = FileInfo("/mnt/lmao/table1/_delta_log", "_delta_log", "", "")
+    folder_table2 = FileInfo("/mnt/lmao/table2/_SUCCESS", "_SUCCESS", "", "")
+    folder_table3 = FileInfo("/mnt/lmao/table2/1.snappy.parquet", "1.snappy.parquet", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/lmao":
+            return [first_folder, second_folder]
+        if path == "/mnt/lmao/table1":
+            return [folder_table1]
+        if path == "/mnt/lmao/table2":
+            return [folder_table2, folder_table3]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/lmao", "")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    assert results == [Table("hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/lmao/table1")]
+
+
+def test_mount_listing_sub_folders():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("/mnt/lmao/entity", "entity", "", "")
+    second_folder = FileInfo("/mnt/lmao/entity/domain", "domain", "", "")
+    third_folder = FileInfo("/mnt/lmao/entity/domain/table1", "table1", "", "")
+    fourth_folder = FileInfo("/mnt/lmao/entity/domain/table1/_delta_log", "_delta_log", "", "")
+    fourth_folder_parquet = FileInfo("/mnt/lmao/entity/domain/table1/1.parquet", "1.parquet", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/lmao":
+            return [first_folder]
+        if path == "/mnt/lmao/entity":
+            return [second_folder]
+        if path == "/mnt/lmao/entity/domain":
+            return [third_folder]
+        if path == "/mnt/lmao/entity/domain/table1":
+            return [fourth_folder, fourth_folder_parquet]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/lmao", "")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    assert results == [
+        Table("hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/lmao/entity/domain/table1")
+    ]
