@@ -23,7 +23,7 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
-from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema, CatalogSchemaCLI
+from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchemaCLI
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
@@ -510,7 +510,7 @@ def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
     installation = Installation.current(w, 'ucx')
     catalog_schema = CatalogSchemaCLI.for_cli(w, installation, prompts)
-    catalog_schema.create_catalog_schema()
+    catalog_schema.create_all_catalogs_schemas()
 
 
 @ucx.command

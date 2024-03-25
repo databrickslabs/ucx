@@ -5,6 +5,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
@@ -107,7 +108,7 @@ class CatalogSchemaCLI:
         cat_schema = CatalogSchema(ws, table_mapping, prompts)
         return cls(cat_schema, prompts)
 
-    def create_all_catalogs_schemas(self, catalog: str, schema: str):
+    def create_all_catalogs_schemas(self):
         candidate_catalogs, candidate_schemas = self._cat_schema.get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
             self._create_catalog(candidate_catalog)
@@ -118,12 +119,14 @@ class CatalogSchemaCLI:
     def _create_catalog(self, catalog):
         logger.info(f"Creating UC catalog: {catalog}")
         # create catalogs
+        attempts = 3
         while True:
             catalog_storage = self._prompts.question(
                 f"Please provide storage location url for catalog:{catalog}.", default="metastore"
             )
             if self._cat_schema.validate_location(catalog_storage):
                 break
+            attempts -= 1
+            if attempts == 0:
+                raise NotFound(f"Failed to validate location for {catalog} catalog")
         self._cat_schema.create_catalog(catalog, catalog_storage)
-
-
