@@ -6,7 +6,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo
 
-from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
+from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema, CatalogSchemaCLI
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 
@@ -84,5 +84,5 @@ def test_for_cli():
         }
     )
     prompts = MockPrompts({"hello": "world"})
-    catalog_schema = CatalogSchema.for_cli(ws, installation, prompts)
-    assert isinstance(catalog_schema, CatalogSchema)
+    catalog_schema = CatalogSchemaCLI.for_cli(ws, installation, prompts)
+    assert isinstance(catalog_schema, CatalogSchemaCLI)
