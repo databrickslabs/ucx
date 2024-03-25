@@ -2,7 +2,6 @@ import json
 import logging
 import os
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from functools import partial
 from itertools import groupby
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -19,7 +18,7 @@ from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
-from databricks.labs.ucx.workspace_access.groups import MigrationState
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
@@ -157,26 +156,34 @@ class PermissionManager(CrawlerBase[Permissions]):
             f"Applying the permissions to account groups. "
             f"Total groups to apply permissions: {len(migration_state)}."
         )
-
-        def migrate_permission(workspace_id, workspace_group_name, account_group_name):
-            self._ws.permission_migration.migrate_permissions(workspace_id, workspace_group_name, account_group_name)
-
-        applier_tasks: list[Callable[..., None]] = []
+        errors: list[Exception] = []
         for migrated_group in migration_state.groups:
-            applier_tasks.append(
-                partial(
-                    migrate_permission,
-                    self._ws.get_workspace_id(),
-                    migrated_group.name_in_workspace,
-                    migrated_group.name_in_account,
-                )
-            )
-        _, errors = Threads.gather("apply account group permissions", applier_tasks)
+            errors.extend(self._migrate_group_permissions_paginated(migrated_group))
         if len(errors) > 0:
-            logger.error(f"Detected {len(errors)} while applying permissions")
+            logger.error(f"Detected {len(errors)} errors while applying permissions")
             raise ManyError(errors)
         logger.info("Permissions were applied")
         return True
+
+    def _migrate_group_permissions_paginated(self, migrated_group: MigratedGroup) -> list[Exception]:
+        batch_size = 1000
+        errors: list[Exception] = []
+        while True:
+            try:
+                response = self._ws.permission_migration.migrate_permissions(
+                    self._ws.get_workspace_id(),
+                    migrated_group.name_in_workspace,
+                    migrated_group.name_in_account,
+                    size=batch_size,
+                )
+                if response.permissions_migrated is None:
+                    break
+                if response.permissions_migrated < batch_size:
+                    break
+            except RuntimeError as e:
+                errors.append(e)
+                break
+        return errors
 
     def verify_group_permissions(self) -> bool:
         items = sorted(self.load_all(), key=lambda i: i.object_type)

@@ -2,10 +2,12 @@ import os.path
 import sys
 from unittest.mock import call, create_autospec, patch
 
+import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
+from databricks.sdk.service.iam import PermissionMigrationResponse
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-private-name
@@ -130,10 +132,49 @@ def test_migrate_permissions_private_api():
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
+    ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(100)
     apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
     calls = [
-        call("12345678", "workspace_group_1", "account_group_1"),
-        call("12345678", "workspace_group_2", "account_group_2"),
-        call("12345678", "workspace_group_3", "account_group_3"),
+        call("12345678", "workspace_group_1", "account_group_1", size=1000),
+        call("12345678", "workspace_group_2", "account_group_2", size=1000),
+        call("12345678", "workspace_group_3", "account_group_3", size=1000),
     ]
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
+
+
+def test_migrate_permissions_private_api_paginated():
+    rows = {
+        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+            ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
+            ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
+            ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
+        ],
+    }
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = "12345678"
+    ws.permission_migration.migrate_permissions.side_effect = [
+        PermissionMigrationResponse(i) for i in (1000, None, 1000, 10, 1000, 10)
+    ]
+    apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+    calls = [
+        call("12345678", "workspace_group_1", "account_group_1", size=1000),
+        call("12345678", "workspace_group_2", "account_group_2", size=1000),
+        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+    ]
+    ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
+
+
+def test_migrate_permissions_private_api_error(caplog):
+    rows = {
+        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+            ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
+            ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
+            ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
+        ],
+    }
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = "12345678"
+    ws.permission_migration.migrate_permissions.side_effect = RuntimeError("internal error")
+    with pytest.raises(RuntimeError):
+        apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+    assert "Detected 3 errors while applying permissions" in caplog.messages
