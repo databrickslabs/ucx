@@ -92,3 +92,18 @@ class CatalogSchema:
     def create_catalog_schema(self):
         candidate_catalogs, candidate_schemas = self._prepare()
         self._create(candidate_catalogs, candidate_schemas)
+
+
+class CatalogSchemaCLI:
+    def __init__(self, cat_schema: CatalogSchema, prompts: Prompts):
+        self._cat_schema = cat_schema
+        self._prompts = prompts
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, installation: Installation, prompts: Prompts):
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        table_mapping = TableMapping(installation, ws, sql_backend)
+        cat_schema = CatalogSchema(ws, table_mapping, prompts)
+        return cls(cat_schema, prompts)
+
