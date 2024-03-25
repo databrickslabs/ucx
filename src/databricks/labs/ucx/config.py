@@ -11,6 +11,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     __version__ = 2
 
     inventory_database: str
+    inventory_database_location: str
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
     workspace_group_replace: str | None = None

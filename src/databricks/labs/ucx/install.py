@@ -57,11 +57,12 @@ NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 logger = logging.getLogger(__name__)
 
 
-def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
+def deploy_schema(sql_backend: SqlBackend, inventory_schema: str, inventory_schema_location: str):
     # we need to import it like this because we expect a module instance
     from databricks.labs import ucx  # pylint: disable=import-outside-toplevel
 
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
+    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{self._inventory_schema} LOCATION {self.inventory_schema_location}")
     deployer.deploy_schema()
     table = functools.partial(deployer.deploy_table)
     Threads.strict(
@@ -198,6 +199,11 @@ class WorkspaceInstaller:
         warehouse_id = self._configure_warehouse()
         configure_groups = ConfigureGroups(self._prompts)
         configure_groups.run()
+
+        inventory_database_location = self._prompts.question(
+            "Inventory Database location", default="dbfs:/user/hive/warehouse/"
+        )
+
         log_level = self._prompts.question("Log level", default="INFO").upper()
         num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
 
@@ -210,6 +216,7 @@ class WorkspaceInstaller:
 
         config = WorkspaceConfig(
             inventory_database=inventory_database,
+            inventory_database_location=inventory_database_location,
             workspace_group_regex=configure_groups.workspace_group_regex,
             workspace_group_replace=configure_groups.workspace_group_replace,
             account_group_regex=configure_groups.account_group_regex,
@@ -343,7 +350,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _create_database(self):
         try:
-            deploy_schema(self._sql_backend, self._config.inventory_database)
+            deploy_schema(self._sql_backend, self._config.inventory_database, self._config.inventory_database_location)
         except Exception as err:
             if "UNRESOLVED_COLUMN.WITH_SUGGESTION" in str(err):
                 msg = (
