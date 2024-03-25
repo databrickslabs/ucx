@@ -130,7 +130,7 @@ def ws():
     workspace_client.dashboard_widgets.create.return_value = Widget(id="abc")
     workspace_client.clusters.list.return_value = mock_clusters()
     workspace_client.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    workspace_client.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    workspace_client.clusters.select_spark_version = lambda **_: "14.2.x-scala2.12"
     workspace_client.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     workspace_client.workspace.download = download
 
