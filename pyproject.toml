@@ -69,7 +69,7 @@ dependencies = [
     "pytest-mock>=3.0.0,<4.0.0",
     "pytest-timeout",
     "black>=23.1.0",
-    "ruff>=0.0.243",
+    "ruff>=0.3.0",
     "isort>=2.5.0",
     "mypy",
     "types-PyYAML",
@@ -87,7 +87,7 @@ coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=htm
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
 fmt         = ["isort .",
                "black .",
-               "ruff  . --fix",
+               "ruff check . --fix",
                "mypy .",
                "pylint --output-format=colorized -j 0 src tests"]
 verify      = ["black --check .",
