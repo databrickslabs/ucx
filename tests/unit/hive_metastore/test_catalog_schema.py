@@ -1,18 +1,21 @@
 from unittest.mock import create_autospec
 
+import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 
-def prepare_test(ws, mock_prompts) -> CatalogSchema:
+def prepare_test(ws) -> CatalogSchema:
     ws.catalogs.list.return_value = [CatalogInfo(name="catalog1")]
     ws.schemas.list.return_value = [SchemaInfo(name="schema1")]
+    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://foo/bar")]
     backend = MockBackend()
     installation = MockInstallation(
         {
@@ -46,26 +49,45 @@ def prepare_test(ws, mock_prompts) -> CatalogSchema:
     )
     table_mapping = TableMapping(installation, ws, backend)
 
-    return CatalogSchema(ws, table_mapping, mock_prompts)
+    return CatalogSchema(ws, table_mapping)
 
 
 def test_create():
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "s3://foo/bar"})
 
-    catalog_schema = prepare_test(ws, mock_prompts)
-    catalog_schema.create_catalog_schema()
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
     ws.catalogs.create.assert_called_once_with("catalog2", storage_root="s3://foo/bar", comment="Created by UCX")
     ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
     ws.schemas.create.assert_any_call("schema3", "catalog1", comment="Created by UCX")
+
+
+def test_create_sub_location():
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "s3://foo/bar/test"})
+
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    ws.catalogs.create.assert_called_once_with("catalog2", storage_root="s3://foo/bar/test", comment="Created by UCX")
+    ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
+    ws.schemas.create.assert_any_call("schema3", "catalog1", comment="Created by UCX")
+
+
+def test_create_bad_location():
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "s3://foo/fail"})
+    catalog_schema = prepare_test(ws)
+    with pytest.raises(NotFound):
+        catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
 
 def test_no_catalog_storage():
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
 
-    catalog_schema = prepare_test(ws, mock_prompts)
-    catalog_schema.create_catalog_schema()
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
     ws.catalogs.create.assert_called_once_with("catalog2", comment="Created by UCX")
 
 
@@ -83,6 +105,5 @@ def test_for_cli():
             }
         }
     )
-    prompts = MockPrompts({"hello": "world"})
-    catalog_schema = CatalogSchema.for_cli(ws, installation, prompts)
+    catalog_schema = CatalogSchema.for_cli(ws, installation)
     assert isinstance(catalog_schema, CatalogSchema)
