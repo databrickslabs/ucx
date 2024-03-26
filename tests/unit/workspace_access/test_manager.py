@@ -331,7 +331,7 @@ def test_manager_verify_no_tasks(mock_ws):
     assert result
 
 
-def test_manager_verify_api_no_tasks(mock_ws, caplog):
+def test_manager_apply_experimental_no_tasks(mock_ws, caplog):
     sql_backend = MockBackend()
 
     group_migration_state = MigrationState([])
