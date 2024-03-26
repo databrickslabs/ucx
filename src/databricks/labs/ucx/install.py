@@ -161,7 +161,7 @@ class WorkspaceInstaller:
         try:
             local_version = self._product_info.released_version()
             remote_version = self._installation.load(Version).version
-            if extract_major_minor(remote_version) == extract_major_minor(local_version[:4]):
+            if extract_major_minor(remote_version) == extract_major_minor(local_version):
                 logger.info(f"UCX v{self._product_info.version()} is already installed on this workspace")
                 msg = "Do you want to update the existing installation?"
                 if not self._prompts.confirm(msg):
