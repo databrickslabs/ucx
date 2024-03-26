@@ -10,7 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
-    AwsIamRole,
+    AwsIamRoleResponse,
     AzureManagedIdentity,
     AzureServicePrincipal,
     StorageCredentialInfo,
@@ -129,7 +129,7 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
 @pytest.fixture
 def credential_manager(ws):
     ws.storage_credentials.list.return_value = [
-        StorageCredentialInfo(aws_iam_role=AwsIamRole("arn:aws:iam::123456789012:role/example-role-name")),
+        StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/example-role-name")),
         StorageCredentialInfo(
             azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
