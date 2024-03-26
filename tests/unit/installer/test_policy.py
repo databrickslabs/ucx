@@ -27,7 +27,7 @@ def common():
     w.cluster_policies.create.return_value = policy
 
     w.cluster_policies.list.return_value = [policy]
-    w.clusters.select_spark_version = lambda latest: "14.2.x-scala2.12"
+    w.clusters.select_spark_version = lambda **_: "14.2.x-scala2.12"
     w.clusters.select_node_type = lambda local_disk: "Standard_F4s"
     w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     prompts = MockPrompts(
@@ -44,7 +44,7 @@ def test_cluster_policy_definition_present_reuse():
     ws, prompts = common()
 
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, _, _ = policy_installer.create('ucx')
+    policy_id, _, _, _ = policy_installer.create('ucx')
     assert policy_id is not None
     ws.cluster_policies.create.assert_not_called()
 
@@ -73,7 +73,7 @@ def test_cluster_policy_definition_azure_hms():
         )
     ]
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, _, _ = policy_installer.create('ucx')
+    policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -114,7 +114,7 @@ def test_cluster_policy_definition_aws_glue():
     ]
 
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, instance_profile, _ = policy_installer.create('ucx')
+    policy_id, instance_profile, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -155,7 +155,7 @@ def test_cluster_policy_definition_gcp():
     ]
 
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, instance_profile, _ = policy_installer.create('ucx')
+    policy_id, instance_profile, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -257,7 +257,7 @@ def test_cluster_policy_definition_azure_hms_warehouse():
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, _, _ = policy_installer.create('ucx')
+    policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -309,7 +309,7 @@ def test_cluster_policy_definition_aws_glue_warehouse():
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, instance_profile, _ = policy_installer.create('ucx')
+    policy_id, instance_profile, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -364,7 +364,7 @@ def test_cluster_policy_definition_gcp_hms_warehouse():
         }
     )
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, _, _ = policy_installer.create('ucx')
+    policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -405,7 +405,7 @@ def test_cluster_policy_definition_empty_config():
     ]
 
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_id, _, _ = policy_installer.create('ucx')
+    policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
@@ -431,7 +431,9 @@ def test_cluster_policy_instance_pool():
     ws.config.is_gcp = False
 
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
-    policy_installer.create('ucx')
+    _, _, _, instance_pool_id = policy_installer.create('ucx')
+
+    assert instance_pool_id == "instance_pool_1"
 
     policy_expected = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
@@ -452,7 +454,8 @@ def test_cluster_policy_instance_pool():
         "node_type_id": {"type": "fixed", "value": "Standard_F4s"},
         "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
     }
-    policy_installer.create('ucx')
+    _, _, _, instance_pool_id = policy_installer.create('ucx')
+    assert instance_pool_id is None
     ws.cluster_policies.create.assert_called_with(
         name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps(policy_expected),

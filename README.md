@@ -74,6 +74,9 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 - Databricks Workspace has to have network access to [pypi.org](https://pypi.org) to download `databricks-sdk` and `pyyaml` packages.
 - A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
 
+Once you [install UCX](#install-ucx), you can proceed to the [assessment workflow](#assessment-workflow) to ensure 
+the compatibility of your workspace with Unity Catalog.
+
 [[back to top](#databricks-labs-ucx)]
 
 ## Authenticate Databricks CLI
@@ -103,8 +106,9 @@ Install UCX via Databricks CLI:
 databricks labs install ucx
 ```
 
-You'll be prompted to select a [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) 
-created by `databricks auth login` command.
+You'll be prompted to select a [configuration profile](https://docs.databricks.com/en/dev-tools/auth.html#databricks-client-unified-authentication) created by `databricks auth login` command.
+
+Once you install, proceed to the [assessment workflow](#assessment-workflow) to ensure the compatibility of your workspace with UCX.
 
 The `WorkspaceInstaller` class is used to create a new configuration for Unity Catalog migration in a Databricks workspace. 
 It guides the user through a series of prompts to gather necessary information, such as selecting an inventory database, choosing 
@@ -142,14 +146,14 @@ If there is an existing global installation of UCX, you can force a user install
 At this moment there is no global override over a user installation of UCX. As this requires migration and can break existing installations.
 
 
-| global | user | expected install location | install_folder | mode |
-| --- | --- | --- | --- |--- |
-| no | no | default | `/Applications/ucx` | install |
-| yes | no | default | `/Applications/ucx` | upgrade |
-| no | yes | default | `/Users/X/.ucx` | upgrade (existing installations must not break) |
-| yes | yes | default | `/Users/X/.ucx` | upgrade |
-| yes | no | **USER** | `/Users/X/.ucx` | install (show prompt) |
-| no | yes | **GLOBAL** | ...  | migrate |
+| global | user | expected install location | install_folder      | mode                                            |
+|--------|------|---------------------------|---------------------|-------------------------------------------------|
+| no     | no   | default                   | `/Applications/ucx` | install                                         |
+| yes    | no   | default                   | `/Applications/ucx` | upgrade                                         |
+| no     | yes  | default                   | `/Users/X/.ucx`     | upgrade (existing installations must not break) |
+| yes    | yes  | default                   | `/Users/X/.ucx`     | upgrade                                         |
+| yes    | no   | **USER**                  | `/Users/X/.ucx`     | install (show prompt)                           |
+| no     | yes  | **GLOBAL**                | ...                 | migrate                                         |
 
 
 * `UCX_FORCE_INSTALL=user databricks labs install ucx` - will force the installation to be for user only
@@ -199,7 +203,9 @@ Databricks CLI will confirm a few options:
 
 # Migration process
 
-On the high level, the steps in migration process can be described as:
+On the high level, the steps in migration process start with the [assessment workflow](#assessment-workflow), 
+followed by [group migration](#group-migration-workflow), [table migration](#table-migration-commands), 
+finalised with the [code migration](#code-migration-commands). It can be described as:
 
 ```mermaid
 flowchart TD
@@ -259,6 +265,9 @@ databricks labs ucx ensure-assessment-run
 
 ![ucx_assessment_workflow](docs/ucx_assessment_workflow.png)
 
+Once you finish the assessment, proceed to the [group migration workflow](#group-migration-workflow). 
+See the [migration process diagram](#migration-process) to understand the role of the assessment workflow in the migration process.
+
 The assessment workflow is designed to assess the compatibility of various entities in the current workspace with Unity Catalog. 
 It identifies incompatible entities and provides information necessary for planning the migration to UC. The tasks in 
 the assessment workflow can be executed in parallel or sequentially, depending on the dependencies specified in the `@task` decorators.
@@ -286,11 +295,16 @@ After UCX assessment workflow is executed, the assessment dashboard will be popu
 
 ## Group migration workflow
 
+You are required to complete the [assessment workflow](#assessment-workflow) before starting the group migration workflow.
+See the [migration process diagram](#migration-process) to understand the role of the group migration workflow in the migration process.
+
 See the [detailed design](docs/local-group-migration.md) of this workflow. It helps you to upgrade all Databricks workspace assets:
 Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, 
 Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
 Directories, Repos, and Files. 
+
+Once done with the group migration, proceed to [table migration](#table-migration-commands).
 
 Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
 If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
@@ -357,6 +371,8 @@ status can be listed with the [`workflows` command](#workflows-command).
 [[back to top](#databricks-labs-ucx)]
 
 ## `workflows` command
+
+See the [migration process diagram](#migration-process) to understand the role of each workflow in the migration process.
 
 ```text
 $ databricks labs ucx workflows
@@ -435,7 +451,32 @@ related to multiple installations of `ucx` on the same workspace.
 
 # Table migration commands
 
-These commands are vital part of [table migration](docs/table_upgrade.md) process.
+These commands are vital part of [table migration](docs/table_upgrade.md) process and require 
+the [assessment workflow](#assessment-workflow) and 
+[group migration workflow](#group-migration-workflow) to be completed. 
+See the [migration process diagram](#migration-process) to understand the role of the table migration commands in 
+the migration process. 
+
+The first step is to run the [`principal-prefix-access` command](#principal-prefix-access-command) to identify all 
+the storage accounts used by tables in the workspace and their permissions on each storage account.
+
+If you don't have any storage credentials and external locations configured,  you'll need to run 
+the [`migrate-credentials` command](#migrate-credentials-command) to migrate the service principals 
+and [`migrate-locations` command](#migrate-locations-command) to create the external locations. 
+If some of the external locations already exist, you should run 
+the [`validate-external-locations` command](#validate-external-locations-command).
+You'll need to create the [uber principal](#create-uber-principal-command) with the _**access to all storage**_ used to tables in 
+the workspace, so that you can migrate all the tables. If you already have the principal, you can skip this step.
+
+Ask your Databricks Account admin to run the [`sync-workspace-info` command](#sync-workspace-info-command) to sync the
+workspace information with the UCX installations. Once the workspace information is synced, you can run the 
+[`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog,
+[create catalogs and schemas](#create-catalogs-schemas-command) and start the migration. During multiple runs of
+the table migration workflow, you can use the [`revert-migrated-tables` command](#revert-migrated-tables-command) to 
+revert the tables that were migrated in the previous run. You can also skip the tables that you don't want to migrate 
+using the [`skip` command](#skip-command).
+
+Once you're done with the table migration, proceed to the [code migration](#code-migration-commands).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -445,10 +486,10 @@ These commands are vital part of [table migration](docs/table_upgrade.md) proces
 databricks labs ucx principal-prefix-access [--subscription-id <Azure Subscription ID>] [--aws-profile <AWS CLI profile>]
 ```
 
-This command depends on results from the [assessment workflow](#assessment-workflow) and requires AWS CLI or Azure CLI
-to be installed and authenticated for the given machine. This command identifies all the storage accounts used by tables 
-in the workspace and their permissions on each storage account. Required to be run before 
-the [`migrate-credentials` command](#migrate-credentials-command).
+This command depends on results from the [assessment workflow](#assessment-workflow) and requires [AWS CLI](#access-for-aws-s3-buckets) 
+or [Azure CLI](#access-for-azure-storage-accounts) to be installed and authenticated for the given machine. This command
+identifies all the storage accounts used by tables in the workspace and their permissions on each storage account. 
+Once you're done running this command, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -460,7 +501,9 @@ databricks labs ucx principal-prefix-access --aws-profile test-profile
 
 Use to identify all instance profiles in the workspace, and map their access to S3 buckets. 
 Also captures the IAM roles which has UC arn listed, and map their access to S3 buckets 
-This requires `aws` CLI to be installed and configured.
+This requires `aws` CLI to be installed and configured. 
+
+Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -472,6 +515,8 @@ databricks labs ucx principal-prefix-access --subscription-id test-subscription-
 
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions 
 on each storage account. This requires Azure CLI to be installed and configured via `az login`. 
+
+Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -487,6 +532,10 @@ workspace and configure the [UCX Cluster Policy](#installation) with the details
 service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
 assignment on every storage account using Azure Resource Manager APIs.
 
+Once done, proceed to the launching the [table migration workflow](#table-migration-commands).
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `migrate-credentials` command
 
 ```commandline
@@ -501,7 +550,7 @@ by [`principal-prefix-access` command](#principal-prefix-access-command).
 Please review the file and delete the Service Principals you do not want to be migrated.
 The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
 
-Run [`validate-external-locations` command](#validate-external-locations-command) after this one.
+Once you're done with this command, run [`validate-external-locations` command](#validate-external-locations-command) after this one.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -516,8 +565,9 @@ run this command to validate and report the missing Unity Catalog external locat
 
 This command validates and provides mapping to external tables to external locations, also as Terraform configurations.
 
-[[back to top](#databricks-labs-ucx)]
+Once you're done with this command, proceed to the [`migrate-locations` command](#migrate-locations-command).
 
+[[back to top](#databricks-labs-ucx)]
 
 ## `migrate-locations` command
 
@@ -527,7 +577,9 @@ databricks labs ucx migrate-locations
 
 Once the [`assessment` workflow](#assessment-workflow) finished successfully, and [storage credentials](#migrate-credentials-command) are configured,
 run this command to have Unity Catalog external locations created. The candidate locations to be created are extracted from guess_external_locations
-task in the assessment job. You can run [validate_external_locations](#validate-external-locations-command) command to check the candidate locations.
+task in the assessment job. You can run [`validate-external-locations` command](#validate-external-locations-command) to check the candidate locations.
+
+Once you're done with this command, proceed to the [`create-table-mapping` command](#create-table-mapping-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -549,6 +601,13 @@ labs-azure,labs_azure,default,default,ucx_tybzs,ucx_tybzs
 You are supposed to review this mapping and adjust it if necessary. This file is in CSV format, so that you can edit it 
 easier in your favorite spreadsheet application.
 
+Once you're done with this command, [create catalogs and schemas](#create-catalogs-schemas-command). During 
+multiple runs of the table migration workflow, you can use the [`revert-migrated-tables` command](#revert-migrated-tables-command)
+to revert the tables that were migrated in the previous run. You can also skip the tables that you don't want to migrate
+using the [`skip` command](#skip-command).
+
+Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
+
 [[back to top](#databricks-labs-ucx)]
 
 ## `skip` command
@@ -564,6 +623,8 @@ The command takes `--schema` and optionally `--table` flags to specify the schem
 is provided, all tables in the specified HMS database are skipped.
 This command is useful to temporarily disable migration on a particular schema or table.
 
+Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
+
 [[back to top](#databricks-labs-ucx)]
 
 ## `revert-migrated-tables` command
@@ -578,6 +639,8 @@ This command removes the `upgraded_from` property on a migrated table for re-mig
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
 
+Go back to the [`create-table-mapping` command](#create-table-mapping-command) after you're done with this command.
+
 [[back to top](#databricks-labs-ucx)]
 
 ## `create-catalogs-schemas` command
@@ -587,6 +650,8 @@ databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
 This command is supposed to be run before migrating tables to UC.
+
+Once you're done with this command, proceed to the [table migration workflow](#table-migration-commands).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -608,8 +673,6 @@ This command moves different table types differently:
 This is due to Unity Catalog not supporting multiple tables with overlapping paths
 - `VIEW` are recreated using the same view definition.
 
-[[back to top](#databricks-labs-ucx)]
-
 This command supports moving multiple tables at once, by specifying `*` as the table name.
 
 [[back to top](#databricks-labs-ucx)]
@@ -628,6 +691,13 @@ It can also be used to debug issues related to table aliasing.
 [[back to top](#databricks-labs-ucx)]
 
 # Code migration commands
+
+See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
+
+After you're done with the [table migration](#table-migration-commands), you can proceed to the code migration.
+
+Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
+clusters to be UC compatible.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -652,6 +722,12 @@ authenticate your machine with:
 
 * `databricks auth login --host https://accounts.cloud.databricks.com/` (AWS)
 * `databricks auth login --host https://accounts.azuredatabricks.net/` (Azure)
+
+Ask your Databricks Account admin to run the [`sync-workspace-info` command](#sync-workspace-info-command) to sync the
+workspace information with the UCX installations. Once the workspace information is synced, you can run the 
+[`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog.
+
+[[back to top](#databricks-labs-ucx)]
 
 ## `sync-workspace-info` command
 
@@ -718,6 +794,8 @@ The following scenarios are supported, if a group X:
 
 This command is useful for the setups, that don't have SCIM provisioning in place.
 
+Once you're done with this command, proceed to the [group migration workflow](#group-migration-workflow).
+
 [[back to top](#databricks-labs-ucx)]
 
 ## `validate-groups-membership` command
@@ -736,6 +814,10 @@ This command is useful for administrators who want to ensure that the groups hav
 used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and 
 [group migration](#group-migration-workflow) for more details.
 
+Once you're done with this command, proceed to the [table migration](#table-migration-commands).
+
+[[back to top](#databricks-labs-ucx)]
+
 ## `cluster-remap` command
 
 ```text
@@ -749,15 +831,17 @@ Shared Autoscaling Americas cluster                     0329-145545-rugby794
 Please provide the cluster id's as comma separated value from the above list (default: <ALL>): 
 ```
 
-This command will remap the cluster to uc enabled one.When we run this command it will list all the clusters 
+Once you're done with the [code migration](#code-migration-commands), you can run this command to remap the clusters to UC enabled.
+
+This command will remap the cluster to uc enabled one. When we run this command it will list all the clusters 
 and its id's and asks to provide the cluster id's as comma separated value which has to be remapped, by default it will take all cluster ids.
 Once we provide the cluster id's it will update these clusters to UC enabled.Back up of the existing cluster 
 config will be stored in backup folder inside the installed location(backup/clusters/cluster_id.json) as a json file.This will help 
 to revert the cluster remapping.
 
+You can revert the cluster remapping using the [`revert-cluster-remap` command](#revert-cluster-remap-command).
 
 [[back to top](#databricks-labs-ucx)]
-
 
 ## `revert-cluster-remap` command
 
@@ -769,12 +853,10 @@ $ databricks labs ucx revert-cluster-remap
 Please provide the cluster id's as comma separated value from the above list (default: <ALL>):
 ```
 
-If a customer want's to revert the cluster remap done using the `cluster-remap` command  they can use this command to revert 
+If a customer want's to revert the cluster remap done using the [`cluster-remap` command](#cluster-remap-command) they can use this command to revert 
 its configuration from UC to original one.It will iterate through the list of clusters from the back up folder and reverts the 
 cluster configurations to original one.This will also ask the user to provide the list of clusters that has to be reverted as a prompt.
-By default it will revert all the clusters present in the back up folder
-
-
+By default, it will revert all the clusters present in the backup folder
 
 [[back to top](#databricks-labs-ucx)]
 

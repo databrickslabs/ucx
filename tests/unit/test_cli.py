@@ -153,6 +153,16 @@ def test_create_account_groups():
     a.groups.list.assert_called_with(attributes="id")
 
 
+def test_create_account_groups_with_id():
+    a = create_autospec(AccountClient)
+    w = create_autospec(WorkspaceClient)
+    a.get_workspace_client.return_value = w
+    w.get_workspace_id.return_value = None
+    prompts = MockPrompts({})
+    with pytest.raises(ValueError, match="No workspace ids provided in the configuration found in the account"):
+        create_account_groups(a, prompts, workspace_ids="123,456", new_workspace_client=lambda: w)
+
+
 def test_manual_workspace_info(ws):
     prompts = MockPrompts({'Workspace name for 123': 'abc', 'Next workspace id': ''})
     manual_workspace_info(ws, prompts)

@@ -1,4 +1,5 @@
 import logging
+import shutil
 from pathlib import Path
 from unittest.mock import create_autospec
 
@@ -103,9 +104,18 @@ def test_run_task(capsys):
     cfg = WorkspaceConfig("test_db", log_level="INFO")
 
     # test the task function is called
+    install_dir = Path("foo")
     run_task(
-        args, Path("foo"), cfg, create_autospec(WorkspaceClient), create_autospec(RuntimeBackend), MockInstallation()
+        args,
+        install_dir,
+        cfg,
+        create_autospec(WorkspaceClient),
+        create_autospec(RuntimeBackend),
+        MockInstallation(),
     )
+    # clean up the log folder created by TaskLogger
+    shutil.rmtree(install_dir)
+
     assert "This mock task of migrate-tables" in capsys.readouterr().out
 
     # test KeyError if task not found

@@ -2,6 +2,7 @@ import functools
 import json
 import logging
 import os.path
+import sys
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
@@ -474,9 +475,9 @@ def test_check_inventory_database_exists(ws, new_installation):
 def test_table_migration_job(  # pylint: disable=too-many-locals
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
-    # skip this test if not in nightly test job: TEST_NIGHTLY is missing or is not set to "true"
-    if env_or_skip("TEST_NIGHTLY").lower() != "true":
-        pytest.skip("TEST_NIGHTLY is not true")
+    # skip this test if not in nightly test job or debug mode
+    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
+        env_or_skip("TEST_NIGHTLY")
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(schema_name=src_schema.name)
