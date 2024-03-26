@@ -168,6 +168,10 @@ class PermissionManager(CrawlerBase[Permissions]):
     def _migrate_group_permissions_paginated(self, migrated_group: MigratedGroup) -> list[Exception]:
         batch_size = 1000
         errors: list[Exception] = []
+        logger.info(
+            f"Migrating permission from workspace group {migrated_group.name_in_workspace} "
+            f"to account group: {migrated_group.name_in_account}."
+        )
         while True:
             try:
                 response = self._ws.permission_migration.migrate_permissions(
@@ -176,10 +180,14 @@ class PermissionManager(CrawlerBase[Permissions]):
                     migrated_group.name_in_account,
                     size=batch_size,
                 )
+                # response shouldn't be empty
                 if response.permissions_migrated is None:
                     break
-                if response.permissions_migrated < batch_size:
+                # no more permissions to migrate
+                if response.permissions_migrated == 0:
+                    logger.info("No more permission to migrated.")
                     break
+                logger.info(f"Migrated {batch_size} permissions.")
             except RuntimeError as e:
                 errors.append(e)
                 break
