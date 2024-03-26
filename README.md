@@ -565,7 +565,7 @@ run this command to validate and report the missing Unity Catalog external locat
 
 This command validates and provides mapping to external tables to external locations, also as Terraform configurations.
 
-Once you're done with this command, proceed to the [migrate locations](#migrate-locations-command) command.
+Once you're done with this command, proceed to the [`migrate-locations` command](#migrate-locations-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -577,9 +577,9 @@ databricks labs ucx migrate-locations
 
 Once the [`assessment` workflow](#assessment-workflow) finished successfully, and [storage credentials](#migrate-credentials-command) are configured,
 run this command to have Unity Catalog external locations created. The candidate locations to be created are extracted from guess_external_locations
-task in the assessment job. You can run [validate_external_locations](#validate-external-locations-command) command to check the candidate locations.
+task in the assessment job. You can run [`validate-external-locations` command](#validate-external-locations-command) to check the candidate locations.
 
-Once you're done with this command, proceed to the [create-table-mapping](#create-table-mapping-command) command.
+Once you're done with this command, proceed to the [`create-table-mapping` command](#create-table-mapping-command).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -639,7 +639,7 @@ This command removes the `upgraded_from` property on a migrated table for re-mig
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
 
-Go back to the [create-table-mapping](#create-table-mapping-command) command after you're done with this command.
+Go back to the [`create-table-mapping` command](#create-table-mapping-command) after you're done with this command.
 
 [[back to top](#databricks-labs-ucx)]
 
