@@ -6,7 +6,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.code.languages import Languages
-from tests.unit import workspace_client_mock
 
 
 def test_files_fix_ignores_unsupported_extensions():
@@ -19,6 +18,7 @@ def test_files_fix_ignores_unsupported_extensions():
 def test_files_fix_ignores_unsupported_language():
     languages = create_autospec(Languages)
     files = Files(languages)
+    # pylint: disable=protected-access
     files._extensions[".py"] = None
     path = Path('unsupported.py')
     assert not files.apply(path)
@@ -55,7 +55,7 @@ def test_files_supported_language_with_fixer():
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
     files = Files(languages)
-    with tempfile.NamedTemporaryFile(mode = "w+t", suffix = ".py") as file:
+    with tempfile.NamedTemporaryFile(mode="w+t", suffix=".py") as file:
         file.writelines(["import tempfile"])
         path = Path(file.name)
         files.apply(path)
@@ -71,6 +71,7 @@ def test_files_walks_directory():
     files.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
+
 
 # TODO the below is unmanageably slow when ran locally, so disabling for now
 # until I get clarifications on what would be done to run it faster

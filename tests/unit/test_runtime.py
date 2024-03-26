@@ -8,18 +8,25 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-private-name
-    _TASKS,
-    Task,
-)
+from databricks.labs.ucx.framework.tasks import _TASKS, Task
 from databricks.labs.ucx.runtime import (
+    apply_permissions_to_account_groups,
     assess_azure_service_principals,
+    assess_clusters,
+    assess_global_init_scripts,
+    assess_incompatible_submit_runs,
+    assess_jobs,
+    assess_pipelines,
+    crawl_cluster_policies,
     crawl_grants,
+    crawl_groups,
+    crawl_mounts,
+    destroy_schema,
+    estimate_table_size_for_migration,
+    guess_external_locations,
     migrate_dbfs_root_delta_tables,
-    migrate_external_tables_sync, crawl_mounts, guess_external_locations, estimate_table_size_for_migration,
-    assess_jobs, assess_clusters, assess_pipelines, assess_incompatible_submit_runs, crawl_cluster_policies,
-    assess_global_init_scripts, workspace_listing, crawl_permissions, crawl_groups, destroy_schema,
-    delete_backup_groups, apply_permissions_to_account_groups,
+    migrate_external_tables_sync,
+    workspace_listing,
 )
 
 
