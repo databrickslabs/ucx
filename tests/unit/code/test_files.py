@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
@@ -46,6 +47,18 @@ def test_files_supported_language_no_fixer():
     path = Path(__file__)
     files.apply(path)
     languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
+
+
+def test_files_supported_language_with_fixer():
+    languages = create_autospec(Languages)
+    languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
+    languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
+    files = Files(languages)
+    with tempfile.NamedTemporaryFile(mode = "w+t", suffix = ".py") as file:
+        file.writelines(["import tempfile"])
+        path = Path(file.name)
+        files.apply(path)
+        assert file.readline() == "Hi there!"
 
 
 def test_files_walks_directory():
