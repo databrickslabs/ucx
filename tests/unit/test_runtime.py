@@ -18,7 +18,8 @@ from databricks.labs.ucx.runtime import (
     migrate_dbfs_root_delta_tables,
     migrate_external_tables_sync, crawl_mounts, guess_external_locations, estimate_table_size_for_migration,
     assess_jobs, assess_clusters, assess_pipelines, assess_incompatible_submit_runs, crawl_cluster_policies,
-    assess_global_init_scripts, workspace_listing, crawl_permissions, crawl_groups,
+    assess_global_init_scripts, workspace_listing, crawl_permissions, crawl_groups, destroy_schema,
+    delete_backup_groups, apply_permissions_to_account_groups,
 )
 
 
@@ -252,3 +253,41 @@ def test_migrate_dbfs_root_delta_tables():
     migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
     ws.catalogs.list.assert_called_once()
 
+
+def test_runtime_destroy_schema(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        destroy_schema(cfg, ws, sql_backend, mock_installation())
+
+        assert "DROP DATABASE ucx CASCADE" in sql_backend.queries
+
+
+# TODO smells like delete_backup_groups isn't deleting anything, but maybe that's because there's nothing to delete ?
+# TODO can't debug this because pydevd_console_integration.py imports stuff from 'code' (Python builtins) which conflicts with databricks/labs/ucx/code
+# (we probably want to rename our 'code' to 'source' or 'source_code')
+# def test_runtime_delete_backup_groups(mocker):
+#     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+#         pyspark_sql_session = mocker.Mock()
+#         sys.modules["pyspark.sql.session"] = pyspark_sql_session
+#         cfg = azure_mock_config()
+#         ws = create_autospec(WorkspaceClient)
+#         sql_backend = MockBackend()
+#         delete_backup_groups(cfg, ws, sql_backend, mock_installation())
+#
+#         assert "DELETE" in sql_backend.queries # TODO
+
+
+def test_runtime_apply_permissions_to_account_groups(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        apply_permissions_to_account_groups(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM hive_metastore.ucx.groups" in sql_backend.queries
