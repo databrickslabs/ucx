@@ -55,7 +55,11 @@ import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.install import (
+    WorkspaceInstallation,
+    WorkspaceInstaller,
+    extract_major_minor,
+)
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
@@ -1554,3 +1558,11 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
     config = install.configure()
     assert config.inventory_database == "ucx_user"
+
+
+def test_extract_major_minor_versions():
+    version_string1 = "0.3.123151"
+    version_string2 = "0.17.1232141"
+
+    assert extract_major_minor(version_string1) == "0.3"
+    assert extract_major_minor(version_string2) == "0.17"
