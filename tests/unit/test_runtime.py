@@ -267,8 +267,6 @@ def test_runtime_destroy_schema(mocker):
 
 
 # TODO smells like delete_backup_groups isn't deleting anything, but maybe that's because there's nothing to delete ?
-# TODO can't debug this because pydevd_console_integration.py imports stuff from 'code' (Python builtins) which conflicts with databricks/labs/ucx/code
-# (we probably want to rename our 'code' to 'source' or 'source_code', created GH issue #1126)
 # def test_runtime_delete_backup_groups(mocker):
 #     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
 #         pyspark_sql_session = mocker.Mock()
