@@ -16,7 +16,9 @@ from databricks.labs.ucx.runtime import (
     assess_azure_service_principals,
     crawl_grants,
     migrate_dbfs_root_delta_tables,
-    migrate_external_tables_sync,
+    migrate_external_tables_sync, crawl_mounts, guess_external_locations, estimate_table_size_for_migration,
+    assess_jobs, assess_clusters, assess_pipelines, assess_incompatible_submit_runs, crawl_cluster_policies,
+    assess_global_init_scripts, workspace_listing, crawl_permissions, crawl_groups,
 )
 
 
@@ -81,7 +83,19 @@ def test_assessment_tasks():
     assert len(azure) >= 1
 
 
-def test_runtime_grants(mocker):
+def test_runtime_workspace_listing(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        workspace_listing(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.workspace_objects" in sql_backend.queries
+
+
+def test_runtime_crawl_grants(mocker):
     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
         pyspark_sql_session = mocker.Mock()
         sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -90,8 +104,141 @@ def test_runtime_grants(mocker):
         sql_backend = MockBackend()
         crawl_grants(cfg, ws, sql_backend, mock_installation())
 
-        assert "SHOW DATABASES FROM hive_metastore" in sql_backend.queries
+        assert "SELECT * FROM hive_metastore.ucx.grants" in sql_backend.queries
+
+
+# TODO crawl_permissions fails, but I don't think I can create tickets yet!
+# def test_runtime_crawl_permissions(mocker):
+#     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+#         pyspark_sql_session = mocker.Mock()
+#         sys.modules["pyspark.sql.session"] = pyspark_sql_session
+#         cfg = azure_mock_config()
+#         ws = create_autospec(WorkspaceClient)
+#         sql_backend = MockBackend()
+#         crawl_permissions(cfg, ws, sql_backend, mock_installation())
+#
+#         assert "SELECT * FROM hive_metastore.ucx.grants" in sql_backend.queries
+
+
+def test_runtime_crawl_groups(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        crawl_groups(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM hive_metastore.ucx.groups" in sql_backend.queries
+
+
+def test_runtime_crawl_cluster_policies(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        crawl_cluster_policies(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.policies" in sql_backend.queries
+
+
+def test_runtime_crawl_init_scripts(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        assess_global_init_scripts(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.global_init_scripts" in sql_backend.queries
+
+
+def test_estimate_table_size_for_migration(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        estimate_table_size_for_migration(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM hive_metastore.ucx.table_size" in sql_backend.queries
         assert "SHOW DATABASES" in sql_backend.queries
+
+
+def test_runtime_mounts(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        crawl_mounts(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.mounts" in sql_backend.queries
+
+
+def test_guess_external_locations(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        guess_external_locations(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.mounts" in sql_backend.queries
+
+
+def test_assess_jobs(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        assess_jobs(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.jobs" in sql_backend.queries
+
+
+def test_assess_clusters(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        assess_clusters(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.clusters" in sql_backend.queries
+
+
+def test_assess_pipelines(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        assess_pipelines(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.pipelines" in sql_backend.queries
+
+
+def test_incompatible_submit_runs(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        assess_incompatible_submit_runs(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM ucx.submit_runs" in sql_backend.queries
 
 
 def test_migrate_external_tables_sync():
@@ -104,3 +251,4 @@ def test_migrate_dbfs_root_delta_tables():
     ws = create_autospec(WorkspaceClient)
     migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
     ws.catalogs.list.assert_called_once()
+
