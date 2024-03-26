@@ -73,7 +73,7 @@ def test_files_walks_directory():
     assert languages.fixer.call_count > 1
 
 # TODO the below is unmanageably slow when ran locally, so disabling for now
-# until I get clarifications on what would be done to run it faster
+# until I get clarifications on what could be done to run it faster
 # created GH issue #1127
 # def test_files_for_cli():
 #     ws = workspace_client_mock()
