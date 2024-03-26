@@ -201,6 +201,7 @@ This section will help explain UCX Assessment findings and provide a recommended
 The assessment finding index is grouped by:
 - The 100 series findings are Databricks Runtime and compute configuration findings.
 - The 200 series findings are centered around data related observations.
+- The 300 series findings relate to potential issues arising from interactive usage on shared compute.
 
 [[back to top](#migration-assessment-report)]
 
@@ -347,6 +348,518 @@ ADLS Gen 2 (`abfss://`) is the only Azure native storage type supported. Use a D
 CREATE TABLE [IF NOT EXISTS] table_name
    [SHALLOW | DEEP] CLONE source_table_name [TBLPROPERTIES clause] [LOCATION path]   
 ```
+
+[[back to top](#migration-assessment-report)]
+
+### AF300.1 - 3 level namespace
+
+The `hive_metastore.` is used to refer to a 3 level namespace.
+
+[[back to top](#migration-assessment-report)]
+
+### AF301.1 - spark.catalog.x
+
+The `spark.catalog.` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed/whitelisted on shared clusters due to security reasons.
+
+[[back to top](#migration-assessment-report)]
+
+### AF301.2 - spark.catalog.x
+
+The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed/whitelisted on shared clusters due to security reasons.
+
+[[back to top](#migration-assessment-report)]
+
+### AF302.x - Arbitrary Java
+With Spark Connect on Shared clusters it is no longer possible to directly access the host JVM from the Python process. This means it is no longer possible to interact with Java classes or instantiate arbitrary Java classes directly from Python similar to the code below.
+
+### AF302.1 - Arbitrary Java
+
+The `spark._jspark` is used to execute arbitrary Java code. 
+
+[[back to top](#migration-assessment-report)]
+
+### AF302.2 - Arbitrary Java
+
+The `spark._jvm` is used to execute arbitrary Java code.
+
+[[back to top](#migration-assessment-report)]
+
+### AF302.3 - Arbitrary Java
+
+The `._jdf` is used to execute arbitrary Java code.
+
+[[back to top](#migration-assessment-report)]
+
+### AF302.4 - Arbitrary Java
+
+The `._jcol` is used to execute arbitrary Java code.
+
+[[back to top](#migration-assessment-report)]
+
+### AF302.5 - Arbitrary Java
+
+The `._jvm` is used to execute arbitrary Java code.
+
+[[back to top](#migration-assessment-report)]
+
+### AF302.6 - Arbitrary Java
+
+The `._jvm.org.apache.log4j` is used to execute arbitrary Java code.
+
+[[back to top](#migration-assessment-report)]
+
+### AF303.1 - Java UDF
+
+The `spark.udf.registerJavaFunction` is used to register a Java UDF.
+
+[[back to top](#migration-assessment-report)]
+
+### AF304.1 - JDBC datasource
+
+The `spark.read.format("jdbc")` pattern was found and is used to read data from a JDBC datasource.
+
+Accessing third-party databases—other than MySQL, PostgreSQL, Amazon Redshift, Snowflake, Microsoft SQL Server, Azure Synapse (SQL Data Warehouse) and Google BigQuery will require additional permissions on a shared cluster if the user is not a workspace admin. This is due to the drivers not guaranteeing user isolation, e.g., as the driver writes data from multiple users to a widely accessible temp directory.
+
+Workaround:
+Granting ANY FILE permissions will allow users to access untrusted databases. Note that ANY FILE will still enforce ACLs on any tables or external (storage) locations governed by Unity Catalog.
+This requires DBR 12.2 or later (DBR 12.1 or before is blocked on the network layer)
+
+[[back to top](#migration-assessment-report)]
+
+### AF305.1 - boto3
+
+The `boto3` library is used.
+
+Instance profiles (AWS) and service principals/managed identity (Azure) are not supported from the Python/Scala REPL or UDFs, e.g. using boto3 or s3fs, Instance profiles are only set from init scripts and (internally) from Spark. 
+
+**Workarounds**
+For accessing cloud storage (S3, ADLS, GCS), use storage credentials and external locations. 
+For accessing non-storage cloud services (e.g., AWS secrets manager, etc), use
+
+
+(AWS) Consider other ways to authenticate with boto3, e.g., by passing credentials from Databricks secrets directly to boto3 as a parameter, or loading them as environment variables. This page contains more information. Please note that unlike instance profiles, those methods do not provide short-lived credentials out of the box, and customers are responsible for rotating secrets according to their security needs.
+
+
+(Azure) Consider creating a Databricks secrets scope backed by Azure vault, and authenticate to external systems using secrets from that secrets scope
+
+
+(GCP) Some customers have used an external secrets store (like Hashicorp vault) and loaded credentials upon cluster startup into the cluster’s environment variables. Please note that those are usually not short-lived credentials, and customers are responsible for securing and rotation secrets according to their security needs.
+
+
+[[back to top](#migration-assessment-report)]
+
+### AF305.2 - boto3
+
+The `s3fs` library is used which provides posix type sematics for S3 access. s3fs is based on boto3 and has similar restrictions. The recommendation is to use EXTERNAL VOLUMES mapped to the fixed s3 storage location or Unity Catalog MANAGED VOLUMES.
+
+[[back to top](#migration-assessment-report)]
+
+### AF306.1 - dbutils...getContext
+
+The `dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()` was found. This function may trigger a security exception in DBR 13.0 and above.
+
+[[back to top](#migration-assessment-report)]
+
+### AF306.2 - dbutils...getContext
+
+The `dbutils.notebook.entry_point.getDbutils().notebook().getContext()` was found. This function may trigger a security exception in DBR 13.0 and above.
+
+[[back to top](#migration-assessment-report)]
+
+### AF310.1 - credential passthrough
+
+The `dbutils.credentials.` is used for credential passthrough. This is not supported by Unity Catalog.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.1 - dbutils.fs
+
+The `dbutils.fs.` was found. DBUtils and other clients that directly read the data from cloud storage are not supported.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.2 - dbutils mount(s)
+
+The `dbutils.fs.mount` was found. This is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.3 - dbutils mount(s)
+
+The `dbutils.fs.refreshMounts` was found. This is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.4 - dbutils mount(s)
+
+The `dbutils.fs.unmount` was found. This is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.5 - mount points
+
+The `dbfs:/mnt` is used as a mount point. This is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.6 - dbfs usage
+
+The `dbfs:/` was found. DBFS is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES. 
+
+Please Note: `dbfs:/Volumes/<catalog>/<schema>/<volume>` is a supported access pattern for spark.
+
+[[back to top](#migration-assessment-report)]
+
+### AF311.7 - dbfs usage
+
+The `/dbfs/` was found. DBFS is not supported by Unity Catalog. Use instead EXTERNAL LOCATIONS and VOLUMES.
+
+[[back to top](#migration-assessment-report)]
+
+## AF313.0 - SparkContext
+
+Spark Context(sc), spark.sparkContext, and sqlContext are not supported for Scala in any Databricks Runtime and are not supported for Python in Databricks Runtime 14.0 and above.
+
+Databricks recommends using the spark variable to interact with the SparkSession instance.
+
+The following sc functions are also not supported: emptyRDD, range, init_batched_serializer, parallelize, pickleFile, textFile, wholeTextFiles, binaryFiles, binaryRecords, sequenceFile, newAPIHadoopFile, newAPIHadoopRDD, hadoopFile, hadoopRDD, union, runJob, setSystemProperty, uiWebUrl, stop, setJobGroup, setLocalProperty, getConf.
+
+### AF313.1 - SparkContext
+
+The `spark.sparkContext` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.2 - SparkContext
+
+The `from pyspark.sql import SQLContext` and `import org.apache.spark.sql.SQLContext` are used. These are not supported in Unity Catalog.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.3 - SparkContext
+
+The `.binaryFiles` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.4 - SparkContext
+
+The `.binaryRecords` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.5 - SparkContext
+
+The `.emptyRDD` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.6 - SparkContext
+
+The `.getConf` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.7 - SparkContext
+
+The `.hadoopFile` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.8 - SparkContext
+
+The `.hadoopRDD` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.9 - SparkContext
+
+The `.init_batched_serializer` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.10 - SparkContext
+
+The `.newAPIHadoopFile` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.11 - SparkContext
+
+The `.newAPIHadoopRDD` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.12 - SparkContext
+
+The `.parallelize` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.13 - SparkContext
+
+The `.pickleFile` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.14 - SparkContext
+
+The `.range` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.15 - SparkContext
+
+The `.rdd` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.16 - SparkContext
+
+The `.runJob` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.17 - SparkContext
+
+The `.sequenceFile` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.18 - SparkContext
+
+The `.setJobGroup` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.19 - SparkContext
+
+The `.setLocalProperty` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.20 - SparkContext
+
+The `.setSystemProperty` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.21 - SparkContext
+
+The `.stop` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.22 - SparkContext
+
+The `.textFile` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.23 - SparkContext
+
+The `.uiWebUrl` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.24 - SparkContext
+
+The `.union` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF313.25 - SparkContext
+
+The `.wholeTextFiles` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.0 - Distributed ML
+Databricks Runtime ML and Spark Machine Learning Library (MLlib) are not supported on shared Unity Catalog compute. The recommendation is to use Assigned mode, use cluster policies and compute (warm) pools to improve compute management.
+
+### AF314.1 - Distributed ML
+
+The `sparknlp` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.2 - Distributed ML
+
+The `xgboost.spark` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.3 - Distributed ML
+
+The `catboost_spark` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.4 - Distributed ML
+
+The `ai.catboost:catboost-spark` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.5 - Distributed ML
+
+The `hyperopt` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.6 - Distributed ML
+
+The `SparkTrials` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.7 - Distributed ML
+
+The `horovod.spark` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.8 - Distributed ML
+
+The `ray.util.spark` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF314.9 - Distributed ML
+
+The `databricks.automl` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF308.1 - Graphframes
+
+The `from graphframes` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF309.1 - Spark ML
+
+The `pyspark.ml.` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF315.1 - UDAF scala issue
+
+The `UserDefinedAggregateFunction` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF315.2 - applyInPandas
+
+The `applyInPandas` was found.
+
+[[back to top](#migration-assessment-report)]
+
+### AF315.3 - mapInPandas
+
+The `mapInPandas` was found.
+
+[[back to top](#migration-assessment-report)]
+
+
+## Streaming
+Streaming limitations for Unity Catalog shared access mode [documentation](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-limitations-for-unity-catalog-shared-access-mode) should be consulted for more details. 
+
+See also [Streaming limitations for Unity Catalog single user access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-single) and [Streaming limitations for Unity Catalog shared access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-shared).
+
+The assessment patterns and specifics are as follows:
+
+### AF330.1 - Streaming
+
+The `.trigger(continuous` was found. Continuous processing mode is not supported in Unity Catalog shared access mode.
+Apache Spark continuous processing mode is not supported. See [Continuous Processing](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#continuous-processing) in the Spark Structured Streaming Programming Guide.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.2 - Streaming
+
+The `kafka.sasl.client.callback.handler.class` was found. SASL features are not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.3 - Streaming
+
+The `kafka.sasl.login.callback.handler.class` was found. SASL features are not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.4 - Streaming
+
+The `kafka.sasl.login.class` was found. SASL features are not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.5 - Streaming
+
+The `kafka.partition.assignment.strategy` was found. Kafka features are not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.6 - Streaming
+
+The `kafka.ssl.truststore.location` was found. SSL features are not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.7 - Streaming
+
+The `kafka.ssl.keystore.location` was found. SSL features are not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.8 - Streaming
+
+The `cleanSource` was found. The cleanSource operation is not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.9 - Streaming
+
+The `sourceArchiveDir` was found. The sourceArchiveDir operation is not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.10 - Streaming
+
+The `applyInPandasWithState` was found. The applyInPandasWithState operation is not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.11 - Streaming
+
+The `.format("socket")` was found. Socket source is not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.12 - Streaming
+
+The `StreamingQueryListener` was found. StreamingQueryListener is not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+### AF330.13 - Streaming
+
+The `applyInPandasWithState` was found. The applyInPandasWithState operation is not supported in Unity Catalog shared access mode.
+
+[[back to top](#migration-assessment-report)]
+
+
+### AF350.0 - r language support
+When using `%r` command cells, the user will receive `Your administrator has only allowed sql and python and scala commands on this cluster. This execution contained at least one disallowed language.` message.
+
+Recommend using Assigned (single user clusters).
+
+[[back to top](#migration-assessment-report)]
+
+### AF350.0 - scala language support
+Scala is supported on Databricks Runtime 13.3 and above.
+
+Recommend upgrading your shared cluster DBR to 13.3 LTS or greater or using Assigned data security mode (single user clusters).
 
 [[back to top](#migration-assessment-report)]
 
