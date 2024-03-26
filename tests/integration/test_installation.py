@@ -450,6 +450,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
             environ={'UCX_FORCE_INSTALL': 'global'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'yes',
+                r".*Do you want to update the existing installation?.*": 'yes',
             },
         )
     existing_user_installation.uninstall()
