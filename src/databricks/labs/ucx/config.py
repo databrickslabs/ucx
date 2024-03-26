@@ -47,9 +47,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
 
-    # Whether to use the Permission Migration API to migrate permissions instead
-    use_permission_migration_api: bool = False
-
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

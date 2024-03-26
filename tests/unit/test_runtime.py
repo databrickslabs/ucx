@@ -15,13 +15,13 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     Task,
 )
 from databricks.labs.ucx.runtime import (
-    apply_permissions_to_account_groups,
+    apply_permissions_to_account_groups_experimental,
     assess_azure_service_principals,
     crawl_grants,
     migrate_dbfs_root_delta_tables,
     migrate_external_tables_sync,
 )
-from tests.unit import GROUPS
+from tests.unit import GROUPS, PERMISSIONS
 
 
 def azure_mock_config() -> WorkspaceConfig:
@@ -31,7 +31,6 @@ def azure_mock_config() -> WorkspaceConfig:
             token="dapifaketoken",
         ),
         inventory_database="ucx",
-        use_permission_migration_api=True,
     )
     return config
 
@@ -111,18 +110,21 @@ def test_migrate_dbfs_root_delta_tables():
     ws.catalogs.list.assert_called_once()
 
 
-def test_migrate_permissions_private_api():
+def test_migrate_permissions_experimental():
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
+        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
     ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(0)
-    apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+    apply_permissions_to_account_groups_experimental(
+        azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
+    )
     calls = [
         call("12345678", "workspace_group_1", "account_group_1", size=1000),
         call("12345678", "workspace_group_2", "account_group_2", size=1000),
@@ -131,20 +133,23 @@ def test_migrate_permissions_private_api():
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 
 
-def test_migrate_permissions_private_api_paginated():
+def test_migrate_permissions_experimental_paginated():
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
             ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
             ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
         ],
+        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
     ws.permission_migration.migrate_permissions.side_effect = [
         PermissionMigrationResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
     ]
-    apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+    apply_permissions_to_account_groups_experimental(
+        azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
+    )
     calls = [
         call("12345678", "workspace_group_1", "account_group_1", size=1000),
         call("12345678", "workspace_group_2", "account_group_2", size=1000),
@@ -153,7 +158,7 @@ def test_migrate_permissions_private_api_paginated():
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 
 
-def test_migrate_permissions_private_api_error(caplog):
+def test_migrate_permissions_experimental_error(caplog):
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
@@ -165,5 +170,7 @@ def test_migrate_permissions_private_api_error(caplog):
     ws.get_workspace_id.return_value = "12345678"
     ws.permission_migration.migrate_permissions.side_effect = RuntimeError("internal error")
     with pytest.raises(RuntimeError):
-        apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+        apply_permissions_to_account_groups_experimental(
+            azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
+        )
     assert "Detected 3 errors while applying permissions" in caplog.messages

@@ -23,30 +23,28 @@ logger = logging.getLogger(__name__)
 def test_permissions_for_redash(
     ws,
     make_group,
-    make_acc_ws_group,
+    make_migrated_group,
     make_user,
     make_query,
     make_query_permissions,
     permission_manager,
     use_permission_migration_api,
 ):
-    ws_group = make_group()
     ws_group_temp = make_group()  # simulate temp/backup group
-    acc_group = make_acc_ws_group()
     user = make_user()
+    migrated_group, _ = make_migrated_group()
 
     query = make_query()
     make_query_permissions(
         object_id=query.id,
         permission_level=sql.PermissionLevel.CAN_EDIT,
-        group_name=ws_group.display_name,
+        group_name=migrated_group.name_in_workspace,
         user_name=user.display_name,
     )
 
-    group_to_migrate = MigratedGroup.partial_info(ws_group, acc_group)
     # Note that Redash support replaces all permissions and apply it on the temp/backup group instead of original group.
     # We don't rename the original group as part of this test therefore we need to set the temp group explicitly here.
-    group_to_migrate.temporary_name = ws_group_temp.display_name
+    migrated_group.temporary_name = ws_group_temp.display_name
 
     redash_permissions = RedashPermissionsSupport(
         ws,
@@ -54,9 +52,9 @@ def test_permissions_for_redash(
     )
 
     if use_permission_migration_api:
-        permission_manager.apply_group_permissions_private_preview_api(MigrationState([group_to_migrate]))
+        permission_manager.apply_group_permissions_experimental(MigrationState([migrated_group]))
     else:
-        apply_tasks(redash_permissions, [group_to_migrate])
+        apply_tasks(redash_permissions, [migrated_group])
 
     query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
     if not use_permission_migration_api:
@@ -64,7 +62,7 @@ def test_permissions_for_redash(
         # on the temp/backup group instead of the original group.
         # Permission migration API skips this step
         assert sql.PermissionLevel.CAN_EDIT == query_permissions[ws_group_temp.display_name]
-    assert sql.PermissionLevel.CAN_EDIT == query_permissions[acc_group.display_name]
+    assert sql.PermissionLevel.CAN_EDIT == query_permissions[migrated_group.name_in_account]
     assert sql.PermissionLevel.CAN_EDIT == query_permissions[user.display_name]
 
 

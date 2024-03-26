@@ -31,6 +31,7 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ def crawl_grants(cfg: WorkspaceConfig, _ws: WorkspaceClient, sql_backend: SqlBac
 
 @task("assessment", depends_on=[crawl_tables])
 def estimate_table_size_for_migration(
-    cfg: WorkspaceConfig, _ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, _ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Scans the previously created Delta table named `$inventory_database.tables` and locate tables that cannot be
     "synced". These tables will have to be cloned in the migration process.
@@ -91,7 +92,7 @@ def crawl_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBack
 
 @task("assessment", depends_on=[crawl_mounts, crawl_tables])
 def guess_external_locations(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Determines the shared path prefixes of all the tables. Specifically, the focus is on identifying locations that
     utilize mount points. The goal is to identify the _external locations_ necessary for a successful migration and
@@ -152,7 +153,7 @@ def assess_pipelines(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sql
 
 @task("assessment")
 def assess_incompatible_submit_runs(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """This module scans through all the Submit Runs and identifies those runs which may become incompatible after
     the workspace attachment.
@@ -182,7 +183,7 @@ def crawl_cluster_policies(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backen
 
 @task("assessment", cloud="azure")
 def assess_azure_service_principals(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
     Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
@@ -200,7 +201,7 @@ def assess_azure_service_principals(
 
 @task("assessment")
 def assess_global_init_scripts(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
     who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
@@ -298,7 +299,7 @@ def estimates_report(*_):
 
 @task("migrate-groups", depends_on=[crawl_groups])
 def rename_workspace_local_groups(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Renames workspace local groups by adding `ucx-renamed-` prefix."""
     verify_has_metastore = VerifyHasMetastore(ws)
@@ -321,7 +322,7 @@ def rename_workspace_local_groups(
 
 @task("migrate-groups", depends_on=[rename_workspace_local_groups])
 def reflect_account_groups_on_workspace(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
     step to be successful. This process does not create the account level group(s)."""
@@ -341,7 +342,7 @@ def reflect_account_groups_on_workspace(
 
 @task("migrate-groups", depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
 def apply_permissions_to_account_groups(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Fourth phase of the workspace-local group migration process. It does the following:
       - Assigns the full set of permissions of the original group to the account-level one
@@ -376,15 +377,12 @@ def apply_permissions_to_account_groups(
         num_threads=cfg.num_threads,
         workspace_start_path=cfg.workspace_start_path,
     )
-    if cfg.use_permission_migration_api:
-        permission_manager.apply_group_permissions_private_preview_api(migration_state)
-    else:
-        permission_manager.apply_group_permissions(migration_state)
+    permission_manager.apply_group_permissions(migration_state)
 
 
 @task("validate-groups-permissions", job_cluster="tacl")
 def validate_groups_permissions(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Validate that all the crawled permissions are applied correctly to the destination groups."""
     logger.info("Running validation of permissions applied to destination groups.")
@@ -426,7 +424,7 @@ def destroy_schema(cfg: WorkspaceConfig, _ws: WorkspaceClient, sql_backend: SqlB
 
 @task("migrate-tables", job_cluster="table_migration")
 def migrate_external_tables_sync(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
 ):
     """This workflow task migrates the *external tables that are supported by SYNC command* from the Hive Metastore to the Unity Catalog.
     Following cli commands are required to be run before running this task:
@@ -446,7 +444,7 @@ def migrate_external_tables_sync(
 
 @task("migrate-tables", job_cluster="table_migration")
 def migrate_dbfs_root_delta_tables(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
 ):
     """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
     Following cli commands are required to be run before running this task:
@@ -462,6 +460,75 @@ def migrate_dbfs_root_delta_tables(
     TablesMigrate(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     ).migrate_tables(what=What.DBFS_ROOT_DELTA)
+
+
+@task("migrate-groups-experimental", depends_on=[crawl_groups])
+def rename_workspace_local_groups_experimental(
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    Renames workspace local groups by adding `ucx-renamed-` prefix."""
+    return rename_workspace_local_groups(cfg, ws, sql_backend, _install)
+
+
+@task("migrate-groups-experimental", depends_on=[rename_workspace_local_groups_experimental])
+def reflect_account_groups_on_workspace_experimental(
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
+    step to be successful. This process does not create the account level group(s)."""
+    return reflect_account_groups_on_workspace(cfg, ws, sql_backend, _install)
+
+
+@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental],
+      job_cluster="tacl")
+def apply_permissions_to_account_groups_experimental(
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    This task uses the new permission migration API which requires enrolment from Databricks
+    Fourth phase of the workspace-local group migration process. It does the following:
+      - Assigns the full set of permissions of the original group to the account-level one
+
+    It covers local workspace-local permissions for all entities: Legacy Table ACLs, Entitlements,
+    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
+    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
+    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
+    """
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
+    )
+
+    migration_state = group_manager.get_migration_state()
+    if len(migration_state.groups) == 0:
+        logger.info("Skipping group migration as no groups were found.")
+        return
+
+    tables_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    udfs_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
+    grants_crawler = GrantsCrawler(tables_crawler, udfs_crawler)
+    tacl_support = TableAclSupport(grants_crawler, sql_backend)
+    permission_manager = PermissionManager(ws, sql_backend, cfg.inventory_database, [tacl_support])
+    permission_manager.apply_group_permissions_experimental(migration_state)
+    permission_manager.apply_group_permissions(migration_state)
+
+
+@task("migrate-groups-experimental", depends_on=[apply_permissions_to_account_groups_experimental], job_cluster="tacl")
+def validate_groups_permissions_experimental(
+        cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    Validate that all the crawled permissions are applied correctly to the destination groups."""
+    return validate_groups_permissions(cfg, ws, sql_backend, _install)
 
 
 def main(*argv):

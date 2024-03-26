@@ -96,11 +96,15 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
 
 
 @pytest.fixture
-def make_acc_ws_group(acc, ws, make_acc_group):
+def make_migrated_group(acc, ws, make_group, make_acc_group):
+    """Create a pair of groups in workspace and account. Assign account group to workspace."""
+
     def inner():
+        ws_group = make_group()
         acc_group = make_acc_group()
         acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [WorkspacePermission.USER])
-        return acc_group
+        # need to return both, as acc_group.id is not in MigratedGroup dataclass
+        return MigratedGroup.partial_info(ws_group, acc_group), acc_group
 
     return inner
 

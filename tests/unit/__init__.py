@@ -41,6 +41,12 @@ GROUPS = MockBackend.rows(
     "roles",
 )
 
+PERMISSIONS = MockBackend.rows(
+    "object_id",
+    "object_type",
+    "raw",
+)
+
 __dir = pathlib.Path(__file__).parent
 
 

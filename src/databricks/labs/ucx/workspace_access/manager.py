@@ -148,7 +148,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         logger.info("Permissions were applied")
         return True
 
-    def apply_group_permissions_private_preview_api(self, migration_state: MigrationState) -> bool:
+    def apply_group_permissions_experimental(self, migration_state: MigrationState) -> bool:
         if len(migration_state) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
