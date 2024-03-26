@@ -8,7 +8,6 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
-from databricks.sdk.service.iam import WorkspacePermission
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -91,20 +90,6 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
         ws_group = make_group(display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"])
         acc_group = make_acc_group(display_name=account_group_name, members=members)
         return ws_group, acc_group
-
-    return inner
-
-
-@pytest.fixture
-def make_migrated_group(acc, ws, make_group, make_acc_group):
-    """Create a pair of groups in workspace and account. Assign account group to workspace."""
-
-    def inner():
-        ws_group = make_group()
-        acc_group = make_acc_group()
-        acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [WorkspacePermission.USER])
-        # need to return both, as acc_group.id is not in MigratedGroup dataclass
-        return MigratedGroup.partial_info(ws_group, acc_group), acc_group
 
     return inner
 
