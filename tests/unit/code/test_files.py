@@ -72,7 +72,7 @@ def test_files_walks_directory():
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
 
-# the below is unmanageably slow when ran locally, so disabling for now
+# TODO the below is unmanageably slow when ran locally, so disabling for now
 # until I get clarifications on what would be done to run it faster
 # def test_files_for_cli():
 #     ws = workspace_client_mock()
