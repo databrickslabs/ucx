@@ -509,8 +509,8 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
 def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
     installation = Installation.current(w, 'ucx')
-    catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
-    catalog_schema.create_catalog_schema()
+    catalog_schema = CatalogSchema.for_cli(w, installation)
+    catalog_schema.create_all_catalogs_schemas(prompts)
 
 
 @ucx.command
