@@ -201,7 +201,7 @@ This section will help explain UCX Assessment findings and provide a recommended
 The assessment finding index is grouped by:
 - The 100 series findings are Databricks Runtime and compute configuration findings.
 - The 200 series findings are centered around data related observations.
-- The 300 series findings relate to potential issues arising from interactive usage on shared compute.
+- The 300 series findings relate to [Compute Access mode limitations for Unity Catalog](https://docs.databricks.com/en/compute/access-mode-limitations.html#spark-api-limitations-for-unity-catalog-shared-access-mode)
 
 [[back to top](#migration-assessment-report)]
 
@@ -351,30 +351,103 @@ CREATE TABLE [IF NOT EXISTS] table_name
 
 [[back to top](#migration-assessment-report)]
 
-### AF300.1 - 3 level namespace
+## AF300 - AF399
+The 300 series findings relate to [Compute Access mode limitations for Unity Catalog](https://docs.databricks.com/en/compute/access-mode-limitations.html#spark-api-limitations-for-unity-catalog-shared-access-mode)
 
-The `hive_metastore.` is used to refer to a 3 level namespace.
+Resolutions may include:
+
+-  Upgrade cluter runtime to latest LTS version (e.g. 14.3 LTS)
+
+-  Migrate users with GPU, Distributed ML, Spark Context, R type workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundry.
+
+-  Upgrade SQL only users (and BI tools) to SQL Warehouses (much better SQL / Warehouse experience and lower cost)
+
+-  For users with single node python ML requirements, Shared Compute with `%pip install` library support or Personal Compute with pools and compute controls may provide a better experience and better manageability.
+
+- For single node ML users on a crowded driver node of a large shared cluster, will get a better experience with Personal Compute policies combined with (warm) Compute pools
+
+### AF300.6 - 3 level namespace
+
+The `hive_metastore.` is used to refer to a 3 level namespace. Most customers will migrate hive_metastore to a workspace catalog (named based on the workspace name). The code should then map the `hive_metastore` to the appropriate catalog name.
+
+Easier solution is to define a default catalog for your session, job, cluster or workspace.
+
+Setting the Workspace default, use the admin UI or command line:
+```
+% databricks unity-catalog metastores assign --workspace-id 1234567890123456 \
+                                             --metastore-id 12345678-9999-9de3-3456-e789f0a12b34 \
+                                           --default-catalog-name my_catalog
+```
+
+Setting the Cluster or Job default catalog (in the spark configuration settings):
+```
+spark.databricks.sql.initial.catalog.name my_catalog
+```
+
+For JDBC, add to the JDBC connection URL:
+- `ConnCatalog=my_catalog`  (preferred)
+- `databricks.Catalog=my_catalog` (rare)
+
+For ODBC `.ini` file:
+```
+[Databricks]
+Driver=<path-to-driver>
+Host=<server-hostname>
+Port=443
+HTTPPath=<http-path>
+ThriftTransport=2
+SSL=1
+AuthMech=3
+UID=token
+PWD=<personal-access-token>
+Catalog=my_catalog
+```
 
 [[back to top](#migration-assessment-report)]
 
+### AF300.1 - r language support
+When using `%r` command cells, the user will receive `Your administrator has only allowed sql and python and scala commands on this cluster. This execution contained at least one disallowed language.` message.
+
+Recommend using Assigned (single user clusters).
+
+[[back to top](#migration-assessment-report)]
+
+### AF300.2 - scala language support
+Scala is supported on Databricks Runtime 13.3 and above.
+
+Recommend upgrading your shared cluster DBR to 13.3 LTS or greater or using Assigned data security mode (single user clusters).
+
+[[back to top](#migration-assessment-report)]
+
+### AF300.3 - Minimum DBR version
+The minimum DBR version to access Unity Catalog was not met. The recommendation is to upgrade to the latest Long Term Supported (LTS) version of the Databricks Runtime.
+
+### AF300.4 - ML Runtime cpu
+The Databricks ML Runtime is not supported on Shared Compute mode clusters. Recommend migrating these workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundry.
+
+### AF300.5 - ML Runtime gpu
+The Databricks ML Runtime is not supported on Shared Compute mode clusters. Recommend migrating these workloads to Assigned clusters. Implement cluster policies and pools to even out startup time and limit upper cost boundry.
+
 ### AF301.1 - spark.catalog.x
 
-The `spark.catalog.` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed/whitelisted on shared clusters due to security reasons.
+The `spark.catalog.` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed/whitelisted on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative.
 
 [[back to top](#migration-assessment-report)]
 
 ### AF301.2 - spark.catalog.x
 
-The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed/whitelisted on shared clusters due to security reasons.
+The `spark._jsparkSession.catalog` pattern was found. Commonly used functions in spark.catalog, such as tableExists, listTables, setDefault catalog are not allowed/whitelisted on shared clusters due to security reasons. `spark.sql("<sql command>)` may be a better alternative.
 
 [[back to top](#migration-assessment-report)]
 
-### AF302.x - Arbitrary Java
+## AF302.x - Arbitrary Java
 With Spark Connect on Shared clusters it is no longer possible to directly access the host JVM from the Python process. This means it is no longer possible to interact with Java classes or instantiate arbitrary Java classes directly from Python similar to the code below.
+
+Recommend finding the equivalent PySpark or Scala api.
 
 ### AF302.1 - Arbitrary Java
 
-The `spark._jspark` is used to execute arbitrary Java code. 
+The `spark._jspark` is used to execute arbitrary Java code.
 
 [[back to top](#migration-assessment-report)]
 
@@ -433,24 +506,15 @@ The `boto3` library is used.
 Instance profiles (AWS) and service principals/managed identity (Azure) are not supported from the Python/Scala REPL or UDFs, e.g. using boto3 or s3fs, Instance profiles are only set from init scripts and (internally) from Spark. 
 
 **Workarounds**
-For accessing cloud storage (S3, ADLS, GCS), use storage credentials and external locations. 
-For accessing non-storage cloud services (e.g., AWS secrets manager, etc), use
-
+For accessing cloud storage (S3), use storage credentials and external locations. 
 
 (AWS) Consider other ways to authenticate with boto3, e.g., by passing credentials from Databricks secrets directly to boto3 as a parameter, or loading them as environment variables. This page contains more information. Please note that unlike instance profiles, those methods do not provide short-lived credentials out of the box, and customers are responsible for rotating secrets according to their security needs.
 
-
-(Azure) Consider creating a Databricks secrets scope backed by Azure vault, and authenticate to external systems using secrets from that secrets scope
-
-
-(GCP) Some customers have used an external secrets store (like Hashicorp vault) and loaded credentials upon cluster startup into the cluster’s environment variables. Please note that those are usually not short-lived credentials, and customers are responsible for securing and rotation secrets according to their security needs.
-
-
 [[back to top](#migration-assessment-report)]
 
-### AF305.2 - boto3
+### AF305.2 - s3fs
 
-The `s3fs` library is used which provides posix type sematics for S3 access. s3fs is based on boto3 and has similar restrictions. The recommendation is to use EXTERNAL VOLUMES mapped to the fixed s3 storage location or Unity Catalog MANAGED VOLUMES.
+The `s3fs` library is used which provides posix type sematics for S3 access. s3fs is based on boto3 library and has similar restrictions. The recommendation is to use EXTERNAL VOLUMES mapped to the fixed s3 storage location or MANAGED VOLUMES.
 
 [[back to top](#migration-assessment-report)]
 
@@ -458,11 +522,24 @@ The `s3fs` library is used which provides posix type sematics for S3 access. s3f
 
 The `dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()` was found. This function may trigger a security exception in DBR 13.0 and above.
 
+The recommendation is to explore alternative APIs:
+```
+from dbruntime.databricks_repl_context import get_context
+context = get_context()
+context.__dict__
+```
+
 [[back to top](#migration-assessment-report)]
 
 ### AF306.2 - dbutils...getContext
 
 The `dbutils.notebook.entry_point.getDbutils().notebook().getContext()` was found. This function may trigger a security exception in DBR 13.0 and above.
+
+```
+from dbruntime.databricks_repl_context import get_context
+context = get_context()
+context.__dict__
+```
 
 [[back to top](#migration-assessment-report)]
 
@@ -474,7 +551,7 @@ The `dbutils.credentials.` is used for credential passthrough. This is not suppo
 
 ### AF311.1 - dbutils.fs
 
-The `dbutils.fs.` was found. DBUtils and other clients that directly read the data from cloud storage are not supported.
+The `dbutils.fs.` was found. DBUtils and other clients that directly read the data from cloud storage are not supported. Please note that `dbutils.fs` calls with /Volumes ([Volumes](https://docs.databricks.com/en/connect/unity-catalog/volumes.html)) will work.
 
 [[back to top](#migration-assessment-report)]
 
@@ -674,8 +751,8 @@ The `.wholeTextFiles` was found.
 
 [[back to top](#migration-assessment-report)]
 
-### AF314.0 - Distributed ML
-Databricks Runtime ML and Spark Machine Learning Library (MLlib) are not supported on shared Unity Catalog compute. The recommendation is to use Assigned mode, use cluster policies and compute (warm) pools to improve compute management.
+## AF314.* - Distributed ML
+Databricks Runtime ML and Spark Machine Learning Library (MLlib) are not supported on shared Unity Catalog compute. The recommendation is to use Assigned mode cluster; Use cluster policies and (warm) compute pools to improve compute and cost management.
 
 ### AF314.1 - Distributed ML
 
@@ -848,20 +925,6 @@ The `applyInPandasWithState` was found. The applyInPandasWithState operation is 
 
 [[back to top](#migration-assessment-report)]
 
-
-### AF350.0 - r language support
-When using `%r` command cells, the user will receive `Your administrator has only allowed sql and python and scala commands on this cluster. This execution contained at least one disallowed language.` message.
-
-Recommend using Assigned (single user clusters).
-
-[[back to top](#migration-assessment-report)]
-
-### AF350.0 - scala language support
-Scala is supported on Databricks Runtime 13.3 and above.
-
-Recommend upgrading your shared cluster DBR to 13.3 LTS or greater or using Assigned data security mode (single user clusters).
-
-[[back to top](#migration-assessment-report)]
 
 # Common Terms
 

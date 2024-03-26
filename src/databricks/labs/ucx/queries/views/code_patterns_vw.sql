@@ -1,5 +1,5 @@
 SELECT col1 AS pattern, col2 AS issue FROM values
-  ('hive_metastore.',                           'AF300.1 - 3 level namespace'),
+  ('hive_metastore.',                           'AF300.6 - 3 level namespace'),
   ('spark.catalog.',                            'AF301.1 - spark.catalog.x'),
   ('spark._jsparkSession.catalog',              'AF301.2 - spark.catalog.x'),
   ('spark._jspark',                             'AF302.1 - Arbitrary Java'),
@@ -12,7 +12,7 @@ SELECT col1 AS pattern, col2 AS issue FROM values
   
   ('spark.read.format("jdbc")',                 'AF304.1 - JDBC datasource'),
   ('boto3',                                     'AF305.1 - boto3'),
-  ('s3fs',                                      'AF305.2 - boto3'),
+  ('s3fs',                                      'AF305.2 - s3fs'),
 
   ('dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()', 'AF306.1 - dbutils...getContext'),
   ('dbutils.notebook.entry_point.getDbutils().notebook().getContext()',          'AF306.2 - dbutils...getContext'),
