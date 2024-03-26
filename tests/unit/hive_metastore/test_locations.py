@@ -315,6 +315,96 @@ def test_mount_listing_sub_folders():
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
         Table(
-            "hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/entity/domain/table1"
+            "hive_metastore",
+            "mounted_/mnt/test_mount",
+            "table1",
+            "EXTERNAL",
+            "DELTA",
+            "/mnt/test_mount/entity/domain/table1",
+        )
+    ]
+
+
+def test_partitioned_parquet_layout():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("/mnt/test_mount/entity", "entity", "", "")
+    first_partition = FileInfo("/mnt/test_mount/entity/xxx=yyy", "xxx=yyy", "", "")
+    first_partition_files = FileInfo("/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
+    second_partition = FileInfo("/mnt/test_mount/entity/xxx=zzz", "xxx=zzz", "", "")
+    second_partition_files = FileInfo("/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/test_mount":
+            return [first_folder]
+        if path == "/mnt/test_mount/entity":
+            return [first_partition, second_partition]
+        if path == "/mnt/test_mount/entity/xxx=yyy":
+            return [first_partition_files]
+        if path == "/mnt/test_mount/entity/xxx=zzz":
+            return [second_partition_files]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    assert results == [
+        Table(
+            "hive_metastore",
+            "mounted_/mnt/test_mount",
+            "entity",
+            "EXTERNAL",
+            "PARQUET",
+            "/mnt/test_mount/entity",
+            storage_properties="PARTITIONED",
+        )
+    ]
+
+
+def test_partitioned_delta():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("/mnt/test_mount/entity", "entity", "", "")
+    first_partition = FileInfo("/mnt/test_mount/entity/xxx=yyy", "xxx=yyy", "", "")
+    first_partition_files = FileInfo("/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
+    second_partition = FileInfo("/mnt/test_mount/entity/xxx=zzz", "xxx=zzz", "", "")
+    second_partition_files = FileInfo("/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
+    delta_log = FileInfo("/mnt/test_mount/entity/_delta_log", "_delta_log", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/test_mount":
+            return [first_folder]
+        if path == "/mnt/test_mount/entity":
+            return [first_partition, second_partition, delta_log]
+        if path == "/mnt/test_mount/entity/xxx=yyy":
+            return [first_partition_files]
+        if path == "/mnt/test_mount/entity/xxx=zzz":
+            return [second_partition_files]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    assert results == [
+        Table(
+            "hive_metastore",
+            "mounted_/mnt/test_mount",
+            "entity",
+            "EXTERNAL",
+            "DELTA",
+            "/mnt/test_mount/entity",
+            storage_properties="PARTITIONED",
         )
     ]

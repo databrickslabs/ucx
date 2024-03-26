@@ -303,6 +303,7 @@ class TablesInMounts(CrawlerBase[Table]):
                     object_type="EXTERNAL",
                     table_format=entry.format,
                     location=path,
+                    storage_properties="PARTITIONED" if entry.is_partitioned else None,
                 )
                 all_tables.append(table)
         return all_tables
@@ -323,7 +324,7 @@ class TablesInMounts(CrawlerBase[Table]):
 
             if entry.name == "_delta_log":
                 logger.debug(f"Found delta table {path}")
-                if delta_log_folders.get(path) and self._is_partitioned(entry.path):
+                if delta_log_folders.get(path) and delta_log_folders.get(path).is_partitioned:
                     delta_log_folders[path] = TableInMount(format="DELTA", is_partitioned=True)
                 else:
                     delta_log_folders[path] = TableInMount(format="DELTA", is_partitioned=False)
@@ -336,8 +337,8 @@ class TablesInMounts(CrawlerBase[Table]):
 
         return delta_log_folders
 
-    def _path_is_delta(self, delta_log_folders, path):
-        return delta_log_folders.get(path, {}) and delta_log_folders.get(path, {}).format == "DELTA"
+    def _path_is_delta(self, delta_log_folders, path: str) -> bool:
+        return delta_log_folders.get(path) and delta_log_folders.get(path).format == "DELTA"
 
     def _is_partitioned(self, entry: str) -> bool:
         partitioned_pattern = {'='}
