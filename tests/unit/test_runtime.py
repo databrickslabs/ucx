@@ -121,7 +121,7 @@ def test_migrate_permissions_private_api():
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
-    ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(100)
+    ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(0)
     apply_permissions_to_account_groups(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
     calls = [
         call("12345678", "workspace_group_1", "account_group_1", size=1000),
