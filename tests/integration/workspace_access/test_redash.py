@@ -3,9 +3,11 @@ import logging
 from datetime import timedelta
 from unittest import skip
 
+import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, sql
+from databricks.sdk.service.iam import WorkspacePermission
 
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.base import Permissions
@@ -17,18 +19,23 @@ from . import apply_tasks, apply_tasks_appliers, apply_tasks_crawlers
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_permissions_for_redash(
+    acc,
     ws,
-    make_ucx_group,
     make_group,
+    make_acc_group,
     make_user,
     make_query,
     make_query_permissions,
+    permission_manager,
+    use_permission_migration_api,
 ):
     ws_group = make_group()
     ws_group_temp = make_group()  # simulate temp/backup group
-    acc_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [WorkspacePermission.USER])
     user = make_user()
 
     query = make_query()
@@ -48,12 +55,18 @@ def test_permissions_for_redash(
         ws,
         [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
     )
-    apply_tasks(redash_permissions, [group_to_migrate])
+
+    if use_permission_migration_api:
+        permission_manager.apply_group_permissions_private_preview_api(MigrationState([group_to_migrate]))
+    else:
+        apply_tasks(redash_permissions, [group_to_migrate])
 
     query_permissions = redash_permissions.load_as_dict(sql.ObjectTypePlural.QUERIES, query.id)
-    # Note that we don't validate the original group permissions here because Redash support apply the permissions
-    # on the temp/backup group instead of the original group.
-    assert sql.PermissionLevel.CAN_EDIT == query_permissions[ws_group_temp.display_name]
+    if not use_permission_migration_api:
+        # Note that we don't validate the original group permissions here because Redash support apply the permissions
+        # on the temp/backup group instead of the original group.
+        # Permission migration API skips this step
+        assert sql.PermissionLevel.CAN_EDIT == query_permissions[ws_group_temp.display_name]
     assert sql.PermissionLevel.CAN_EDIT == query_permissions[acc_group.display_name]
     assert sql.PermissionLevel.CAN_EDIT == query_permissions[user.display_name]
 

@@ -187,7 +187,7 @@ class PermissionManager(CrawlerBase[Permissions]):
                 if response.permissions_migrated == 0:
                     logger.info("No more permission to migrated.")
                     break
-                logger.info(f"Migrated {batch_size} permissions.")
+                logger.info(f"Migrated {response.permissions_migrated} permissions.")
             except RuntimeError as e:
                 errors.append(e)
                 break
