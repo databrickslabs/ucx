@@ -7,7 +7,7 @@ from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
-    AwsIamRole,
+    AwsIamRoleRequest,
     Privilege,
     StorageCredentialInfo,
     ValidationResultResult,
@@ -57,7 +57,7 @@ class CredentialManager:
     def create(self, role_action: AWSRoleAction) -> StorageCredentialInfo:
         return self._ws.storage_credentials.create(
             role_action.role_name,
-            aws_iam_role=AwsIamRole(role_action.role_arn),
+            aws_iam_role=AwsIamRoleRequest(role_action.role_arn),
             comment=f"Created by UCX during migration to UC using AWS IAM Role: {role_action.role_name}",
             read_only=role_action.privilege == Privilege.READ_FILES.value,
         )

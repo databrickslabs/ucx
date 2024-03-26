@@ -2,7 +2,7 @@ import json
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk.service.catalog import AwsIamRole
+from databricks.sdk.service.catalog import AwsIamRoleRequest
 
 from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -35,7 +35,9 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     aws.create_uc_role(role_name)
     aws.put_role_policy(role_name, policy_name, s3_prefixes, account_id)
     ws.storage_credentials.create(
-        f"ucx_{rand}", aws_iam_role=AwsIamRole(role_arn=f"arn:aws:iam::{account_id}:role/{role_name}"), read_only=False
+        f"ucx_{rand}",
+        aws_iam_role=AwsIamRoleRequest(role_arn=f"arn:aws:iam::{account_id}:role/{role_name}"),
+        read_only=False,
     )
     installation = Installation(ws, rand)
     aws_permissions = AWSResourcePermissions(
