@@ -4,7 +4,7 @@ from pathlib import Path
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.code.languages import Languages
+from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 
 logger = logging.getLogger(__name__)

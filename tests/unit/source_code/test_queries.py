@@ -1,5 +1,5 @@
-from databricks.labs.ucx.code.base import Deprecation
-from databricks.labs.ucx.code.queries import FromTable
+from databricks.labs.ucx.source_code.base import Deprecation
+from databricks.labs.ucx.source_code.queries import FromTable
 
 
 def test_not_migrated_tables_trigger_nothing(empty_index):

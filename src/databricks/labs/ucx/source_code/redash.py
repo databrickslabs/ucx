@@ -1,7 +1,7 @@
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query
 
-from databricks.labs.ucx.code.base import Fixer
+from databricks.labs.ucx.source_code.base import Fixer
 
 
 class Redash:
