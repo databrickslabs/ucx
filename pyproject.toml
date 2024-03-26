@@ -158,7 +158,8 @@ omit = [
     "src/databricks/labs/ucx/mixins/*",
     "src/databricks/labs/ucx/code/lsp.py",
     "*/working-copy/*",
-    "*/fresh_wheel_file/*"
+    "*/fresh_wheel_file/*",
+    "*/__init__.py"
 ]
 exclude_lines = [
     "no cov",
