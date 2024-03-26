@@ -6,6 +6,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.code.languages import Languages
+from tests.unit import workspace_client_mock
 
 
 def test_files_fix_ignores_unsupported_extensions():
@@ -70,3 +71,10 @@ def test_files_walks_directory():
     files.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
+
+# the below is unmanageably slow when ran locally, so disabling for now
+# until I get clarifications on what would be done to run it faster
+# def test_files_for_cli():
+#     ws = workspace_client_mock()
+#     clazz = Files.for_cli(ws)
+#     assert clazz is not None
