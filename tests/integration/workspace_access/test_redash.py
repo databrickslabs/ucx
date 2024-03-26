@@ -7,7 +7,6 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam, sql
-from databricks.sdk.service.iam import WorkspacePermission
 
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.base import Permissions
@@ -22,10 +21,9 @@ logger = logging.getLogger(__name__)
 @pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_permissions_for_redash(
-    acc,
     ws,
     make_group,
-    make_acc_group,
+    make_acc_ws_group,
     make_user,
     make_query,
     make_query_permissions,
@@ -34,8 +32,7 @@ def test_permissions_for_redash(
 ):
     ws_group = make_group()
     ws_group_temp = make_group()  # simulate temp/backup group
-    acc_group = make_acc_group()
-    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [WorkspacePermission.USER])
+    acc_group = make_acc_ws_group()
     user = make_user()
 
     query = make_query()

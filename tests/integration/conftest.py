@@ -8,6 +8,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
+from databricks.sdk.service.iam import WorkspacePermission
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -90,6 +91,16 @@ def make_ucx_group(make_random, make_group, make_acc_group, make_user):
         ws_group = make_group(display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"])
         acc_group = make_acc_group(display_name=account_group_name, members=members)
         return ws_group, acc_group
+
+    return inner
+
+
+@pytest.fixture
+def make_acc_ws_group(acc, ws, make_acc_group):
+    def inner():
+        acc_group = make_acc_group()
+        acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [WorkspacePermission.USER])
+        return acc_group
 
     return inner
 
