@@ -115,7 +115,7 @@ def test_runtime_crawl_grants(mocker):
         assert "SELECT * FROM hive_metastore.ucx.grants" in sql_backend.queries
 
 
-# TODO crawl_permissions fails, but I don't think I can create tickets yet!
+# TODO crawl_permissions fails, filed GH issue #1129
 # def test_runtime_crawl_permissions(mocker):
 #     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
 #         pyspark_sql_session = mocker.Mock()
