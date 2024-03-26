@@ -4,8 +4,8 @@ from unittest.mock import Mock, create_autospec
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.code.files import Files
-from databricks.labs.ucx.code.languages import Languages
+from databricks.labs.ucx.source_code.files import Files
+from databricks.labs.ucx.source_code.languages import Languages
 from tests.unit import workspace_client_mock
 
 
