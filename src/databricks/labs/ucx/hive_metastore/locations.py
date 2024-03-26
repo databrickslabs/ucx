@@ -267,11 +267,17 @@ class TablesInMounts(CrawlerBase[Table]):
         inventory_database: str,
         mc: Mounts,
         include_mounts: list[str] | None = None,
+        filter_paths_in_mount: list[str] | None = None,
     ):
         super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
         self._mc = mc
         self._include_mounts = include_mounts
+
+        irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
+        if filter_paths_in_mount:
+            irrelevant_patterns.update(filter_paths_in_mount)
+        self._fiter_paths = irrelevant_patterns
 
     def snapshot(self) -> list[Table]:
         """
@@ -349,5 +355,4 @@ class TablesInMounts(CrawlerBase[Table]):
         return any(pattern in entry for pattern in parquet_patterns)
 
     def _is_irrelevant(self, entry: str) -> bool:
-        patterns = {'_SUCCESS', '_committed_', '_started_'}
-        return any(pattern in entry for pattern in patterns)
+        return any(pattern in entry for pattern in self._fiter_paths)

@@ -408,3 +408,34 @@ def test_partitioned_delta():
             storage_properties="PARTITIONED",
         )
     ]
+
+
+def test_filtering_irrelevant_paths():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("/mnt/test_mount/table1", "table1", "", "")
+    second_folder = FileInfo("/mnt/test_mount/$_azuretempfolder", "$_azuretempfolder", "", "")
+    first_folder_delta_log = FileInfo("/mnt/test_mount/table1/_delta_log", "_delta_log", "", "")
+    second_folder_delta_log = FileInfo("/mnt/test_mount/$_azuretempfolder/_delta_log", "_delta_log", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/test_mount":
+            return [first_folder, second_folder]
+        if path == "/mnt/test_mount/table1":
+            return [first_folder_delta_log]
+        if path == "/mnt/test_mount/$_azuretempfolder":
+            return [second_folder_delta_log]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts, filter_paths_in_mount=["$_azuretempfolder"]).snapshot()
+    assert results == [
+        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
+    ]

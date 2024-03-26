@@ -50,6 +50,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Whether the tables in mounts crawler should crawl a specific list of mounts.
     # If not specified, it will list all moubts.
     include_mounts: list[str] | None = None
+    filter_paths_in_mount: list[str] | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
