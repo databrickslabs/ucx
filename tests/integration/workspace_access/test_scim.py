@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
@@ -16,7 +17,11 @@ from . import apply_tasks
 @pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_some_entitlements(
-    ws, make_group, make_acc_ws_group, permission_manager: PermissionManager, use_permission_migration_api: bool
+    ws: WorkspaceClient,
+    make_group,
+    make_acc_ws_group,
+    permission_manager: PermissionManager,
+    use_permission_migration_api: bool,
 ):
     group_a = make_group()
     group_b = make_acc_ws_group()
