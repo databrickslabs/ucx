@@ -247,7 +247,7 @@ def test_mount_listing_one_table():
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
-        Table("hive_metastore", "tables_in_mounts", "test_mount", "EXTERNAL", "DELTA", "/mnt/test_mount/")
+        Table("hive_metastore", "mounted_/mnt/test_mount", "test_mount", "EXTERNAL", "DELTA", "/mnt/test_mount")
     ]
 
 
@@ -279,8 +279,8 @@ def test_mount_listing_multiple_folders():
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
-        Table("hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1/"),
-        Table("hive_metastore", "tables_in_mounts", "table2", "EXTERNAL", "PARQUET", "/mnt/test_mount/table2/"),
+        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
+        Table("hive_metastore", "mounted_/mnt/test_mount", "table2", "EXTERNAL", "PARQUET", "/mnt/test_mount/table2"),
     ]
 
 
@@ -315,6 +315,6 @@ def test_mount_listing_sub_folders():
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
         Table(
-            "hive_metastore", "tables_in_mounts", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/entity/domain/table1/"
+            "hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/entity/domain/table1"
         )
     ]

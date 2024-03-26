@@ -254,8 +254,7 @@ class Mounts(CrawlerBase[Mount]):
 
 @dataclass
 class TableInMount:
-    is_delta: bool
-    is_parquet: bool
+    format: str
     is_partitioned: bool
 
 
@@ -296,12 +295,13 @@ class TablesInMounts(CrawlerBase[Table]):
                 continue
             table_paths = self._find_delta_log_folders(mount.name)
             for path, entry in table_paths.items():
+                guess_table = os.path.basename(path)
                 table = Table(
                     catalog="hive_metastore",
-                    database="tables_in_mounts",
-                    name=self._get_table_name(path),
+                    database=f"mounted_{mount.name}",
+                    name=guess_table,
                     object_type="EXTERNAL",
-                    table_format="DELTA" if entry.is_delta else "PARQUET",
+                    table_format=entry.format,
                     location=path,
                 )
                 all_tables.append(table)
@@ -316,41 +316,37 @@ class TablesInMounts(CrawlerBase[Table]):
             if self._is_irrelevant(entry.name):
                 continue
 
-            path = self._get_absolute_directory(entry.path)
+            path = os.path.dirname(entry.path)
 
-            if self._is_parquet(entry.path):
-                if self._path_is_delta(delta_log_folders, path):
-                    continue
-                delta_log_folders[path] = TableInMount(is_delta=False, is_parquet=True, is_partitioned=False)
-            elif entry.name == "_delta_log":
+            if self._path_is_delta(delta_log_folders, path):
+                continue
+
+            if entry.name == "_delta_log":
                 logger.debug(f"Found delta table {path}")
-                delta_log_folders[path] = TableInMount(is_delta=True, is_parquet=False, is_partitioned=False)
+                if delta_log_folders.get(path) and self._is_partitioned(entry.path):
+                    delta_log_folders[path] = TableInMount(format="DELTA", is_partitioned=True)
+                else:
+                    delta_log_folders[path] = TableInMount(format="DELTA", is_partitioned=False)
+            elif self._is_partitioned(entry.path):
+                delta_log_folders[path] = TableInMount(format="PARQUET", is_partitioned=True)
+            elif self._is_parquet(entry.path):
+                delta_log_folders[path] = TableInMount(format="PARQUET", is_partitioned=False)
             else:
                 self._find_delta_log_folders(entry.path, delta_log_folders)
 
         return delta_log_folders
 
-    def _get_absolute_directory(self, path):
-        """
-        Returns the absolute directory of a given path.
-        Example: _get_absolute_directory('/mnt/test/123/dxs/aaa.parquet') -> /mnt/test/123/dxs/
-        """
-        return re.search(r'^(.*/)[^/]+/?', path).group(1)
-
-    def _get_table_name(self, path):
-        """
-        Returns the parent directory of a given path.
-        Example: _get_table_name('/mnt/test/123/dxs/aaa.parquet') -> dxs
-        """
-        return re.search("([^/]+)/?$", path, re.IGNORECASE).group(1)
-
     def _path_is_delta(self, delta_log_folders, path):
-        return delta_log_folders.get(path, {}) and delta_log_folders.get(path, {}).is_delta
+        return delta_log_folders.get(path, {}) and delta_log_folders.get(path, {}).format == "DELTA"
+
+    def _is_partitioned(self, entry: str) -> bool:
+        partitioned_pattern = {'='}
+        return any(pattern in entry for pattern in partitioned_pattern)
 
     def _is_parquet(self, entry: str) -> bool:
         parquet_patterns = {'.parquet'}
         return any(pattern in entry for pattern in parquet_patterns)
 
     def _is_irrelevant(self, entry: str) -> bool:
-        patterns = {'_SUCCESS', '_committed_', '_started_', '='}
+        patterns = {'_SUCCESS', '_committed_', '_started_'}
         return any(pattern in entry for pattern in patterns)
