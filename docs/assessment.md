@@ -448,7 +448,7 @@ For accessing non-storage cloud services (e.g., AWS secrets manager, etc), use
 
 [[back to top](#migration-assessment-report)]
 
-### AF305.2 - boto3
+### AF305.2 - s3fs
 
 The `s3fs` library is used which provides posix type sematics for S3 access. s3fs is based on boto3 and has similar restrictions. The recommendation is to use EXTERNAL VOLUMES mapped to the fixed s3 storage location or Unity Catalog MANAGED VOLUMES.
 
