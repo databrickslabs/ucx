@@ -374,9 +374,7 @@ Easier solution is to define a default catalog for your session, job, cluster or
 
 Setting the Workspace default, use the admin UI or command line:
 ```
-% databricks unity-catalog metastores assign --workspace-id 1234567890123456 \
-                                             --metastore-id 12345678-9999-9de3-3456-e789f0a12b34 \
-                                           --default-catalog-name my_catalog
+% databricks settings update-default-workspace-namespace
 ```
 
 Setting the Cluster or Job default catalog (in the spark configuration settings):
