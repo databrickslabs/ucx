@@ -1,20 +1,25 @@
 from datetime import timedelta
 
+import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.workspace_access.base import Permissions
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 from . import apply_tasks
 
 
+@pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_some_entitlements(ws, make_group):
+def test_some_entitlements(
+    ws, make_group, make_acc_ws_group, permission_manager: PermissionManager, use_permission_migration_api: bool
+):
     group_a = make_group()
-    group_b = make_group()
+    group_b = make_acc_ws_group()
     ws.groups.patch(
         group_a.id,
         operations=[
@@ -31,12 +36,11 @@ def test_some_entitlements(ws, make_group):
     _, before = scim_support.load_for_group(group_a.id)
     assert "databricks-sql-access" in before
 
-    apply_tasks(
-        scim_support,
-        [
-            MigratedGroup.partial_info(group_a, group_b),
-        ],
-    )
+    migrated_groups: list[MigratedGroup] = [MigratedGroup.partial_info(group_a, group_b)]
+    if use_permission_migration_api:
+        permission_manager.apply_group_permissions_private_preview_api(MigrationState(migrated_groups))
+    else:
+        apply_tasks(scim_support, migrated_groups)
 
     _, after = scim_support.load_for_group(group_b.id)
     assert "databricks-sql-access" in after
