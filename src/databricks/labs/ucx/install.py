@@ -1,6 +1,7 @@
 import functools
 import logging
 import os
+import re
 import time
 import webbrowser
 from collections.abc import Callable
@@ -96,6 +97,13 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
+def extract_major_minor(version_string):
+    match = re.search(r'(\d+\.\d+)', version_string)
+    if match:
+        return match.group(1)
+    return None
+
+
 class WorkspaceInstaller:
     def __init__(
         self,
@@ -149,13 +157,13 @@ class WorkspaceInstaller:
                 raise err.errs[0] from None
             raise err
 
-    def _check_remote_local_versions(self):
+    def _compare_remote_local_versions(self):
         try:
-            local_version = self._product_info.version()
+            local_version = self._product_info.released_version()
             remote_version = self._installation.load(Version).version
-            if remote_version == local_version:
+            if extract_major_minor(remote_version) == extract_major_minor(local_version[:4]):
                 logger.info(f"UCX v{self._product_info.version()} is already installed on this workspace")
-                msg = "Do you want to change the existing installation?"
+                msg = "Do you want to update the existing installation?"
                 if not self._prompts.confirm(msg):
                     raise RuntimeWarning("Remote and Local versions are same and no override is requested. Exiting...")
         except NotFound as err:
@@ -188,7 +196,7 @@ class WorkspaceInstaller:
     def configure(self) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
-            self._check_remote_local_versions()
+            self._compare_remote_local_versions()
             if self._confirm_force_install():
                 return self._configure_new_installation()
             self._apply_upgrades()

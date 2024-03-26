@@ -1498,6 +1498,7 @@ def test_validate_step(ws, any_prompt, result_state, expected):
 
     assert workflows_installer.validate_step("assessment") == expected
 
+
 def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     ws.jobs.run_now = mocker.Mock()
 
@@ -1513,7 +1514,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     )
 
     product_info = create_autospec(ProductInfo)
-    product_info.version.return_value = "0.3.0"
+    product_info.released_version.return_value = "0.3.0"
 
     installation = MockInstallation(
         {
@@ -1539,7 +1540,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
 
     first_prompts = base_prompts.extend(
         {
-            r"Do you want to change the existing installation?": "yes",
+            r"Do you want to update the existing installation?": "yes",
         }
     )
     install = WorkspaceInstaller(first_prompts, installation, ws, product_info)
@@ -1548,8 +1549,8 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     config = install.configure()
     assert config.inventory_database == "ucx_user"
 
-    # finishes successfully when versions match and no override is provided/needed
-    product_info.version.return_value = "0.3.1"
+    # finishes successfully when versions don't match and no override is provided/needed
+    product_info.released_version.return_value = "0.4.1"
     install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
     config = install.configure()
     assert config.inventory_database == "ucx_user"
