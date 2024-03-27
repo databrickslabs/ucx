@@ -26,8 +26,8 @@ class Files:
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
-            for folder in path.iterdir():
-                self.apply(folder)
+            for child_path in path.iterdir():
+                self.apply(child_path)
             return True
         return self._apply_file_fix(path)
 
