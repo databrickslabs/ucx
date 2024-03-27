@@ -1,0 +1,18 @@
+{
+  "created_time": 1694536604319,
+  "creator_user_name": "anonymous@databricks.com",
+  "job_id": 3001,
+  "settings": {
+    "name": "On Simplest Autoscale",
+    "tasks": [
+      {
+        "task_key": "spark_jar_task",
+        "existing_cluster_id": "azure-spn-secret",
+        "spark_jar_task": {
+           "jar_uri": "/foo/bar",
+           "main_class_name": "foo"
+        }
+      }
+    ]
+  }
+}

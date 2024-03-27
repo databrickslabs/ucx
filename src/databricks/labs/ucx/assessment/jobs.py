@@ -87,9 +87,8 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
                 continue
             cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
             cluster_failures = self._check_cluster_failures(cluster_details, "Job cluster")
-            jar_task_check = self._is_jar_task(job.settings.tasks)
-            job_failuers = cluster_failures.extend(jar_task_check)
-            job_assessment[job_id].update(job_failuers)
+            cluster_failures.extend(self._is_jar_task(job.settings.tasks))
+            job_assessment[job_id].update(cluster_failures)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
         for job_key in job_details.keys():  # pylint: disable=consider-using-dict-items,consider-iterating-dictionary
@@ -135,11 +134,11 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
 
-    def _is_jar_task(self, all_task: list(RunTask)):
+    def _is_jar_task(self, all_task: list[RunTask]) -> list[str]:
         task_failures: list[str] = []
         for task in all_task:
             if task.spark_jar_task:
-                task_failures.append(f"{task.task_key} is a spark_jar_task")
+                task_failures.append(f"task {task.task_key} is a jar task")
         return task_failures
 
 
@@ -351,4 +350,4 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
             if cluster_details:
                 task_failures.extend(self._check_cluster_failures(cluster_details, _task_key))
             if task.spark_jar_task:
-                task_failures.append(f"{task.task_key} is a spark_jar_task")
+                task_failures.append(f"task {task.task_key} is a jar task")

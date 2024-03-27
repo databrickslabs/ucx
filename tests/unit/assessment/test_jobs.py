@@ -34,6 +34,15 @@ def test_job_assessment_no_job_settings():
     assert len(result_set) == 0
 
 
+def test_spark_jar_task_failures():
+    ws = workspace_client_mock(job_ids=['spark-jar-task'], cluster_ids=['azure-spn-secret'])
+    sql_backend = MockBackend()
+    result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
+    assert len(result_set) == 1
+    assert result_set[0].success == 0
+    assert "task spark_jar_task is a jar task" in result_set[0].failures
+
+
 def test_job_assessment_for_azure_spark_config():
     ws = workspace_client_mock(job_ids=['on-azure-spn-secret'], cluster_ids=['azure-spn-secret'])
     sql_backend = MockBackend()
@@ -55,7 +64,8 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     sql_backend = MockBackend()
     JobsCrawler(ws, sql_backend, "ucx").snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "append")
-    assert result == [Row(job_id='9001', success=1, failures='[]', has_jar_task=0, job_name='No Tasks', creator=None)]
+    print(result)
+    assert result == [Row(job_id='9001', success=1, failures='[]', job_name='No Tasks', creator=None)]
 
 
 @pytest.mark.parametrize(
@@ -81,7 +91,12 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
         ),
         (['gitsource_task'], ['outdated-autoscale'], '[123]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
         (['dbt_task'], ['outdated-autoscale'], '[123]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
-        (['jar_task'], ['outdated-autoscale'], '[123]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
+        (
+            ['jar_task'],
+            ['outdated-autoscale'],
+            '[123]',
+            '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]',
+        ),
         (['python_wheel_task'], ['outdated-autoscale'], '[123]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
         (['run_condition_task'], ['outdated-autoscale'], '[123]', '["not supported DBR: 9.3.x-cpu-ml-scala2.12"]'),
         (['notebook_no_failure_task'], ['simplest-autoscale'], '[123]', '[]'),
@@ -98,6 +113,7 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
             '[123]',
             '["unsupported config: spark.databricks.passthrough.enabled"]',
         ),
+        (['spark_jar_task'], ['simplest-autoscale'], '[123]', '["task jar is a jar task"]'),
     ],
 )
 def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
