@@ -19,8 +19,10 @@ from databricks.labs.ucx.runtime import (
     assess_azure_service_principals,
     crawl_grants,
     migrate_dbfs_root_delta_tables,
-    migrate_external_tables_sync, rename_workspace_local_groups_experimental,
-    reflect_account_groups_on_workspace_experimental, validate_groups_permissions_experimental,
+    migrate_external_tables_sync,
+    reflect_account_groups_on_workspace_experimental,
+    rename_workspace_local_groups_experimental,
+    validate_groups_permissions_experimental,
 )
 from tests.unit import GROUPS, PERMISSIONS
 
