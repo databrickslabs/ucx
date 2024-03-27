@@ -5,7 +5,6 @@ SELECT
     job_name,
     success,
     failures,
-    has_jar_task,
     creator
 FROM $inventory.jobs
 WHERE job_name not like '[UCX]%'
