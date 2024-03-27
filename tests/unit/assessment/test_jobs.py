@@ -64,7 +64,6 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     sql_backend = MockBackend()
     JobsCrawler(ws, sql_backend, "ucx").snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "append")
-    print(result)
     assert result == [Row(job_id='9001', success=1, failures='[]', job_name='No Tasks', creator=None)]
 
 
