@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import timedelta
 
+import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import NotFound
 from databricks.sdk.retries import retried
@@ -9,7 +10,8 @@ from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.workspace_access.base import Permissions
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import MigrationState
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
 from . import apply_tasks
@@ -17,27 +19,33 @@ from . import apply_tasks
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_permissions_for_secrets(ws: WorkspaceClient, make_group, make_secret_scope, make_secret_scope_acl):
-    group_a = make_group()
-    group_b = make_group()
+def test_permissions_for_secrets(
+    ws: WorkspaceClient,
+    make_migrated_group,
+    make_secret_scope,
+    make_secret_scope_acl,
+    permission_manager: PermissionManager,
+    use_permission_migration_api: bool,
+):
+    migrated_group = make_migrated_group()
 
     scope = make_secret_scope()
-    make_secret_scope_acl(scope=scope, principal=group_a.display_name, permission=AclPermission.WRITE)
+    make_secret_scope_acl(scope=scope, principal=migrated_group.name_in_workspace, permission=AclPermission.WRITE)
 
-    scope_acl = ws.secrets.get_acl(scope, group_a.display_name)
+    scope_acl = ws.secrets.get_acl(scope, migrated_group.name_in_workspace)
 
     secret_support = SecretScopesSupport(ws)
-    apply_tasks(
-        secret_support,
-        [
-            MigratedGroup.partial_info(group_a, group_b),
-        ],
-    )
 
-    reflected_scope_acls = ws.secrets.get_acl(scope, group_b.display_name)
+    if use_permission_migration_api:
+        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+    else:
+        apply_tasks(secret_support, [migrated_group])
 
-    assert reflected_scope_acls.principal == group_b.display_name
+    reflected_scope_acls = ws.secrets.get_acl(scope, migrated_group.name_in_account)
+
+    assert reflected_scope_acls.principal == migrated_group.name_in_account
     assert scope_acl.permission == reflected_scope_acls.permission
 
 

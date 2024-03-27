@@ -1,12 +1,13 @@
 import os.path
 import sys
-from unittest.mock import create_autospec, patch
+from unittest.mock import call, create_autospec, patch
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
+from databricks.sdk.service.iam import PermissionMigrationResponse
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-private-name
@@ -15,6 +16,7 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
 )
 from databricks.labs.ucx.runtime import (
     apply_permissions_to_account_groups,
+    apply_permissions_to_account_groups_experimental,
     assess_azure_service_principals,
     assess_clusters,
     assess_global_init_scripts,
@@ -32,8 +34,12 @@ from databricks.labs.ucx.runtime import (
     guess_external_locations,
     migrate_dbfs_root_delta_tables,
     migrate_external_tables_sync,
+    reflect_account_groups_on_workspace_experimental,
+    rename_workspace_local_groups_experimental,
+    validate_groups_permissions_experimental,
     workspace_listing,
 )
+from tests.unit import GROUPS, PERMISSIONS
 
 
 def azure_mock_config() -> WorkspaceConfig:
@@ -304,3 +310,86 @@ def test_runtime_apply_permissions_to_account_groups(mocker):
         apply_permissions_to_account_groups(cfg, ws, sql_backend, mock_installation())
 
         assert "SELECT * FROM hive_metastore.ucx.groups" in sql_backend.queries
+
+
+def test_rename_workspace_local_group(caplog):
+    ws = create_autospec(WorkspaceClient)
+    rename_workspace_local_groups_experimental(azure_mock_config(), ws, MockBackend(), mock_installation())
+
+
+def test_reflect_account_groups_on_workspace(caplog):
+    ws = create_autospec(WorkspaceClient)
+    reflect_account_groups_on_workspace_experimental(azure_mock_config(), ws, MockBackend(), mock_installation())
+
+
+def test_validate_groups_permissions(caplog):
+    ws = create_autospec(WorkspaceClient)
+    rows = {
+        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+    }
+    validate_groups_permissions_experimental(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
+
+
+def test_migrate_permissions_experimental():
+    rows = {
+        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+            ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
+            ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
+            ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
+        ],
+        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+    }
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = "12345678"
+    ws.permission_migration.migrate_permissions.return_value = PermissionMigrationResponse(0)
+    apply_permissions_to_account_groups_experimental(
+        azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
+    )
+    calls = [
+        call("12345678", "workspace_group_1", "account_group_1", size=1000),
+        call("12345678", "workspace_group_2", "account_group_2", size=1000),
+        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+    ]
+    ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
+
+
+def test_migrate_permissions_experimental_paginated():
+    rows = {
+        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+            ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
+            ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
+            ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
+        ],
+        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+    }
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = "12345678"
+    ws.permission_migration.migrate_permissions.side_effect = [
+        PermissionMigrationResponse(i) for i in (1000, None, 1000, 10, 0, 1000, 10, 0)
+    ]
+    apply_permissions_to_account_groups_experimental(
+        azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
+    )
+    calls = [
+        call("12345678", "workspace_group_1", "account_group_1", size=1000),
+        call("12345678", "workspace_group_2", "account_group_2", size=1000),
+        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+    ]
+    ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
+
+
+def test_migrate_permissions_experimental_error(caplog):
+    rows = {
+        'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
+            ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
+            ("", "workspace_group_2", "account_group_2", "temp_2", "", "", "", ""),
+            ("", "workspace_group_3", "account_group_3", "temp_3", "", "", "", ""),
+        ],
+    }
+    ws = create_autospec(WorkspaceClient)
+    ws.get_workspace_id.return_value = "12345678"
+    ws.permission_migration.migrate_permissions.side_effect = NotImplementedError("api not enabled")
+    with pytest.raises(NotImplementedError):
+        apply_permissions_to_account_groups_experimental(
+            azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
+        )

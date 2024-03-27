@@ -28,7 +28,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
-from .. import table_mapping_mock, workspace_client_mock
+from .. import GROUPS, table_mapping_mock, workspace_client_mock
 
 logger = logging.getLogger(__name__)
 
@@ -600,16 +600,6 @@ def test_table_status_seen_tables():
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
-GROUPS = MockBackend.rows(
-    "id_in_workspace",
-    "name_in_workspace",
-    "name_in_account",
-    "temporary_name",
-    "members",
-    "entitlements",
-    "external_id",
-    "roles",
-)
 
 
 def test_migrate_acls_should_produce_proper_queries(ws, caplog):

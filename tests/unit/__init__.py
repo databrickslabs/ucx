@@ -5,6 +5,7 @@ import pathlib
 from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
@@ -28,6 +29,23 @@ DEFAULT_CONFIG = {
         },
     },
 }
+
+GROUPS = MockBackend.rows(
+    "id_in_workspace",
+    "name_in_workspace",
+    "name_in_account",
+    "temporary_name",
+    "members",
+    "entitlements",
+    "external_id",
+    "roles",
+)
+
+PERMISSIONS = MockBackend.rows(
+    "object_id",
+    "object_type",
+    "raw",
+)
 
 __dir = pathlib.Path(__file__).parent
 
