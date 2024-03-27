@@ -24,14 +24,14 @@ iteractive_cluster_commands (
     WHERE a.event_date >= DATE_SUB(CURRENT_DATE(), 90)
 ),
 misc_patterns(
-    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM $inventory.misc_patterns_vw
+    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM $inventory.misc_patterns
 ),
 pattern_matcher(
     SELECT
         array_except(array(p.issue, lp.issue, rv.issue,dbr_type.issue), array(null)) issues,
         a.*
     FROM iteractive_cluster_commands a
-        LEFT OUTER JOIN $inventory.code_patterns_vw p 
+        LEFT OUTER JOIN $inventory.code_patterns p 
             ON a.commandLanguage in ('python','scala')
                 AND contains(a.commandText, p.pattern)
         LEFT OUTER JOIN misc_patterns lp                                                       
