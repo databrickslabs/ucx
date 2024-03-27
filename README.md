@@ -70,7 +70,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 - Databricks Workspace Administrator privileges for the user, that runs the installation. Running UCX as a Service Principal is not supported.
 - Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
 - Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
-- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read the [this guide](docs/external_hms_glue.md).
+- If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](docs/external_hms_glue.md).
 - Databricks Workspace has to have network access to [pypi.org](https://pypi.org) to download `databricks-sdk` and `pyyaml` packages.
 - A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
 
@@ -422,6 +422,7 @@ access the configuration file from the command line. Here's the description of c
   * `spark_conf`: An optional dictionary of Spark configuration properties.
   * `override_clusters`: An optional dictionary mapping job cluster names to existing cluster IDs.
   * `policy_id`: An optional string representing the ID of the cluster policy.
+  * `is_terraform_used`: A boolean value indicating whether some workspace resources are managed by Terraform.
   * `include_databases`: An optional list of strings representing the names of databases to include for migration.
 
 [[back to top](#databricks-labs-ucx)]
