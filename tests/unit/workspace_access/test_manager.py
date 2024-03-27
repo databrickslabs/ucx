@@ -1,10 +1,13 @@
 import json
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
+from databricks.labs.ucx.workspace_access.base import AclSupport
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
 
@@ -12,6 +15,11 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager, Perm
 @pytest.fixture
 def mock_backend():
     return MockBackend()
+
+
+@pytest.fixture
+def mock_ws():
+    return create_autospec(WorkspaceClient)
 
 
 def test_inventory_table_manager_init(mock_backend):
@@ -72,7 +80,7 @@ def test_load_all_no_rows_present():
         permission_manager.load_all()
 
 
-def test_manager_inventorize(mock_backend, mocker):
+def test_manager_inventorize(mock_ws, mock_backend, mocker):
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
     permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
@@ -140,7 +148,7 @@ def test_manager_apply(mocker):
     group_migration_state = MigrationState(
         [
             MigratedGroup(
-                id_in_workspace=None,
+                id_in_workspace="",
                 name_in_workspace="group",
                 name_in_account="group",
                 temporary_name="group_backup",
@@ -169,11 +177,10 @@ def test_unregistered_support():
     permission_manager.apply_group_permissions(migration_state=MigrationState([]))
 
 
-def test_factory(mocker):
-    ws = mocker.Mock()
-    ws.groups.list.return_value = []
+def test_factory(mock_ws):
+    mock_ws.groups.list.return_value = []
     sql_backend = MockBackend()
-    permission_manager = PermissionManager.factory(ws, sql_backend, "test")
+    permission_manager = PermissionManager.factory(mock_ws, sql_backend, "test")
     appliers = permission_manager.object_type_support()
 
     assert sorted(
@@ -210,7 +217,7 @@ def test_factory(mocker):
     ) == sorted(appliers.keys())
 
 
-def test_manager_verify(mocker):
+def test_manager_verify():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -239,7 +246,7 @@ def test_manager_verify(mocker):
 
     # has to be set, as it's going to be appended through multiple threads
     items = set()
-    mock_verifier = mocker.Mock()
+    mock_verifier = create_autospec(AclSupport)
     mock_verifier.object_types = lambda: {"clusters"}
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: lambda: items.add(f"{item.object_id} {item.object_id}")
@@ -251,7 +258,7 @@ def test_manager_verify(mocker):
     assert {"test test"} == items
 
 
-def test_manager_verify_not_supported_type(mocker):
+def test_manager_verify_not_supported_type():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -278,7 +285,7 @@ def test_manager_verify_not_supported_type(mocker):
         }
     )
 
-    mock_verifier = mocker.Mock()
+    mock_verifier = create_autospec(AclSupport)
     mock_verifier.object_types = lambda: {"not_supported"}
     permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
 
@@ -286,7 +293,7 @@ def test_manager_verify_not_supported_type(mocker):
         permission_manager.verify_group_permissions()
 
 
-def test_manager_verify_no_tasks(mocker):
+def test_manager_verify_no_tasks():
     sql_backend = MockBackend(
         rows={
             "SELECT object_id": [
@@ -313,7 +320,7 @@ def test_manager_verify_no_tasks(mocker):
         }
     )
 
-    mock_verifier = mocker.Mock()
+    mock_verifier = create_autospec(AclSupport)
     mock_verifier.object_types = lambda: {"clusters"}
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: None
@@ -322,3 +329,12 @@ def test_manager_verify_no_tasks(mocker):
     result = permission_manager.verify_group_permissions()
 
     assert result
+
+
+def test_manager_apply_experimental_no_tasks(mock_ws, caplog):
+
+    group_migration_state = MigrationState([])
+
+    with caplog.at_level("INFO"):
+        group_migration_state.apply_group_permissions_experimental(mock_ws)
+        assert "No valid groups selected, nothing to do." in caplog.messages

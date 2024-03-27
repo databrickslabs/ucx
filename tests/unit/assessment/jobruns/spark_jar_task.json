@@ -1,0 +1,16 @@
+{
+  "run_name": "jar task run",
+  "run_id": "123",
+  "start_time": 1704085200000,
+  "timeout_seconds": 86400,
+  "tasks": [
+    {
+      "task_key": "jar",
+      "existing_cluster_id": "simplest-autoscale",
+      "spark_jar_task": {
+        "jar_uri": "/foo/bar",
+        "main_class_name": "foo"
+      }
+    }
+  ]
+}

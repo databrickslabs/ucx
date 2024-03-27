@@ -87,6 +87,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
                 continue
             cluster_details = ClusterDetails.from_dict(cluster_config.as_dict())
             cluster_failures = self._check_cluster_failures(cluster_details, "Job cluster")
+            cluster_failures.extend(self._check_jar_task(job.settings.tasks))
             job_assessment[job_id].update(cluster_failures)
 
         # TODO: next person looking at this - rewrite, as this code makes no sense
@@ -116,6 +117,7 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
             job_name = job_settings.name
             if not job_name:
                 job_name = "Unknown"
+
             job_details[job.job_id] = JobInfo(
                 job_id=str(job.job_id),
                 job_name=job_name,
@@ -131,6 +133,13 @@ class JobsCrawler(CrawlerBase[JobInfo], JobsMixin, CheckClusterMixin):
     def _try_fetch(self) -> Iterable[JobInfo]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
             yield JobInfo(*row)
+
+    def _check_jar_task(self, all_task: list[RunTask]) -> list[str]:
+        task_failures: list[str] = []
+        for task in all_task:
+            if task.spark_jar_task:
+                task_failures.append(f"task {task.task_key} is a jar task")
+        return task_failures
 
 
 @dataclass
@@ -340,3 +349,5 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
                 cluster_details = clusters.get(task.existing_cluster_id, None)
             if cluster_details:
                 task_failures.extend(self._check_cluster_failures(cluster_details, _task_key))
+            if task.spark_jar_task:
+                task_failures.append(f"task {task.task_key} is a jar task")
