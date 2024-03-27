@@ -24,7 +24,8 @@ SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
             WHEN size_in_bytes < 100000000 THEN CONCAT(CAST(round(size_in_bytes/1024/1024,2) AS string),"MB")
             WHEN size_in_bytes < 100000000000 THEN CONCAT(CAST(round(size_in_bytes/1024/1024/1024,2) AS string),"GB")
             ELSE CONCAT(CAST(round(size_in_bytes/1024/1024/1024/1024,2) AS string),"TB")
-       END AS table_size
+       END AS table_size,
+       IF(is_partitioned is true, "Yes", "No") AS is_partitioned
 FROM $inventory.tables left outer join $inventory.table_size on
 $inventory.tables.catalog = $inventory.table_size.catalog and
 $inventory.tables.database = $inventory.table_size.database and

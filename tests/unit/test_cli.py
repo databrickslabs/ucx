@@ -10,6 +10,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam, sql
+from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.workspace import ObjectInfo
 
@@ -452,6 +453,7 @@ def test_migrate_locations_gcp(ws, caplog):
 
 def test_create_catalogs_schemas(ws):
     prompts = MockPrompts({'.*': 's3://test'})
+    ws.external_locations.list.return_value = [ExternalLocationInfo(url="s3://test")]
     create_catalogs_schemas(ws, prompts)
     ws.catalogs.list.assert_called_once()
 
