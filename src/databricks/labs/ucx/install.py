@@ -41,7 +41,11 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
-from databricks.labs.ucx.hive_metastore.tables import Table, TableError, AclMigrationWhat
+from databricks.labs.ucx.hive_metastore.tables import (
+    AclMigrationWhat,
+    Table,
+    TableError,
+)
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
@@ -210,11 +214,7 @@ class WorkspaceInstaller:
 
         # Confirm grant migration strategy
         grant_migration_strategy = self._prompts.choice_from_dict(
-            "Select grant migration strategy?",
-            {
-                "None": None,
-                "Table ACL": AclMigrationWhat.LEGACY_TACL
-            }
+            "Select grant migration strategy?", {"None": None, "Table ACL": AclMigrationWhat.LEGACY_TACL}
         )
 
         config = WorkspaceConfig(

@@ -468,6 +468,7 @@ def test_save_config(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "2",
             r".*": "",
             r".*days to analyze submitted runs.*": "1",
+            r".*grant migration strategy.*": 0,
         }
     )
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
@@ -498,6 +499,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r".*workspace group names.*": "g1, g2, g99",
+            r".*grant migration strategy.*": 0,
             r".*": "",
         }
     )
@@ -542,6 +544,7 @@ def test_create_cluster_policy(ws, mock_installation):
             r".*workspace group names.*": "g1, g2, g99",
             r".*We have identified one or more cluster.*": "No",
             r".*Choose a cluster policy.*": "0",
+            r".*grant migration strategy.*": 0,
             r".*": "",
         }
     )
@@ -1101,6 +1104,7 @@ def test_open_config(ws, mocker, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r".*workspace group names.*": "g1, g2, g99",
+            r".*grant migration strategy.*": 0,
             r"Open config file in.*": "yes",
             r".*": "",
         }
@@ -1119,6 +1123,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r"Comma-separated list of databases to migrate.*": "db1,db2",
+            r".*grant migration strategy.*": 0,
             r".*": "",
         }
     )
@@ -1229,6 +1234,7 @@ def test_fresh_install(ws, mock_installation):
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
+            r".*grant migration strategy.*": 0,
             r"Open config file in.*": "no",
             r".*": "",
         }
@@ -1283,11 +1289,12 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     ws.jobs.delete.assert_called_with("123")
 
 
-def test_get_existing_installation_global(ws, mock_installation, mocker):
+def test_get_existing_installation_global(ws, mock_installation):
     base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
+            r".*grant migration strategy.*": 0,
             r"Open config file in.*": "no",
             r".*": "",
         }
