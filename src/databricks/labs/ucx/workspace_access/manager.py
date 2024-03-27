@@ -80,9 +80,7 @@ class PermissionManager(CrawlerBase[Permissions]):
         grants_crawler = GrantsCrawler(tables_crawler, udfs_crawler)
         tacl_support = TableAclSupport(grants_crawler, sql_backend)
         return cls(
-            sql_backend,
-            inventory_database,
-            [generic_support, sql_support, secrets_support, scim_support, tacl_support],
+            sql_backend, inventory_database, [generic_support, sql_support, secrets_support, scim_support, tacl_support]
         )
 
     def inventorize_permissions(self):
