@@ -46,7 +46,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Flag to see if terraform has been used for deploying certain entities
     is_terraform_used: bool = False
 
-    # Flag to see if terraform has been used for deploying certain entities
     grant_migration_strategy: AclMigrationWhat | None = None
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.

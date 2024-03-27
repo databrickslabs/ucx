@@ -422,6 +422,8 @@ access the configuration file from the command line. Here's the description of c
   * `spark_conf`: An optional dictionary of Spark configuration properties.
   * `override_clusters`: An optional dictionary mapping job cluster names to existing cluster IDs.
   * `policy_id`: An optional string representing the ID of the cluster policy.
+  * `is_terraform_used`: A boolean value indicating whether Terraform is used for resources provisioning.
+  * `grant_migration_strategy`: An optional string representing the grant migration strategy.
   * `include_databases`: An optional list of strings representing the names of databases to include for migration.
 
 [[back to top](#databricks-labs-ucx)]
