@@ -1,6 +1,6 @@
-from databricks.labs.ucx.code.base import Deprecation
-from databricks.labs.ucx.code.pyspark import SparkSql
-from databricks.labs.ucx.code.queries import FromTable
+from databricks.labs.ucx.source_code.base import Deprecation
+from databricks.labs.ucx.source_code.pyspark import SparkSql
+from databricks.labs.ucx.source_code.queries import FromTable
 
 
 def test_spark_not_sql(empty_index):

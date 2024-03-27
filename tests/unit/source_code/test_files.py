@@ -5,8 +5,8 @@ from unittest.mock import Mock, create_autospec
 import pytest
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.code.files import Files
-from databricks.labs.ucx.code.languages import Languages
+from databricks.labs.ucx.source_code.files import Files
+from databricks.labs.ucx.source_code.languages import Languages
 from tests.unit import workspace_client_mock
 
 
@@ -20,7 +20,6 @@ def test_files_fix_ignores_unsupported_extensions():
 def test_files_fix_ignores_unsupported_language():
     languages = create_autospec(Languages)
     files = Files(languages)
-    # pylint: disable=protected-access
     files._extensions[".py"] = None
     path = Path('unsupported.py')
     assert not files.apply(path)
