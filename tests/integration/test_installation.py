@@ -64,7 +64,6 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
                 r".*connect to the external metastore?.*": "yes",
                 r".*Inventory Database.*": f"{inventory_schema}{inventory_schema_suffix}",
                 r".*Backup prefix*": renamed_group_prefix,
-                r".*grant migration strategy.*": "1",
                 r".*": "",
             }
             | (extend_prompts or {})

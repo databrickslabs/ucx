@@ -41,11 +41,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
 from databricks.labs.ucx.hive_metastore.table_size import TableSize
-from databricks.labs.ucx.hive_metastore.tables import (
-    AclMigrationWhat,
-    Table,
-    TableError,
-)
+from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
@@ -212,11 +208,6 @@ class WorkspaceInstaller:
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
 
-        # Confirm grant migration strategy
-        grant_migration_strategy = self._prompts.choice_from_dict(
-            "Select grant migration strategy?", {"None": None, "Table ACL": AclMigrationWhat.LEGACY_TACL}
-        )
-
         config = WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -233,7 +224,6 @@ class WorkspaceInstaller:
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
             is_terraform_used=is_terraform_used,
-            grant_migration_strategy=grant_migration_strategy,
             include_databases=self._select_databases(),
         )
         self._installation.save(config)
