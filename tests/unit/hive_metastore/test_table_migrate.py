@@ -628,7 +628,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_migrate = TablesMigrate(
         table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
     )
-    table_migrate.migrate_tables(acl_strategy=AclMigrationWhat.LEGACY_TACL)
+    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
     assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" in backend.queries
