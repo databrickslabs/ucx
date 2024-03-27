@@ -19,7 +19,8 @@ from databricks.labs.ucx.runtime import (
     assess_azure_service_principals,
     crawl_grants,
     migrate_dbfs_root_delta_tables,
-    migrate_external_tables_sync,
+    migrate_external_tables_sync, rename_workspace_local_groups_experimental,
+    reflect_account_groups_on_workspace_experimental, validate_groups_permissions_experimental,
 )
 from tests.unit import GROUPS, PERMISSIONS
 
@@ -108,6 +109,24 @@ def test_migrate_dbfs_root_delta_tables():
     ws = create_autospec(WorkspaceClient)
     migrate_dbfs_root_delta_tables(azure_mock_config(), ws, MockBackend(), mock_installation())
     ws.catalogs.list.assert_called_once()
+
+
+def test_rename_workspace_local_group(caplog):
+    ws = create_autospec(WorkspaceClient)
+    rename_workspace_local_groups_experimental(azure_mock_config(), ws, MockBackend(), mock_installation())
+
+
+def test_reflect_account_groups_on_workspace(caplog):
+    ws = create_autospec(WorkspaceClient)
+    reflect_account_groups_on_workspace_experimental(azure_mock_config(), ws, MockBackend(), mock_installation())
+
+
+def test_validate_groups_permissions(caplog):
+    ws = create_autospec(WorkspaceClient)
+    rows = {
+        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
+    }
+    validate_groups_permissions_experimental(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
 
 
 def test_migrate_permissions_experimental():
