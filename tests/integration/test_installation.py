@@ -221,7 +221,7 @@ def test_running_real_migrate_groups_job(
 
     install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     inventory_database = install.config.inventory_database
-    permission_manager = PermissionManager(ws, sql_backend, inventory_database, [generic_permissions])
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
     permission_manager.inventorize_permissions()
 
     workflows_install.run_workflow("migrate-groups")
@@ -250,7 +250,7 @@ def test_running_real_validate_groups_permissions_job(
     )
 
     install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    permission_manager = PermissionManager(ws, sql_backend, install.config.inventory_database, [redash_permissions])
+    permission_manager = PermissionManager(sql_backend, install.config.inventory_database, [redash_permissions])
     permission_manager.inventorize_permissions()
 
     # assert the job does not throw any exception
@@ -279,7 +279,7 @@ def test_running_real_validate_groups_permissions_job_fails(
 
     install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     inventory_database = install.config.inventory_database
-    permission_manager = PermissionManager(ws, sql_backend, inventory_database, [generic_permissions])
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
     permission_manager.inventorize_permissions()
 
     # remove permission so the validation fails

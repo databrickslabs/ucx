@@ -1,5 +1,7 @@
 import json
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 from time import process_time
 
@@ -14,7 +16,15 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
 
-NB_OF_TEST_WS_OBJECTS = 1000
+NB_OF_TEST_WS_OBJECTS = 100
+
+
+@dataclass
+class WorkspaceObject:
+    fixture: Callable
+    permissions: list[iam.PermissionLevel]
+    id_attribute: str
+    type: str
 
 
 def test_apply_group_permissions_experimental_performance(
@@ -24,24 +34,36 @@ def test_apply_group_permissions_experimental_performance(
     permission_manager: PermissionManager,
     make_migrated_group,
     make_experiment,
+    make_model,
+    make_cluster_policy,
+    env_or_skip,
 ):
-    migrated_group_experimental, _ = make_migrated_group()
-    migrated_group, _ = make_migrated_group()
-
-    create_ws_objects_parallel(
-        ws,
-        sql_backend,
-        inventory_schema,
-        NB_OF_TEST_WS_OBJECTS,
-        make_experiment,
-        [iam.PermissionLevel.CAN_MANAGE],
-        "experiment_id",
-        "experiments",
-        [migrated_group.name_in_workspace, migrated_group_experimental.name_in_workspace],
-    )
+    # Making sure this test can only be launched from local
+    env_or_skip("PWD")
+    migrated_group_experimental = make_migrated_group()
+    migrated_group = make_migrated_group()
+    ws_objects = [
+        WorkspaceObject(partial(make_experiment), [iam.PermissionLevel.CAN_MANAGE], "experiment_id", "experiments"),
+        WorkspaceObject(
+            partial(make_model), [iam.PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS], "id", "registered-models"
+        ),
+        WorkspaceObject(partial(make_cluster_policy), [iam.PermissionLevel.CAN_USE], "policy_id", "cluster-policies"),
+    ]
+    for ws_object in ws_objects:
+        create_ws_objects_parallel(
+            ws,
+            sql_backend,
+            inventory_schema,
+            NB_OF_TEST_WS_OBJECTS,
+            ws_object.fixture,
+            ws_object.permissions,
+            ws_object.id_attribute,
+            ws_object.type,
+            [migrated_group.name_in_workspace, migrated_group_experimental.name_in_workspace],
+        )
 
     start = process_time()
-    permission_manager.apply_group_permissions_experimental(MigrationState([migrated_group_experimental]))
+    MigrationState([migrated_group_experimental]).apply_group_permissions_experimental(ws)
     logger.info(f"Migration using experimental API takes {process_time() - start}s")
 
     start = process_time()

@@ -168,9 +168,8 @@ def test_migrate_permissions_experimental_error(caplog):
     }
     ws = create_autospec(WorkspaceClient)
     ws.get_workspace_id.return_value = "12345678"
-    ws.permission_migration.migrate_permissions.side_effect = RuntimeError("internal error")
-    with pytest.raises(RuntimeError):
+    ws.permission_migration.migrate_permissions.side_effect = NotImplementedError("api not enabled")
+    with pytest.raises(NotImplementedError):
         apply_permissions_to_account_groups_experimental(
             azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
         )
-    assert "Detected 3 errors while applying permissions" in caplog.messages

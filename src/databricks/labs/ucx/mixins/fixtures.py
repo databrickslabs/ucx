@@ -31,7 +31,6 @@ from databricks.sdk.service.catalog import (
     TableInfo,
     TableType,
 )
-from databricks.sdk.service.iam import WorkspacePermission
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedModelInput,
@@ -656,9 +655,9 @@ def make_migrated_group(acc, ws, make_group, make_acc_group):
     def inner():
         ws_group = make_group()
         acc_group = make_acc_group()
-        acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [WorkspacePermission.USER])
+        acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
         # need to return both, as acc_group.id is not in MigratedGroup dataclass
-        return MigratedGroup.partial_info(ws_group, acc_group), acc_group
+        return MigratedGroup.partial_info(ws_group, acc_group)
 
     return inner
 

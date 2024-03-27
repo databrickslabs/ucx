@@ -32,7 +32,7 @@ def test_permissions_for_redash(
 ):
     ws_group_temp = make_group()  # simulate temp/backup group
     user = make_user()
-    migrated_group, _ = make_migrated_group()
+    migrated_group = make_migrated_group()
 
     query = make_query()
     make_query_permissions(
@@ -52,7 +52,7 @@ def test_permissions_for_redash(
     )
 
     if use_permission_migration_api:
-        permission_manager.apply_group_permissions_experimental(MigrationState([migrated_group]))
+        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
     else:
         apply_tasks(redash_permissions, [migrated_group])
 

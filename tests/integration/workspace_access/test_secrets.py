@@ -29,7 +29,7 @@ def test_permissions_for_secrets(
     permission_manager: PermissionManager,
     use_permission_migration_api: bool,
 ):
-    migrated_group, _ = make_migrated_group()
+    migrated_group = make_migrated_group()
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=migrated_group.name_in_workspace, permission=AclPermission.WRITE)
@@ -39,7 +39,7 @@ def test_permissions_for_secrets(
     secret_support = SecretScopesSupport(ws)
 
     if use_permission_migration_api:
-        permission_manager.apply_group_permissions_experimental(MigrationState([migrated_group]))
+        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
     else:
         apply_tasks(secret_support, [migrated_group])
 
