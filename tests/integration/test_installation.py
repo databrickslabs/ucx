@@ -627,7 +627,8 @@ def test_compare_remote_local_install_versions(ws, new_installation):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     new_installation(product_info=product_info)
     with pytest.raises(
-        RuntimeWarning, match="Remote and Local versions are same and no override is requested. Exiting..."
+        RuntimeWarning,
+        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         new_installation(product_info=product_info)
 

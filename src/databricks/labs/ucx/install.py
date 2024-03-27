@@ -165,9 +165,11 @@ class WorkspaceInstaller:
                 logger.info(f"UCX v{self._product_info.version()} is already installed on this workspace")
                 msg = "Do you want to update the existing installation?"
                 if not self._prompts.confirm(msg):
-                    raise RuntimeWarning("Remote and Local versions are same and no override is requested. Exiting...")
+                    raise RuntimeWarning(
+                        "UCX workspace remote and local install versions are same and no override is requested. Exiting..."
+                    )
         except NotFound as err:
-            logger.warning(f"Remote version not found: {err}")
+            logger.warning(f"UCX workspace remote version not found: {err}")
 
     def _new_wheel_builder(self):
         return WheelsV2(self._installation, self._product_info)

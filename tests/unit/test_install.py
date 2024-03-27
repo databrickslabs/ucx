@@ -1538,7 +1538,8 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
 
     # raises runtime warning when versions match and no override provided
     with pytest.raises(
-        RuntimeWarning, match="Remote and Local versions are same and no override is requested. Exiting..."
+        RuntimeWarning,
+        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         install.configure()
 
