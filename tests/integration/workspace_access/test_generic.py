@@ -31,12 +31,11 @@ from . import apply_tasks
 def test_instance_pools(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_instance_pool,
     make_instance_pool_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     pool = make_instance_pool()
     make_instance_pool_permissions(
         object_id=pool.instance_pool_id,
@@ -67,13 +66,12 @@ def test_instance_pools(
 def test_clusters(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_cluster,
     make_cluster_permissions,
     env_or_skip,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     cluster = make_cluster(instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"), single_node=True)
     make_cluster_permissions(
         object_id=cluster.cluster_id,
@@ -104,12 +102,11 @@ def test_clusters(
 def test_jobs(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_job,
     make_job_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     job = make_job()
     make_job_permissions(
         object_id=job.job_id,
@@ -140,12 +137,11 @@ def test_jobs(
 def test_pipelines(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_pipeline,
     make_pipeline_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     pipeline = make_pipeline()
     make_pipeline_permissions(
         object_id=pipeline.pipeline_id,
@@ -176,12 +172,11 @@ def test_pipelines(
 def test_cluster_policies(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_cluster_policy,
     make_cluster_policy_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
         object_id=cluster_policy.policy_id,
@@ -212,12 +207,11 @@ def test_cluster_policies(
 def test_warehouses(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_warehouse,
     make_warehouse_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     warehouse = make_warehouse()
     make_warehouse_permissions(
         object_id=warehouse.id,
@@ -248,12 +242,11 @@ def test_warehouses(
 def test_models(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_model,
     make_registered_model_permissions,  # pylint: disable=invalid-name
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     model = make_model()
     make_registered_model_permissions(
         object_id=model.id,
@@ -284,12 +277,11 @@ def test_models(
 def test_experiments(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_experiment,
     make_experiment_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     experiment = make_experiment()
     make_experiment_permissions(
         object_id=experiment.experiment_id,
@@ -319,12 +311,11 @@ def test_directories(
     sql_backend,
     inventory_schema,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_directory,
     make_directory_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     directory = make_directory()
     make_directory_permissions(
         object_id=directory,
@@ -364,12 +355,11 @@ def test_notebooks(
     permission_manager: PermissionManager,
     sql_backend,
     inventory_schema,
-    make_migrated_group,
+    migrated_group,
     make_notebook,
     make_notebook_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     notebook = make_notebook()
     make_notebook_permissions(
         object_id=notebook,
@@ -407,11 +397,10 @@ def test_notebooks(
 def test_tokens(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_authorization_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     make_authorization_permissions(
         object_id="tokens",
         permission_level=PermissionLevel.CAN_USE,
@@ -437,7 +426,7 @@ def test_tokens(
 
 
 @retried(on=[BadRequest], timeout=timedelta(minutes=3))
-def test_verify_permissions(ws: WorkspaceClient, make_group, make_migrated_group, make_job, make_job_permissions):
+def test_verify_permissions(ws: WorkspaceClient, make_group, make_job, make_job_permissions):
     group_a = make_group()
     job = make_job()
     make_job_permissions(
@@ -483,12 +472,11 @@ def test_verify_permissions(ws: WorkspaceClient, make_group, make_migrated_group
 def test_endpoints(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_serving_endpoint,
     make_serving_endpoint_permissions,  # pylint: disable=invalid-name
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     endpoint = make_serving_endpoint()
     make_serving_endpoint_permissions(
         object_id=endpoint.response.id,
@@ -513,12 +501,11 @@ def test_endpoints(
 def test_feature_tables(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     make_feature_table,
     make_feature_table_permissions,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     feature_table = make_feature_table()
     make_feature_table_permissions(
         object_id=feature_table["id"],
@@ -545,10 +532,9 @@ def test_feature_tables(
 def test_feature_store_root_page(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
     ws.permissions.update(
         "feature-tables",
         "/root",
@@ -581,10 +567,9 @@ def test_feature_store_root_page(
 def test_models_root_page(
     ws: WorkspaceClient,
     permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
     is_experimental: bool,
 ):
-    migrated_group = make_migrated_group()
 
     ws.permissions.update(
         "registered-models",
