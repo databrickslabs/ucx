@@ -2,10 +2,12 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
+import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.code.languages import Languages
+from tests.unit import workspace_client_mock
 
 
 def test_files_fix_ignores_unsupported_extensions():
@@ -73,10 +75,8 @@ def test_files_walks_directory():
     assert languages.fixer.call_count > 1
 
 
-# TODO the below is unmanageably slow when ran locally, so disabling for now
-# until I get clarifications on what would be done to run it faster
-# created GH issue #1127
-# def test_files_for_cli():
-#     ws = workspace_client_mock()
-#     clazz = Files.for_cli(ws)
-#     assert clazz is not None
+@pytest.mark.skip("the below is unmanageably slow when ran locally, so disabling for now, created GH issue #1127")
+def test_files_for_cli():
+    ws = workspace_client_mock()
+    clazz = Files.for_cli(ws)
+    assert clazz is not None
