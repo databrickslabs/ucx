@@ -21,7 +21,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, iam, jobs, pipelines, sql, workspace
 from databricks.sdk.service._internal import Wait
 from databricks.sdk.service.catalog import (
-    AwsIamRole,
+    AwsIamRoleRequest,
     AzureServicePrincipal,
     CatalogInfo,
     DataSourceFormat,
@@ -1104,7 +1104,7 @@ def make_storage_credential(ws):
     ) -> StorageCredentialInfo:
         if aws_iam_role_arn != "":
             storage_credential = ws.storage_credentials.create(
-                credential_name, aws_iam_role=AwsIamRole(role_arn=aws_iam_role_arn), read_only=read_only
+                credential_name, aws_iam_role=AwsIamRoleRequest(role_arn=aws_iam_role_arn), read_only=read_only
             )
         else:
             azure_service_principal = AzureServicePrincipal(directory_id, application_id, client_secret)
