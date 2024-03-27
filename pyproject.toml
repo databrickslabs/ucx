@@ -156,7 +156,7 @@ parallel = true
 [tool.coverage.report]
 omit = [
     "src/databricks/labs/ucx/mixins/*",
-    "src/databricks/labs/ucx/code/lsp.py",
+    "src/databricks/labs/ucx/source_code/lsp.py",
     "*/working-copy/*",
     "*/fresh_wheel_file/*",
     "*/__init__.py"
