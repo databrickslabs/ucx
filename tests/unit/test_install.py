@@ -1567,3 +1567,6 @@ def test_extract_major_minor_versions():
 
     assert extract_major_minor(version_string1) == "0.3"
     assert extract_major_minor(version_string2) == "0.17"
+
+    version_string3 = "should not match"
+    assert extract_major_minor(version_string3) is None
