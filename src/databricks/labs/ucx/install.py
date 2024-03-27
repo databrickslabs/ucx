@@ -1,6 +1,7 @@
 import functools
 import logging
 import os
+import re
 import time
 import webbrowser
 from collections.abc import Callable
@@ -13,7 +14,12 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.upgrades import Upgrades
-from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2, find_project_root
+from databricks.labs.blueprint.wheels import (
+    ProductInfo,
+    Version,
+    WheelsV2,
+    find_project_root,
+)
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient
@@ -91,6 +97,13 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
 
 
+def extract_major_minor(version_string):
+    match = re.search(r'(\d+\.\d+)', version_string)
+    if match:
+        return match.group(1)
+    return None
+
+
 class WorkspaceInstaller:
     def __init__(
         self,
@@ -144,6 +157,20 @@ class WorkspaceInstaller:
                 raise err.errs[0] from None
             raise err
 
+    def _compare_remote_local_versions(self):
+        try:
+            local_version = self._product_info.released_version()
+            remote_version = self._installation.load(Version).version
+            if extract_major_minor(remote_version) == extract_major_minor(local_version):
+                logger.info(f"UCX v{self._product_info.version()} is already installed on this workspace")
+                msg = "Do you want to update the existing installation?"
+                if not self._prompts.confirm(msg):
+                    raise RuntimeWarning(
+                        "UCX workspace remote and local install versions are same and no override is requested. Exiting..."
+                    )
+        except NotFound as err:
+            logger.warning(f"UCX workspace remote version not found: {err}")
+
     def _new_wheel_builder(self):
         return WheelsV2(self._installation, self._product_info)
 
@@ -171,6 +198,7 @@ class WorkspaceInstaller:
     def configure(self) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
+            self._compare_remote_local_versions()
             if self._confirm_force_install():
                 return self._configure_new_installation()
             self._apply_upgrades()
