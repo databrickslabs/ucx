@@ -20,7 +20,7 @@ def test_files_fix_ignores_unsupported_extensions():
 def test_files_fix_ignores_unsupported_language():
     languages = create_autospec(Languages)
     files = Files(languages)
-    files._extensions[".py"] = None
+    files._extensions[".py"] = None  # pylint: disable=protected-access
     path = Path('unsupported.py')
     assert not files.apply(path)
 
