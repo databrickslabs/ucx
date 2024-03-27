@@ -27,7 +27,7 @@ def test_some_entitlements(
     ws_group = make_group()
     acc_group = make_acc_group()
     acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
-    migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
+    migrated_groups = MigratedGroup.partial_info(ws_group, acc_group)
     ws.groups.patch(
         ws_group.id,
         operations=[
@@ -45,9 +45,9 @@ def test_some_entitlements(
     assert "databricks-sql-access" in before
 
     if use_permission_migration_api:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_groups]).apply_group_permissions_experimental(ws)
     else:
-        apply_tasks(scim_support, [migrated_group])
+        apply_tasks(scim_support, [migrated_groups])
 
     _, after = scim_support.load_for_group(acc_group.id)
     assert "databricks-sql-access" in after

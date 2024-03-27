@@ -5,13 +5,14 @@ from dataclasses import dataclass
 from functools import partial
 from time import process_time
 
+import pytest
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.workspace_access.base import Permissions
-from databricks.labs.ucx.workspace_access.groups import MigrationState
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
@@ -27,21 +28,28 @@ class WorkspaceObject:
     type: str
 
 
+@pytest.fixture
+def migrated_group_experimental(acc, ws, make_group, make_acc_group):
+    """Create a pair of groups in workspace and account. Assign account group to workspace."""
+    ws_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
+    return MigratedGroup.partial_info(ws_group, acc_group)
+
+
 def test_apply_group_permissions_experimental_performance(
     ws: WorkspaceClient,
     sql_backend: SqlBackend,
     inventory_schema,
-    permission_manager: PermissionManager,
-    make_migrated_group,
+    migrated_group,
+    migrated_group_experimental,
     make_experiment,
     make_model,
     make_cluster_policy,
     env_or_skip,
 ):
     # Making sure this test can only be launched from local
-    env_or_skip("PWD")
-    migrated_group_experimental = make_migrated_group()
-    migrated_group = make_migrated_group()
+    env_or_skip("IDE_PROJECT_ROOTS")
     ws_objects = [
         WorkspaceObject(partial(make_experiment), [iam.PermissionLevel.CAN_MANAGE], "experiment_id", "experiments"),
         WorkspaceObject(
@@ -67,6 +75,7 @@ def test_apply_group_permissions_experimental_performance(
     logger.info(f"Migration using experimental API takes {process_time() - start}s")
 
     start = process_time()
+    permission_manager = PermissionManager.factory(ws, sql_backend, inventory_schema)
     permission_manager.apply_group_permissions(MigrationState([migrated_group]))
     logger.info(f"Migration using normal approach takes {process_time() - start}s")
 
