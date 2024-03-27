@@ -1,6 +1,17 @@
-from databricks.labs.lsql.backends import MockBackend
+from unittest.mock import create_autospec
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    ClusterSource,
+    DataSecurityMode,
+)
+
+from databricks.labs.ucx.assessment.azure import (
+    AzureServicePrincipalCrawler,
+    AzureServicePrincipalInfo,
+)
 
 from .. import workspace_client_mock
 
@@ -199,3 +210,49 @@ def test_jobs_assessment_with_spn_cluster_policy_not_found():
     ws = workspace_client_mock(job_ids=['policy-not-found'])
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx").snapshot()
     assert len(crawler) == 1
+
+
+def test_get_cluster_to_storage_mapping_no_cluster_return_empty():
+    ws = create_autospec(WorkspaceClient)
+    ws.clusters.list.return_value = []
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    assert not crawler.get_cluster_to_storage_mapping()
+
+
+def test_get_cluster_to_storage_mapping_no_interactive_cluster_return_empty():
+    ws = workspace_client_mock(cluster_ids=['azure-spn-secret'])
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_source=ClusterSource.JOB),
+        ClusterDetails(cluster_source=ClusterSource.UI, data_security_mode=DataSecurityMode.SINGLE_USER),
+    ]
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    assert not crawler.get_cluster_to_storage_mapping()
+
+
+def test_get_cluster_to_storage_mapping_interactive_cluster_no_spn_return_empty():
+    ws = workspace_client_mock(cluster_ids=['azure-spn-secret-interactive'])
+
+    crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
+    cluster_spn_info = crawler.get_cluster_to_storage_mapping()
+    spn_info = set(
+        [
+            AzureServicePrincipalInfo(
+                application_id='Hello, World!',
+                secret_scope='abcff',
+                secret_key='sp_secret',
+                tenant_id='dedededede',
+                storage_account='abcde',
+            ),
+            AzureServicePrincipalInfo(
+                application_id='Hello, World!',
+                secret_scope='fgh',
+                secret_key='sp_secret2',
+                tenant_id='dedededede',
+                storage_account='fgh',
+            ),
+        ]
+    )
+
+    assert cluster_spn_info[0].cluster_id == "azure-spn-secret-interactive"
+    assert len(cluster_spn_info[0].spn_info) == 2
+    assert cluster_spn_info[0].spn_info == spn_info

@@ -364,15 +364,16 @@ class PrincipalACL:
             return []
         external_locations = list(self._ws.external_locations.list())
         if len(external_locations) == 0:
-            logger.warning("No external location found, If hive metastore tables are created in external storage, "
-                        "ensure migrate_locations cli cmd is run to create the required locations.")
+            logger.warning(
+                "No external location found, If hive metastore tables are created in external storage, "
+                "ensure migrate_locations cli cmd is run to create the required locations."
+            )
             return []
         permission_mappings = self._resource_permission.load()
         if len(permission_mappings) == 0:
             logger.warning("Please ensure principal_prefix_access cli cmd is run to create the access permission file.")
         tables = self._table_crawler.snapshot()
         grants: list[Grant] = []
-
 
         for cluster_spn in spn_cluster_mapping:
             principals = self._get_cluster_principal_mapping(cluster_spn.cluster_id)

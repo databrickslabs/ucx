@@ -16,11 +16,7 @@ def ws():
 def installation():
     return MockInstallation(
         {
-            "config.yml": {
-                'warehouse_id': 'abc',
-                'connect': {'host': 'a', 'token': 'b'},
-                'inventory_database':'ucx'
-            },
+            "config.yml": {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'prefix1',
@@ -37,6 +33,7 @@ def installation():
 
 def test_for_cli(ws, installation):
     assert isinstance(PrincipalACL.for_cli(ws, installation), PrincipalACL)
+
 
 def test_interactive_cluster(ws, installation):
     assert isinstance(PrincipalACL.for_cli(ws, installation), PrincipalACL)
