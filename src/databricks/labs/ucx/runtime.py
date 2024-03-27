@@ -481,7 +481,7 @@ def reflect_account_groups_on_workspace_experimental(
     return reflect_account_groups_on_workspace(cfg, ws, sql_backend, _install)
 
 
-@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental], job_cluster="tacl")
+@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental])
 def apply_permissions_to_account_groups_experimental(
     cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
