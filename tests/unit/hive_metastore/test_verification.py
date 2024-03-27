@@ -1,7 +1,11 @@
 import pytest
 
-from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore, MetastoreNotFoundError
+from databricks.labs.ucx.hive_metastore.verification import (
+    MetastoreNotFoundError,
+    VerifyHasMetastore,
+)
 from tests.unit import workspace_client_mock
+
 
 def test_verify_has_metastore():
     ws = workspace_client_mock()

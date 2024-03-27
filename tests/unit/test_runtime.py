@@ -2,6 +2,7 @@ import os.path
 import sys
 from unittest.mock import create_autospec, patch
 
+import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -13,13 +14,25 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     Task,
 )
 from databricks.labs.ucx.runtime import (
+    apply_permissions_to_account_groups,
     assess_azure_service_principals,
+    assess_clusters,
+    assess_global_init_scripts,
+    assess_incompatible_submit_runs,
+    assess_jobs,
+    assess_pipelines,
+    crawl_cluster_policies,
     crawl_grants,
+    crawl_groups,
+    crawl_mounts,
+    crawl_permissions,
+    delete_backup_groups,
+    destroy_schema,
+    estimate_table_size_for_migration,
+    guess_external_locations,
     migrate_dbfs_root_delta_tables,
-    migrate_external_tables_sync, crawl_mounts, guess_external_locations, estimate_table_size_for_migration,
-    assess_jobs, assess_clusters, assess_pipelines, assess_incompatible_submit_runs, crawl_cluster_policies,
-    assess_global_init_scripts, workspace_listing, crawl_permissions, crawl_groups, destroy_schema,
-    delete_backup_groups, apply_permissions_to_account_groups,
+    migrate_external_tables_sync,
+    workspace_listing,
 )
 
 
@@ -108,17 +121,17 @@ def test_runtime_crawl_grants(mocker):
         assert "SELECT * FROM hive_metastore.ucx.grants" in sql_backend.queries
 
 
-# TODO crawl_permissions fails, but I don't think I can create tickets yet!
-# def test_runtime_crawl_permissions(mocker):
-#     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
-#         pyspark_sql_session = mocker.Mock()
-#         sys.modules["pyspark.sql.session"] = pyspark_sql_session
-#         cfg = azure_mock_config()
-#         ws = create_autospec(WorkspaceClient)
-#         sql_backend = MockBackend()
-#         crawl_permissions(cfg, ws, sql_backend, mock_installation())
-#
-#         assert "SELECT * FROM hive_metastore.ucx.grants" in sql_backend.queries
+@pytest.mark.skip("1crawl_permissions fails, filed GH issue #1129")
+def test_runtime_crawl_permissions(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        crawl_permissions(cfg, ws, sql_backend, mock_installation())
+
+        assert "SELECT * FROM hive_metastore.ucx.permissions" in sql_backend.queries
 
 
 def test_runtime_crawl_groups(mocker):
@@ -266,17 +279,19 @@ def test_runtime_destroy_schema(mocker):
         assert "DROP DATABASE ucx CASCADE" in sql_backend.queries
 
 
-# TODO smells like delete_backup_groups isn't deleting anything, but maybe that's because there's nothing to delete ?
-# def test_runtime_delete_backup_groups(mocker):
-#     with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
-#         pyspark_sql_session = mocker.Mock()
-#         sys.modules["pyspark.sql.session"] = pyspark_sql_session
-#         cfg = azure_mock_config()
-#         ws = create_autospec(WorkspaceClient)
-#         sql_backend = MockBackend()
-#         delete_backup_groups(cfg, ws, sql_backend, mock_installation())
-#
-#         assert "DELETE" in sql_backend.queries # TODO
+@pytest.mark.skip(
+    "smells like delete_backup_groups isn't deleting anything, but maybe that's because there's nothing to delete ?"
+)
+def test_runtime_delete_backup_groups(mocker):
+    with patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
+        pyspark_sql_session = mocker.Mock()
+        sys.modules["pyspark.sql.session"] = pyspark_sql_session
+        cfg = azure_mock_config()
+        ws = create_autospec(WorkspaceClient)
+        sql_backend = MockBackend()
+        delete_backup_groups(cfg, ws, sql_backend, mock_installation())
+
+        assert "DELETE" in sql_backend.queries  # TODO
 
 
 def test_runtime_apply_permissions_to_account_groups(mocker):
