@@ -3,8 +3,8 @@ from collections.abc import Iterable
 import sqlglot
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.code.base import Advice, Deprecation, Fixer, Linter
 from databricks.labs.ucx.hive_metastore.table_migrate import Index
+from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter
 
 
 class FromTable(Linter, Fixer):

@@ -46,6 +46,9 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat
 
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
+
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
@@ -157,6 +160,11 @@ def acc(product_info, debug_env) -> AccountClient:
         product=product_name,
         product_version=product_version,
     )
+
+
+@pytest.fixture
+def permission_manager(ws, sql_backend, inventory_schema) -> PermissionManager:
+    return PermissionManager.factory(ws, sql_backend, inventory_schema)
 
 
 def _permissions_mapping():
@@ -638,6 +646,15 @@ def make_group(ws, make_random):
 @pytest.fixture
 def make_acc_group(acc, make_random):
     yield from _make_group("account group", acc.config, acc.groups, make_random)
+
+
+@pytest.fixture
+def migrated_group(acc, ws, make_group, make_acc_group):
+    """Create a pair of groups in workspace and account. Assign account group to workspace."""
+    ws_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
+    return MigratedGroup.partial_info(ws_group, acc_group)
 
 
 @pytest.fixture

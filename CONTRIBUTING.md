@@ -146,7 +146,7 @@ databricks users create --active --display-name "test-user-1" --user-name "first
 databricks users create --active --display-name "test-user-2" --user-name "first.last-t2@example.com"
 ```
 
-Before running integration tests on Azure Cloud, you must login (and clear any TOKEN authenticaton):
+Before running integration tests on Azure Cloud, you must log in (and clear any TOKEN authentication):
 
 ```shell
 az login
@@ -159,6 +159,7 @@ Use the following command to run the integration tests:
 make integration
 ```
 
+### Fixtures
 We'd like to encourage you to leverage the extensive set of [pytest fixtures](https://docs.pytest.org/en/latest/explanation/fixtures.html#about-fixtures). 
 These fixtures follow a consistent naming pattern, starting with "make_". These functions can be called multiple 
 times to _create and clean up objects as needed_ for your tests. Reusing these fixtures helps maintain clean and consistent 
@@ -175,7 +176,25 @@ def test_secret_scope_acl(make_secret_scope, make_secret_scope_acl, make_group):
     make_secret_scope_acl(scope=scope_name, principal=make_group().display_name, permission=AclPermission.WRITE)
 ```
 
-Each integration test _must be debuggable within the free [IntelliJ IDEA (Community Edition)](https://www.jetbrains.com/idea/download) 
+If the fixture requires no argument and special cleanup, you can simplify the fixture from 
+```python
+@pytest.fixture
+def make_thing(...):
+    def inner():
+        ...
+        return x
+    return inner
+```
+to:
+```python
+@pytest.fixture
+def thing(...):
+    ...
+    return x
+```
+
+### Debugging
+Each integration test _must be debuggable_ within the free [IntelliJ IDEA (Community Edition)](https://www.jetbrains.com/idea/download) 
 with the [Python plugin (Community Edition)](https://plugins.jetbrains.com/plugin/7322-python-community-edition). If it works within 
 IntelliJ CE, then it would work in PyCharm. Debugging capabilities are essential for troubleshooting and diagnosing issues during 
 development. Please make sure that your test setup allows for easy debugging by following best practices.
@@ -235,21 +254,21 @@ Here are the example steps to submit your first contribution:
 
 1. [Make a Fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) from the repo
 2. `git clone`
-3. `git checkout main` (or `gcm` if you're using [ohmyzsh](https://ohmyz.sh/)).
-4. `git pull` (or `gl` if you're using [ohmyzsh](https://ohmyz.sh/)).
-5. `git checkout -b FEATURENAME` (or `gcb FEATURENAME` if you're using [ohmyzsh](https://ohmyz.sh/)).
-6. .. do the work
+3. `git checkout main` (or `gcm` if you're using [oh-my-zsh](https://ohmyz.sh/)).
+4. `git pull` (or `gl` if you're using [oh-my-zsh](https://ohmyz.sh/)).
+5. `git checkout -b FEATURENAME` (or `gcb FEATURENAME` if you're using [oh-my-zsh](https://ohmyz.sh/)).
+6. ... do the work
 7. `make fmt`
-9. .. fix if any
-10. `make test`
-11. .. fix if any
-12. `git commit -a`. Make sure to enter a meaningful commit message title.
-13. `git push origin FEATURENAME`
-14. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed). 
+8. ... fix if any
+9. `make test`
+10. ... fix if any
+11. `git commit -a`. Make sure to enter a meaningful commit message title.
+12. `git push origin FEATURENAME`
+13. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed). 
     Use a meaningful pull request title because it'll appear in the release notes. Use `Resolves #NUMBER` in pull
     request description to [automatically link it](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests#linking-a-pull-request-to-an-issue)
     to an existing issue. 
-15. announce PR for the review
+14. Announce PR for the review.
 
 ## Troubleshooting
 
@@ -328,6 +347,6 @@ $ python3.10 -m pip install hatch
 $ make dev
 $ make test
 ```
-Note: Before performing a clean install deactivate the virtual environment and follow the commands given above.
+Note: Before performing a clean installation, deactivate the virtual environment and follow the commands given above.
 
 Note: The initial `hatch env show` is just to list the environments managed by Hatch and is not needed.

@@ -1,4 +1,4 @@
-from databricks.labs.ucx.code.base import (
+from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
     Convention,

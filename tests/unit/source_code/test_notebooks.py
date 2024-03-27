@@ -3,8 +3,8 @@ from unittest.mock import create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo
 
-from databricks.labs.ucx.code.languages import Languages
-from databricks.labs.ucx.code.notebooks import Notebooks
+from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.notebooks import Notebooks
 
 
 def test_notebooks_revert_restores_original_code():

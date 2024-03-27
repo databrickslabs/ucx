@@ -4,8 +4,8 @@ from pathlib import Path
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.code.languages import Languages
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.source_code.languages import Languages
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,8 @@ class Files:
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
-            for folder in path.iterdir():
-                self.apply(folder)
+            for child_path in path.iterdir():
+                self.apply(child_path)
             return True
         return self._apply_file_fix(path)
 
