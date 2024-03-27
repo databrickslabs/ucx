@@ -15,8 +15,8 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     Task,
 )
 from databricks.labs.ucx.runtime import (
-    apply_permissions_to_account_groups_experimental,
     apply_permissions_to_account_groups,
+    apply_permissions_to_account_groups_experimental,
     assess_azure_service_principals,
     assess_clusters,
     assess_global_init_scripts,
