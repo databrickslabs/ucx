@@ -7,14 +7,17 @@ from databricks.labs.lsql.backends import MockBackend, SqlBackend
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.table_migrate import Index, MigrationStatus
+from databricks.labs.ucx.hive_metastore.views_migrator import ViewsMigrator
 
 
-def test_migrates_no_view():
+def test_migrates_no_view_returns_empty_sequence():
     samples = Samples.load("db1_t1", "db2_t1")
     index = create_index(samples)
     sql_backend = mock_backend(samples, "db1", "db2")
     crawler = TablesCrawler(sql_backend, "hive_metastore", ["db1", "db2"])
-    assert index is not None and crawler is not None
+    migrator = ViewsMigrator(index, crawler)
+    sequence = migrator.sequence()
+    assert len(sequence) == 0
 
 
 def create_index(samples: list[dict]) -> Index:
@@ -33,7 +36,7 @@ def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
     db_rows = {}
     template = Template('SHOW TABLES FROM hive_metastore.$db')
     for dbname in dbnames:
-        # pylint W0640 here is a pylint bug (verified manually)
+        # pylint warning W0640 here is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
         legacy_samples = [s["legacy"] for s in filter(lambda s: s["legacy"]["database"] == dbname, samples)]
         tuples = [("hive_metastore", s["database"], s["table"], s.get("view_text", None)) for s in legacy_samples]
         db_rows[template.substitute({'db': dbname})] = tuples
