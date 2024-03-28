@@ -1,0 +1,79 @@
+[
+  {
+    "db": "db1",
+    "table": "t1"
+  },
+  {
+    "db": "db1",
+    "table": "t2"
+  },
+  {
+    "db": "db1",
+    "table": "t3"
+  },
+  {
+    "db": "db2",
+    "table": "t1"
+  },
+  {
+    "db": "db2",
+    "table": "t3"
+  },
+  {
+    "db": "db1",
+    "table": "v1",
+    "view_text": "select * from db1.t1"
+  },
+  {
+    "db": "db1",
+    "table": "v2",
+    "view_text": "select * from db1.t2 where db1.t2.c1 = 32"
+  },
+  {
+    "db": "db1",
+    "table": "v3",
+    "view_text": "select * from db1.t1, db1.t2 where db1.t1.c1 = db1.t2.c1"
+  },
+  {
+    "db": "db1",
+    "table": "v4",
+    "view_text": "select * from db1.v1"
+  },
+    {
+    "db": "db1",
+    "table": "v5",
+    "view_text": "select * from db1.v7, db1.v6"
+  },
+  {
+    "db": "db1",
+    "table": "v6",
+    "view_text": "select * from db1.v7"
+  },
+  {
+    "db": "db1",
+    "table": "v7",
+    "view_text": "select * from db1.v4"
+  },
+  {
+    "db": "db1",
+    "table": "v8",
+    "view_text": "123 invalid SQL"
+  },
+   {
+    "db": "db1",
+    "table": "v9",
+    "view_text": "select * from db15.t32"
+  },
+  {
+    "db": "db1",
+    "table": "v10",
+    "view_text": "select * from db1.v11"
+  },
+  {
+    "db": "db1",
+    "table": "v11",
+    "view_text": "select * from db1.v10"
+  }
+
+
+]
