@@ -284,7 +284,6 @@ class TablesInMounts(CrawlerBase[Table]):
         return self._snapshot(partial(self._try_load), partial(self._crawl))
 
     def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
-
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         cached_results = []
         try:
@@ -324,7 +323,7 @@ class TablesInMounts(CrawlerBase[Table]):
                     name=guess_table,
                     object_type="EXTERNAL",
                     table_format=entry.format,
-                    location=path,
+                    location=path.replace(f"dbfs:{mount.name}/", mount.source),
                     is_partitioned=entry.is_partitioned,
                 )
                 all_tables.append(table)

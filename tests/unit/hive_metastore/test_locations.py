@@ -232,41 +232,21 @@ def test_match_table_external_locations():
     assert ExternalLocation("abfss://cont1@storagetest1/a/", 2) in missing_locations
 
 
-def test_mount_listing_one_table():
-    client = create_autospec(WorkspaceClient)
-    client.dbutils.fs.ls.return_value = [
-        FileInfo("/mnt/test_mount/_delta_log/", "_delta_log/", "", ''),
-        FileInfo("/mnt/test_mount/xxx.parquet", "xxx.parquet", "", ''),
-        FileInfo("/mnt/test_mount/yyy.parquet", "yyy.parquet", "", ''),
-    ]
-    backend = MockBackend(
-        rows={
-            'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount/", "")],
-        }
-    )
-    mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts).snapshot()
-    assert results == [
-        Table("hive_metastore", "mounted_/mnt/test_mount/", "test_mount", "EXTERNAL", "DELTA", "/mnt/test_mount")
-    ]
-
-
 def test_mount_listing_multiple_folders():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/test_mount/table1/", "table1/", "", "")
-    second_folder = FileInfo("/mnt/test_mount/table2/", "table2/", "", "")
-    folder_table1 = FileInfo("/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
-    folder_table2 = FileInfo("/mnt/test_mount/table2/_SUCCESS", "_SUCCESS", "", "")
-    folder_table3 = FileInfo("/mnt/test_mount/table2/1.snappy.parquet", "1.snappy.parquet", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount/table2/", "table2/", "", "")
+    folder_table1 = FileInfo("dbfs:/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
+    folder_table2 = FileInfo("dbfs:/mnt/test_mount/table2/_SUCCESS", "_SUCCESS", "", "")
+    folder_table3 = FileInfo("dbfs:/mnt/test_mount/table2/1.snappy.parquet", "1.snappy.parquet", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder, second_folder]
-        if path == "/mnt/test_mount/table1/":
+        if path == "dbfs:/mnt/test_mount/table1/":
             return [folder_table1]
-        if path == "/mnt/test_mount/table2/":
+        if path == "dbfs:/mnt/test_mount/table2/":
             return [folder_table2, folder_table3]
         return None
 
@@ -274,38 +254,38 @@ def test_mount_listing_multiple_folders():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table2", "EXTERNAL", "PARQUET", "/mnt/test_mount/table2"),
+        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
+        Table("hive_metastore", "mounted_/mnt/test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
     ]
 
 
 def test_mount_listing_sub_folders():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/test_mount/entity/", "entity/", "", "")
-    second_folder = FileInfo("/mnt/test_mount/entity/domain/", "domain/", "", "")
-    third_folder = FileInfo("/mnt/test_mount/entity/domain/table1/", "table1/", "", "")
-    fourth_folder = FileInfo("/mnt/test_mount/entity/domain/table1/_delta_log/", "_delta_log/", "", "")
-    fourth_folder_parquet = FileInfo("/mnt/test_mount/entity/domain/table1/1.parquet", "1.parquet", "", "")
-    delta_log = FileInfo("/mnt/test_mount/entity/domain/table1/_delta_log/000.json", "000.json", "", "")
-    delta_log_2 = FileInfo("/mnt/test_mount/entity/domain/table1/_delta_log/001.json", "001.json", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount/entity/domain/", "domain/", "", "")
+    third_folder = FileInfo("dbfs:/mnt/test_mount/entity/domain/table1/", "table1/", "", "")
+    fourth_folder = FileInfo("dbfs:/mnt/test_mount/entity/domain/table1/_delta_log/", "_delta_log/", "", "")
+    fourth_folder_parquet = FileInfo("dbfs:/mnt/test_mount/entity/domain/table1/1.parquet", "1.parquet", "", "")
+    delta_log = FileInfo("dbfs:/mnt/test_mount/entity/domain/table1/_delta_log/000.json", "000.json", "", "")
+    delta_log_2 = FileInfo("dbfs:/mnt/test_mount/entity/domain/table1/_delta_log/001.json", "001.json", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder]
-        if path == "/mnt/test_mount/entity/":
+        if path == "dbfs:/mnt/test_mount/entity/":
             return [second_folder]
-        if path == "/mnt/test_mount/entity/domain/":
+        if path == "dbfs:/mnt/test_mount/entity/domain/":
             return [third_folder]
-        if path == "/mnt/test_mount/entity/domain/table1/":
+        if path == "dbfs:/mnt/test_mount/entity/domain/table1/":
             return [fourth_folder, fourth_folder_parquet]
-        if path == "/mnt/test_mount/entity/domain/table1/_delta_log/":
+        if path == "dbfs:/mnt/test_mount/entity/domain/table1/_delta_log/":
             return [delta_log, delta_log_2]
         return None
 
@@ -313,7 +293,7 @@ def test_mount_listing_sub_folders():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -325,7 +305,7 @@ def test_mount_listing_sub_folders():
             "table1",
             "EXTERNAL",
             "DELTA",
-            "/mnt/test_mount/entity/domain/table1",
+            "adls://bucket/entity/domain/table1",
         )
     ]
 
@@ -333,20 +313,20 @@ def test_mount_listing_sub_folders():
 def test_partitioned_parquet_layout():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/test_mount/entity/", "entity/", "", "")
-    first_partition = FileInfo("/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
-    first_partition_files = FileInfo("/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
-    second_partition = FileInfo("/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
-    second_partition_files = FileInfo("/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", "", "")
+    first_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
+    first_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
+    second_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
+    second_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder]
-        if path == "/mnt/test_mount/entity/":
+        if path == "dbfs:/mnt/test_mount/entity/":
             return [first_partition, second_partition]
-        if path == "/mnt/test_mount/entity/xxx=yyy/":
+        if path == "dbfs:/mnt/test_mount/entity/xxx=yyy/":
             return [first_partition_files]
-        if path == "/mnt/test_mount/entity/xxx=zzz/":
+        if path == "dbfs:/mnt/test_mount/entity/xxx=zzz/":
             return [second_partition_files]
         return None
 
@@ -354,7 +334,7 @@ def test_partitioned_parquet_layout():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -366,7 +346,7 @@ def test_partitioned_parquet_layout():
             "entity",
             "EXTERNAL",
             "PARQUET",
-            "/mnt/test_mount/entity",
+            "adls://bucket/entity",
             is_partitioned=True,
         )
     ]
@@ -375,30 +355,30 @@ def test_partitioned_parquet_layout():
 def test_partitioned_delta():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/test_mount/entity/", "entity/", "", "")
-    first_first_partition = FileInfo("/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
-    first_first_partition_files = FileInfo("/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
-    first_second_partition = FileInfo("/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
-    first_second_partition_files = FileInfo("/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
-    first_delta_log = FileInfo("/mnt/test_mount/entity/_delta_log/", "_delta_log/", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", "", "")
+    first_first_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
+    first_first_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
+    first_second_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
+    first_second_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
+    first_delta_log = FileInfo("dbfs:/mnt/test_mount/entity/_delta_log/", "_delta_log/", "", "")
 
-    second_folder = FileInfo("/mnt/test_mount/entity_2/", "entity_2/", "", "")
-    second_first_partition = FileInfo("/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
-    second_first_partition_files = FileInfo("/mnt/test_mount/entity_2/xxx=yyy/1.parquet", "1.parquet", "", "")
-    second_delta_log = FileInfo("/mnt/test_mount/entity_2/_delta_log/", "_delta_log/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount/entity_2/", "entity_2/", "", "")
+    second_first_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
+    second_first_partition_files = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/1.parquet", "1.parquet", "", "")
+    second_delta_log = FileInfo("dbfs:/mnt/test_mount/entity_2/_delta_log/", "_delta_log/", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder, second_folder]
-        if path == "/mnt/test_mount/entity/":
+        if path == "dbfs:/mnt/test_mount/entity/":
             return [first_first_partition, first_second_partition, first_delta_log]
-        if path == "/mnt/test_mount/entity/xxx=yyy/":
+        if path == "dbfs:/mnt/test_mount/entity/xxx=yyy/":
             return [first_first_partition_files]
-        if path == "/mnt/test_mount/entity/xxx=zzz/":
+        if path == "dbfs:/mnt/test_mount/entity/xxx=zzz/":
             return [first_second_partition_files]
-        if path == "/mnt/test_mount/entity_2/":
+        if path == "dbfs:/mnt/test_mount/entity_2/":
             return [second_delta_log, second_first_partition]
-        if path == "/mnt/test_mount/entity_2/xxx=yyy/":
+        if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/":
             return [second_first_partition_files]
         return None
 
@@ -406,7 +386,7 @@ def test_partitioned_delta():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -418,7 +398,7 @@ def test_partitioned_delta():
             "entity",
             "EXTERNAL",
             "DELTA",
-            "/mnt/test_mount/entity",
+            "adls://bucket/entity",
             is_partitioned=True,
         ),
         Table(
@@ -427,7 +407,7 @@ def test_partitioned_delta():
             "entity_2",
             "EXTERNAL",
             "DELTA",
-            "/mnt/test_mount/entity_2",
+            "adls://bucket/entity_2",
             is_partitioned=True,
         ),
     ]
@@ -436,17 +416,17 @@ def test_partitioned_delta():
 def test_filtering_irrelevant_paths():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/test_mount/table1/", "table1/", "", "")
-    second_folder = FileInfo("/mnt/test_mount/$_azuretempfolder/", "$_azuretempfolder/", "", "")
-    first_folder_delta_log = FileInfo("/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
-    second_folder_delta_log = FileInfo("/mnt/test_mount/$_azuretempfolder/_delta_log/", "_delta_log/", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount/$_azuretempfolder/", "$_azuretempfolder/", "", "")
+    first_folder_delta_log = FileInfo("dbfs:/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
+    second_folder_delta_log = FileInfo("dbfs:/mnt/test_mount/$_azuretempfolder/_delta_log/", "_delta_log/", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder, second_folder]
-        if path == "/mnt/test_mount/table1/":
+        if path == "dbfs:/mnt/test_mount/table1/":
             return [first_folder_delta_log]
-        if path == "/mnt/test_mount/$_azuretempfolder/":
+        if path == "dbfs:/mnt/test_mount/$_azuretempfolder/":
             return [second_folder_delta_log]
         return None
 
@@ -454,13 +434,13 @@ def test_filtering_irrelevant_paths():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"]).snapshot()
     assert results == [
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
+        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
     ]
 
 
@@ -502,19 +482,19 @@ def test_filter_irrelevant_mounts():
 def test_historical_data_should_be_overwritten():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("/mnt/test_mount/table1/", "table1/", "", "")
-    second_folder = FileInfo("/mnt/test_mount2/table2/", "table2/", "", "")
-    first_folder_delta_log = FileInfo("/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
-    second_folder_delta_log = FileInfo("/mnt/test_mount2/table2/_delta_log/", "_delta_log/", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount2/table2/", "table2/", "", "")
+    first_folder_delta_log = FileInfo("dbfs:/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
+    second_folder_delta_log = FileInfo("dbfs:/mnt/test_mount2/table2/_delta_log/", "_delta_log/", "", "")
 
     def my_side_effect(path, **_):
-        if path == "/mnt/test_mount/":
+        if path == "/mnt/test_mount":
             return [first_folder]
-        if path == "/mnt/test_mount2/":
+        if path == "dbfs:/mnt/test_mount2/":
             return [second_folder]
-        if path == "/mnt/test_mount/table1/":
+        if path == "dbfs:/mnt/test_mount/table1/":
             return [first_folder_delta_log]
-        if path == "/mnt/test_mount/table2/":
+        if path == "dbfs:/mnt/test_mount/table2/":
             return [second_folder_delta_log]
         return None
 
@@ -524,7 +504,7 @@ def test_historical_data_should_be_overwritten():
             'hive_metastore.test.tables': TABLE_STORAGE[
                 ("catalog", "database", "name", "object_type", "table_format", "location")
             ],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount/", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "abfss://bucket@windows/")],
         }
     )
     mounts = Mounts(backend, client, "test")
@@ -532,11 +512,11 @@ def test_historical_data_should_be_overwritten():
     assert backend.rows_written_for("hive_metastore.test.tables", "overwrite") == [
         Row(
             catalog='hive_metastore',
-            database='mounted_/mnt/test_mount/',
+            database='mounted_/mnt/test_mount',
             name='table1',
             object_type='EXTERNAL',
             table_format='DELTA',
-            location='/mnt/test_mount/table1',
+            location='abfss://bucket@windows/table1',
             view_text=None,
             upgraded_to=None,
             storage_properties=None,
