@@ -498,7 +498,7 @@ class WorkflowsInstallation(InstallationMixin):
                 jobs.JobCluster(
                     job_cluster_key="table_migration",
                     new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.USER_ISOLATION,
+                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
                         spark_conf=self._job_cluster_spark_conf("table_migration"),
                         policy_id=self._config.policy_id,
                         autoscale=compute.AutoScale(
