@@ -114,7 +114,7 @@ Migration Assessment Report
     - [AF315.1 - UDAF scala issue](#af3151---udaf-scala-issue)
     - [AF315.2 - applyInPandas](#af3152---applyinpandas)
     - [AF315.3 - mapInPandas](#af3153---mapinpandas)
-  - [AF330.0 - Streaming](#af3300---streaming)
+  - [AF330.x - Streaming](#af330x---streaming)
     - [AF330.1 - Streaming](#af3301---streaming)
     - [AF330.2 - Streaming](#af3302---streaming)
     - [AF330.3 - Streaming](#af3303---streaming)
@@ -929,7 +929,7 @@ The `mapInPandas` was found.
 [[back to top](#migration-assessment-report)]
 
 
-## AF330.0 - Streaming
+## AF330.x - Streaming
 Streaming limitations for Unity Catalog shared access mode [documentation](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-limitations-for-unity-catalog-shared-access-mode) should be consulted for more details. 
 
 See also [Streaming limitations for Unity Catalog single user access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-single) and [Streaming limitations for Unity Catalog shared access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-shared).
