@@ -503,6 +503,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
     _, workflows_install = new_installation(
+        lambda wc: replace(wc, override_clusters=None),
         product_info=product_info,
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
@@ -565,10 +566,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, workflows_install = new_installation(
-        lambda wc: replace(wc, override_clusters={"table_migration": env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")}),
-        product_info=product_info,
-    )
+    _, workflows_install = new_installation(product_info=product_info)
     # save table mapping for migration before trigger the run
     installation = product_info.current_installation(ws)
     migrate_rules = [
