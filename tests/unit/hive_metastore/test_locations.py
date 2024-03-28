@@ -386,6 +386,7 @@ def test_partitioned_delta():
     second_first_partition = FileInfo("/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
     second_first_partition_files = FileInfo("/mnt/test_mount/entity_2/xxx=yyy/1.parquet", "1.parquet", "", "")
     second_delta_log = FileInfo("/mnt/test_mount/entity_2/_delta_log/", "_delta_log/", "", "")
+
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder, second_folder]
@@ -428,7 +429,7 @@ def test_partitioned_delta():
             "DELTA",
             "/mnt/test_mount/entity_2",
             is_partitioned=True,
-        )
+        ),
     ]
 
 
