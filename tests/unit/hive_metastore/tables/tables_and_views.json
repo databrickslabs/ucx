@@ -1,119 +1,42 @@
 [
   {
-    "id": "db1_t1",
-    "legacy": {
-      "database": "db1",
-      "table": "t1"
-    },
-    "unity": {
-      "catalog": "cat1",
-      "schema": "db1",
-      "table": "t1"
-    }
+    "db": "db1",
+    "table": "t1"
   },
   {
-    "id": "db1_t2",
-    "legacy": {
-      "database": "db1",
-      "table": "t2"
-    },
-    "unity": {
-      "catalog": "cat3",
-      "schema": "db3",
-      "table": "t1"
-    }
+    "db": "db1",
+    "table": "t2"
   },
   {
-    "id": "db1_t3",
-    "legacy": {
-      "database": "db1",
-      "table": "t3"
-    },
-    "unity": {
-      "catalog": "cat1",
-      "schema": "db3",
-      "table": "t7"
-    }
+    "db": "db1",
+    "table": "t3"
   },
   {
-    "id": "db2_t1",
-    "legacy": {
-      "database": "db2",
-      "table": "t1"
-    },
-    "unity": {
-      "catalog": "cat1",
-      "schema": "db2",
-      "table": "t1"
-    }
+    "db": "db2",
+    "table": "t1"
   },
   {
-    "id": "db2_t3",
-    "legacy": {
-      "database": "db2",
-      "table": "t3"
-    },
-    "unity": {
-      "catalog": "cat12",
-      "schema": "db1",
-      "table": "t1"
-    }
+    "db": "db2",
+    "table": "t3"
   },
   {
-    "id": "db1_v1",
-    "legacy": {
-      "database": "db1",
-      "table": "v1",
-      "view_text": "select * from db1.t1"
-    },
-    "unity": {
-      "catalog": "cat12",
-      "schema": "db1",
-      "table": "v1",
-      "view_text": "select * from cat1.db1.t1"
-    }
+    "db": "db1",
+    "table": "v1",
+    "view_text": "select * from db1.t1"
   },
   {
-    "id": "db1_v2",
-    "legacy": {
-      "database": "db1",
-      "table": "v2",
-      "view_text": "select * from db1.t2 where db1.t2.c1 = 32"
-    },
-    "unity": {
-      "catalog": "cat3",
-      "schema": "db3",
-      "table": "v2",
-      "view_text": "select * from cat3.db3.t1 where cat3.db3.t1.c1 = 32"
-    }
+    "db": "db1",
+    "table": "v2",
+    "view_text": "select * from db1.t2 where db1.t2.c1 = 32"
   },
   {
-    "id": "db1_v3",
-    "legacy": {
-      "database": "db1",
-      "table": "v3",
-      "view_text": "select * from db1.t1, db1.t2 where db1.t1.c1 = db1.t2.c1"
-    },
-    "unity": {
-      "catalog": "cat3",
-      "schema": "db3",
-      "table": "v3",
-      "view_text": "select * from cat1.db1.t1, cat3.db3.t1 where cat1.db1.t1.c1 = cat3.db3.t1.c1"
-    }
+    "db": "db1",
+    "table": "v3",
+    "view_text": "select * from db1.t1, db1.t2 where db1.t1.c1 = db1.t2.c1"
   },
   {
-    "id": "db1_v4",
-    "legacy": {
-      "database": "db1",
-      "table": "v4",
-      "view_text": "select * from db1.v1"
-    },
-    "unity": {
-      "catalog": "cat3",
-      "schema": "db3",
-      "table": "v4",
-      "view_text": "select * from cat1.db1.t1, cat3.db3.t1 where cat1.db1.t1.c1 = cat3.db3.t1.c1"
-    }
+    "db": "db1",
+    "table": "v4",
+    "view_text": "select * from db1.v1"
   }
-
 ]

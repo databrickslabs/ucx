@@ -1,7 +1,7 @@
 {
   "src": {
     "catalog": "hive_metastore",
-    "database": "db1_src",
+    "db": "db1_src",
     "name": "view_src",
     "object_type": "VIEW",
     "table_format": "VIEW",

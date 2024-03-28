@@ -1,7 +1,7 @@
 {
   "src": {
     "catalog": "hive_metastore",
-    "database": "db1_src",
+    "db": "db1_src",
     "name": "external_src",
     "object_type": "EXTERNAL",
     "table_format": "DELTA"

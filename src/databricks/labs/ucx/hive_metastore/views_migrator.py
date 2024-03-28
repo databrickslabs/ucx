@@ -2,7 +2,6 @@ import sqlglot
 from sqlglot.expressions import Table as SqlTable
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.table_migrate import Index
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
@@ -48,8 +47,7 @@ class ViewToMigrate:
 
 class ViewsMigrator:
 
-    def __init__(self, index: Index, crawler: TablesCrawler):
-        self.index = index
+    def __init__(self, crawler: TablesCrawler):
         self.crawler = crawler
         self.result: list[ViewToMigrate] = []
         self.result_set: set[ViewToMigrate] = set()
