@@ -1,11 +1,10 @@
-from dataclasses import dataclass
-
 import sqlglot
 from sqlglot.expressions import Table as SqlTable
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.table_migrate import Index, MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migrate import Index
 from databricks.labs.ucx.hive_metastore.tables import Table
+
 
 class ViewToMigrate:
 
@@ -21,7 +20,9 @@ class ViewToMigrate:
 
     def compute_dependencies(self, all_tables: dict[str, Table]):
         if len(self.table_dependencies) + len(self.view_dependencies) == 0:
+            assert self.table.view_text is not None
             statement = sqlglot.parse(self.table.view_text)[0]
+            assert statement is not None
             for sql_table in statement.find_all(SqlTable):
                 catalog = self._catalog(sql_table)
                 if catalog != 'hive_metastore':
@@ -34,14 +35,12 @@ class ViewToMigrate:
                 else:
                     self.view_dependencies.add(table)
 
-
     # duplicated from FromTable._catalog, not sure if it's worth factorizing
     @staticmethod
     def _catalog(table):
         if table.catalog:
             return table.catalog
         return 'hive_metastore'
-
 
     def __hash__(self):
         return hash(self.table)
@@ -60,18 +59,17 @@ class ViewsMigrator:
         raw_tables = set(filter(lambda t: t.view_text is None, table_values))
         raw_views = set(table_values)
         raw_views.difference_update(raw_tables)
-        table_keys = [ table.key for table in table_values ]
-        all_tables = { k: v for k, v in zip(table_keys, table_values) }
-        views = set([ ViewToMigrate(view) for view in raw_views ])
+        table_keys = [table.key for table in table_values]
+        all_tables = dict(zip(table_keys, table_values))
+        views = {ViewToMigrate(view) for view in raw_views}
         while len(views) > 0:
-            next = self._next_batch(views, all_tables)
-            self.result.extend(next)
-            self.result_set.update(next)
-            views.difference_update(next)
-        return [ v.table for v in self.result ]
+            next_batch = self._next_batch(views, all_tables)
+            self.result.extend(next_batch)
+            self.result_set.update(next_batch)
+            views.difference_update(next_batch)
+        return [v.table for v in self.result]
 
-
-    def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str,Table]) -> set[ViewToMigrate]:
+    def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, Table]) -> set[ViewToMigrate]:
         if len(views) == 0:
             return set()
         if len(views) == 1:
@@ -83,7 +81,3 @@ class ViewsMigrator:
             if len(not_batched_yet) == 0:
                 result.add(view)
         return result
-
-
-
-

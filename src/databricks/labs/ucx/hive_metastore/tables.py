@@ -72,10 +72,8 @@ class Table:
     def key(self) -> str:
         return f"{self.catalog}.{self.database}.{self.name}".lower()
 
-
     def __hash__(self):
         return hash(self.key)
-
 
     @property
     def kind(self) -> str:

@@ -42,10 +42,9 @@ def test_migrates_direct_views_returns_sequence() -> None:
     migrator = ViewsMigrator(index, crawler)
     sequence = migrator.sequence()
     assert len(sequence) == 2
-    expected = { "hive_metastore.db1.v1", "hive_metastore.db1.v2" }
-    keys = set([ t.key for t in sequence ])
+    expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
+    keys = {t.key for t in sequence}
     assert expected == keys
-
 
 
 def create_index(samples: list[dict]) -> Index:
