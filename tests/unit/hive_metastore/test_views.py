@@ -10,7 +10,7 @@ from databricks.labs.ucx.hive_metastore.views_migrator import ViewsMigrator
 SCHEMA_NAME = "schema"
 
 
-def test_migrates_no_view_returns_empty_sequence():
+def test_migrate_no_view_returns_empty_sequence():
     samples = Samples.load("db1.t1", "db2.t1")
     sql_backend = mock_backend(samples, "db1", "db2")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1", "db2"])
@@ -19,7 +19,7 @@ def test_migrates_no_view_returns_empty_sequence():
     assert len(sequence) == 0
 
 
-def test_migrates_direct_view_returns_singleton_sequence() -> None:
+def test_migrate_direct_view_returns_singleton_sequence() -> None:
     samples = Samples.load("db1.t1", "db1.v1")
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
@@ -30,7 +30,7 @@ def test_migrates_direct_view_returns_singleton_sequence() -> None:
     assert table.key == "hive_metastore.db1.v1"
 
 
-def test_migrates_direct_views_returns_sequence() -> None:
+def test_migrate_direct_views_returns_sequence() -> None:
     samples = Samples.load("db1.t1", "db1.v1", "db1.t2", "db1.v2")
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
@@ -38,8 +38,38 @@ def test_migrates_direct_views_returns_sequence() -> None:
     sequence = migrator.sequence()
     assert len(sequence) == 2
     expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
-    keys = {t.key for t in sequence}
-    assert expected == keys
+    actual = {t.key for t in sequence}
+    assert expected == actual
+
+
+def test_migrate_indirect_views_returns_correct_sequence() -> None:
+    samples = Samples.load("db1.t1", "db1.v1", "db1.v4")
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    migrator = ViewsMigrator(crawler)
+    sequence = migrator.sequence()
+    assert len(sequence) == 2
+    expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
+    actual = [t.key for t in sequence]
+    assert expected == actual
+
+
+def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
+    samples = Samples.load("db1.t1", "db1.v1", "db1.v4", "db1.v5", "db1.v6", "db1.v7")
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    migrator = ViewsMigrator(crawler)
+    sequence = migrator.sequence()
+    assert len(sequence) == 5
+    expected = [
+        "hive_metastore.db1.v1",
+        "hive_metastore.db1.v4",
+        "hive_metastore.db1.v7",
+        "hive_metastore.db1.v6",
+        "hive_metastore.db1.v5",
+    ]
+    actual = [t.key for t in sequence]
+    assert expected == actual
 
 
 def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:

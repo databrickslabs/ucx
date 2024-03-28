@@ -38,5 +38,21 @@
     "db": "db1",
     "table": "v4",
     "view_text": "select * from db1.v1"
+  },
+    {
+    "db": "db1",
+    "table": "v5",
+    "view_text": "select * from db1.v7, db1.v6"
+  },
+  {
+    "db": "db1",
+    "table": "v6",
+    "view_text": "select * from db1.v7"
+  },
+  {
+    "db": "db1",
+    "table": "v7",
+    "view_text": "select * from db1.v4"
   }
+
 ]

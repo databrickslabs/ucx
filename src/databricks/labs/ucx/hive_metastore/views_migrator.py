@@ -49,8 +49,8 @@ class ViewsMigrator:
 
     def __init__(self, crawler: TablesCrawler):
         self.crawler = crawler
-        self.result: list[ViewToMigrate] = []
-        self.result_set: set[ViewToMigrate] = set()
+        self.result_view_list: list[ViewToMigrate] = []
+        self.result_tables_set: set[Table] = set()
 
     def sequence(self) -> list[Table]:
         table_values = self.crawler.snapshot()
@@ -62,10 +62,10 @@ class ViewsMigrator:
         views = {ViewToMigrate(view) for view in raw_views}
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
-            self.result.extend(next_batch)
-            self.result_set.update(next_batch)
+            self.result_view_list.extend(next_batch)
+            self.result_tables_set.update([v.table for v in next_batch])
             views.difference_update(next_batch)
-        return [v.table for v in self.result]
+        return [v.table for v in self.result_view_list]
 
     def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, Table]) -> set[ViewToMigrate]:
         if len(views) == 0:
@@ -75,7 +75,7 @@ class ViewsMigrator:
         result: set[ViewToMigrate] = set()
         for view in views:
             view.compute_dependencies(all_tables)
-            not_batched_yet = list(filter(lambda v: v not in self.result_set, view.view_dependencies))
+            not_batched_yet = list(filter(lambda v: v not in self.result_tables_set, view.view_dependencies))
             if len(not_batched_yet) == 0:
                 result.add(view)
         return result
