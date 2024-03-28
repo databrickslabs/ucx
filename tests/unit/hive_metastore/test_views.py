@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
-from string import Template
 
+import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -72,15 +72,36 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
     assert expected == actual
 
 
+def test_migrate_invalid_sql_raises_value_error() -> None:
+    with pytest.raises(ValueError) as error:
+        samples = Samples.load("db1.v8")
+        sql_backend = mock_backend(samples, "db1")
+        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+        migrator = ViewsMigrator(crawler)
+        sequence = migrator.sequence()
+        assert sequence is None  # should never get there
+    assert "Could not analyze view SQL:" in str(error)
+
+
+def test_migrate_invalid_sql_tables_raises_value_error() -> None:
+    with pytest.raises(ValueError) as error:
+        samples = Samples.load("db1.v9")
+        sql_backend = mock_backend(samples, "db1")
+        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+        migrator = ViewsMigrator(crawler)
+        sequence = migrator.sequence()
+        assert sequence is None  # should never get there
+    assert "Unknown schema object:" in str(error)
+
+
 def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
     db_rows: dict[str, list[tuple]] = {}
-    show_template = Template('SHOW TABLES FROM hive_metastore.$db')
     select_query = 'SELECT \\* FROM hive_metastore.schema.tables'
     for dbname in dbnames:
         # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
         valid_samples = list(filter(lambda s: s["db"] == dbname, samples))
         show_tuples = [(s["db"], s["table"], "true") for s in valid_samples]
-        db_rows[show_template.substitute({'db': dbname})] = show_tuples
+        db_rows[f'SHOW TABLES FROM hive_metastore.{dbname}'] = show_tuples
         # catalog, database, table, object_type, table_format, location, view_text
         select_tuples = [
             (

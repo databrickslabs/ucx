@@ -53,6 +53,16 @@
     "db": "db1",
     "table": "v7",
     "view_text": "select * from db1.v4"
+  },
+  {
+    "db": "db1",
+    "table": "v8",
+    "view_text": "123 invalid SQL"
+  },
+   {
+    "db": "db1",
+    "table": "v9",
+    "view_text": "select * from db15.t32"
   }
 
 ]
