@@ -68,6 +68,14 @@ class ViewsMigrator:
         self.result_tables_set: set[Table] = set()
 
     def sequence(self) -> list[Table]:
+        # sequencing is achieved using a very simple algorithm:
+        # for each view, we register dependencies (extracted from view_text)
+        # then given the remaining set of views to process,
+        # and the growing set of views already processed
+        # we check if each remaining view refers to not yet processed views
+        # if none, then it's safe to add that view to the next batch of views
+        # the complexity for a given set of views v and a dependency depth d looks like Ov^d
+        # this seems enormous but in practice d remains small and v decreases rapidly
         table_values = self.crawler.snapshot()
         raw_tables = set(filter(lambda t: t.view_text is None, table_values))
         raw_views = set(table_values)
