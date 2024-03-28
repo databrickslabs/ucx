@@ -26,6 +26,7 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     PermissionDenied,
     Unknown,
 )
+from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
     ClusterDetails,
@@ -222,7 +223,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         PRODUCT_INFO,
     )
 
-    with pytest.raises(ManyError) as failure:
+    with pytest.raises(BadRequest) as failure:
         workspace_installation.run()
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
