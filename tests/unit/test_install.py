@@ -396,7 +396,7 @@ def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
-    with pytest.raises(NotFound) as failure:
+    with pytest.raises(NotFound):
         installer.run_workflow("assessment")
 
 
