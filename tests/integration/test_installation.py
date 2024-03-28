@@ -13,7 +13,12 @@ from databricks.labs.blueprint.installer import InstallState, RawState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk.errors import AlreadyExists, InvalidParameterValue, NotFound
+from databricks.sdk.errors import (
+    AlreadyExists,
+    BadRequest,
+    InvalidParameterValue,
+    NotFound,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
@@ -286,7 +291,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(BadRequest):
         workflows_install.run_workflow("validate-groups-permissions")
 
 
