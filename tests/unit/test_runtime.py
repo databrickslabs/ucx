@@ -56,6 +56,7 @@ def azure_mock_config() -> WorkspaceConfig:
 def mock_installation() -> MockInstallation:
     return MockInstallation(
         {
+            'config.yml': {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
             'mapping.csv': [
                 {
                     'catalog_name': 'catalog',
@@ -65,7 +66,7 @@ def mock_installation() -> MockInstallation:
                     'src_table': 'table',
                     'workspace_name': 'workspace',
                 },
-            ]
+            ],
         }
     )
 
