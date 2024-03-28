@@ -94,6 +94,17 @@ def test_migrate_invalid_sql_tables_raises_value_error() -> None:
     assert "Unknown schema object:" in str(error)
 
 
+def test_migrate_circular_vues_raises_value_error() -> None:
+    with pytest.raises(ValueError) as error:
+        samples = Samples.load("db1.v10", "db1.v11")
+        sql_backend = mock_backend(samples, "db1")
+        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+        migrator = ViewsMigrator(crawler)
+        sequence = migrator.sequence()
+        assert sequence is None  # should never get there
+    assert "Circular view references are preventing migration:" in str(error)
+
+
 def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
     db_rows: dict[str, list[tuple]] = {}
     select_query = 'SELECT \\* FROM hive_metastore.schema.tables'

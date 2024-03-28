@@ -91,4 +91,7 @@ class ViewsMigrator:
             not_batched_yet = list(filter(lambda v: v not in self.result_tables_set, view.view_dependencies))
             if len(not_batched_yet) == 0:
                 result.add(view)
+        # prevent infinite loop
+        if len(result) == 0 and len(views) > 0:
+            raise ValueError(f"Circular view references are preventing migration: {views}")
         return result
