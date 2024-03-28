@@ -9,7 +9,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
+from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -740,11 +740,10 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
 
     assert "Cannot identify UC grant" in caplog.text
 
+
 def test_migrate_principal_acls_should_produce_proper_queries(ws):
     errors = {}
-    rows = {
-        r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]
-    }
+    rows = {r"SYNC .*": MockBackend.rows("status_code", "description")[("SUCCESS", "test")]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
@@ -772,4 +771,3 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
     assert "GRANT ALL_PRIVILEGES ON TABLE ucx_default.db1_dst.managed_other TO `Group2`" not in backend.queries
-
