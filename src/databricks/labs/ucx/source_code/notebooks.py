@@ -1,7 +1,7 @@
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo
 
-from databricks.labs.ucx.code.languages import Languages
+from databricks.labs.ucx.source_code.languages import Languages
 
 
 class Notebooks:

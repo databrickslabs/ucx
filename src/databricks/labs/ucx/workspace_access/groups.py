@@ -86,6 +86,41 @@ class MigrationState:
     def __len__(self):
         return len(self._name_to_group)
 
+    def apply_group_permissions_experimental(self, ws: WorkspaceClient) -> bool:
+        if len(self) == 0:
+            logger.info("No valid groups selected, nothing to do.")
+            return True
+        logger.info(f"Applying the permissions to account groups. " f"Total groups to apply permissions: {len(self)}.")
+        items = 0
+        for migrated_group in self.groups:
+            items += self._migrate_group_permissions_paginated(ws, migrated_group)
+        logger.info(f"Migrated {items} objects")
+        return True
+
+    @staticmethod
+    def _migrate_group_permissions_paginated(ws: WorkspaceClient, migrated_group: MigratedGroup):
+        batch_size = 1000
+        logger.info(
+            f"Migrating permissions from workspace group {migrated_group.name_in_workspace} "
+            f"to account group: {migrated_group.name_in_account}."
+        )
+        permissions_migrated = 0
+        while True:
+            response = ws.permission_migration.migrate_permissions(
+                ws.get_workspace_id(),
+                migrated_group.name_in_workspace,
+                migrated_group.name_in_account,
+                size=batch_size,
+            )
+            if not response.permissions_migrated:
+                logger.info("No more permission to migrated.")
+                return permissions_migrated
+            permissions_migrated += response.permissions_migrated
+            logger.info(
+                f"Migrated {response.permissions_migrated} permissions to "
+                f"{migrated_group.name_in_account} account group"
+            )
+
 
 class GroupMigrationStrategy:
     def __init__(

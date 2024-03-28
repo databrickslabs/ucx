@@ -10,7 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import (
-    AwsIamRole,
+    AwsIamRoleResponse,
     ExternalLocationInfo,
     StorageCredentialInfo,
 )
@@ -112,12 +112,12 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, mock_aw
         StorageCredentialInfo(
             id="1",
             name="cred1",
-            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-role1"),
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-role1"),
         ),
         StorageCredentialInfo(
             id="2",
             name="credx",
-            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-rolex"),
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-rolex"),
         ),
     ]
     aws_resource_permissions = AWSResourcePermissions(
@@ -142,12 +142,12 @@ def test_create_external_locations_skip_existing(mock_ws, mock_aws, backend, loc
         StorageCredentialInfo(
             id="1",
             name="cred1",
-            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-role1"),
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-role1"),
         ),
         StorageCredentialInfo(
             id="2",
             name="credx",
-            aws_iam_role=AwsIamRole("arn:aws:iam::12345:role/uc-rolex"),
+            aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-rolex"),
         ),
     ]
     mock_ws.external_locations.list.return_value = [

@@ -26,12 +26,13 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     TablesMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import What
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
@@ -439,7 +440,7 @@ def migrate_external_tables_sync(
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     TablesMigrate(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.EXTERNAL_SYNC)
+    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
 @task("migrate-tables", job_cluster="table_migration")
@@ -459,7 +460,105 @@ def migrate_dbfs_root_delta_tables(
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     TablesMigrate(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.DBFS_ROOT_DELTA)
+    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+
+@task("migrate-groups-experimental", depends_on=[crawl_groups])
+def rename_workspace_local_groups_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    Renames workspace local groups by adding `ucx-renamed-` prefix."""
+    return rename_workspace_local_groups(cfg, ws, sql_backend, _install)
+
+
+@task("migrate-groups-experimental", depends_on=[rename_workspace_local_groups_experimental])
+def reflect_account_groups_on_workspace_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
+    step to be successful. This process does not create the account level group(s)."""
+    return reflect_account_groups_on_workspace(cfg, ws, sql_backend, _install)
+
+
+@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental])
+def apply_permissions_to_account_groups_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    This task uses the new permission migration API which requires enrolment from Databricks
+    Fourth phase of the workspace-local group migration process. It does the following:
+      - Assigns the full set of permissions of the original group to the account-level one
+
+    It covers local workspace-local permissions for most entities: Entitlements,
+    AWS instance profiles, Clusters, Cluster policies, Instance Pools, Databricks SQL warehouses, Delta Live
+    Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries, SQL Alerts, Token and Password usage
+    permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
+    """
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
+    )
+
+    migration_state = group_manager.get_migration_state()
+    if len(migration_state.groups) == 0:
+        logger.info("Skipping group migration as no groups were found.")
+        return
+
+    migration_state.apply_group_permissions_experimental(ws)
+
+
+@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental], job_cluster="tacl")
+def apply_tacl_to_account_groups_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    This task migrates Legacy Table ACLs from workspace-local group to account-level group.
+    """
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        cfg.include_group_names,
+        cfg.renamed_group_prefix,
+        workspace_group_regex=cfg.workspace_group_regex,
+        workspace_group_replace=cfg.workspace_group_replace,
+        account_group_regex=cfg.account_group_regex,
+        external_id_match=cfg.group_match_by_external_id,
+    )
+
+    migration_state = group_manager.get_migration_state()
+    if len(migration_state.groups) == 0:
+        logger.info("Skipping group migration as no groups were found.")
+        return
+
+    tables_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    udfs_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
+    grants_crawler = GrantsCrawler(tables_crawler, udfs_crawler)
+    tacl_support = TableAclSupport(grants_crawler, sql_backend)
+    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [tacl_support])
+    permission_manager.apply_group_permissions(migration_state)
+
+
+@task(
+    "migrate-groups-experimental",
+    depends_on=[apply_permissions_to_account_groups_experimental, apply_tacl_to_account_groups_experimental],
+    job_cluster="tacl",
+)
+def validate_groups_permissions_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    Validate that all the crawled permissions are applied correctly to the destination groups."""
+    return validate_groups_permissions(cfg, ws, sql_backend, _install)
 
 
 @task("migrate-tables-in-mounts")

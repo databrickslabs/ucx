@@ -23,9 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Unshallow
-        run: git fetch --prune --unshallow
+        with:
+          fetch-depth: 0
 
       - name: Install Python
         uses: actions/setup-python@v4
@@ -48,6 +47,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Install Python
         uses: actions/setup-python@v4

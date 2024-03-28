@@ -20,7 +20,6 @@ from databricks.labs.ucx.aws.credentials import IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.code.files import Files
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
@@ -29,6 +28,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
@@ -509,8 +509,8 @@ def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
 def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
     installation = Installation.current(w, 'ucx')
-    catalog_schema = CatalogSchema.for_cli(w, installation, prompts)
-    catalog_schema.create_catalog_schema()
+    catalog_schema = CatalogSchema.for_cli(w, installation)
+    catalog_schema.create_all_catalogs_schemas(prompts)
 
 
 @ucx.command

@@ -1,20 +1,21 @@
-name: acceptance
+name: nightly
 
 on:
-  pull_request:
-    types: [ opened, synchronize, ready_for_review ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
 
 permissions:
   id-token: write
+  issues: write
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 concurrency:
   group: single-acceptance-job-per-repo
 
 jobs:
   integration:
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     environment: account-admin
     runs-on: larger
     steps:
@@ -33,12 +34,14 @@ jobs:
       - name: Install hatch
         run: pip install hatch==1.9.4
 
-      - name: Run integration tests
+      - name: Run nightly tests
         uses: databrickslabs/sandbox/acceptance@acceptance/v0.2.1
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
           timeout: 45m
+          create_issues: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          TEST_NIGHTLY: true

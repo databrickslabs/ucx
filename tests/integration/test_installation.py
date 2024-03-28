@@ -13,13 +13,19 @@ from databricks.labs.blueprint.installer import InstallState, RawState
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk.errors import AlreadyExists, InvalidParameterValue, NotFound
+from databricks.sdk.errors import (
+    AlreadyExists,
+    BadRequest,
+    InvalidParameterValue,
+    NotFound,
+)
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
@@ -52,7 +58,6 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
         if not environ:
             environ = {}
         renamed_group_prefix = f"rename-{product_info.product_name()}-"
-
         prompts = MockPrompts(
             {
                 r'Open job overview in your browser.*': 'no',
@@ -143,7 +148,8 @@ def test_job_cluster_policy(ws, new_installation):
 
     assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database}) ({user_name})"
 
-    assert policy_definition["spark_version"]["value"] == ws.clusters.select_spark_version(latest=True)
+    spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
+    assert policy_definition["spark_version"]["value"] == spark_version
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
     if ws.config.is_azure:
         assert (
@@ -285,7 +291,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(BadRequest):
         workflows_install.run_workflow("validate-groups-permissions")
 
 
@@ -375,6 +381,9 @@ def test_global_installation_on_existing_global_install(ws, new_installation):
     reinstall_global, _ = new_installation(
         product_info=product_info,
         installation=Installation.assume_global(ws, product_info.product_name()),
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
     )
     assert reinstall_global.folder == f"/Applications/{product_info.product_name()}"
     reinstall_global.uninstall()
@@ -389,16 +398,16 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
-    with pytest.raises(RuntimeWarning) as err:
+    with pytest.raises(RuntimeWarning, match="UCX is already installed, but no confirmation"):
         new_installation(
             product_info=product_info,
             installation=Installation.assume_global(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'user'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'no',
+                r".*Do you want to update the existing installation?.*": 'yes',
             },
         )
-    assert err.value.args[0] == "UCX is already installed, but no confirmation"
 
     # successful override with confirmation
     reinstall_user_force, _ = new_installation(
@@ -407,6 +416,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
         environ={'UCX_FORCE_INSTALL': 'user'},
         extend_prompts={
             r".*UCX is already installed on this workspace.*": 'yes',
+            r".*Do you want to update the existing installation?.*": 'yes',
         },
         inventory_schema_suffix="_reinstall",
     )
@@ -426,28 +436,28 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
-    with pytest.raises(RuntimeWarning) as err:
+    with pytest.raises(RuntimeWarning, match="UCX is already installed, but no confirmation"):
         new_installation(
             product_info=product_info,
             installation=Installation.assume_user_home(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'global'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'no',
+                r".*Do you want to update the existing installation?.*": 'yes',
             },
         )
-    assert err.value.args[0] == "UCX is already installed, but no confirmation"
 
     # not implemented error with confirmation
-    with pytest.raises(databricks.sdk.errors.NotImplemented) as err:
+    with pytest.raises(databricks.sdk.errors.NotImplemented, match="Migration needed. Not implemented yet."):
         new_installation(
             product_info=product_info,
             installation=Installation.assume_user_home(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'global'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'yes',
+                r".*Do you want to update the existing installation?.*": 'yes',
             },
         )
-    assert err.value.args[0] == "Migration needed. Not implemented yet."
     existing_user_installation.uninstall()
 
 
@@ -459,16 +469,18 @@ def test_check_inventory_database_exists(ws, new_installation):
     )
     inventory_database = install.config.inventory_database
 
-    with pytest.raises(AlreadyExists) as err:
+    with pytest.raises(
+        AlreadyExists, match=f"Inventory database '{inventory_database}' already exists in another installation"
+    ):
         new_installation(
             product_info=product_info,
             installation=Installation.assume_global(ws, product_info.product_name()),
             environ={'UCX_FORCE_INSTALL': 'user'},
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'yes',
+                r".*Do you want to update the existing installation?.*": 'yes',
             },
         )
-    assert err.value.args[0] == f"Inventory database '{inventory_database}' already exists in another installation"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
@@ -590,3 +602,44 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     job_id = install_state.resources["jobs"]["migrate-tables"]
     for task in ws.jobs.get(job_id).settings.tasks:
         assert task.existing_cluster_id == env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+
+
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema, make_schema, make_table):
+    _, workflows_install = new_installation()
+
+    schema = make_schema(catalog_name="hive_metastore")
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) PARTITIONED BY (column1)"
+    )
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)"
+    )
+    workflows_install.run_workflow("assessment")
+
+    tables = TablesCrawler(sql_backend, inventory_schema)
+
+    all_tables = {}
+    for table in tables.snapshot():
+        all_tables[table.key] = table
+
+    assert len(all_tables) >= 2
+    assert all_tables[f"{schema.full_name}.partitioned_table"].is_partitioned is True
+    assert all_tables[f"{schema.full_name}.non_partitioned_table"].is_partitioned is False
+
+
+def test_compare_remote_local_install_versions(ws, new_installation):
+    product_info = ProductInfo.for_testing(WorkspaceConfig)
+    new_installation(product_info=product_info)
+    with pytest.raises(
+        RuntimeWarning,
+        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
+    ):
+        new_installation(product_info=product_info)
+
+    new_installation(
+        product_info=product_info,
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )

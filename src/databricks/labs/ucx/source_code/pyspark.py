@@ -1,8 +1,8 @@
 import ast
 from collections.abc import Iterable
 
-from databricks.labs.ucx.code.base import Advice, Fixer, Linter
-from databricks.labs.ucx.code.queries import FromTable
+from databricks.labs.ucx.source_code.base import Advice, Fixer, Linter
+from databricks.labs.ucx.source_code.queries import FromTable
 
 
 class SparkSql(Linter, Fixer):
