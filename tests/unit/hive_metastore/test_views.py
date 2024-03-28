@@ -26,12 +26,26 @@ def test_migrates_direct_view_returns_singleton_sequence() -> None:
     samples = Samples.load("db1_t1", "db1_v1")
     index = create_index(samples)
     sql_backend = mock_backend(samples, "db1")
-    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1", "db2"])
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     migrator = ViewsMigrator(index, crawler)
     sequence = migrator.sequence()
     assert len(sequence) == 1
-    migration: MigrationStatus = sequence[0]
-    assert migration.src_schema == "db1" and migration.src_table == "v1"
+    table = sequence[0]
+    assert table.database == "db1" and table.name == "v1"
+
+
+def test_migrates_direct_views_returns_sequence() -> None:
+    samples = Samples.load("db1_t1", "db1_v1", "db1_t2", "db1_v2")
+    index = create_index(samples)
+    sql_backend = mock_backend(samples, "db1")
+    crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+    migrator = ViewsMigrator(index, crawler)
+    sequence = migrator.sequence()
+    assert len(sequence) == 2
+    expected = { "hive_metastore.db1.v1", "hive_metastore.db1.v2" }
+    keys = set([ t.key for t in sequence ])
+    assert expected == keys
+
 
 
 def create_index(samples: list[dict]) -> Index:
