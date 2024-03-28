@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import ClassVar
@@ -10,9 +10,10 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result, ResultFn
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -280,13 +281,26 @@ class TablesInMounts(CrawlerBase[Table]):
         self._fiter_paths = irrelevant_patterns
 
     def snapshot(self) -> list[Table]:
-        """
-        Takes a snapshot of tables in the specified catalog and database.
-
-        Returns:
-            list[Table]: A list of Table objects representing the snapshot of tables.
-        """
         return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
+
+        logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
+        cached_results = []
+        try:
+            cached_results = list(fetcher())
+        except NotFound:
+            pass
+        logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
+        loaded_records = list(loader())
+        if len(cached_results) > 0:
+            loaded_records = loaded_records + cached_results
+        self._append_records(loaded_records)
+        return loaded_records
+
+    def _append_records(self, items: Sequence[Table]):
+        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
+        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
 
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
@@ -298,8 +312,10 @@ class TablesInMounts(CrawlerBase[Table]):
         all_tables = []
         for mount in all_mounts:
             if self._include_mounts and mount.name not in self._include_mounts:
+                logger.info(f"Filtering mount {mount.name}")
                 continue
             table_paths = self._find_delta_log_folders(mount.name)
+            logger.info(f"Found {len(table_paths)} in mount {mount.name}")
             for path, entry in table_paths.items():
                 guess_table = os.path.basename(path)
                 table = Table(
@@ -318,26 +334,34 @@ class TablesInMounts(CrawlerBase[Table]):
         if delta_log_folders is None:
             delta_log_folders = {}
 
+        logger.info(f"Listing {root_dir}")
         entries = self._dbutils.fs.ls(root_dir)
         for entry in entries:
-            if self._is_irrelevant(entry.name):
+            if self._is_irrelevant(entry.name) or entry.path == root_dir:
+                logger.debug(f"Path {entry.path} is irrelevant")
                 continue
 
-            path = os.path.dirname(entry.path)
-
-            if self._path_is_delta(delta_log_folders, path):
+            root_path = os.path.dirname(root_dir)
+            if self._path_is_delta(delta_log_folders, root_path):
+                if self._is_partitioned(entry.path):
+                    logger.debug(f"Found partitioned delta {root_path}")
+                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
+                    continue
+                logger.debug(f"Path {entry.path} was identified as Delta, skipping")
                 continue
 
-            if entry.name == "_delta_log":
-                logger.debug(f"Found delta table {path}")
-                if delta_log_folders.get(path) and delta_log_folders.get(path).is_partitioned:
-                    delta_log_folders[path] = TableInMount(format="DELTA", is_partitioned=True)
+            if entry.name == "_delta_log/":
+                logger.debug(f"Found delta table {root_path}")
+                if delta_log_folders.get(root_path) and delta_log_folders.get(root_path).is_partitioned:
+                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
                 else:
-                    delta_log_folders[path] = TableInMount(format="DELTA", is_partitioned=False)
-            elif self._is_partitioned(entry.path):
-                delta_log_folders[path] = TableInMount(format="PARQUET", is_partitioned=True)
-            elif self._is_parquet(entry.path):
-                delta_log_folders[path] = TableInMount(format="PARQUET", is_partitioned=False)
+                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=False)
+            elif self._is_partitioned(entry.name):
+                logger.debug(f"Found partitioned parquet {entry.path}")
+                delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=True)
+            elif self._is_parquet(entry.name):
+                logger.debug(f"Found parquet {entry.path}")
+                delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=False)
             else:
                 self._find_delta_log_folders(entry.path, delta_log_folders)
 
@@ -356,3 +380,6 @@ class TablesInMounts(CrawlerBase[Table]):
 
     def _is_irrelevant(self, entry: str) -> bool:
         return any(pattern in entry for pattern in self._fiter_paths)
+
+    def _is_directory(self, entry: str) -> bool:
+        return entry.endswith("/")
