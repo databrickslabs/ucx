@@ -2,53 +2,140 @@ Migration Assessment Report
 ===
 
 <!-- TOC -->
-* [Migration Assessment Report](#migration-assessment-report)
-* [Assessment Report Summary](#assessment-report-summary)
-* [Assessment Widgets](#assessment-widgets)
-  * [Readiness](#readiness)
-  * [Total Databases](#total-databases)
-  * [Metastore Crawl Failures](#metastore-crawl-failures)
-  * [Total Tables](#total-tables)
-  * [Storage Locations](#storage-locations)
-* [Assessment Widgets](#assessment-widgets-1)
-  * [Readiness](#readiness-1)
-  * [Assessment Summary](#assessment-summary)
-  * [Table counts by storage](#table-counts-by-storage)
-  * [Table counts by schema and format](#table-counts-by-schema-and-format)
-  * [Database Summary](#database-summary)
-  * [External Locations](#external-locations)
-  * [Mount Points](#mount-points)
-  * [Table Types](#table-types)
-  * [Incompatible Clusters](#incompatible-clusters)
-  * [Incompatible Jobs](#incompatible-jobs)
-  * [Incompatible Delta Live Tables](#incompatible-delta-live-tables)
-  * [Incompatible Global Init Scripts](#incompatible-global-init-scripts)
-* [Assessment Finding Index](#assessment-finding-index)
-    * [AF101 - not supported DBR: ##.#.x-scala2.12](#af101---not-supported-dbr-x-scala212)
-    * [AF102 - not supported DBR: ##.#.x-cpu-ml-scala2.12](#af102---not-supported-dbr-x-cpu-ml-scala212)
-    * [AF103 - not supported DBR: ##.#.x-gpu-ml-scala2.12](#af103---not-supported-dbr-x-gpu-ml-scala212)
-    * [AF111 - Uses azure service principal credentials config in cluster.](#af111---uses-azure-service-principal-credentials-config-in-cluster)
-    * [AF112 - Uses azure service principal credentials config in Job cluster.](#af112---uses-azure-service-principal-credentials-config-in-job-cluster)
-    * [AF113 - Uses azure service principal credentials config in pipeline.](#af113---uses-azure-service-principal-credentials-config-in-pipeline)
-    * [AF114 - unsupported config](#af114---unsupported-config)
-    * [AF115 - unsupported config: spark.databricks.passthrough.enabled](#af115---unsupported-config-sparkdatabrickspassthroughenabled)
-    * [AF116 - No isolation shared clusters not supported in UC](#af116---no-isolation-shared-clusters-not-supported-in-uc)
-    * [AF117 - cluster type not supported](#af117---cluster-type-not-supported)
-    * [AF201 - Inplace Sync](#af201---inplace-sync)
-    * [AF202 - Asset Replication Required](#af202---asset-replication-required)
-    * [AF203 - Data in DBFS Root](#af203---data-in-dbfs-root)
-    * [AF204 - Data is in DBFS Mount](#af204---data-is-in-dbfs-mount)
-    * [AF210 - Non-DELTA format: CSV](#af210---non-delta-format-csv)
-    * [AF211 - Non-DELTA format: DELTA](#af211---non-delta-format-delta)
-    * [AF212 - Non-DELTA format](#af212---non-delta-format)
-    * [AF221 - Unsupported Storage Type](#af221---unsupported-storage-type)
-* [Common Terms](#common-terms)
-  * [UC](#uc)
-  * [DELTA](#delta)
-  * [CTAS](#ctas)
-  * [DEEP CLONE](#deep-clone)
-  * [EXTERNAL LOCATION](#external-location)
-  * [STORAGE CREDENTIAL](#storage-credential)
+- [Migration Assessment Report](#migration-assessment-report)
+- [Assessment Report Summary](#assessment-report-summary)
+- [Assessment Widgets](#assessment-widgets)
+  - [Readiness](#readiness)
+  - [Total Databases](#total-databases)
+  - [Metastore Crawl Failures](#metastore-crawl-failures)
+  - [Total Tables](#total-tables)
+  - [Storage Locations](#storage-locations)
+- [Assessment Widgets](#assessment-widgets-1)
+  - [Readiness](#readiness-1)
+  - [Assessment Summary](#assessment-summary)
+  - [Table counts by storage](#table-counts-by-storage)
+  - [Table counts by schema and format](#table-counts-by-schema-and-format)
+  - [Database Summary](#database-summary)
+  - [External Locations](#external-locations)
+  - [Mount Points](#mount-points)
+  - [Table Types](#table-types)
+  - [Incompatible Clusters](#incompatible-clusters)
+  - [Incompatible Jobs](#incompatible-jobs)
+  - [Incompatible Delta Live Tables](#incompatible-delta-live-tables)
+  - [Incompatible Global Init Scripts](#incompatible-global-init-scripts)
+- [Assessment Finding Index](#assessment-finding-index)
+    - [AF101 - not supported DBR: ##.#.x-scala2.12](#af101---not-supported-dbr-x-scala212)
+    - [AF102 - not supported DBR: ##.#.x-cpu-ml-scala2.12](#af102---not-supported-dbr-x-cpu-ml-scala212)
+    - [AF103 - not supported DBR: ##.#.x-gpu-ml-scala2.12](#af103---not-supported-dbr-x-gpu-ml-scala212)
+    - [AF111 - Uses azure service principal credentials config in cluster.](#af111---uses-azure-service-principal-credentials-config-in-cluster)
+    - [AF112 - Uses azure service principal credentials config in Job cluster.](#af112---uses-azure-service-principal-credentials-config-in-job-cluster)
+    - [AF113 - Uses azure service principal credentials config in pipeline.](#af113---uses-azure-service-principal-credentials-config-in-pipeline)
+    - [AF114 - unsupported config](#af114---unsupported-config)
+    - [AF115 - unsupported config: spark.databricks.passthrough.enabled](#af115---unsupported-config-sparkdatabrickspassthroughenabled)
+    - [AF116 - No isolation shared clusters not supported in UC](#af116---no-isolation-shared-clusters-not-supported-in-uc)
+    - [AF117 - cluster type not supported](#af117---cluster-type-not-supported)
+    - [AF201 - Inplace Sync](#af201---inplace-sync)
+    - [AF202 - Asset Replication Required](#af202---asset-replication-required)
+    - [AF203 - Data in DBFS Root](#af203---data-in-dbfs-root)
+    - [AF204 - Data is in DBFS Mount](#af204---data-is-in-dbfs-mount)
+    - [AF210 - Non-DELTA format: CSV](#af210---non-delta-format-csv)
+    - [AF211 - Non-DELTA format: DELTA](#af211---non-delta-format-delta)
+    - [AF212 - Non-DELTA format](#af212---non-delta-format)
+    - [AF221 - Unsupported Storage Type](#af221---unsupported-storage-type)
+  - [AF300 - AF399](#af300---af399)
+    - [AF300.6 - 3 level namespace](#af3006---3-level-namespace)
+    - [AF300.1 - r language support](#af3001---r-language-support)
+    - [AF300.2 - scala language support](#af3002---scala-language-support)
+    - [AF300.3 - Minimum DBR version](#af3003---minimum-dbr-version)
+    - [AF300.4 - ML Runtime cpu](#af3004---ml-runtime-cpu)
+    - [AF300.5 - ML Runtime gpu](#af3005---ml-runtime-gpu)
+    - [AF301.1 - spark.catalog.x](#af3011---sparkcatalogx)
+    - [AF301.2 - spark.catalog.x](#af3012---sparkcatalogx)
+  - [AF302.x - Arbitrary Java](#af302x---arbitrary-java)
+    - [AF302.1 - Arbitrary Java](#af3021---arbitrary-java)
+    - [AF302.2 - Arbitrary Java](#af3022---arbitrary-java)
+    - [AF302.3 - Arbitrary Java](#af3023---arbitrary-java)
+    - [AF302.4 - Arbitrary Java](#af3024---arbitrary-java)
+    - [AF302.5 - Arbitrary Java](#af3025---arbitrary-java)
+    - [AF302.6 - Arbitrary Java](#af3026---arbitrary-java)
+    - [AF303.1 - Java UDF](#af3031---java-udf)
+    - [AF304.1 - JDBC datasource](#af3041---jdbc-datasource)
+    - [AF305.1 - boto3](#af3051---boto3)
+    - [AF305.2 - s3fs](#af3052---s3fs)
+    - [AF306.1 - dbutils...getContext](#af3061---dbutilsgetcontext)
+    - [AF306.2 - dbutils...getContext](#af3062---dbutilsgetcontext)
+    - [AF310.1 - credential passthrough](#af3101---credential-passthrough)
+  - [AF311.x - dbutils](#af311x---dbutils)
+    - [AF311.1 - dbutils.fs](#af3111---dbutilsfs)
+    - [AF311.2 - dbutils mount(s)](#af3112---dbutils-mounts)
+    - [AF311.3 - dbutils mount(s)](#af3113---dbutils-mounts)
+    - [AF311.4 - dbutils mount(s)](#af3114---dbutils-mounts)
+    - [AF311.5 - mount points](#af3115---mount-points)
+    - [AF311.6 - dbfs usage](#af3116---dbfs-usage)
+    - [AF311.7 - dbfs usage](#af3117---dbfs-usage)
+  - [AF313.x - SparkContext](#af313x---sparkcontext)
+    - [AF313.1 - SparkContext](#af3131---sparkcontext)
+    - [AF313.2 - SparkContext](#af3132---sparkcontext)
+    - [AF313.3 - SparkContext](#af3133---sparkcontext)
+    - [AF313.4 - SparkContext](#af3134---sparkcontext)
+    - [AF313.5 - SparkContext](#af3135---sparkcontext)
+    - [AF313.6 - SparkContext](#af3136---sparkcontext)
+    - [AF313.7 - SparkContext](#af3137---sparkcontext)
+    - [AF313.8 - SparkContext](#af3138---sparkcontext)
+    - [AF313.9 - SparkContext](#af3139---sparkcontext)
+    - [AF313.10 - SparkContext](#af31310---sparkcontext)
+    - [AF313.11 - SparkContext](#af31311---sparkcontext)
+    - [AF313.12 - SparkContext](#af31312---sparkcontext)
+    - [AF313.13 - SparkContext](#af31313---sparkcontext)
+    - [AF313.14 - SparkContext](#af31314---sparkcontext)
+    - [AF313.15 - SparkContext](#af31315---sparkcontext)
+    - [AF313.16 - SparkContext](#af31316---sparkcontext)
+    - [AF313.17 - SparkContext](#af31317---sparkcontext)
+    - [AF313.18 - SparkContext](#af31318---sparkcontext)
+    - [AF313.19 - SparkContext](#af31319---sparkcontext)
+    - [AF313.20 - SparkContext](#af31320---sparkcontext)
+    - [AF313.21 - SparkContext](#af31321---sparkcontext)
+    - [AF313.22 - SparkContext](#af31322---sparkcontext)
+    - [AF313.23 - SparkContext](#af31323---sparkcontext)
+    - [AF313.24 - SparkContext](#af31324---sparkcontext)
+    - [AF313.25 - SparkContext](#af31325---sparkcontext)
+  - [AF314.x - Distributed ML](#af314x---distributed-ml)
+    - [AF314.1 - Distributed ML](#af3141---distributed-ml)
+    - [AF314.2 - Distributed ML](#af3142---distributed-ml)
+    - [AF314.3 - Distributed ML](#af3143---distributed-ml)
+    - [AF314.4 - Distributed ML](#af3144---distributed-ml)
+    - [AF314.5 - Distributed ML](#af3145---distributed-ml)
+    - [AF314.6 - Distributed ML](#af3146---distributed-ml)
+    - [AF314.7 - Distributed ML](#af3147---distributed-ml)
+    - [AF314.8 - Distributed ML](#af3148---distributed-ml)
+    - [AF314.9 - Distributed ML](#af3149---distributed-ml)
+    - [AF308.1 - Graphframes](#af3081---graphframes)
+    - [AF309.1 - Spark ML](#af3091---spark-ml)
+    - [AF315.1 - UDAF scala issue](#af3151---udaf-scala-issue)
+    - [AF315.2 - applyInPandas](#af3152---applyinpandas)
+    - [AF315.3 - mapInPandas](#af3153---mapinpandas)
+  - [AF330.0 - Streaming](#af3300---streaming)
+    - [AF330.1 - Streaming](#af3301---streaming)
+    - [AF330.2 - Streaming](#af3302---streaming)
+    - [AF330.3 - Streaming](#af3303---streaming)
+    - [AF330.4 - Streaming](#af3304---streaming)
+    - [AF330.5 - Streaming](#af3305---streaming)
+    - [AF330.6 - Streaming](#af3306---streaming)
+    - [AF330.7 - Streaming](#af3307---streaming)
+    - [AF330.8 - Streaming](#af3308---streaming)
+    - [AF330.9 - Streaming](#af3309---streaming)
+    - [AF330.10 - Streaming](#af33010---streaming)
+    - [AF330.11 - Streaming](#af33011---streaming)
+    - [AF330.12 - Streaming](#af33012---streaming)
+    - [AF330.13 - Streaming](#af33013---streaming)
+- [Common Terms](#common-terms)
+  - [UC](#uc)
+  - [DELTA](#delta)
+  - [CTAS](#ctas)
+  - [DEEP CLONE](#deep-clone)
+  - [EXTERNAL LOCATION](#external-location)
+  - [STORAGE CREDENTIAL](#storage-credential)
+  - [Assigned Clusters or Single User Clusters](#assigned-clusters-or-single-user-clusters)
 <!-- TOC -->
 
 This document describes the Assessment Report generated from the UCX tools. The main assessment report includes dashlets, widgets and details of the assessment findings and common recommendations made based on the Assessment Finding (AF) Index entry.
@@ -547,6 +634,11 @@ The `dbutils.credentials.` is used for credential passthrough. This is not suppo
 
 [[back to top](#migration-assessment-report)]
 
+## AF311.x - dbutils
+
+DBUtils and other clients that directly read the data from cloud storage are not supported. 
+Use [Volumes](https://docs.databricks.com/en/connect/unity-catalog/volumes.html) or use Assigned clusters.
+
 ### AF311.1 - dbutils.fs
 
 The `dbutils.fs.` was found. DBUtils and other clients that directly read the data from cloud storage are not supported. Please note that `dbutils.fs` calls with /Volumes ([Volumes](https://docs.databricks.com/en/connect/unity-catalog/volumes.html)) will work.
@@ -591,7 +683,7 @@ The `/dbfs/` was found. DBFS is not supported by Unity Catalog. Use instead EXTE
 
 [[back to top](#migration-assessment-report)]
 
-## AF313.0 - SparkContext
+## AF313.x - SparkContext
 
 Spark Context(sc), spark.sparkContext, and sqlContext are not supported for Scala in any Databricks Runtime and are not supported for Python in Databricks Runtime 14.0 and above.
 
@@ -749,7 +841,7 @@ The `.wholeTextFiles` was found.
 
 [[back to top](#migration-assessment-report)]
 
-## AF314.* - Distributed ML
+## AF314.x - Distributed ML
 Databricks Runtime ML and Spark Machine Learning Library (MLlib) are not supported on shared Unity Catalog compute. The recommendation is to use Assigned mode cluster; Use cluster policies and (warm) compute pools to improve compute and cost management.
 
 ### AF314.1 - Distributed ML
@@ -837,7 +929,7 @@ The `mapInPandas` was found.
 [[back to top](#migration-assessment-report)]
 
 
-## Streaming
+## AF330.0 - Streaming
 Streaming limitations for Unity Catalog shared access mode [documentation](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-limitations-for-unity-catalog-shared-access-mode) should be consulted for more details. 
 
 See also [Streaming limitations for Unity Catalog single user access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-single) and [Streaming limitations for Unity Catalog shared access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-shared).
@@ -948,5 +1040,13 @@ Is shortcut for CREATE TABLE DEEP CLONE <target table> <source table> which only
 ## STORAGE CREDENTIAL
 
 [STORAGE CREDENTIAL]([url](https://docs.databricks.com/en/sql/language-manual/sql-ref-storage-credentials.html)https://docs.databricks.com/en/sql/language-manual/sql-ref-storage-credentials.html) are a UC object encapsulating the credentials necessary to access cloud storage.
+
+## Assigned Clusters or Single User Clusters
+"Assigned Clusters" are Interactive clusters assigned to a single principal. Implicit in this term is that these clusters are enabled for Unity Catalog. Publically available today, "Assigned Clusters" can be assigned to a user and the user's identity is used to access data resources. The access to the cluster is restricted to that single user to ensure accountability and accuracy of the audit logs.
+
+"Single User Clusters" are Interactive clusters that name one specific user account as user.
+
+The `data_security_mode` for these clusters are `SINGLE_USER`
+
 
 [[back to top](#migration-assessment-report)]
