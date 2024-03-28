@@ -19,6 +19,7 @@ from databricks.labs.ucx.hive_metastore import (
     Mounts,
     TablesCrawler,
 )
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
@@ -434,12 +435,20 @@ def migrate_external_tables_sync(
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = TableMapping(install, ws, sql_backend)
+    table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
+    interactive_grants = PrincipalACL.for_cli(ws, install)
     TablesMigrate(
-        table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-tables", job_cluster="table_migration")
@@ -454,12 +463,20 @@ def migrate_dbfs_root_delta_tables(
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = TableMapping(install, ws, sql_backend)
+    table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
+    interactive_grants = PrincipalACL.for_cli(ws, install)
     TablesMigrate(
-        table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-groups-experimental", depends_on=[crawl_groups])
