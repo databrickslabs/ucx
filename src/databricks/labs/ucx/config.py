@@ -11,7 +11,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     __version__ = 2
 
     inventory_database: str
-    inventory_database_location: str
     # Group name conversion parameters.
     workspace_group_regex: str | None = None
     workspace_group_replace: str | None = None
@@ -47,6 +46,8 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
+
+    inventory_database_location: str | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

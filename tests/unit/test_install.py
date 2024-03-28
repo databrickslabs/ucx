@@ -468,6 +468,7 @@ def test_save_config(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "2",
             r".*": "",
             r".*days to analyze submitted runs.*": "1",
+            r"Inventory Database location.*": "dbfs:/user/hive/warehouse",
         }
     )
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
@@ -488,6 +489,7 @@ def test_save_config(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'inventory_database_location': 'dbfs:/user/hive/warehouse',
         },
     )
 
@@ -499,6 +501,8 @@ def test_save_config_strip_group_names(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r".*workspace group names.*": "g1, g2, g99",
             r".*": "",
+            r"Inventory Database location.*": "dbfs:/user/hive/warehouse",
+
         }
     )
     ws.workspace.get_status = not_found
@@ -522,6 +526,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'inventory_database_location': 'dbfs:/user/hive/warehouse',
         },
     )
 
@@ -542,6 +547,7 @@ def test_create_cluster_policy(ws, mock_installation):
             r".*workspace group names.*": "g1, g2, g99",
             r".*We have identified one or more cluster.*": "No",
             r".*Choose a cluster policy.*": "0",
+            r"Inventory Database location.*": "dbfs:/user/hive/warehouse",
             r".*": "",
         }
     )
@@ -564,6 +570,8 @@ def test_create_cluster_policy(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'inventory_database_location': 'dbfs:/user/hive/warehouse',
+
         },
     )
 
@@ -1119,6 +1127,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r"Comma-separated list of databases to migrate.*": "db1,db2",
+            r"Inventory Database location.*": "dbfs:/user/hive/warehouse",
             r".*": "",
         }
     )
@@ -1142,6 +1151,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
             'num_days_submit_runs_history': 30,
+            'inventory_database_location': 'dbfs:/user/hive/warehouse',
         },
     )
 
@@ -1231,6 +1241,8 @@ def test_fresh_install(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
             r".*": "",
+            r"Inventory Database location.*": "dbfs:/user/hive/warehouse",
+
         }
     )
     ws.workspace.get_status = not_found
@@ -1253,6 +1265,7 @@ def test_fresh_install(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'inventory_database_location': 'dbfs:/user/hive/warehouse',
         },
     )
 

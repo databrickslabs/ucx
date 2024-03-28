@@ -62,7 +62,9 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str, inventory_sche
     from databricks.labs import ucx  # pylint: disable=import-outside-toplevel
 
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
-    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{self._inventory_schema} LOCATION {self.inventory_schema_location}")
+    sql_backend.execute(
+        f"CREATE SCHEMA IF NOT EXISTS hive_metastore.{inventory_schema} LOCATION {inventory_schema_location}"
+    )
     deployer.deploy_schema()
     table = functools.partial(deployer.deploy_table)
     Threads.strict(
