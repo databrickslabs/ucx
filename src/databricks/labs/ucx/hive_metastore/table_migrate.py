@@ -84,13 +84,13 @@ class TablesMigrate:
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
-        grants = []
         if acl_strategy is not None:
             grants_to_migrate = self._gc.snapshot()
             migrated_groups = self._group.snapshot()
         else:
             acl_strategy = []
         for table in tables_to_migrate:
+            grants = []
             if what is not None and table.src.what != what:
                 continue
             if AclMigrationWhat.LEGACY_TACL in acl_strategy:
