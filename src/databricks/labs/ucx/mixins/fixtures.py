@@ -649,17 +649,12 @@ def make_acc_group(acc, make_random):
 
 
 @pytest.fixture
-def make_migrated_group(acc, ws, make_group, make_acc_group):
+def migrated_group(acc, ws, make_group, make_acc_group):
     """Create a pair of groups in workspace and account. Assign account group to workspace."""
-
-    def inner():
-        ws_group = make_group()
-        acc_group = make_acc_group()
-        acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
-        # need to return both, as acc_group.id is not in MigratedGroup dataclass
-        return MigratedGroup.partial_info(ws_group, acc_group)
-
-    return inner
+    ws_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
+    return MigratedGroup.partial_info(ws_group, acc_group)
 
 
 @pytest.fixture

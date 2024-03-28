@@ -193,7 +193,8 @@ def test_is_db_dataset(table, db_dataset):
         (Table("a", "b", "c", "EXTERNAL", "TEXT", location="dbfs:/somelocation/tablename"), True),
         (Table("a", "b", "c", "EXTERNAL", "ORC", location="dbfs:/somelocation/tablename"), True),
         (Table("a", "b", "c", "EXTERNAL", "JSON", location="dbfs:/somelocation/tablename"), True),
-        (Table("a", "b", "c", "EXTERNAL", "AVRO", location="dbfs:/somelocation/tablename"), False),
+        (Table("a", "b", "c", "EXTERNAL", "AVRO", location="dbfs:/somelocation/tablename"), True),
+        (Table("a", "b", "c", "EXTERNAL", "BINARYFILE", location="dbfs:/somelocation/tablename"), False),
     ],
 )
 def test_is_supported_for_sync(table, supported):

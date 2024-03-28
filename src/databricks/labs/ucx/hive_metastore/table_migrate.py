@@ -90,28 +90,23 @@ class TablesMigrate:
     def index(self):
         return self._migration_status_refresher.index()
 
-    def migrate_tables(self, *, what: What | None = None, acl_strategy: AclMigrationWhat | None = None):
+    def migrate_tables(self, *, what: What | None = None, acl_strategy: list[AclMigrationWhat] | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        tasks = []
         if acl_strategy is not None:
             grants_to_migrate = self._gc.snapshot()
             migrated_groups = self._group.snapshot()
             # principal_grants = self._principal_grants.get_interactive_cluster_grants()
-        tasks = []
+        else:
+            acl_strategy = []
         for table in tables_to_migrate:
+            grants = []
             if what is not None and table.src.what != what:
                 continue
-            match acl_strategy:
-                case None:
-                    tasks.append(partial(self._migrate_table, table.src, table.rule))
-                case AclMigrationWhat.LEGACY_TACL:
-                    grants = self._match_grants(table.src, grants_to_migrate, migrated_groups)
-                    tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
-                case AclMigrationWhat.PRINCIPAL:
-                    pass
-                    # TODO: Implement principal-based ACL migration
-                    # grants = self._match_grants(table.src, principal_grants, migrated_groups)
-                    # tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
+            if AclMigrationWhat.LEGACY_TACL in acl_strategy:
+                grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
+            tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):

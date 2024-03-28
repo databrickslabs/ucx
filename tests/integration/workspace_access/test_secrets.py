@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_permissions_for_secrets(
     ws: WorkspaceClient,
-    make_migrated_group,
+    migrated_group,
     make_secret_scope,
     make_secret_scope_acl,
     permission_manager: PermissionManager,
     use_permission_migration_api: bool,
 ):
-    migrated_group = make_migrated_group()
 
     scope = make_secret_scope()
     make_secret_scope_acl(scope=scope, principal=migrated_group.name_in_workspace, permission=AclPermission.WRITE)

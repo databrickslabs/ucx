@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def test_permissions_for_redash(
     ws,
     make_group,
-    make_migrated_group,
+    migrated_group,
     make_user,
     make_query,
     make_query_permissions,
@@ -32,7 +32,6 @@ def test_permissions_for_redash(
 ):
     ws_group_temp = make_group()  # simulate temp/backup group
     user = make_user()
-    migrated_group = make_migrated_group()
 
     query = make_query()
     make_query_permissions(

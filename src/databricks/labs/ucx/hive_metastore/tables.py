@@ -109,7 +109,7 @@ class Table:
     def is_format_supported_for_sync(self) -> bool:
         if self.table_format is None:
             return False
-        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT"}
+        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT", "AVRO"}
 
     @property
     def is_databricks_dataset(self) -> bool:

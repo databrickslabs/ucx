@@ -486,7 +486,7 @@ def test_migrate_managed_tables_with_acl(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     )
 
-    table_migrate.migrate_tables(acl_strategy=AclMigrationWhat.LEGACY_TACL)
+    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
