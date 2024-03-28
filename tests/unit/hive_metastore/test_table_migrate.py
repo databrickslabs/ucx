@@ -631,8 +631,14 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
+    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" not in backend.queries
+    assert "ALTER TABLE ucx_default.db1_dst.managed_dbfs OWNER TO `account group`" not in backend.queries
     assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" in backend.queries
+    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_mnt TO `account group`" not in backend.queries
     assert "ALTER TABLE ucx_default.db1_dst.managed_other OWNER TO `account group`" in backend.queries
+    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_other TO `account group`" not in backend.queries
+    assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_other TO `account group`" not in backend.queries
     assert "GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`" in backend.queries
+    assert "GRANT MODIFY ON VIEW ucx_default.db1_dst.view_dst TO `account group`" not in backend.queries
 
     assert "Cannot identify UC grant" in caplog.text
