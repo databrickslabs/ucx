@@ -268,7 +268,7 @@ class TablesInMounts(CrawlerBase[Table]):
         inventory_database: str,
         mc: Mounts,
         include_mounts: list[str] | None = None,
-        filter_paths_in_mount: list[str] | None = None,
+        exclude_paths_in_mount: list[str] | None = None,
     ):
         super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
@@ -276,8 +276,8 @@ class TablesInMounts(CrawlerBase[Table]):
         self._include_mounts = include_mounts
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
-        if filter_paths_in_mount:
-            irrelevant_patterns.update(filter_paths_in_mount)
+        if exclude_paths_in_mount:
+            irrelevant_patterns.update(exclude_paths_in_mount)
         self._fiter_paths = irrelevant_patterns
 
     def snapshot(self) -> list[Table]:
@@ -325,7 +325,7 @@ class TablesInMounts(CrawlerBase[Table]):
                     object_type="EXTERNAL",
                     table_format=entry.format,
                     location=path,
-                    storage_properties="PARTITIONED" if entry.is_partitioned else None,
+                    is_partitioned=entry.is_partitioned,
                 )
                 all_tables.append(table)
         return all_tables
@@ -333,53 +333,48 @@ class TablesInMounts(CrawlerBase[Table]):
     def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> dict:
         if delta_log_folders is None:
             delta_log_folders = {}
-
         logger.info(f"Listing {root_dir}")
-        entries = self._dbutils.fs.ls(root_dir)
-        for entry in entries:
-            if self._is_irrelevant(entry.name) or entry.path == root_dir:
-                logger.debug(f"Path {entry.path} is irrelevant")
+        file_infos = self._dbutils.fs.ls(root_dir)
+        for file_info in file_infos:
+            if self._is_irrelevant(file_info.name) or file_info.path == root_dir:
+                logger.debug(f"Path {file_info.path} is irrelevant")
                 continue
 
             root_path = os.path.dirname(root_dir)
             if self._path_is_delta(delta_log_folders, root_path):
-                if self._is_partitioned(entry.path):
+                if self._is_partitioned(file_info.name):
                     logger.debug(f"Found partitioned delta {root_path}")
                     delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
                     continue
-                logger.debug(f"Path {entry.path} was identified as Delta, skipping")
+                logger.debug(f"Path {file_info.path} was identified as Delta, skipping")
                 continue
 
-            if entry.name == "_delta_log/":
+            if file_info.name == "_delta_log/":
                 logger.debug(f"Found delta table {root_path}")
                 if delta_log_folders.get(root_path) and delta_log_folders.get(root_path).is_partitioned:
                     delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
                 else:
                     delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=False)
-            elif self._is_partitioned(entry.name):
-                logger.debug(f"Found partitioned parquet {entry.path}")
+            elif self._is_partitioned(file_info.name):
+                logger.debug(f"Found partitioned parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=True)
-            elif self._is_parquet(entry.name):
-                logger.debug(f"Found parquet {entry.path}")
+            elif self._is_parquet(file_info.name):
+                logger.debug(f"Found parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=False)
             else:
-                self._find_delta_log_folders(entry.path, delta_log_folders)
+                self._find_delta_log_folders(file_info.path, delta_log_folders)
 
         return delta_log_folders
 
     def _path_is_delta(self, delta_log_folders, path: str) -> bool:
         return delta_log_folders.get(path) and delta_log_folders.get(path).format == "DELTA"
 
-    def _is_partitioned(self, entry: str) -> bool:
-        partitioned_pattern = {'='}
-        return any(pattern in entry for pattern in partitioned_pattern)
+    def _is_partitioned(self, file_name: str) -> bool:
+        return '=' in file_name
 
-    def _is_parquet(self, entry: str) -> bool:
+    def _is_parquet(self, file_name: str) -> bool:
         parquet_patterns = {'.parquet'}
-        return any(pattern in entry for pattern in parquet_patterns)
+        return any(pattern in file_name for pattern in parquet_patterns)
 
-    def _is_irrelevant(self, entry: str) -> bool:
-        return any(pattern in entry for pattern in self._fiter_paths)
-
-    def _is_directory(self, entry: str) -> bool:
-        return entry.endswith("/")
+    def _is_irrelevant(self, file_name: str) -> bool:
+        return any(pattern in file_name for pattern in self._fiter_paths)

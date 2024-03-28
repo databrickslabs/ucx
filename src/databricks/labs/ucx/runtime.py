@@ -568,7 +568,7 @@ def scan_tables_in_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     TablesInMounts(
-        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.filter_paths_in_mount
+        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
     ).snapshot()
 
 

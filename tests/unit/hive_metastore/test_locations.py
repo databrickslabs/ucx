@@ -367,7 +367,7 @@ def test_partitioned_parquet_layout():
             "EXTERNAL",
             "PARQUET",
             "/mnt/test_mount/entity",
-            storage_properties="PARTITIONED",
+            is_partitioned=True,
         )
     ]
 
@@ -410,7 +410,7 @@ def test_partitioned_delta():
             "EXTERNAL",
             "DELTA",
             "/mnt/test_mount/entity",
-            storage_properties="PARTITIONED",
+            is_partitioned=True,
         )
     ]
 
@@ -440,7 +440,7 @@ def test_filtering_irrelevant_paths():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts, filter_paths_in_mount=["$_azuretempfolder"]).snapshot()
+    results = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"]).snapshot()
     assert results == [
         Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
     ]
@@ -522,6 +522,7 @@ def test_historical_data_should_be_overwritten():
             view_text=None,
             upgraded_to=None,
             storage_properties=None,
+            is_partitioned=False,
         ),
         Row(
             catalog='catalog',
@@ -533,5 +534,6 @@ def test_historical_data_should_be_overwritten():
             view_text=None,
             upgraded_to=None,
             storage_properties=None,
+            is_partitioned=False,
         ),
     ]
