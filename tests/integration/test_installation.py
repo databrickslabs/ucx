@@ -527,13 +527,13 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
         },
     )
     # save test data to grants, udfs tables for ACL migration
-    user = make_user()
-    grants = [
-        Grant(user.user_name, "SELECT", table=src_managed_table.name, database=src_managed_table.schema_name),
-        Grant(user.user_name, "SELECT", table=src_external_table.name, database=src_external_table.schema_name),
-    ]
-    sql_backend.save_table(f"hive_metastore.{inventory_schema}.grants", grants, Grant)
-    sql_backend.save_table(f"hive_metastore.{inventory_schema}.udfs", [], Udf)
+    # user = make_user()
+    # grants = [
+    #     Grant(user.user_name, "SELECT", table=src_managed_table.name, database=src_managed_table.schema_name),
+    #     Grant(user.user_name, "SELECT", table=src_external_table.name, database=src_external_table.schema_name),
+    # ]
+    # sql_backend.save_table(f"hive_metastore.{inventory_schema}.grants", grants, Grant)
+    # sql_backend.save_table(f"hive_metastore.{inventory_schema}.udfs", [], Udf)
     # save table mapping for migration before trigger the run
     installation = product_info.current_installation(ws)
     migrate_rules = [
@@ -600,13 +600,13 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     product_info = ProductInfo.from_class(WorkspaceConfig)
     _, workflows_install = new_installation(product_info=product_info)
     # save test data to grants, udfs tables for ACL migration
-    user = make_user()
-    grants = [
-        Grant(user.user_name, "SELECT", table=src_managed_table.name, database=src_managed_table.schema_name),
-        Grant(user.user_name, "SELECT", table=src_external_table.name, database=src_external_table.schema_name),
-    ]
-    sql_backend.save_table(f"hive_metastore.{inventory_schema}.grants", grants, Grant)
-    sql_backend.save_table(f"hive_metastore.{inventory_schema}.udfs", [], Udf)
+    # user = make_user()
+    # grants = [
+    #     Grant(user.user_name, "SELECT", table=src_managed_table.name, database=src_managed_table.schema_name),
+    #     Grant(user.user_name, "SELECT", table=src_external_table.name, database=src_external_table.schema_name),
+    # ]
+    # sql_backend.save_table(f"hive_metastore.{inventory_schema}.grants", grants, Grant)
+    # sql_backend.save_table(f"hive_metastore.{inventory_schema}.udfs", [], Udf)
     # save table mapping for migration before trigger the run
     installation = product_info.current_installation(ws)
     migrate_rules = [

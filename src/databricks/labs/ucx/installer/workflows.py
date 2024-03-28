@@ -458,7 +458,7 @@ class WorkflowsInstallation(InstallationMixin):
         return replace(
             jobs_task,
             # TODO: check when we can install wheels from WSFS properly
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+            libraries=[compute.Library(whl=f"/Workspace{remote_wheel}")],
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -498,7 +498,7 @@ class WorkflowsInstallation(InstallationMixin):
                 jobs.JobCluster(
                     job_cluster_key="table_migration",
                     new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
+                        data_security_mode=compute.DataSecurityMode.USER_ISOLATION,
                         spark_conf=self._job_cluster_spark_conf("table_migration"),
                         policy_id=self._config.policy_id,
                         autoscale=compute.AutoScale(
