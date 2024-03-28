@@ -130,9 +130,7 @@ def test_tables_returning_error_when_describing():
 
 def test_tables_returning_error_when_show_tables(caplog):
     errors = {"SHOW TABLES FROM hive_metastore.database": "SCHEMA_NOT_FOUND"}
-    rows = {
-        "SHOW DATABASES": [("database",)]
-    }
+    rows = {"SHOW DATABASES": [("database",)]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     tables_crawler = TablesCrawler(backend, "default")
     results = tables_crawler.snapshot()

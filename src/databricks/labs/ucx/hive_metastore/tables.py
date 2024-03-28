@@ -233,8 +233,11 @@ class TablesCrawler(CrawlerBase):
                 )
             except NotFound:
                 # TODO: https://github.com/databrickslabs/ucx/issues/406
-                # in case schema is deleted, StatementExecutionBackend returns empty result while RuntimeBackend raises NotFound
-                logger.error(f"Schema {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)} is no longer existed")
+                # This make the integration test more robust as many test schemas are being created and deleted quickly.
+                # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend raises NotFound
+                logger.error(
+                    f"Schema {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)} is no longer existed"
+                )
                 continue
             for _, table, _is_tmp in table_rows:
                 tasks.append(partial(self._describe, catalog, database, table))
