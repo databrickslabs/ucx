@@ -376,21 +376,29 @@ def test_partitioned_delta():
     client = create_autospec(WorkspaceClient)
 
     first_folder = FileInfo("/mnt/test_mount/entity/", "entity/", "", "")
-    first_partition = FileInfo("/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
-    first_partition_files = FileInfo("/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
-    second_partition = FileInfo("/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
-    second_partition_files = FileInfo("/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
-    delta_log = FileInfo("/mnt/test_mount/entity/_delta_log/", "_delta_log/", "", "")
+    first_first_partition = FileInfo("/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
+    first_first_partition_files = FileInfo("/mnt/test_mount/entity/xxx=yyy/1.parquet", "1.parquet", "", "")
+    first_second_partition = FileInfo("/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
+    first_second_partition_files = FileInfo("/mnt/test_mount/entity/xxx=zzz/1.parquet", "1.parquet", "", "")
+    first_delta_log = FileInfo("/mnt/test_mount/entity/_delta_log/", "_delta_log/", "", "")
 
+    second_folder = FileInfo("/mnt/test_mount/entity_2/", "entity_2/", "", "")
+    second_first_partition = FileInfo("/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
+    second_first_partition_files = FileInfo("/mnt/test_mount/entity_2/xxx=yyy/1.parquet", "1.parquet", "", "")
+    second_delta_log = FileInfo("/mnt/test_mount/entity_2/_delta_log/", "_delta_log/", "", "")
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
-            return [first_folder]
+            return [first_folder, second_folder]
         if path == "/mnt/test_mount/entity/":
-            return [first_partition, second_partition, delta_log]
+            return [first_first_partition, first_second_partition, first_delta_log]
         if path == "/mnt/test_mount/entity/xxx=yyy/":
-            return [first_partition_files]
+            return [first_first_partition_files]
         if path == "/mnt/test_mount/entity/xxx=zzz/":
-            return [second_partition_files]
+            return [first_second_partition_files]
+        if path == "/mnt/test_mount/entity_2/":
+            return [second_delta_log, second_first_partition]
+        if path == "/mnt/test_mount/entity_2/xxx=yyy/":
+            return [second_first_partition_files]
         return None
 
     client.dbutils.fs.ls.side_effect = my_side_effect
@@ -410,6 +418,15 @@ def test_partitioned_delta():
             "EXTERNAL",
             "DELTA",
             "/mnt/test_mount/entity",
+            is_partitioned=True,
+        ),
+        Table(
+            "hive_metastore",
+            "mounted_/mnt/test_mount",
+            "entity_2",
+            "EXTERNAL",
+            "DELTA",
+            "/mnt/test_mount/entity_2",
             is_partitioned=True,
         )
     ]
@@ -469,7 +486,7 @@ def test_filter_irrelevant_mounts():
     backend = MockBackend(
         rows={
             'hive_metastore.test.tables': [],
-            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "")],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", ""), ("/mnt/test_mount2", "")],
         }
     )
     mounts = Mounts(backend, client, "test")
