@@ -1,7 +1,7 @@
 {
   "src": {
     "catalog": "hive_metastore",
-    "db": "db1_src",
+    "database": "db1_src",
     "name": "managed_other",
     "object_type": "MANAGED",
     "table_format": "DELTA",
