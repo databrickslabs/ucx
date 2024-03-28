@@ -64,7 +64,7 @@ def metadataForAllTables(databases: Seq[String], queue: ConcurrentLinkedQueue[Ta
           }
           val isPartitioned = if (partitionColumnNames != null && !partitionColumnNames.isEmpty) true else false
 
-          Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.orNull,
+          Some(TableDetails("hive_metastore", databaseName, tableName, table.tableType.name, table.provider.getOrElse("UNKNOWN"),
             table.storage.locationUri.map(_.toString).orNull, table.viewText.orNull,
             upgraded_to match { case Some(target) => target case None => null }, formattedString, isPartitioned))
         }
