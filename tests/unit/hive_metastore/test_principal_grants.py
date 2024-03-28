@@ -2,14 +2,109 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import ResourceDoesNotExist
+from databricks.sdk.service import iam
+from databricks.sdk.service.catalog import ExternalLocationInfo
 
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
+from databricks.labs.ucx.assessment.azure import (
+    AzureServicePrincipalCrawler,
+    AzureServicePrincipalInfo,
+    ServicePrincipalClusterMapping,
+)
+from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.fixture
 def ws():
-    return create_autospec(WorkspaceClient)
+    w = create_autospec(WorkspaceClient)
+    w.config.is_azure = True
+    w.external_locations.list.return_value = [
+        ExternalLocationInfo(url="abfss://container1@storage1.dfs.core.windows.net/folder1"),
+        ExternalLocationInfo(url="abfss://container1@storage2.dfs.core.windows.net/folder2"),
+        ExternalLocationInfo(url="abfss://container1@storage3.dfs.core.windows.net/folder3"),
+    ]
+
+    permissions = {
+        'cluster1': iam.ObjectPermissions(
+            object_id='cluster1',
+            object_type="clusters",
+            access_control_list=[
+                iam.AccessControlResponse(group_name='group1', all_permissions=[iam.Permission(inherited=False)]),
+                iam.AccessControlResponse(
+                    user_name='foo.bar@imagine.com',
+                    all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
+                ),
+            ],
+        ),
+        'cluster2': iam.ObjectPermissions(
+            object_id='cluster2',
+            object_type="clusters",
+            access_control_list=[
+                iam.AccessControlResponse(
+                    service_principal_name='spn1',
+                    all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
+                ),
+            ],
+        ),
+        'cluster3': iam.ObjectPermissions(object_id='cluster2', object_type="clusters"),
+    }
+    w.permissions.get.side_effect = lambda _, object_id: permissions[object_id]
+    return w
+
+
+def principal_acl(w, install, cluster_spn: list):
+
+    config = install.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    locations = create_autospec(ExternalLocations)
+    table_crawler = create_autospec(TablesCrawler)
+    tables = [
+        Table(
+            'hive_metastore',
+            'schema1',
+            'table1',
+            'TABLE',
+            'delta',
+            location='abfss://container1@storage1.dfs.core.windows.net/folder1/table1',
+        ),
+        Table('hive_metastore', 'schema1', 'view1', 'VIEW', 'delta', view_text="select * from table1"),
+        Table(
+            'hive_metastore',
+            'schema1',
+            'table2',
+            'TABLE',
+            'delta',
+            location='abfss://container1@storage2.dfs.core.windows.net/folder2/table2',
+        ),
+        Table('hive_metastore', 'schema1', 'table3', 'TABLE', 'delta'),
+        Table('hive_metastore', 'schema1', 'table5', 'TABLE', 'delta', location='dbfs://hms/folder1/table1'),
+        Table(
+            'hive_metastore',
+            'schema2',
+            'table4',
+            'TABLE',
+            'delta',
+            location='abfss://container1@storage3.dfs.core.windows.net/folder3/table3',
+        ),
+    ]
+    table_crawler.snapshot.return_value = tables
+    azure_client = AzureAPIClient(
+        w.config.arm_environment.resource_manager_endpoint,
+        w.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_client, graph_client)
+    resource_permissions = AzureResourcePermissions(install, w, azurerm, locations)
+    spn_crawler = create_autospec(AzureServicePrincipalCrawler)
+    spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
+    return PrincipalACL(w, sql_backend, install, table_crawler, spn_crawler, resource_permissions)
 
 
 @pytest.fixture
@@ -19,8 +114,24 @@ def installation():
             "config.yml": {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
             "azure_storage_account_info.csv": [
                 {
-                    'prefix': 'prefix1',
-                    'client_id': 'app_secret1',
+                    'prefix': 'abfss://container1@storage1.dfs.core.windows.net',
+                    'client_id': 'client1',
+                    'principal': 'principal_1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_ss1',
+                },
+                {
+                    'prefix': 'abfss://container1@storage2.dfs.core.windows.net',
+                    'client_id': 'client2',
+                    'principal': 'principal_1',
+                    'privilege': 'READ_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_ss1',
+                },
+                {
+                    'prefix': 'abfss://container1@storage3.dfs.core.windows.net',
+                    'client_id': 'client2',
                     'principal': 'principal_1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
@@ -31,9 +142,109 @@ def installation():
     )
 
 
-def test_for_cli(ws, installation):
+def test_for_cli_azure(ws, installation):
+    ws.config.is_azure = True
     assert isinstance(PrincipalACL.for_cli(ws, installation), PrincipalACL)
 
 
-def test_interactive_cluster(ws, installation):
-    assert isinstance(PrincipalACL.for_cli(ws, installation), PrincipalACL)
+def test_for_cli_aws(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    assert PrincipalACL.for_cli(ws, installation) is None
+
+
+def test_for_cli_gcp(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = False
+    ws.config.is_gcp = True
+    assert PrincipalACL.for_cli(ws, installation) is None
+
+
+def test_interactive_cluster_no_cluster_mapping(ws, installation):
+    grants = principal_acl(ws, installation, [])
+    grants.get_interactive_cluster_grants()
+    ws.external_locations.list.assert_not_called()
+
+
+def test_interactive_cluster_no_external_location(ws, installation):
+    cluster_spn = ServicePrincipalClusterMapping(
+        'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
+    )
+    grants = principal_acl(ws, installation, [cluster_spn])
+    ws.external_locations.list.return_value = []
+    with pytest.raises(ResourceDoesNotExist):
+        grants = grants.get_interactive_cluster_grants()
+
+
+def test_interactive_cluster_no_permission_mapping(ws):
+    cluster_spn = ServicePrincipalClusterMapping(
+        'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
+    )
+    install = MockInstallation(
+        {
+            "config.yml": {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
+            "azure_storage_account_info.csv": [],
+        }
+    )
+    grants = principal_acl(ws, install, [cluster_spn])
+
+    with pytest.raises(ResourceDoesNotExist):
+        grants.get_interactive_cluster_grants()
+
+
+def test_interactive_cluster_no_acl(ws, installation):
+    cluster_spn = ServicePrincipalClusterMapping(
+        'cluster3', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
+    )
+    grants = principal_acl(ws, installation, [cluster_spn])
+    actual_grants = grants.get_interactive_cluster_grants()
+    assert len(actual_grants) == 0
+
+
+def test_interactive_cluster_single_spn(ws, installation):
+    cluster_spn = ServicePrincipalClusterMapping(
+        'cluster1',
+        {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')},
+    )
+    grants = principal_acl(ws, installation, [cluster_spn])
+    expected_grants = [
+        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
+        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
+        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
+        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
+        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('group1', "USE", "hive_metastore", 'schema1'),
+        Grant('foo.bar@imagine.com', "USE", "hive_metastore", 'schema1'),
+        Grant('group1', "USE", "hive_metastore"),
+        Grant('foo.bar@imagine.com', "USE", "hive_metastore"),
+    ]
+    actual_grants = grants.get_interactive_cluster_grants()
+    for grant in expected_grants:
+        assert grant in actual_grants
+
+
+def test_interactive_cluster_multiple_spn(ws, installation):
+    cluster_spn = ServicePrincipalClusterMapping(
+        'cluster2',
+        {
+            AzureServicePrincipalInfo(application_id='client2', storage_account='storage2'),
+            AzureServicePrincipalInfo(application_id='client2', storage_account='storage3'),
+        },
+    )
+    grants = principal_acl(ws, installation, [cluster_spn])
+    expected_grants = [
+        Grant('spn1', "SELECT", "hive_metastore", 'schema1', 'table2'),
+        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema2', 'table4'),
+        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
+        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('spn1', "USE", "hive_metastore", 'schema1'),
+        Grant('spn1', "USE", "hive_metastore", 'schema2'),
+        Grant('spn1', "USE", "hive_metastore"),
+    ]
+    actual_grants = grants.get_interactive_cluster_grants()
+    for grant in expected_grants:
+        assert grant in actual_grants

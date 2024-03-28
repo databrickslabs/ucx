@@ -8,6 +8,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.assessment.azure import (
@@ -16,7 +17,6 @@ from databricks.labs.ucx.assessment.azure import (
 )
 from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
-    Privilege,
     StoragePermissionMapping,
 )
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
@@ -330,9 +330,9 @@ class PrincipalACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         installation: Installation,
-        spn_crawler: AzureServicePrincipalCrawler,
-        resource_permission: AzureResourcePermissions,
         table_crawler: TablesCrawler,
+        spn_crawler: AzureServicePrincipalCrawler | None = None,
+        resource_permission: AzureResourcePermissions | None = None,
     ):
         self._backend = backend
         self._ws = ws
@@ -345,33 +345,54 @@ class PrincipalACL:
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azure_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_client, graph_client)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
-        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-        return cls(ws, sql_backend, installation, spn_crawler, resource_permissions, table_crawler)
+        if ws.config.is_azure:
+            azure_client = AzureAPIClient(
+                ws.config.arm_environment.resource_manager_endpoint,
+                ws.config.arm_environment.service_management_endpoint,
+            )
+            graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+            azurerm = AzureResources(azure_client, graph_client)
+            resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+            spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
+            return cls(ws, sql_backend, installation, table_crawler, spn_crawler, resource_permissions)
+        if ws.config.is_aws:
+            return None
+        if ws.config.is_gcp:
+            logger.error("UCX is not supported for GCP yet. Please run it on azure or aws")
+            return None
+        return None
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
+        if self._ws.config.is_azure:
+            return self._get_azure_grants()
+        return []
+
+    def _get_azure_grants(self) -> list[Grant]:
+        assert self._spn_crawler is not None
+        assert self._resource_permission is not None
         spn_cluster_mapping = self._spn_crawler.get_cluster_to_storage_mapping()
         if len(spn_cluster_mapping) == 0:
+            # if there are no interactive clusters , then return empty grants
             logger.info("No interactive cluster found with spn configured")
             return []
         external_locations = list(self._ws.external_locations.list())
         if len(external_locations) == 0:
-            logger.warning(
+            # if there are no external locations, then throw an error to run migrate_locations cli command
+            msg = (
                 "No external location found, If hive metastore tables are created in external storage, "
                 "ensure migrate_locations cli cmd is run to create the required locations."
             )
-            return []
+            logger.error(msg)
+            raise ResourceDoesNotExist(msg) from None
+
         permission_mappings = self._resource_permission.load()
         if len(permission_mappings) == 0:
-            logger.warning("Please ensure principal_prefix_access cli cmd is run to create the access permission file.")
+            # if permission mapping is empty, raise an error to run principal_prefix cmd
+            msg = "No storage permission file found. Please ensure principal_prefix_access cli cmd is run to create the access permission file."
+            logger.error(msg)
+            raise ResourceDoesNotExist(msg) from None
         tables = self._table_crawler.snapshot()
         grants: list[Grant] = []
 
@@ -384,16 +405,27 @@ class PrincipalACL:
                 if len(eligible_locations) == 0:
                     continue
                 grant = self._get_grants(eligible_locations, principals, tables)
-                if len(grants) == 0:
-                    continue
                 grants.extend(grant)
-        return grants
+        catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
+        grants.extend(catalog_grants)
 
-    def _get_privilege(self, location: str | None, locations: dict[ExternalLocationInfo, str]):
-        if location is None:
+        return list(set(grants))
+
+    def _get_aws_grants(self) -> list[Grant]:
+        # TODO
+        return []
+
+    def _get_privilege(self, table: Table, locations: dict[str, str]):
+        if table.view_text is not None:
+            # return nothing for view so that it goes to the seperate view logic
             return None
+        if table.location is None:
+            return "WRITE_FILES"
+        if table.location.startswith('dbfs://') or table.location.startswith('/dbfs/'):
+            return "WRITE_FILES"
+
         for loc, privilege in locations.items():
-            if loc.url is not None and location.startswith(loc.url):
+            if loc is not None and table.location.startswith(loc):
                 return privilege
         return None
 
@@ -408,35 +440,27 @@ class PrincipalACL:
 
     def _get_grants(
         self,
-        locations: dict[ExternalLocationInfo, str],
+        locations: dict[str, str],
         principals: list[str],
         tables: list[Table],
     ) -> list[Grant]:
         grants = []
+        filtered_tables = []
         for table in tables:
-            if self._get_privilege(table.location, locations) is not None:
-                privilege = self._get_privilege(table.location, locations)
-                if privilege == Privilege.READ_FILES:
-                    grants.extend(
-                        [
-                            Grant(principal, "SELECT", table.catalog, table.database, table.name)
-                            for principal in principals
-                        ]
-                    )
-                if privilege == Privilege.WRITE_FILES:
-                    grants.extend(
-                        [
-                            Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, table.name)
-                            for principal in principals
-                        ]
-                    )
-            if table.location is None:
+            privilege = self._get_privilege(table, locations)
+            if privilege == "READ_FILES":
+                grants.extend(
+                    [Grant(principal, "SELECT", table.catalog, table.database, table.name) for principal in principals]
+                )
+                filtered_tables.append(table)
+            if privilege == "WRITE_FILES":
                 grants.extend(
                     [
-                        Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, view=table.name)
+                        Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, table.name)
                         for principal in principals
                     ]
                 )
+                filtered_tables.append(table)
             if table.view_text is not None:
                 grants.extend(
                     [
@@ -444,10 +468,12 @@ class PrincipalACL:
                         for principal in principals
                     ]
                 )
-        database_grants = self._get_database_grants(tables, principals)
-        catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
+                filtered_tables.append(table)
+
+        database_grants = self._get_database_grants(filtered_tables, principals)
+
         grants.extend(database_grants)
-        grants.extend(catalog_grants)
+
         return grants
 
     def _get_external_location(
@@ -455,7 +481,7 @@ class PrincipalACL:
         spn: AzureServicePrincipalInfo,
         external_locations: list[ExternalLocationInfo],
         permission_mappings: list[StoragePermissionMapping],
-    ) -> dict[ExternalLocationInfo, str]:
+    ) -> dict[str, str]:
         matching_location = {}
         for location in external_locations:
             if location.url is None:
@@ -467,7 +493,7 @@ class PrincipalACL:
                     and spn.storage_account is not None
                     and spn.storage_account in permission_mapping.prefix
                 ):
-                    matching_location[location] = permission_mapping.privilege
+                    matching_location[location.url] = permission_mapping.privilege
         return matching_location
 
     def _get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
