@@ -36,7 +36,6 @@ from databricks.labs.ucx.runtime import (
     migrate_external_tables_sync,
     reflect_account_groups_on_workspace_experimental,
     rename_workspace_local_groups_experimental,
-    validate_groups_permissions_experimental,
     workspace_listing,
 )
 from tests.unit import GROUPS, PERMISSIONS
@@ -320,14 +319,6 @@ def test_rename_workspace_local_group(caplog):
 def test_reflect_account_groups_on_workspace(caplog):
     ws = create_autospec(WorkspaceClient)
     reflect_account_groups_on_workspace_experimental(azure_mock_config(), ws, MockBackend(), mock_installation())
-
-
-def test_validate_groups_permissions(caplog):
-    ws = create_autospec(WorkspaceClient)
-    rows = {
-        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
-    }
-    validate_groups_permissions_experimental(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
 
 
 def test_migrate_permissions_experimental():

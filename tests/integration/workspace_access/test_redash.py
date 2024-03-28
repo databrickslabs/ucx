@@ -27,7 +27,6 @@ def test_permissions_for_redash(
     make_user,
     make_query,
     make_query_permissions,
-    permission_manager,
     use_permission_migration_api,
 ):
     ws_group_temp = make_group()  # simulate temp/backup group
@@ -72,8 +71,6 @@ def test_permissions_for_redash(
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_permissions_for_redash_after_group_is_renamed(
     ws,
-    sql_backend,
-    inventory_schema,
     make_group,
     make_query,
     make_query_permissions,
@@ -120,8 +117,6 @@ def test_permissions_for_redash_after_group_is_renamed(
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_verify_permissions_for_redash(
     ws,
-    sql_backend,
-    inventory_schema,
     make_group,
     make_query,
     make_query_permissions,

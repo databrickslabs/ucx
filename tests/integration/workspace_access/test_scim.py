@@ -8,7 +8,6 @@ from databricks.sdk.service import iam
 
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
-from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 from . import apply_tasks
@@ -21,7 +20,6 @@ def test_some_entitlements(
     ws: WorkspaceClient,
     make_group,
     make_acc_group,
-    permission_manager: PermissionManager,
     use_permission_migration_api: bool,
 ):
     ws_group = make_group()

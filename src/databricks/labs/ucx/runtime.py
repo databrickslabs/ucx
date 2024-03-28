@@ -32,7 +32,6 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
-from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 logger = logging.getLogger(__name__)
 
@@ -514,51 +513,6 @@ def apply_permissions_to_account_groups_experimental(
         return
 
     migration_state.apply_group_permissions_experimental(ws)
-
-
-@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental], job_cluster="tacl")
-def apply_tacl_to_account_groups_experimental(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
-):
-    """EXPERIMENTAL
-    This task migrates Legacy Table ACLs from workspace-local group to account-level group.
-    """
-    group_manager = GroupManager(
-        sql_backend,
-        ws,
-        cfg.inventory_database,
-        cfg.include_group_names,
-        cfg.renamed_group_prefix,
-        workspace_group_regex=cfg.workspace_group_regex,
-        workspace_group_replace=cfg.workspace_group_replace,
-        account_group_regex=cfg.account_group_regex,
-        external_id_match=cfg.group_match_by_external_id,
-    )
-
-    migration_state = group_manager.get_migration_state()
-    if len(migration_state.groups) == 0:
-        logger.info("Skipping group migration as no groups were found.")
-        return
-
-    tables_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
-    udfs_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
-    grants_crawler = GrantsCrawler(tables_crawler, udfs_crawler)
-    tacl_support = TableAclSupport(grants_crawler, sql_backend)
-    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [tacl_support])
-    permission_manager.apply_group_permissions(migration_state)
-
-
-@task(
-    "migrate-groups-experimental",
-    depends_on=[apply_permissions_to_account_groups_experimental, apply_tacl_to_account_groups_experimental],
-    job_cluster="tacl",
-)
-def validate_groups_permissions_experimental(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
-):
-    """EXPERIMENTAL
-    Validate that all the crawled permissions are applied correctly to the destination groups."""
-    return validate_groups_permissions(cfg, ws, sql_backend, _install)
 
 
 @task("migrate-tables-in-mounts-experimental")

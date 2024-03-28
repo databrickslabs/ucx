@@ -90,7 +90,7 @@ class MigrationState:
         if len(self) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        logger.info(f"Applying the permissions to account groups. " f"Total groups to apply permissions: {len(self)}.")
+        logger.info(f"Applying the permissions to account groups. Total groups to apply permissions: {len(self)}.")
         items = 0
         for migrated_group in self.groups:
             items += self._migrate_group_permissions_paginated(ws, migrated_group)
@@ -98,28 +98,22 @@ class MigrationState:
         return True
 
     @staticmethod
-    def _migrate_group_permissions_paginated(ws: WorkspaceClient, migrated_group: MigratedGroup):
+    def _migrate_group_permissions_paginated(ws: WorkspaceClient, group: MigratedGroup):
         batch_size = 1000
-        logger.info(
-            f"Migrating permissions from workspace group {migrated_group.name_in_workspace} "
-            f"to account group: {migrated_group.name_in_account}."
-        )
+        logger.info(f"Migrating permissions: {group.name_in_workspace} -> {group.name_in_account}")
         permissions_migrated = 0
         while True:
-            response = ws.permission_migration.migrate_permissions(
+            result = ws.permission_migration.migrate_permissions(
                 ws.get_workspace_id(),
-                migrated_group.name_in_workspace,
-                migrated_group.name_in_account,
+                group.name_in_workspace,
+                group.name_in_account,
                 size=batch_size,
             )
-            if not response.permissions_migrated:
+            if not result.permissions_migrated:
                 logger.info("No more permission to migrated.")
                 return permissions_migrated
-            permissions_migrated += response.permissions_migrated
-            logger.info(
-                f"Migrated {response.permissions_migrated} permissions to "
-                f"{migrated_group.name_in_account} account group"
-            )
+            permissions_migrated += result.permissions_migrated
+            logger.info(f"Migrated {result.permissions_migrated} permissions to {group.name_in_account} account group")
 
 
 class GroupMigrationStrategy:
