@@ -344,6 +344,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
         ],
     )
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
     installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),
@@ -385,6 +386,7 @@ def test_run_workflow_creates_failure_from_mapping(
             )
         ],
     )
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     ws.jobs.get_run_output.return_value = jobs.RunOutput(
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
@@ -440,6 +442,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_in
     ws.jobs.get_run_output.return_value = jobs.RunOutput(
         error="something: DataLoss: does not compute", error_trace="# goes to stderr"
     )
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
     installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),

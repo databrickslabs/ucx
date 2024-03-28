@@ -141,13 +141,15 @@ class WorkflowsInstallation(InstallationMixin):
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
-        job_run_waiter = self._ws.jobs.run_now(job_id)
-        try:
-            job_run_waiter.result()
-        except OperationFailed as err:
-            # currently we don't have any good message from API, so we have to work around it.
-            job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            raise self._infer_error_from_job_run(job_run) from err
+        job_initial_run = self._ws.jobs.run_now(job_id)
+        if job_initial_run.run_id:
+            try:
+                self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
+            except OperationFailed as err:
+                job_run = self._ws.jobs.get_run(job_initial_run.run_id)
+                raise self._infer_error_from_job_run(job_run) from err
+            return
+        raise NotFound(f"job run not found for {step}")
 
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
