@@ -1,5 +1,5 @@
 -- viz type=table, name=Cluster Policies, columns=policy_name,cluster_dbr_version,policy_spark_version
--- widget title=Cluster Policies, row=8, col=0, size_x=3, size_y=8
+-- widget title=Cluster Policies, row=22, col=4, size_x=3, size_y=8
 SELECT
     distinct policy_name,
     cluster.spark_version as cluster_dbr_version,
