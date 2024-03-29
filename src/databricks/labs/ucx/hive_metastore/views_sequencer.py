@@ -3,7 +3,6 @@ from sqlglot import ParseError
 from sqlglot.expressions import Expression as SqlExpression
 from sqlglot.expressions import Table as SqlTable
 
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
