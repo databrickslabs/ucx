@@ -562,7 +562,9 @@ def validate_groups_permissions_experimental(
 
 
 @task("migrate-tables-in-mounts-experimental")
-def scan_tables_in_mounts_experimental(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
+def scan_tables_in_mounts_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
     """EXPERIMENTAL
     This workflow scans for Delta tables inside all mount points captured during the assessment.
     It will store the results under the `tables` table located under the assessment.
