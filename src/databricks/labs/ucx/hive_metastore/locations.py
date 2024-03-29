@@ -319,7 +319,7 @@ class TablesInMounts(CrawlerBase[Table]):
                 guess_table = os.path.basename(path)
                 table = Table(
                     catalog="hive_metastore",
-                    database=f"mounted_{mount.name}",
+                    database=f"mounted_{mount.name.replace('/mnt/', '').replace('/', '_')}",
                     name=guess_table,
                     object_type="EXTERNAL",
                     table_format=entry.format,

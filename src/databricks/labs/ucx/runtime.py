@@ -561,9 +561,10 @@ def validate_groups_permissions_experimental(
     return validate_groups_permissions(cfg, ws, sql_backend, _install)
 
 
-@task("migrate-tables-in-mounts")
+@task("migrate-tables-in-mounts-experimental")
 def scan_tables_in_mounts(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
-    """This workflow scans for Delta tables inside all mount points captured during the assessment.
+    """EXPERIMENTAL
+    This workflow scans for Delta tables inside all mount points captured during the assessment.
     It will store the results under the `tables` table located under the assessment.
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)

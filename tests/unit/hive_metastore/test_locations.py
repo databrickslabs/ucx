@@ -260,8 +260,8 @@ def test_mount_listing_multiple_folders():
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
+        Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
+        Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
     ]
 
 
@@ -301,7 +301,7 @@ def test_mount_listing_sub_folders():
     assert results == [
         Table(
             "hive_metastore",
-            "mounted_/mnt/test_mount",
+            "mounted_test_mount",
             "table1",
             "EXTERNAL",
             "DELTA",
@@ -342,7 +342,7 @@ def test_partitioned_parquet_layout():
     assert results == [
         Table(
             "hive_metastore",
-            "mounted_/mnt/test_mount",
+            "mounted_test_mount",
             "entity",
             "EXTERNAL",
             "PARQUET",
@@ -394,7 +394,7 @@ def test_partitioned_delta():
     assert results == [
         Table(
             "hive_metastore",
-            "mounted_/mnt/test_mount",
+            "mounted_test_mount",
             "entity",
             "EXTERNAL",
             "DELTA",
@@ -403,7 +403,7 @@ def test_partitioned_delta():
         ),
         Table(
             "hive_metastore",
-            "mounted_/mnt/test_mount",
+            "mounted_test_mount",
             "entity_2",
             "EXTERNAL",
             "DELTA",
@@ -440,7 +440,7 @@ def test_filtering_irrelevant_paths():
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts, exclude_paths_in_mount=["$_azuretempfolder"]).snapshot()
     assert results == [
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
+        Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "adls://bucket/table1"),
     ]
 
 
@@ -474,7 +474,7 @@ def test_filter_irrelevant_mounts():
     results = TablesInMounts(backend, client, "test", mounts, include_mounts=["/mnt/test_mount"]).snapshot()
 
     assert results == [
-        Table("hive_metastore", "mounted_/mnt/test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
+        Table("hive_metastore", "mounted_test_mount", "table1", "EXTERNAL", "DELTA", "/mnt/test_mount/table1"),
     ]
     client.dbutils.fs.ls.assert_has_calls([call('/mnt/test_mount'), call('/mnt/test_mount/table1/')])
 
@@ -512,7 +512,7 @@ def test_historical_data_should_be_overwritten():
     assert backend.rows_written_for("hive_metastore.test.tables", "overwrite") == [
         Row(
             catalog='hive_metastore',
-            database='mounted_/mnt/test_mount',
+            database='mounted_test_mount',
             name='table1',
             object_type='EXTERNAL',
             table_format='DELTA',
