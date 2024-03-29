@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
+from more_itertools import flatten
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.views_sequencer import ViewsSequencer
@@ -15,7 +16,8 @@ def test_migrate_no_view_returns_empty_sequence():
     sql_backend = mock_backend(samples, "db1", "db2")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1", "db2"])
     sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches[1:]))
     assert len(sequence) == 0
 
 
@@ -24,7 +26,8 @@ def test_migrate_direct_view_returns_singleton_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches[1:]))
     assert len(sequence) == 1
     table = sequence[0]
     assert table.key == "hive_metastore.db1.v1"
@@ -35,7 +38,8 @@ def test_migrate_direct_views_returns_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches[1:]))
     assert len(sequence) == 2
     expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
     actual = {t.key for t in sequence}
@@ -47,7 +51,8 @@ def test_migrate_indirect_views_returns_correct_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches[1:]))
     assert len(sequence) == 2
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
     actual = [t.key for t in sequence]
@@ -59,7 +64,8 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches[1:]))
     assert len(sequence) == 5
     expected = [
         "hive_metastore.db1.v1",
@@ -78,7 +84,8 @@ def test_migrate_invalid_sql_raises_value_error() -> None:
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
         sequencer = ViewsSequencer(crawler.snapshot())
-        sequence = sequencer.sequence()
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches[1:]))
         assert sequence is None  # should never get there
     assert "Could not analyze view SQL:" in str(error)
 
@@ -89,7 +96,8 @@ def test_migrate_invalid_sql_tables_raises_value_error() -> None:
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
         sequencer = ViewsSequencer(crawler.snapshot())
-        sequence = sequencer.sequence()
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches[1:]))
         assert sequence is None  # should never get there
     assert "Unknown schema object:" in str(error)
 
@@ -100,7 +108,8 @@ def test_migrate_circular_vues_raises_value_error() -> None:
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
         sequencer = ViewsSequencer(crawler.snapshot())
-        sequence = sequencer.sequence()
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches[1:]))
         assert sequence is None  # should never get there
     assert "Circular view references are preventing migration:" in str(error)
 

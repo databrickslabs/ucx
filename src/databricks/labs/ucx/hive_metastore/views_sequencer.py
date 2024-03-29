@@ -1,10 +1,8 @@
 import sqlglot
-from more_itertools import flatten
 from sqlglot import ParseError
 from sqlglot.expressions import Expression as SqlExpression
 from sqlglot.expressions import Table as SqlTable
 
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
@@ -81,11 +79,7 @@ class ViewsSequencer:
         self._result_view_list: list[ViewToMigrate] = []
         self._result_tables_set: set[Table] = set()
 
-    def sequence(self) -> list[Table]:
-        batches = self.batches()
-        return list(flatten(batches))
-
-    def batches(self) -> list[list[Table]]:
+    def sequence_batches(self) -> list[list[Table]]:
         # sequencing is achieved using a very simple algorithm:
         # for each view, we register dependencies (extracted from view_text)
         # then given the remaining set of views to process,
@@ -96,12 +90,14 @@ class ViewsSequencer:
         # this seems enormous but in practice d remains small and v decreases rapidly
         all_tables = {}
         views = set()
+        tables = []
         for table in self._tables:
             all_tables[table.key] = table
             if table.view_text is None:
-                continue
-            views.add(ViewToMigrate(table))
-        batches = []
+                tables.append(table)
+            else:
+                views.add(ViewToMigrate(table))
+        batches = [tables]
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)
