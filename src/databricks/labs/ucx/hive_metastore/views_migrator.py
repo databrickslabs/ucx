@@ -10,19 +10,24 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 class ViewToMigrate:
 
     _view: Table
-    _table_dependencies: set[Table]
-    _view_dependencies: set[Table]
+    _table_dependencies: list[Table] | None
+    _view_dependencies: list[Table] | None
 
     def __init__(self, table: Table):
         if table.view_text is None:
             raise RuntimeError("Should never get there! A view must have 'view_text'!")
         self._view = table
-        self._table_dependencies = set()
-        self._view_dependencies = set()
+        self._table_dependencies = None
+        self._view_dependencies = None
 
-    def compute_dependencies(self, all_tables: dict[str, Table]):
-        if len(self._table_dependencies) + len(self._view_dependencies) > 0:
-            return
+    def view_dependencies(self, all_tables: dict[str, Table]) -> list[Table]:
+        if self._table_dependencies is None or self._view_dependencies is None:
+            self._compute_dependencies(all_tables)
+        return self._view_dependencies
+
+    def _compute_dependencies(self, all_tables: dict[str, Table]):
+        table_dependencies = set()
+        view_dependencies = set()
         statement = self._parse_view_text()
         for sql_table in statement.find_all(SqlTable):
             catalog = self._catalog(sql_table)
@@ -35,9 +40,11 @@ class ViewToMigrate:
                     f"Unknown schema object: {table_with_key.key} in view SQL: {self._view.view_text} of table {self._view.key}"
                 )
             if table.view_text is None:
-                self._table_dependencies.add(table)
+                table_dependencies.add(table)
             else:
-                self._view_dependencies.add(table)
+                view_dependencies.add(table)
+        self._table_dependencies = list(table_dependencies)
+        self._view_dependencies = list(view_dependencies)
 
     def _parse_view_text(self) -> SqlExpression:
         try:
@@ -96,10 +103,14 @@ class ViewsMigrator:
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
         for view in views:
-            view.compute_dependencies(all_tables)
-            not_batched_yet = list(filter(lambda v: v not in self._result_tables_set, view._view_dependencies))
-            if len(not_batched_yet) == 0:
+            view_deps = view.view_dependencies(all_tables)
+            if len(view_deps) == 0:
                 result.add(view)
+            else:
+                # does the view have at least one view dependency that is not yet processed ?
+                not_processed_yet = next((t for t in view_deps if t not in self._result_tables_set), None)
+                if not_processed_yet is None:
+                    result.add(view)
         # prevent infinite loop
         if len(result) == 0 and len(views) > 0:
             raise ValueError(f"Circular view references are preventing migration: {views}")
