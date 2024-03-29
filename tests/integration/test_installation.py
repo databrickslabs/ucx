@@ -131,69 +131,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         pending.uninstall()
 
 
-def test_experimental_permissions_migration_job(  # pylint: disable=too-many-locals
-    ws,
-    sql_backend,
-    new_installation,
-    make_schema,
-    migrated_group,
-    make_table,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
-):
-    cluster_policy = make_cluster_policy()
-    make_cluster_policy_permissions(
-        object_id=cluster_policy.policy_id,
-        permission_level=PermissionLevel.CAN_USE,
-        group_name=migrated_group.name_in_workspace,
-    )
-    schema_a = make_schema()
-    table_a = make_table(schema_name=schema_a.name)
-    sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{migrated_group.name_in_workspace}`")
-    sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{migrated_group.name_in_workspace}`")
-    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{migrated_group.name_in_workspace}`")
-
-    workspace_installation, workflow_installation = new_installation(
-        config_transform=lambda wc: replace(wc, include_group_names=[migrated_group.name_in_workspace])
-    )
-    workspace_installation.run()
-
-    inventory_database = workspace_installation.config.inventory_database
-    sql_backend.save_table(f'{inventory_database}.groups', [migrated_group], MigratedGroup)
-
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_database, [])
-    tables_crawler = StaticTablesCrawler(sql_backend, inventory_database, [table_a])
-    grants_crawler = StaticGrantsCrawler(
-        tables_crawler,
-        udf_crawler,
-        [
-            Grant(
-                catalog=table_a.catalog_name,
-                database=table_a.schema_name,
-                table=table_a.name,
-                principal=migrated_group.name_in_workspace,
-                action_type="SELECT",
-            ),
-        ],
-    )
-    tacl_support = TableAclSupport(grants_crawler, sql_backend)
-
-    generic_permissions = GenericPermissionsSupport(
-        ws, [Listing(lambda: [cluster_policy], "policy_id", "cluster-policies")]
-    )
-    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions, tacl_support])
-    permission_manager.inventorize_permissions()
-
-    workflow_installation.run_workflow("migrate-groups-experimental")
-
-    object_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    new_schema_grants = grants_crawler.for_schema_info(schema_a)
-
-    assert {"USAGE", "OWN"} == new_schema_grants[migrated_group.name_in_account]
-    assert object_permissions[migrated_group.name_in_account] == PermissionLevel.CAN_USE
-
-
-def test_experimental_permissions_migration_job_same_name(  # pylint: disable=too-many-locals
+def test_experimental_permissions_migration_for_group_with_same_name(  # pylint: disable=too-many-locals
     ws,
     sql_backend,
     new_installation,
