@@ -4,7 +4,7 @@
 Once you have defined your data model in UC and that you've created appropriate Storage Credentials and External Locations, 
 you can then migrate your data to UC 
 
-Assumptions for a single table upgrade estimates:
+Assumptions for a single table migration estimates:
 
 - UC Data model has been defined
 - Storage Credentials are in place
@@ -12,7 +12,7 @@ Assumptions for a single table upgrade estimates:
 - Target Catalogs and schemas has been defined
 - Grants has been defined
 
-Please note that depending on the table type and their location, the upgrade effort will differ.
+Please note that depending on the table type and their location, the migration effort will differ.
 [Full guidance](https://www.databricks.com/blog/migrating-tables-hive-metastore-unity-catalog-metastore)
 
 | object_type | table_format                         | location       | estimated effort | suggestion                                                                               |

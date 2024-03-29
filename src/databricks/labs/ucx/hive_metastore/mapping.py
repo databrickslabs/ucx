@@ -133,7 +133,7 @@ class TableMapping:
                 logger.info(f"Table {rule.as_hms_table_key} is in a database that was marked to be skipped")
                 continue
             if crawled_tables_keys[rule.as_hms_table_key].is_databricks_dataset:
-                logger.info(f"Table {rule.as_hms_table_key} is a db demo dataset and will not be upgraded")
+                logger.info(f"Table {rule.as_hms_table_key} is a db demo dataset and will not be migrated")
                 continue
             tasks.append(
                 partial(self._get_table_in_scope_task, TableToMigrate(crawled_tables_keys[rule.as_hms_table_key], rule))
@@ -177,8 +177,8 @@ class TableMapping:
                 logger.info(f"{table.key} is set as upgraded to {value['value']}")
                 if self.exists_in_uc(table, value["value"]):
                     logger.info(
-                        f"The table {table.key} was previously upgraded to {value['value']}. "
-                        f"To revert the table and allow it to be upgraded again use the CLI command:"
+                        f"The table {table.key} was previously migrated to {value['value']}. "
+                        f"To revert the table and allow it to be migrated again use the CLI command:"
                         f"databricks labs ucx revert --schema {table.database} --table {table.name}"
                     )
                     return None
