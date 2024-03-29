@@ -41,6 +41,7 @@ class Table:
 
     location: str | None = None
     view_text: str | None = None
+    # really means migrated_to
     upgraded_to: str | None = None
 
     storage_properties: str | None = None
