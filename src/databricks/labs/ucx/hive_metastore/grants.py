@@ -142,6 +142,7 @@ class Grant:
             ("TABLE", "SELECT"): self._uc_action("SELECT"),
             ("TABLE", "MODIFY"): self._uc_action("MODIFY"),
             ("TABLE", "READ_METADATA"): self._uc_action("BROWSE"),
+            ("TABLE", "ALL PRIVILEGES"): self._uc_action("ALL PRIVILEGES"),
             ("TABLE", "OWN"): self._set_owner_sql,
             ("VIEW", "SELECT"): self._uc_action("SELECT"),
             ("VIEW", "READ_METADATA"): self._uc_action("BROWSE"),
@@ -417,11 +418,11 @@ class PrincipalACL:
 
     def _get_privilege(self, table: Table, locations: dict[str, str]):
         if table.view_text is not None:
-            # return nothing for view so that it goes to the seperate view logic
+            # return nothing for view so that it goes to the separate view logic
             return None
         if table.location is None:
             return "WRITE_FILES"
-        if table.location.startswith('dbfs://') or table.location.startswith('/dbfs/'):
+        if table.location.startswith('dbfs:/') or table.location.startswith('/dbfs/'):
             return "WRITE_FILES"
 
         for loc, privilege in locations.items():
@@ -456,7 +457,7 @@ class PrincipalACL:
             if privilege == "WRITE_FILES":
                 grants.extend(
                     [
-                        Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, table.name)
+                        Grant(principal, "ALL PRIVILEGES", table.catalog, table.database, table.name)
                         for principal in principals
                     ]
                 )
@@ -464,7 +465,7 @@ class PrincipalACL:
             if table.view_text is not None:
                 grants.extend(
                     [
-                        Grant(principal, "ALL_PRIVILEGES", table.catalog, table.database, view=table.name)
+                        Grant(principal, "ALL PRIVILEGES", table.catalog, table.database, view=table.name)
                         for principal in principals
                     ]
                 )
@@ -506,6 +507,8 @@ class PrincipalACL:
             if acl.user_name is not None:
                 principal_list.append(acl.user_name)
             if acl.group_name is not None:
+                if acl.group_name == "admins":
+                    continue
                 principal_list.append(acl.group_name)
             if acl.service_principal_name is not None:
                 principal_list.append(acl.service_principal_name)

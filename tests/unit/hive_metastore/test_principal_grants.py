@@ -208,14 +208,14 @@ def test_interactive_cluster_single_spn(ws, installation):
     )
     grants = principal_acl(ws, installation, [cluster_spn])
     expected_grants = [
-        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
-        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
-        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
-        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
-        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
-        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
-        Grant('group1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
-        Grant('foo.bar@imagine.com', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('group1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
+        Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table1'),
+        Grant('group1', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('group1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
+        Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
+        Grant('group1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
         Grant('group1', "USE", "hive_metastore", 'schema1'),
         Grant('foo.bar@imagine.com', "USE", "hive_metastore", 'schema1'),
         Grant('group1', "USE", "hive_metastore"),
@@ -237,10 +237,10 @@ def test_interactive_cluster_multiple_spn(ws, installation):
     grants = principal_acl(ws, installation, [cluster_spn])
     expected_grants = [
         Grant('spn1', "SELECT", "hive_metastore", 'schema1', 'table2'),
-        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema2', 'table4'),
-        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
-        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
-        Grant('spn1', "ALL_PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema2', 'table4'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
         Grant('spn1', "USE", "hive_metastore", 'schema1'),
         Grant('spn1', "USE", "hive_metastore", 'schema2'),
         Grant('spn1', "USE", "hive_metastore"),

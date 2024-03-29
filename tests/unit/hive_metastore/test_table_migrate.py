@@ -753,8 +753,9 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
     expected_grants = [
-        Grant('spn1', "SELECT", "hive_metastore", 'db1_src', 'managed_dbfs'),
-        Grant('Group2', "ALL_PRIVILEGES", "hive_metastore", 'db1_src', 'managed_other'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'db1_src', 'managed_dbfs'),
+        Grant('spn1', "USE", "hive_metastore", 'db1_src'),
+        Grant('spn1', "USE", "hive_metastore"),
     ]
     principal_grants.get_interactive_cluster_grants.return_value = expected_grants
     table_migrate = TablesMigrate(
@@ -769,5 +770,4 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     )
     table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
-    assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
-    assert "GRANT ALL_PRIVILEGES ON TABLE ucx_default.db1_dst.managed_other TO `Group2`" not in backend.queries
+    assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries

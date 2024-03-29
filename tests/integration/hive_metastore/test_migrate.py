@@ -3,10 +3,12 @@ from datetime import timedelta
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, SecurableType
+from databricks.sdk.service.compute import DataSecurityMode
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
@@ -26,6 +28,17 @@ from ..conftest import (
 )
 
 logger = logging.getLogger(__name__)
+_SPARK_CONF = {
+    "spark.databricks.cluster.profile": "singleNode",
+    "spark.master": "local[*]",
+    "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
+    "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
+    ".azurebfs.oauth2.ClientCredsTokenProvider",
+    "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
+    "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
+    "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
+    ".microsoftonline.com/directory_12345/oauth2/token",
+}
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -550,3 +563,101 @@ def test_migrate_managed_tables_with_acl(
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     assert target_table_grants.privilege_assignments[0].principal == user.user_name
     assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too-many-arguments
+    ws,
+    sql_backend,
+    inventory_schema,
+    make_catalog,
+    make_schema,
+    make_table,
+    make_user,
+    make_cluster,
+    make_cluster_permissions,
+    env_or_skip,
+):  # pylint: disable=too-many-locals
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    user = make_user()
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_MANAGE,
+        user_name=user.user_name,
+    )
+    src_schema = make_schema(catalog_name="hive_metastore")
+
+    src_managed_table = make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+    )
+
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
+
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
+    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
+    grant_crawler = StaticGrantsCrawler(table_crawler, udf_crawler, [])
+    rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_managed_table.name,
+            src_managed_table.name,
+        ),
+    ]
+    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
+    group_manager = GroupManager(sql_backend, ws, inventory_schema)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    installation = MockInstallation(
+        {
+            "config.yml": {
+                'warehouse_id': env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+                'connect': {'host': 'a', 'token': 'b'},
+                'inventory_database': inventory_schema,
+            },
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://things@labsazurethings.dfs.core.windows.net',
+                    'client_id': 'dummy_application_id',
+                    'principal': 'principal_1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_ss1',
+                }
+            ],
+        }
+    )
+    principal_grants = PrincipalACL.for_cli(ws, installation)
+    table_migrate = TablesMigrate(
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+
+    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 1
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
+    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    match = False
+    for assignment in target_table_grants.privilege_assignments:
+        if assignment.principal == user.user_name and assignment.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
