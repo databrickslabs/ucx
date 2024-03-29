@@ -4,7 +4,7 @@ from pathlib import Path
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.source_code.languages import Languages
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class Files:
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient):
-        tables_migrate = TablesMigrate.for_cli(ws)
+        tables_migrate = TablesMigrator.for_cli(ws)
         index = tables_migrate.index()
         languages = Languages(index)
         return cls(languages)
