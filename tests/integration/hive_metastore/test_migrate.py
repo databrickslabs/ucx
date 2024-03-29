@@ -10,8 +10,12 @@ from databricks.sdk.service.catalog import Privilege, SecurableType
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
@@ -22,6 +26,7 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 from ..conftest import (
     StaticGrantsCrawler,
+    StaticMountCrawler,
     StaticTableMapping,
     StaticTablesCrawler,
     StaticUdfsCrawler,
@@ -442,6 +447,7 @@ def test_mapping_reverts_table(
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     installation = Installation.current(ws, 'ucx')
+
     principal_grants = PrincipalACL.for_cli(ws, installation)
     table_migrate = TablesMigrate(
         table_crawler,
@@ -577,6 +583,8 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
     make_cluster,
     make_cluster_permissions,
     env_or_skip,
+    make_dbfs_data_copy,
+    make_random,
 ):  # pylint: disable=too-many-locals
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -588,28 +596,33 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
         user_name=user.user_name,
     )
     src_schema = make_schema(catalog_name="hive_metastore")
-
-    src_managed_table = make_table(
-        catalog_name=src_schema.catalog_name,
-        schema_name=src_schema.name,
-    )
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
-    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_external_table.full_name}")
 
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
+    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
     udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
     grant_crawler = StaticGrantsCrawler(table_crawler, udf_crawler, [])
+    mount_crawler = StaticMountCrawler(
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        sql_backend,
+        ws,
+        inventory_schema,
+    )
     rules = [
         Rule(
             "workspace",
             dst_catalog.name,
             src_schema.name,
             dst_schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
+            src_external_table.name,
+            src_external_table.name,
         ),
     ]
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
@@ -634,7 +647,18 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
             ],
         }
     )
-    principal_grants = PrincipalACL.for_cli(ws, installation)
+    azure_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    locations = ExternalLocations(ws, sql_backend, inventory_schema)
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_client, graph_client)
+    resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
+    principal_grants = PrincipalACL(
+        ws, sql_backend, installation, table_crawler, mount_crawler, spn_crawler, resource_permissions
+    )
     table_migrate = TablesMigrate(
         table_crawler,
         grant_crawler,
@@ -651,9 +675,9 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
 
-    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_managed_table.name}")
-    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
+    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_external_table.name}")
+    assert target_table_properties["upgraded_from"] == src_external_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     match = False
     for assignment in target_table_grants.privilege_assignments:

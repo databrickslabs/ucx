@@ -17,6 +17,7 @@ from databricks.labs.ucx.assessment.azure import (
 )
 from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
@@ -190,3 +191,12 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
 
     def snapshot(self) -> list[AzureServicePrincipalInfo]:
         return self._spn_infos
+
+
+class StaticMountCrawler(Mounts):
+    def __init__(self, mounts: list[Mount], *args):
+        super().__init__(*args)
+        self._mounts = mounts
+
+    def snapshot(self) -> list[Mount]:
+        return self._mounts

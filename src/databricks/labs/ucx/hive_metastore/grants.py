@@ -23,7 +23,11 @@ from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
+from databricks.labs.ucx.hive_metastore.locations import (
+    ExternalLocations,
+    Mount,
+    Mounts,
+)
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 
@@ -332,6 +336,7 @@ class PrincipalACL:
         backend: SqlBackend,
         installation: Installation,
         table_crawler: TablesCrawler,
+        mount_crawler: Mounts,
         spn_crawler: AzureServicePrincipalCrawler | None = None,
         resource_permission: AzureResourcePermissions | None = None,
     ):
@@ -341,6 +346,7 @@ class PrincipalACL:
         self._installation = installation
         self._resource_permission = resource_permission
         self._table_crawler = table_crawler
+        self._mount_crawler = mount_crawler
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
@@ -348,6 +354,7 @@ class PrincipalACL:
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         locations = ExternalLocations(ws, sql_backend, config.inventory_database)
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
         if ws.config.is_azure:
             azure_client = AzureAPIClient(
                 ws.config.arm_environment.resource_manager_endpoint,
@@ -357,7 +364,7 @@ class PrincipalACL:
             azurerm = AzureResources(azure_client, graph_client)
             resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
             spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-            return cls(ws, sql_backend, installation, table_crawler, spn_crawler, resource_permissions)
+            return cls(ws, sql_backend, installation, table_crawler, mount_crawler, spn_crawler, resource_permissions)
         if ws.config.is_aws:
             return None
         if ws.config.is_gcp:
@@ -395,6 +402,7 @@ class PrincipalACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
         tables = self._table_crawler.snapshot()
+        mounts = list(self._mount_crawler.snapshot())
         grants: list[Grant] = []
 
         for cluster_spn in spn_cluster_mapping:
@@ -405,7 +413,7 @@ class PrincipalACL:
                 eligible_locations = self._get_external_location(spn, external_locations, permission_mappings)
                 if len(eligible_locations) == 0:
                     continue
-                grant = self._get_grants(eligible_locations, principals, tables)
+                grant = self._get_grants(eligible_locations, principals, tables, mounts)
                 grants.extend(grant)
         catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
         grants.extend(catalog_grants)
@@ -416,12 +424,26 @@ class PrincipalACL:
         # TODO
         return []
 
-    def _get_privilege(self, table: Table, locations: dict[str, str]):
+    def _get_mount_location(self, location: str, mounts: list[Mount]):
+        for mount in mounts:
+            if location.startswith(f"dbfs:{mount.name}") or location.startswith(f"/dbfs{mount.name}"):
+                return mount.source
+        return None
+
+    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
             return None
         if table.location is None:
-            return "WRITE_FILES"
+            return None
+        if table.location.startswith('dbfs:/mnt') or table.location.startswith('/dbfs/mnt'):
+            mount_location = self._get_mount_location(table.location, mounts)
+            if mount_location is None:
+                return None
+            for loc, privilege in locations.items():
+                if loc is not None and mount_location.startswith(loc):
+                    return privilege
+            return None
         if table.location.startswith('dbfs:/') or table.location.startswith('/dbfs/'):
             return "WRITE_FILES"
 
@@ -440,15 +462,12 @@ class PrincipalACL:
         ]
 
     def _get_grants(
-        self,
-        locations: dict[str, str],
-        principals: list[str],
-        tables: list[Table],
+        self, locations: dict[str, str], principals: list[str], tables: list[Table], mounts: list[Mount]
     ) -> list[Grant]:
         grants = []
         filtered_tables = []
         for table in tables:
-            privilege = self._get_privilege(table, locations)
+            privilege = self._get_privilege(table, locations, mounts)
             if privilege == "READ_FILES":
                 grants.extend(
                     [Grant(principal, "SELECT", table.catalog, table.database, table.name) for principal in principals]

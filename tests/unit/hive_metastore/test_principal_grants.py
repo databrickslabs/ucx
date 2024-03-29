@@ -16,8 +16,9 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
+from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
@@ -83,8 +84,8 @@ def principal_acl(w, install, cluster_spn: list):
             'delta',
             location='abfss://container1@storage2.dfs.core.windows.net/folder2/table2',
         ),
-        Table('hive_metastore', 'schema1', 'table3', 'TABLE', 'delta'),
-        Table('hive_metastore', 'schema1', 'table5', 'TABLE', 'delta', location='dbfs://hms/folder1/table1'),
+        Table('hive_metastore', 'schema1', 'table3', 'TABLE', 'delta', location='dbfs:/mnt/folder1/table3'),
+        Table('hive_metastore', 'schema1', 'table5', 'TABLE', 'delta', location='dbfs:/hms/folder1/table1'),
         Table(
             'hive_metastore',
             'schema2',
@@ -95,6 +96,10 @@ def principal_acl(w, install, cluster_spn: list):
         ),
     ]
     table_crawler.snapshot.return_value = tables
+    mount_crawler = create_autospec(Mounts)
+    mount_crawler.snapshot.return_value = [
+        Mount('/mnt/folder1', 'abfss://container1@storage1.dfs.core.windows.net/folder1')
+    ]
     azure_client = AzureAPIClient(
         w.config.arm_environment.resource_manager_endpoint,
         w.config.arm_environment.service_management_endpoint,
@@ -104,7 +109,7 @@ def principal_acl(w, install, cluster_spn: list):
     resource_permissions = AzureResourcePermissions(install, w, azurerm, locations)
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
-    return PrincipalACL(w, sql_backend, install, table_crawler, spn_crawler, resource_permissions)
+    return PrincipalACL(w, sql_backend, install, table_crawler, mount_crawler, spn_crawler, resource_permissions)
 
 
 @pytest.fixture
@@ -238,7 +243,6 @@ def test_interactive_cluster_multiple_spn(ws, installation):
     expected_grants = [
         Grant('spn1', "SELECT", "hive_metastore", 'schema1', 'table2'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema2', 'table4'),
-        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
         Grant('spn1', "USE", "hive_metastore", 'schema1'),
