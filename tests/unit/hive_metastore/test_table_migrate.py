@@ -220,7 +220,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     ) in backend.queries
 
 
-def get_table_migrate(backend: SqlBackend) -> TablesMigrator:
+def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)
     client = workspace_client_mock()
@@ -309,17 +309,17 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrator:
     group_manager = GroupManager(backend, client, "inventory_database")
     table_mapping = table_mapping_mock()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrator(
+    table_migrator = TablesMigrator(
         table_crawler, grant_crawler, client, backend, table_mapping, group_manager, migration_status_refresher
     )
-    return table_migrate
+    return table_migrator
 
 
 def test_revert_migrated_tables_skip_managed(ws):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(backend)
+    table_migrate = get_table_migrator(backend)
     table_migrate.revert_migrated_tables(schema="test_schema1")
     revert_queries = backend.queries
     assert (
@@ -338,7 +338,7 @@ def test_revert_migrated_tables_including_managed(ws):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(backend)
+    table_migrate = get_table_migrator(backend)
     # testing reverting managed tables
     table_migrate.revert_migrated_tables(schema="test_schema1", delete_managed=True)
     revert_with_managed_queries = backend.queries
@@ -384,7 +384,7 @@ def test_revert_report(ws, capsys):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_migrate = get_table_migrate(backend)
+    table_migrate = get_table_migrator(backend)
     table_migrate.print_revert_report(delete_managed=True)
     captured = capsys.readouterr()
     assert "test_schema1|1|0|1|0|1|0|0|" in captured.out.replace(" ", "")
@@ -413,7 +413,7 @@ def test_empty_revert_report(ws):
     assert not table_migrate.print_revert_report(delete_managed=False)
 
 
-def test_is_upgraded(ws):
+def test_is_migrated(ws):
     errors = {}
     rows = {
         "SHOW TBLPROPERTIES schema1.table1": [
@@ -625,10 +625,10 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    table_migrate = TablesMigrator(
+    table_migrator = TablesMigrator(
         table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
     )
-    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    table_migrator.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
     assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" not in backend.queries
@@ -642,3 +642,44 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     assert "GRANT MODIFY ON VIEW ucx_default.db1_dst.view_dst TO `account group`" not in backend.queries
 
     assert "Cannot identify UC grant" in caplog.text
+
+
+def test_migrate_tables_and_views_should_be_properly_sequenced(ws):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = create_autospec(TablesCrawler)
+    grant_crawler = create_autospec(GrantsCrawler)
+    table_mapping = table_mapping_mock()
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "v1_src", "EXTERNAL", "VIEW", None, "select * from db1_src.v3_src"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "v1_src", "v1_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "v2_src", "EXTERNAL", "VIEW", None, "select * from db1_src.t1_src"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "v2_src", "v2_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "t1_src", "EXTERNAL", "TABLE"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "t1_src", "t1_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "v3_src", "EXTERNAL", "VIEW", None, "select * from db1_src.v2_src"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "v3_src", "v3_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "t2_src", "EXTERNAL", "TABLE"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "t2_src", "t2_dst"),
+        ),
+    ]
+    group_manager = GroupManager(backend, ws, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    table_migrate = TablesMigrator(
+        table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
+    )
+    tasks = table_migrate.migrate_tables()
+    table_keys = [task.args[0].key for task in tasks]
+    assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
+    assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
+    assert table_keys.index("hive_metastore.db1_src.v2_src") > table_keys.index("hive_metastore.db1_src.t1_src")
