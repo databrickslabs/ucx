@@ -7,7 +7,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import (
-    AwsIamRole,
+    AwsIamRoleResponse,
     AzureManagedIdentity,
     AzureServicePrincipal,
     Privilege,
@@ -32,17 +32,21 @@ def ws():
 
 
 def side_effect_create_aws_storage_credential(name, aws_iam_role, comment, read_only):
-    return StorageCredentialInfo(name=name, aws_iam_role=aws_iam_role, comment=comment, read_only=read_only)
+    return StorageCredentialInfo(
+        name=name, aws_iam_role=AwsIamRoleResponse(role_arn=aws_iam_role.role_arn), comment=comment, read_only=read_only
+    )
 
 
 @pytest.fixture
 def credential_manager(ws):
     ws.storage_credentials.list.return_value = [
-        StorageCredentialInfo(aws_iam_role=AwsIamRole(role_arn="arn:aws:iam::123456789012:role/example-role-name")),
+        StorageCredentialInfo(
+            aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/example-role-name")
+        ),
         StorageCredentialInfo(
             azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
-        StorageCredentialInfo(aws_iam_role=AwsIamRole("arn:aws:iam::123456789012:role/another-role-name")),
+        StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/another-role-name")),
         StorageCredentialInfo(azure_service_principal=AzureServicePrincipal("directory_id_1", "app_secret2", "secret")),
     ]
 
@@ -134,7 +138,7 @@ def test_for_cli(ws, installation):
     assert isinstance(IamRoleMigration.for_cli(ws, installation, aws, prompts), IamRoleMigration)
 
 
-def test_print_action_plan(caplog, ws, instance_profile_migration):
+def test_print_action_plan(caplog, ws, instance_profile_migration, credential_manager):
     caplog.set_level(logging.INFO)
 
     prompts = MockPrompts({"Above IAM roles will be migrated to UC storage credentials*": "Yes"})

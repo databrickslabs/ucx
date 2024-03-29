@@ -47,7 +47,14 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
 
+
     inventory_database_location: str | None = None
+
+    # Whether the tables in mounts crawler should crawl a specific list of mounts.
+    # If not specified, it will list all moubts.
+    include_mounts: list[str] | None = None
+    exclude_paths_in_mount: list[str] | None = None
+
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

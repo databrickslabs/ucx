@@ -141,13 +141,15 @@ class WorkflowsInstallation(InstallationMixin):
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
-        job_run_waiter = self._ws.jobs.run_now(job_id)
-        try:
-            job_run_waiter.result()
-        except OperationFailed as err:
-            # currently we don't have any good message from API, so we have to work around it.
-            job_run = self._ws.jobs.get_run(job_run_waiter.run_id)
-            raise self._infer_error_from_job_run(job_run) from err
+        job_initial_run = self._ws.jobs.run_now(job_id)
+        if job_initial_run.run_id:
+            try:
+                self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
+            except OperationFailed as err:
+                job_run = self._ws.jobs.get_run(job_initial_run.run_id)
+                raise self._infer_error_from_job_run(job_run) from err
+            return
+        raise NotFound(f"job run not found for {step}")
 
     def create_jobs(self):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
@@ -453,10 +455,16 @@ class WorkflowsInstallation(InstallationMixin):
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
+        if "table_migration" in task.job_cluster:
+            # Shared mode cluster cannot use dbfs, need to use WSFS
+            libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
+        else:
+            # TODO: check when we can install wheels from WSFS properly
+            # None UC cluster cannot use WSFS, need to use dbfs
+            libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
         return replace(
             jobs_task,
-            # TODO: check when we can install wheels from WSFS properly
-            libraries=[compute.Library(whl=f"dbfs:{remote_wheel}")],
+            libraries=libraries,
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
@@ -496,7 +504,7 @@ class WorkflowsInstallation(InstallationMixin):
                 jobs.JobCluster(
                     job_cluster_key="table_migration",
                     new_cluster=compute.ClusterSpec(
-                        data_security_mode=compute.DataSecurityMode.SINGLE_USER,
+                        data_security_mode=compute.DataSecurityMode.USER_ISOLATION,
                         spark_conf=self._job_cluster_spark_conf("table_migration"),
                         policy_id=self._config.policy_id,
                         autoscale=compute.AutoScale(

@@ -51,7 +51,7 @@ class TablesMigrate:
         backend: SqlBackend,
         table_mapping: TableMapping,
         group_manager: GroupManager,
-        migration_status_refresher,
+        migration_status_refresher: 'MigrationStatusRefresher',
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -80,25 +80,22 @@ class TablesMigrate:
     def index(self):
         return self._migration_status_refresher.index()
 
-    def migrate_tables(self, *, what: What | None = None, acl_strategy: AclMigrationWhat | None = None):
+    def migrate_tables(self, *, what: What | None = None, acl_strategy: list[AclMigrationWhat] | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        tasks = []
         if acl_strategy is not None:
             grants_to_migrate = self._gc.snapshot()
             migrated_groups = self._group.snapshot()
-        tasks = []
+        else:
+            acl_strategy = []
         for table in tables_to_migrate:
+            grants = []
             if what is not None and table.src.what != what:
                 continue
-            match acl_strategy:
-                case None:
-                    tasks.append(partial(self._migrate_table, table.src, table.rule))
-                case AclMigrationWhat.LEGACY_TACL:
-                    grants = self._match_grants(table.src, grants_to_migrate, migrated_groups)
-                    tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
-                case AclMigrationWhat.PRINCIPAL:
-                    # TODO: Implement principal-based ACL migration
-                    pass
+            if AclMigrationWhat.LEGACY_TACL in acl_strategy:
+                grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
+            tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
@@ -279,25 +276,20 @@ class TablesMigrate:
         return matched_grants
 
 
-class Index:
+class MigrationIndex:
     def __init__(self, tables: list[MigrationStatus]):
-        self._tables = tables
+        self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        src_schema = schema.lower()
-        src_table = table.lower()
-        for migration_status in self._tables:
-            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
-                return True
-        return False
+        """Check if a table is migrated."""
+        return self.get(schema, table) is not None
 
     def get(self, schema: str, table: str) -> MigrationStatus | None:
-        src_schema = schema.lower()
-        src_table = table.lower()
-        for migration_status in self._tables:
-            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
-                return migration_status
-        return None
+        """Get the migration status for a table. If the table is not migrated, return None."""
+        dst = self._index.get((schema.lower(), table.lower()))
+        if not dst or not dst.dst_table:
+            return None
+        return dst
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
@@ -309,8 +301,8 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def snapshot(self) -> Iterable[MigrationStatus]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def index(self) -> Index:
-        return Index(list(self.snapshot()))
+    def index(self) -> MigrationIndex:
+        return MigrationIndex(list(self.snapshot()))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}

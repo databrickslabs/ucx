@@ -26,6 +26,7 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     PermissionDenied,
     Unknown,
 )
+from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.compute import (
     ClusterDetails,
@@ -55,7 +56,11 @@ import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.install import (
+    WorkspaceInstallation,
+    WorkspaceInstaller,
+    extract_major_minor,
+)
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
@@ -218,7 +223,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         PRODUCT_INFO,
     )
 
-    with pytest.raises(ManyError) as failure:
+    with pytest.raises(BadRequest) as failure:
         workspace_installation.run()
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
@@ -339,6 +344,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
         ],
     )
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
     installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),
@@ -353,6 +359,45 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
         installer.run_workflow("assessment")
 
     assert str(failure.value) == "stuff: does not compute"
+
+
+def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation_with_jobs):
+    def run_now(job_id):
+        assert job_id == 123
+
+        def result():
+            raise OperationFailed(...)
+
+        waiter = mocker.Mock()
+        waiter.result = result
+        waiter.run_id = None
+        return waiter
+
+    ws.jobs.run_now = run_now
+    ws.jobs.get_run.return_value = jobs.Run(
+        state=jobs.RunState(state_message="Stuff happens."),
+        tasks=[
+            jobs.RunTask(
+                task_key="stuff",
+                state=jobs.RunState(result_state=jobs.RunResultState.FAILED),
+                run_id=123,
+            )
+        ],
+    )
+    ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
+    wheels = create_autospec(WheelsV2)
+    installer = WorkflowsInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation_with_jobs,
+        ws,
+        wheels,
+        any_prompt,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+    )
+    with pytest.raises(NotFound):
+        installer.run_workflow("assessment")
 
 
 def test_run_workflow_creates_failure_from_mapping(
@@ -380,6 +425,7 @@ def test_run_workflow_creates_failure_from_mapping(
             )
         ],
     )
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     ws.jobs.get_run_output.return_value = jobs.RunOutput(
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
@@ -435,6 +481,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_in
     ws.jobs.get_run_output.return_value = jobs.RunOutput(
         error="something: DataLoss: does not compute", error_trace="# goes to stderr"
     )
+    ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
     installer = WorkflowsInstallation(
         WorkspaceConfig(inventory_database='ucx'),
@@ -1510,3 +1557,72 @@ def test_validate_step(ws, any_prompt, result_state, expected):
     )
 
     assert workflows_installer.validate_step("assessment") == expected
+
+
+def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
+    ws.jobs.run_now = mocker.Mock()
+
+    mocker.patch("webbrowser.open")
+    base_prompts = MockPrompts(
+        {
+            r"Open config file in.*": "yes",
+            r"Open job overview in your browser.*": "yes",
+            r"Do you want to trigger assessment job ?.*": "yes",
+            r"Open assessment Job url that just triggered ?.*": "yes",
+            r".*": "",
+        }
+    )
+
+    product_info = create_autospec(ProductInfo)
+    product_info.released_version.return_value = "0.3.0"
+
+    installation = MockInstallation(
+        {
+            'config.yml': {
+                'inventory_database': 'ucx_user',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            },
+            'version.json': {'version': '0.3.0', 'wheel': '...', 'date': '...'},
+        },
+        is_global=False,
+    )
+
+    install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
+
+    # raises runtime warning when versions match and no override provided
+    with pytest.raises(
+        RuntimeWarning,
+        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
+    ):
+        install.configure()
+
+    first_prompts = base_prompts.extend(
+        {
+            r"Do you want to update the existing installation?": "yes",
+        }
+    )
+    install = WorkspaceInstaller(first_prompts, installation, ws, product_info)
+
+    # finishes successfully when versions match and override is provided
+    config = install.configure()
+    assert config.inventory_database == "ucx_user"
+
+    # finishes successfully when versions don't match and no override is provided/needed
+    product_info.released_version.return_value = "0.4.1"
+    install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
+    config = install.configure()
+    assert config.inventory_database == "ucx_user"
+
+
+def test_extract_major_minor_versions():
+    version_string1 = "0.3.123151"
+    version_string2 = "0.17.1232141"
+
+    assert extract_major_minor(version_string1) == "0.3"
+    assert extract_major_minor(version_string2) == "0.17"
+
+    version_string3 = "should not match"
+    assert extract_major_minor(version_string3) is None

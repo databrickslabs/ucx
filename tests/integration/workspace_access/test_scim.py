@@ -1,22 +1,35 @@
 from datetime import timedelta
 
+import pytest
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.workspace_access.base import Permissions
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
+from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
 from . import apply_tasks
 
 
+@pytest.mark.parametrize("use_permission_migration_api", [True, False])
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_some_entitlements(ws, make_group):
-    group_a = make_group()
-    group_b = make_group()
+def test_some_entitlements(
+    acc: AccountClient,
+    ws: WorkspaceClient,
+    make_group,
+    make_acc_group,
+    permission_manager: PermissionManager,
+    use_permission_migration_api: bool,
+):
+    ws_group = make_group()
+    acc_group = make_acc_group()
+    acc.workspace_assignment.update(ws.get_workspace_id(), acc_group.id, [iam.WorkspacePermission.USER])
+    migrated_groups = MigratedGroup.partial_info(ws_group, acc_group)
     ws.groups.patch(
-        group_a.id,
+        ws_group.id,
         operations=[
             iam.Patch(
                 op=iam.PatchOp.ADD,
@@ -28,17 +41,15 @@ def test_some_entitlements(ws, make_group):
     )
 
     scim_support = ScimSupport(ws)
-    _, before = scim_support.load_for_group(group_a.id)
+    _, before = scim_support.load_for_group(ws_group.id)
     assert "databricks-sql-access" in before
 
-    apply_tasks(
-        scim_support,
-        [
-            MigratedGroup.partial_info(group_a, group_b),
-        ],
-    )
+    if use_permission_migration_api:
+        MigrationState([migrated_groups]).apply_group_permissions_experimental(ws)
+    else:
+        apply_tasks(scim_support, [migrated_groups])
 
-    _, after = scim_support.load_for_group(group_b.id)
+    _, after = scim_support.load_for_group(acc_group.id)
     assert "databricks-sql-access" in after
 
 
