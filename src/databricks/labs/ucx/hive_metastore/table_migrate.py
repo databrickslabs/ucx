@@ -42,7 +42,7 @@ class MigrationStatus:
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
-class TablesMigrate:
+class TablesMigrator:
     def __init__(
         self,
         table_crawler: TablesCrawler,

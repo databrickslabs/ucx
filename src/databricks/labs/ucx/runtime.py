@@ -22,7 +22,7 @@ from databricks.labs.ucx.hive_metastore import (
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
-    TablesMigrate,
+    TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import What
@@ -437,7 +437,7 @@ def migrate_external_tables_sync(
     table_mapping = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
-    TablesMigrate(
+    TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     ).migrate_tables(what=What.EXTERNAL_SYNC)
 
@@ -457,7 +457,7 @@ def migrate_dbfs_root_delta_tables(
     table_mapping = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
-    TablesMigrate(
+    TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     ).migrate_tables(what=What.DBFS_ROOT_DELTA)
 

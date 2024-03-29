@@ -12,7 +12,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
-    TablesMigrate,
+    TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -56,7 +56,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     )
 
@@ -117,7 +117,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     )
 
@@ -169,7 +169,7 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
     ]
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -227,7 +227,7 @@ def test_migrate_external_table_failed_sync(
     ]
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -281,7 +281,7 @@ def test_revert_migrated_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     )
     table_migrate.migrate_tables()
@@ -393,7 +393,7 @@ def test_mapping_reverts_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     )
     table_migrate.migrate_tables()
@@ -482,7 +482,7 @@ def test_migrate_managed_tables_with_acl(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
     )
 
