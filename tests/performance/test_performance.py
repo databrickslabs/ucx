@@ -71,7 +71,7 @@ def test_apply_group_permissions_experimental_performance(
         )
 
     start = process_time()
-    MigrationState([migrated_group_experimental]).apply_group_permissions_experimental(ws)
+    MigrationState([migrated_group_experimental]).apply_to_groups_with_different_names(ws)
     logger.info(f"Migration using experimental API takes {process_time() - start}s")
 
     start = process_time()

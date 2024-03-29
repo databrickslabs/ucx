@@ -336,5 +336,5 @@ def test_manager_apply_experimental_no_tasks(mock_ws, caplog):
     group_migration_state = MigrationState([])
 
     with caplog.at_level("INFO"):
-        group_migration_state.apply_group_permissions_experimental(mock_ws)
+        group_migration_state.apply_to_groups_with_different_names(mock_ws)
         assert "No valid groups selected, nothing to do." in caplog.messages
