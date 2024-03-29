@@ -20,9 +20,14 @@ class ViewToMigrate:
         self._table_dependencies = None
         self._view_dependencies = None
 
+    @property
+    def view(self):
+        return self._view
+
     def view_dependencies(self, all_tables: dict[str, Table]) -> list[Table]:
         if self._table_dependencies is None or self._view_dependencies is None:
             self._compute_dependencies(all_tables)
+        assert self._view_dependencies is not None
         return self._view_dependencies
 
     def _compute_dependencies(self, all_tables: dict[str, Table]):
@@ -94,9 +99,9 @@ class ViewsMigrator:
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)
-            self._result_tables_set.update([v._view for v in next_batch])
+            self._result_tables_set.update([v.view for v in next_batch])
             views.difference_update(next_batch)
-        return [v._view for v in self._result_view_list]
+        return [v.view for v in self._result_view_list]
 
     def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, Table]) -> set[ViewToMigrate]:
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
