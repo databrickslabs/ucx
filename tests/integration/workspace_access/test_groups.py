@@ -218,7 +218,7 @@ def test_group_matching_names(
 
 
 # average runtime is 100 seconds
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
 def test_replace_workspace_groups_with_account_groups(  # pylint: disable=too-many-locals,too-many-statements
     ws,
     sql_backend,
