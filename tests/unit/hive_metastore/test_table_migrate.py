@@ -200,7 +200,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["view"])
+    table_mapping = table_mapping_mock(["view", "managed_dbfs"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     table_migrate = TablesMigrator(
@@ -208,7 +208,10 @@ def test_migrate_view_should_produce_proper_queries(ws):
     )
     table_migrate.migrate_tables()
 
-    assert "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM table;" in backend.queries
+    assert (
+        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM db1_src.managed_dbfs;"
+        in backend.queries
+    )
     assert (
         "ALTER VIEW hive_metastore.db1_src.view_src "
         "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
