@@ -53,6 +53,9 @@ class TableToMigrate:
     src: Table
     rule: Rule
 
+    def __hash__(self):
+        return hash(self.src)
+
 
 class TableMapping:
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"

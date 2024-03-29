@@ -1,19 +1,22 @@
+from typing import Collection
+
 import sqlglot
 from sqlglot import ParseError
 from sqlglot.expressions import Expression as SqlExpression
 from sqlglot.expressions import Table as SqlTable
 
+from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 class ViewToMigrate:
 
-    _view: Table
-    _table_dependencies: list[Table] | None
-    _view_dependencies: list[Table] | None
+    _view: TableToMigrate
+    _table_dependencies: list[TableToMigrate] | None
+    _view_dependencies: list[TableToMigrate] | None
 
-    def __init__(self, table: Table):
-        if table.view_text is None:
+    def __init__(self, table: TableToMigrate):
+        if table.src.view_text is None:
             raise RuntimeError("Should never get there! A view must have 'view_text'!")
         self._view = table
         self._table_dependencies = None
@@ -23,13 +26,13 @@ class ViewToMigrate:
     def view(self):
         return self._view
 
-    def view_dependencies(self, all_tables: dict[str, Table]) -> list[Table]:
+    def view_dependencies(self, all_tables: dict[str, TableToMigrate]) -> list[TableToMigrate]:
         if self._table_dependencies is None or self._view_dependencies is None:
             self._compute_dependencies(all_tables)
         assert self._view_dependencies is not None
         return self._view_dependencies
 
-    def _compute_dependencies(self, all_tables: dict[str, Table]):
+    def _compute_dependencies(self, all_tables: dict[str, TableToMigrate]):
         table_dependencies = set()
         view_dependencies = set()
         statement = self._parse_view_text()
@@ -41,9 +44,9 @@ class ViewToMigrate:
             table = all_tables.get(table_with_key.key)
             if table is None:
                 raise ValueError(
-                    f"Unknown schema object: {table_with_key.key} in view SQL: {self._view.view_text} of table {self._view.key}"
+                    f"Unknown schema object: {table_with_key.key} in view SQL: {self._view.src.view_text} of table {self._view.src.key}"
                 )
-            if table.view_text is None:
+            if table.src.view_text is None:
                 table_dependencies.add(table)
             else:
                 view_dependencies.add(table)
@@ -53,13 +56,17 @@ class ViewToMigrate:
     def _parse_view_text(self) -> SqlExpression:
         try:
             # below can never happen but avoids a pylint error
-            assert self._view.view_text is not None
-            statements = sqlglot.parse(self._view.view_text)
+            assert self._view.src.view_text is not None
+            statements = sqlglot.parse(self._view.src.view_text)
             if len(statements) != 1 or statements[0] is None:
-                raise ValueError(f"Could not analyze view SQL: {self._view.view_text} of table {self._view.key}")
+                raise ValueError(
+                    f"Could not analyze view SQL: {self._view.src.view_text} of table {self._view.src.key}"
+                )
             return statements[0]
         except ParseError as e:
-            raise ValueError(f"Could not analyze view SQL: {self._view.view_text} of table {self._view.key}") from e
+            raise ValueError(
+                f"Could not analyze view SQL: {self._view.src.view_text} of table {self._view.src.key}"
+            ) from e
 
     # duplicated from FromTable._catalog, not sure if it's worth factorizing
     @staticmethod
@@ -72,14 +79,14 @@ class ViewToMigrate:
         return hash(self._view)
 
 
-class ViewsSequencer:
+class TableMigrationSequencer:
 
-    def __init__(self, tables: list[Table]):
+    def __init__(self, tables: Collection[TableToMigrate]):
         self._tables = tables
         self._result_view_list: list[ViewToMigrate] = []
-        self._result_tables_set: set[Table] = set()
+        self._result_tables_set: set[TableToMigrate] = set()
 
-    def sequence_batches(self) -> list[list[Table]]:
+    def sequence_batches(self) -> list[list[TableToMigrate]]:
         # sequencing is achieved using a very simple algorithm:
         # for each view, we register dependencies (extracted from view_text)
         # then given the remaining set of views to process,
@@ -92,8 +99,8 @@ class ViewsSequencer:
         views = set()
         tables = []
         for table in self._tables:
-            all_tables[table.key] = table
-            if table.view_text is None:
+            all_tables[table.src.key] = table
+            if table.src.view_text is None:
                 tables.append(table)
             else:
                 views.add(ViewToMigrate(table))
@@ -106,7 +113,7 @@ class ViewsSequencer:
             batches.append(list([v.view for v in next_batch]))
         return batches
 
-    def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, Table]) -> set[ViewToMigrate]:
+    def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, TableToMigrate]) -> set[ViewToMigrate]:
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
