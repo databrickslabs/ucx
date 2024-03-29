@@ -110,6 +110,7 @@ def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
     select_query = 'SELECT \\* FROM hive_metastore.schema.tables'
     for dbname in dbnames:
         # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
+        # pylint disable=cell-var-from-loop
         valid_samples = list(filter(lambda s: s["db"] == dbname, samples))
         show_tuples = [(s["db"], s["table"], "true") for s in valid_samples]
         db_rows[f'SHOW TABLES FROM hive_metastore.{dbname}'] = show_tuples
