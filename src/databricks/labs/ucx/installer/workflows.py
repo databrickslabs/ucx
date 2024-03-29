@@ -455,10 +455,16 @@ class WorkflowsInstallation(InstallationMixin):
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
+        if "table_migration" in task.job_cluster:
+            # Shared mode cluster cannot use dbfs, need to use WSFS
+            libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
+        else:
+            # TODO: check when we can install wheels from WSFS properly
+            # None UC cluster cannot use WSFS, need to use dbfs
+            libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
         return replace(
             jobs_task,
-            # TODO: check when we can install wheels from WSFS properly
-            libraries=[compute.Library(whl=f"/Workspace{remote_wheel}")],
+            libraries=libraries,
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
