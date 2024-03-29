@@ -230,7 +230,6 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
             assert len(e.errs) == 1
             raise e.errs[0]
 
-
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
 
 
