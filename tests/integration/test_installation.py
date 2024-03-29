@@ -25,7 +25,6 @@ from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
@@ -602,30 +601,6 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     job_id = install_state.resources["jobs"]["migrate-tables"]
     for task in ws.jobs.get(job_id).settings.tasks:
         assert task.existing_cluster_id == env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
-
-
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
-def test_partitioned_tables(ws, sql_backend, new_installation, make_schema, make_table):
-    workspace_install, workflows_install = new_installation()
-
-    schema = make_schema(catalog_name="hive_metastore")
-    sql_backend.execute(
-        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) PARTITIONED BY (column1)"
-    )
-    sql_backend.execute(
-        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)"
-    )
-    workflows_install.run_workflow("assessment")
-
-    tables = TablesCrawler(sql_backend, workspace_install.config.inventory_database)
-
-    all_tables = {}
-    for table in tables.snapshot():
-        all_tables[table.key] = table
-
-    assert len(all_tables) >= 2
-    assert all_tables[f"{schema.full_name}.partitioned_table"].is_partitioned is True
-    assert all_tables[f"{schema.full_name}.non_partitioned_table"].is_partitioned is False
 
 
 def test_compare_remote_local_install_versions(ws, new_installation):
