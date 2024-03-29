@@ -90,12 +90,13 @@ class ViewsMigrator:
         # the complexity for a given set of views v and a dependency depth d looks like Ov^d
         # this seems enormous but in practice d remains small and v decreases rapidly
         table_list = self._crawler.snapshot()
-     all_tables = dict()
-     for table in table_list:
-         all_tables[table.key] = table
-         if table.view_text is None:
-            continue
-         views.add(ViewToMigrate(table))
+        all_tables = {}
+        views = set()
+        for table in table_list:
+            all_tables[table.key] = table
+            if table.view_text is None:
+                continue
+            views.add(ViewToMigrate(table))
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)
