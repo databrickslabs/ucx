@@ -25,7 +25,6 @@ from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
