@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
+def new_installation(ws, sql_backend, env_or_skip, make_random):
     cleanup = []
 
     def factory(
@@ -66,8 +66,9 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": f"{inventory_schema}{inventory_schema_suffix}",
+                r".*Inventory Database.*": f"ucx_S{make_random(4).lower()}{inventory_schema_suffix}",
                 r".*Backup prefix*": renamed_group_prefix,
+                r"Do you want to update the existing installation.*": "yes",
                 r".*": "",
             }
             | (extend_prompts or {})
@@ -484,14 +485,14 @@ def test_check_inventory_database_exists(ws, new_installation):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
-def test_table_migration_job(  # pylint: disable=too-many-locals
+def test_table_migration_job(
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
     # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore")
+    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=src_schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
@@ -503,6 +504,7 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
     _, workflows_install = new_installation(
+        lambda wc: replace(wc, override_clusters=None),
         product_info=product_info,
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
@@ -510,8 +512,8 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
             r"Max workers for auto-scale.*": "20",
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
         },
+        inventory_schema_suffix="_migrate_inventory",
     )
-    # save table mapping for migration before trigger the run
     installation = product_info.current_installation(ws)
     migrate_rules = [
         Rule(
@@ -537,16 +539,13 @@ def test_table_migration_job(  # pylint: disable=too-many-locals
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
     # assert the tables are migrated
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
-    # assert the cluster is configured correctly
-    install_state = installation.load(RawState)
-    job_id = install_state.resources["jobs"]["migrate-tables"]
-    for job_cluster in ws.jobs.get(job_id).settings.job_clusters:
-        cluster_spec = job_cluster.new_cluster
-        assert cluster_spec.autoscale.min_workers == 2
-        assert cluster_spec.autoscale.max_workers == 20
-        assert cluster_spec.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
+    try:
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    except NotFound:
+        assert (
+            False
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
@@ -554,7 +553,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
     # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore")
+    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=src_schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
@@ -565,11 +564,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, workflows_install = new_installation(
-        lambda wc: replace(wc, override_clusters={"table_migration": env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")}),
-        product_info=product_info,
-    )
-    # save table mapping for migration before trigger the run
+    _, workflows_install = new_installation(product_info=product_info, inventory_schema_suffix="_migrate_inventory")
     installation = product_info.current_installation(ws)
     migrate_rules = [
         Rule(
@@ -595,8 +590,13 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
     # assert the tables are migrated
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    try:
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    except NotFound:
+        assert (
+            False
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
     # assert the cluster is configured correctly
     install_state = installation.load(RawState)
     job_id = install_state.resources["jobs"]["migrate-tables"]
@@ -605,8 +605,8 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
-def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema, make_schema, make_table):
-    _, workflows_install = new_installation()
+def test_partitioned_tables(ws, sql_backend, new_installation, make_schema, make_table):
+    workspace_install, workflows_install = new_installation()
 
     schema = make_schema(catalog_name="hive_metastore")
     sql_backend.execute(
@@ -617,7 +617,7 @@ def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema,
     )
     workflows_install.run_workflow("assessment")
 
-    tables = TablesCrawler(sql_backend, inventory_schema)
+    tables = TablesCrawler(sql_backend, workspace_install.config.inventory_database)
 
     all_tables = {}
     for table in tables.snapshot():

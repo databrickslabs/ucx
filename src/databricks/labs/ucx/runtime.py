@@ -26,7 +26,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     TablesMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import What
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
@@ -440,7 +440,7 @@ def migrate_external_tables_sync(
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     TablesMigrate(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.EXTERNAL_SYNC)
+    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
 @task("migrate-tables", job_cluster="table_migration")
@@ -460,7 +460,7 @@ def migrate_dbfs_root_delta_tables(
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     TablesMigrate(
         table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.DBFS_ROOT_DELTA)
+    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
 @task("migrate-groups-experimental", depends_on=[crawl_groups])
