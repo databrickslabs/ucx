@@ -15,9 +15,9 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk.errors import (
     AlreadyExists,
-    BadRequest,
     InvalidParameterValue,
     NotFound,
+    Unknown,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
@@ -291,7 +291,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    with pytest.raises(BadRequest):
+    with pytest.raises(Unknown):
         workflows_install.run_workflow("validate-groups-permissions")
 
 
