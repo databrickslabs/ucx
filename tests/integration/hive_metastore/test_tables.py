@@ -52,3 +52,27 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     assert all_tables[view.full_name].object_type == "VIEW"
     assert all_tables[view.full_name].view_text == "SELECT 2+2 AS four"
     assert all_tables[view.full_name].what == What.VIEW
+
+
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
+    schema = make_schema(catalog_name="hive_metastore")
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.partitioned_table (column1 string, column2 STRING) "
+        f"PARTITIONED BY (column1)"
+    )
+    sql_backend.execute(
+        f"CREATE TABLE IF NOT EXISTS {schema.full_name}.non_partitioned_table (column1 string, column2 STRING)"
+    )
+
+    inventory_schema = make_schema(catalog_name="hive_metastore")
+
+    tables = TablesCrawler(sql_backend, inventory_schema.name,[schema.name])
+
+    all_tables = {}
+    for table in tables.snapshot():
+        all_tables[table.key] = table
+
+    assert len(all_tables) >= 2
+    assert all_tables[f"{schema.full_name}.partitioned_table"].is_partitioned is True
+    assert all_tables[f"{schema.full_name}.non_partitioned_table"].is_partitioned is False
