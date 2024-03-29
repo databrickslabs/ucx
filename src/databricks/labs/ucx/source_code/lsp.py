@@ -12,7 +12,10 @@ from urllib.parse import parse_qsl
 from databricks.labs.blueprint.logger import install_logger
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migrate import Index, MigrationStatus
+from databricks.labs.ucx.hive_metastore.table_migrate import (
+    MigrationIndex,
+    MigrationStatus,
+)
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
@@ -326,7 +329,7 @@ if __name__ == '__main__':
     install_logger()
     logging.root.setLevel('DEBUG')
     languages = Languages(
-        Index(
+        MigrationIndex(
             [
                 MigrationStatus(
                     src_schema='old', src_table='things', dst_catalog='brand', dst_schema='new', dst_table='stuff'
