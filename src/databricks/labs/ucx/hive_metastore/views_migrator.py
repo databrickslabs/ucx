@@ -1,4 +1,5 @@
 import sqlglot
+from more_itertools import flatten
 from sqlglot import ParseError
 from sqlglot.expressions import Expression as SqlExpression
 from sqlglot.expressions import Table as SqlTable
@@ -81,6 +82,10 @@ class ViewsMigrator:
         self._result_tables_set: set[Table] = set()
 
     def sequence(self) -> list[Table]:
+        batches = self.batches()
+        return list(flatten(batches))
+
+    def batches(self) -> list[list[Table]]:
         # sequencing is achieved using a very simple algorithm:
         # for each view, we register dependencies (extracted from view_text)
         # then given the remaining set of views to process,
@@ -97,12 +102,14 @@ class ViewsMigrator:
             if table.view_text is None:
                 continue
             views.add(ViewToMigrate(table))
+        batches = []
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)
             self._result_tables_set.update([v.view for v in next_batch])
             views.difference_update(next_batch)
-        return [v.view for v in self._result_view_list]
+            batches.append(list([v.view for v in next_batch]))
+        return batches
 
     def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, Table]) -> set[ViewToMigrate]:
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
