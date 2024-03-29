@@ -547,16 +547,6 @@ def test_table_migration_job(
             False
         ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
 
-    # skip asserting following until we fix the prompt to ask for these values in another PR
-    # # assert the cluster is configured correctly
-    # install_state = installation.load(RawState)
-    # job_id = install_state.resources["jobs"]["migrate-tables"]
-    # for job_cluster in ws.jobs.get(job_id).settings.job_clusters:
-    #     cluster_spec = job_cluster.new_cluster
-    #     assert cluster_spec.autoscale.min_workers == 2
-    #     assert cluster_spec.autoscale.max_workers == 20
-    #     assert cluster_spec.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
-
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
