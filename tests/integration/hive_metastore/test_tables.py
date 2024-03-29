@@ -54,7 +54,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     assert all_tables[view.full_name].what == What.VIEW
 
 
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
     schema = make_schema(catalog_name="hive_metastore")
     sql_backend.execute(
