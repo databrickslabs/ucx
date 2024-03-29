@@ -25,7 +25,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     TablesMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
+from databricks.labs.ucx.hive_metastore.tables import What
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
