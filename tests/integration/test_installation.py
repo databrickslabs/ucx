@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
+def new_installation(ws, sql_backend, env_or_skip, make_random):
     cleanup = []
 
     def factory(
@@ -66,7 +66,7 @@ def new_installation(ws, sql_backend, env_or_skip, inventory_schema):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": f"{inventory_schema}{inventory_schema_suffix}",
+                r".*Inventory Database.*": f"ucx_S{make_random(4).lower()}{inventory_schema_suffix}",
                 r".*Backup prefix*": renamed_group_prefix,
                 r"Do you want to update the existing installation.*": "yes",
                 r".*": "",
@@ -615,8 +615,8 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
-def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema, make_schema, make_table):
-    _, workflows_install = new_installation()
+def test_partitioned_tables(ws, sql_backend, new_installation, make_schema, make_table):
+    workspace_install, workflows_install = new_installation()
 
     schema = make_schema(catalog_name="hive_metastore")
     sql_backend.execute(
@@ -627,7 +627,7 @@ def test_partitioned_tables(ws, sql_backend, new_installation, inventory_schema,
     )
     workflows_install.run_workflow("assessment")
 
-    tables = TablesCrawler(sql_backend, inventory_schema)
+    tables = TablesCrawler(sql_backend, workspace_install.config.inventory_database)
 
     all_tables = {}
     for table in tables.snapshot():
