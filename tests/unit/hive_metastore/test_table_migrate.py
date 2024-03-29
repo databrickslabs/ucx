@@ -433,8 +433,8 @@ def test_is_upgraded(ws):
         table_crawler, grant_crawler, ws, backend, table_mapping, group_manager, migration_status_refresher
     )
     table_migrate.migrate_tables()
-    assert table_migrate.is_upgraded("schema1", "table1")
-    assert not table_migrate.is_upgraded("schema1", "table2")
+    assert table_migrate.is_migrated("schema1", "table1")
+    assert not table_migrate.is_migrated("schema1", "table2")
 
 
 def test_table_status():
