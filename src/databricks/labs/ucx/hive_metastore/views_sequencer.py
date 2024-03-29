@@ -1,4 +1,4 @@
-from typing import Collection
+from collections.abc import Collection
 
 import sqlglot
 from sqlglot import ParseError
@@ -110,7 +110,7 @@ class TableMigrationSequencer:
             self._result_view_list.extend(next_batch)
             self._result_tables_set.update([v.view for v in next_batch])
             views.difference_update(next_batch)
-            batches.append(list([v.view for v in next_batch]))
+            batches.append(list(v.view for v in next_batch))
         return batches
 
     def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, TableToMigrate]) -> set[ViewToMigrate]:

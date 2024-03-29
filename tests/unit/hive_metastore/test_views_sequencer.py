@@ -1,6 +1,7 @@
 import json
 from itertools import chain
 from pathlib import Path
+from typing import TypeVar
 from unittest.mock import create_autospec
 
 import pytest
@@ -12,8 +13,10 @@ from databricks.labs.ucx.hive_metastore.views_sequencer import TableMigrationSeq
 
 SCHEMA_NAME = "schema"
 
+T = TypeVar('T')
 
-def flatten(lists: list[list[any]]) -> list[any]:
+
+def flatten(lists: list[list[T]]) -> list[T]:
     return list(chain.from_iterable(lists))
 
 
