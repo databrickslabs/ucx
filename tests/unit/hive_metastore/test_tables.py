@@ -249,3 +249,62 @@ def test_tables_crawler_should_filter_by_database():
             'DESCRIBE TABLE EXTENDED hive_metastore.database.table2',
         ]
     )
+
+
+def test_is_partitioned_flag():
+    rows = {
+        "SHOW DATABASES": [("database",)],
+        "SHOW TABLES FROM hive_metastore.database": [("", "table1", ""), ("", "table2", "")],
+        'DESCRIBE TABLE EXTENDED hive_metastore.database.table1': [
+            ("column1", "string", "null"),
+            ("column2", "string", "null"),
+            ("# Partition Information", "", ""),
+            ("# col_name", "data_type", "comment"),
+            ("column1", "string", "null"),
+            ("Provider", "delta", ""),
+            ("Type", "table", ""),
+        ],
+        'DESCRIBE TABLE EXTENDED hive_metastore.database.table2': [
+            ("column1", "string", "null"),
+            ("column2", "string", "null"),
+            ("Provider", "delta", ""),
+            ("Type", "table", ""),
+        ],
+    }
+    backend = MockBackend(rows=rows)
+    tables_crawler = TablesCrawler(
+        backend,
+        "default",
+    )
+    results = tables_crawler.snapshot()
+    assert len(results) == 2
+    assert (
+        Table(
+            catalog='hive_metastore',
+            database='database',
+            name='table2',
+            object_type='TABLE',
+            table_format='DELTA',
+            location=None,
+            view_text=None,
+            upgraded_to=None,
+            storage_properties={},
+            is_partitioned=False,
+        )
+        in results
+    )
+    assert (
+        Table(
+            catalog='hive_metastore',
+            database='database',
+            name='table1',
+            object_type='TABLE',
+            table_format='DELTA',
+            location=None,
+            view_text=None,
+            upgraded_to=None,
+            storage_properties={},
+            is_partitioned=True,
+        )
+        in results
+    )
