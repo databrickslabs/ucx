@@ -25,7 +25,6 @@ from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
@@ -159,11 +158,11 @@ def test_experimental_permissions_migration_job(  # pylint: disable=too-many-loc
     )
     workspace_installation.run()
 
-    cfg = workspace_installation.config
-    sql_backend.save_table(f'{cfg.inventory_database}.groups', [migrated_group], MigratedGroup)
+    inventory_database = workspace_installation.config.inventory_database
+    sql_backend.save_table(f'{inventory_database}.groups', [migrated_group], MigratedGroup)
 
-    udf_crawler = StaticUdfsCrawler(sql_backend, cfg.inventory_database, [])
-    tables_crawler = StaticTablesCrawler(sql_backend, cfg.inventory_database, [table_a])
+    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_database, [])
+    tables_crawler = StaticTablesCrawler(sql_backend, inventory_database, [table_a])
     grants_crawler = StaticGrantsCrawler(
         tables_crawler,
         udf_crawler,
@@ -182,7 +181,7 @@ def test_experimental_permissions_migration_job(  # pylint: disable=too-many-loc
     generic_permissions = GenericPermissionsSupport(
         ws, [Listing(lambda: [cluster_policy], "policy_id", "cluster-policies")]
     )
-    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [generic_permissions, tacl_support])
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions, tacl_support])
     permission_manager.inventorize_permissions()
 
     workflow_installation.run_workflow("migrate-groups-experimental")
@@ -223,11 +222,11 @@ def test_experimental_permissions_migration_job_same_name(  # pylint: disable=to
     )
     workspace_installation.run()
 
-    cfg = workspace_installation.config
-    sql_backend.save_table(f'{cfg.inventory_database}.groups', [migrated_group], MigratedGroup)
+    inventory_database = workspace_installation.config.inventory_database
+    sql_backend.save_table(f'{inventory_database}.groups', [migrated_group], MigratedGroup)
 
-    udf_crawler = StaticUdfsCrawler(sql_backend, cfg.inventory_database, [])
-    tables_crawler = StaticTablesCrawler(sql_backend, cfg.inventory_database, [table_a])
+    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_database, [])
+    tables_crawler = StaticTablesCrawler(sql_backend, inventory_database, [table_a])
     grants_crawler = StaticGrantsCrawler(
         tables_crawler,
         udf_crawler,
@@ -246,7 +245,7 @@ def test_experimental_permissions_migration_job_same_name(  # pylint: disable=to
     generic_permissions = GenericPermissionsSupport(
         ws, [Listing(lambda: [cluster_policy], "policy_id", "cluster-policies")]
     )
-    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [generic_permissions, tacl_support])
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions, tacl_support])
     permission_manager.inventorize_permissions()
 
     workflow_installation.run_workflow("migrate-groups-experimental")
