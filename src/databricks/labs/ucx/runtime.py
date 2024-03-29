@@ -481,7 +481,13 @@ def reflect_account_groups_on_workspace_experimental(
     return reflect_account_groups_on_workspace(cfg, ws, sql_backend, _install)
 
 
-@task("migrate-groups-experimental", depends_on=[reflect_account_groups_on_workspace_experimental])
+@task(
+    "migrate-groups-experimental",
+    depends_on=[
+        reflect_account_groups_on_workspace_experimental,
+        rename_workspace_local_groups_experimental,
+    ],
+)
 def apply_permissions_to_account_groups_experimental(
     cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
@@ -506,13 +512,11 @@ def apply_permissions_to_account_groups_experimental(
         account_group_regex=cfg.account_group_regex,
         external_id_match=cfg.group_match_by_external_id,
     )
-
     migration_state = group_manager.get_migration_state()
     if len(migration_state.groups) == 0:
         logger.info("Skipping group migration as no groups were found.")
         return
-
-    migration_state.apply_group_permissions_experimental(ws)
+    migration_state.apply_to_renamed_groups(ws)
 
 
 @task("migrate-tables-in-mounts-experimental")

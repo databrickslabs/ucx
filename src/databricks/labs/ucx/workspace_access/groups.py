@@ -86,34 +86,50 @@ class MigrationState:
     def __len__(self):
         return len(self._name_to_group)
 
-    def apply_group_permissions_experimental(self, ws: WorkspaceClient) -> bool:
+    def apply_to_renamed_groups(self, ws: WorkspaceClient) -> bool:
+        """(Production) Apply migration state to groups that have been renamed in the workspace."""
+        return self._apply_to_groups(ws, renamed=True)
+
+    def apply_to_groups_with_different_names(self, ws: WorkspaceClient) -> bool:
+        """(Integration Testing) Apply to groups that have different names in the workspace and account."""
+        return self._apply_to_groups(ws, renamed=False)
+
+    def _apply_to_groups(self, ws: WorkspaceClient, *, renamed: bool = False) -> bool:
         if len(self) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        logger.info(f"Applying the permissions to account groups. Total groups to apply permissions: {len(self)}.")
+        logger.info(f"Migrating permissions to {len(self)} account groups.")
         items = 0
         for migrated_group in self.groups:
-            items += self._migrate_group_permissions_paginated(ws, migrated_group)
-        logger.info(f"Migrated {items} objects")
+            name_in_workspace = migrated_group.name_in_workspace
+            if renamed:
+                # during integration testing, local and account group have completely different names,
+                # that simplifies visual debuggability. In production, we need to first rename local
+                # groups, otherwise we get `Workspace group XXX is not a workspace local group` and
+                # the migration fails.
+                name_in_workspace = migrated_group.temporary_name
+            name_in_account = migrated_group.name_in_account
+            items += self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
+            logger.info(f"Migrated {items} permissions.")
         return True
 
     @staticmethod
-    def _migrate_group_permissions_paginated(ws: WorkspaceClient, group: MigratedGroup):
+    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str):
         batch_size = 1000
-        logger.info(f"Migrating permissions: {group.name_in_workspace} -> {group.name_in_account}")
+        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)")
         permissions_migrated = 0
         while True:
             result = ws.permission_migration.migrate_permissions(
                 ws.get_workspace_id(),
-                group.name_in_workspace,
-                group.name_in_account,
+                name_in_workspace,
+                name_in_account,
                 size=batch_size,
             )
             if not result.permissions_migrated:
                 logger.info("No more permission to migrated.")
                 return permissions_migrated
             permissions_migrated += result.permissions_migrated
-            logger.info(f"Migrated {result.permissions_migrated} permissions to {group.name_in_account} account group")
+            logger.info(f"Migrated {result.permissions_migrated} permissions to {name_in_account} account group")
 
 
 class GroupMigrationStrategy:

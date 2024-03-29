@@ -50,7 +50,7 @@ def test_permissions_for_redash(
     )
 
     if use_permission_migration_api:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(redash_permissions, [migrated_group])
 

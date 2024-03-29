@@ -337,9 +337,9 @@ def test_migrate_permissions_experimental():
         azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
     )
     calls = [
-        call("12345678", "workspace_group_1", "account_group_1", size=1000),
-        call("12345678", "workspace_group_2", "account_group_2", size=1000),
-        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+        call("12345678", "temp_1", "account_group_1", size=1000),
+        call("12345678", "temp_2", "account_group_2", size=1000),
+        call("12345678", "temp_3", "account_group_3", size=1000),
     ]
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 
@@ -362,9 +362,9 @@ def test_migrate_permissions_experimental_paginated():
         azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
     )
     calls = [
-        call("12345678", "workspace_group_1", "account_group_1", size=1000),
-        call("12345678", "workspace_group_2", "account_group_2", size=1000),
-        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+        call("12345678", "temp_1", "account_group_1", size=1000),
+        call("12345678", "temp_2", "account_group_2", size=1000),
+        call("12345678", "temp_3", "account_group_3", size=1000),
     ]
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 

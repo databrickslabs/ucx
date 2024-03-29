@@ -51,7 +51,7 @@ def test_instance_pools(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -86,7 +86,7 @@ def test_clusters(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -114,7 +114,7 @@ def test_jobs(ws: WorkspaceClient, migrated_group, make_job, make_job_permission
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -148,7 +148,7 @@ def test_pipelines(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -182,7 +182,7 @@ def test_cluster_policies(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_USE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -216,7 +216,7 @@ def test_warehouses(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -250,7 +250,7 @@ def test_models(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -281,7 +281,7 @@ def test_experiments(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -324,7 +324,7 @@ def test_directories(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -367,7 +367,7 @@ def test_notebooks(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -394,7 +394,7 @@ def test_tokens(ws: WorkspaceClient, migrated_group, make_authorization_permissi
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_USE
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -465,7 +465,7 @@ def test_endpoints(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_QUERY
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -495,7 +495,7 @@ def test_feature_tables(
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_EDIT_METADATA
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(generic_permissions, [migrated_group])
 
@@ -522,7 +522,7 @@ def test_feature_store_root_page(ws: WorkspaceClient, migrated_group, is_experim
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_EDIT_METADATA
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(
             generic_permissions,
@@ -552,7 +552,7 @@ def test_models_root_page(ws: WorkspaceClient, migrated_group, is_experimental: 
     assert before[migrated_group.name_in_workspace] == PermissionLevel.CAN_MANAGE_PRODUCTION_VERSIONS
 
     if is_experimental:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(
             generic_permissions,

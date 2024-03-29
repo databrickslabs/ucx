@@ -32,7 +32,7 @@ def test_grants_with_permission_migration_api(
     original_schema_grants = {"a": grants.for_schema_info(schema_a)}
     assert {"USAGE", "OWN"} == original_schema_grants["a"][migrated_group.name_in_workspace]
 
-    MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+    MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
     new_table_grants = {"a": grants.for_table_info(table_a)}
     assert {"SELECT"} == new_table_grants["a"][migrated_group.name_in_account]
@@ -49,7 +49,7 @@ def test_permission_for_files_anonymous_func_migration_api(ws, sql_backend, inve
     udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
     grants = GrantsCrawler(tables, udfs)
 
-    MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+    MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
     any_file_actual = {}
     for any_file_grant in grants.grants(any_file=True):
@@ -89,7 +89,7 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, inventory_schema, ma
     assert f"{migrated_group.name_in_workspace}.{udf_a.full_name}:OWN" in all_initial_grants
     assert f"{migrated_group.name_in_workspace}.{udf_b.full_name}:READ_METADATA" in all_initial_grants
 
-    MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+    MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
     actual_udf_a_grants = defaultdict(set)
     for grant in grants.grants(catalog=schema.catalog_name, database=schema.name, udf=udf_a.name):
