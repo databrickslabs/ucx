@@ -51,7 +51,7 @@ class TablesMigrate:
         backend: SqlBackend,
         table_mapping: TableMapping,
         group_manager: GroupManager,
-        migration_status_refresher,
+        migration_status_refresher: 'MigrationStatusRefresher',
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -276,25 +276,20 @@ class TablesMigrate:
         return matched_grants
 
 
-class Index:
+class MigrationIndex:
     def __init__(self, tables: list[MigrationStatus]):
-        self._tables = tables
+        self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
 
     def is_upgraded(self, schema: str, table: str) -> bool:
-        src_schema = schema.lower()
-        src_table = table.lower()
-        for migration_status in self._tables:
-            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
-                return True
-        return False
+        """Check if a table is migrated."""
+        return self.get(schema, table) is not None
 
     def get(self, schema: str, table: str) -> MigrationStatus | None:
-        src_schema = schema.lower()
-        src_table = table.lower()
-        for migration_status in self._tables:
-            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
-                return migration_status
-        return None
+        """Get the migration status for a table. If the table is not migrated, return None."""
+        dst = self._index.get((schema.lower(), table.lower()))
+        if not dst or not dst.dst_table:
+            return None
+        return dst
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
@@ -306,8 +301,8 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def snapshot(self) -> Iterable[MigrationStatus]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def index(self) -> Index:
-        return Index(list(self.snapshot()))
+    def index(self) -> MigrationIndex:
+        return MigrationIndex(list(self.snapshot()))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}

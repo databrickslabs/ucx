@@ -19,6 +19,7 @@ from databricks.labs.ucx.hive_metastore import (
     Mounts,
     TablesCrawler,
 )
+from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
@@ -558,6 +559,20 @@ def validate_groups_permissions_experimental(
     """EXPERIMENTAL
     Validate that all the crawled permissions are applied correctly to the destination groups."""
     return validate_groups_permissions(cfg, ws, sql_backend, _install)
+
+
+@task("migrate-tables-in-mounts-experimental")
+def scan_tables_in_mounts_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+):
+    """EXPERIMENTAL
+    This workflow scans for Delta tables inside all mount points captured during the assessment.
+    It will store the results under the `tables` table located under the assessment.
+    """
+    mounts = Mounts(sql_backend, ws, cfg.inventory_database)
+    TablesInMounts(
+        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
+    ).snapshot()
 
 
 def main(*argv):
