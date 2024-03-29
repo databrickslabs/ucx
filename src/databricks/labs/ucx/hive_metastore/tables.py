@@ -8,6 +8,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -230,9 +231,19 @@ class TablesCrawler(CrawlerBase):
         catalog = "hive_metastore"
         for database in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
-            for _, table, _is_tmp in self._fetch(
-                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
-            ):
+            try:
+                table_rows = self._fetch(
+                    f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+                )
+            except NotFound:
+                # TODO: https://github.com/databrickslabs/ucx/issues/406
+                # This make the integration test more robust as many test schemas are being created and deleted quickly.
+                # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend raises NotFound
+                logger.error(
+                    f"Schema {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)} is no longer existed"
+                )
+                continue
+            for _, table, _is_tmp in table_rows:
                 tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
@@ -273,6 +284,7 @@ class TablesCrawler(CrawlerBase):
                 storage_properties=self._parse_table_props(
                     describe.get("Storage Properties", "").lower()
                 ),  # type: ignore[arg-type]
+                is_partitioned="# Partition Information" in describe,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             # TODO: https://github.com/databrickslabs/ucx/issues/406
