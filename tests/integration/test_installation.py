@@ -492,7 +492,7 @@ def test_table_migration_job(
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
     # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore")
+    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=src_schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
@@ -512,6 +512,7 @@ def test_table_migration_job(
             r"Max workers for auto-scale.*": "20",
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
         },
+        inventory_schema_suffix="_migrate_inventory",
     )
     installation = product_info.current_installation(ws)
     migrate_rules = [
@@ -538,10 +539,15 @@ def test_table_migration_job(
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
     # assert the tables are migrated
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
-    # skip asserting following until we fix the prompt to ask for these values in another PR
+    try:
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    except NotFound:
+        assert (
+            False
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
 
+    # skip asserting following until we fix the prompt to ask for these values in another PR
     # # assert the cluster is configured correctly
     # install_state = installation.load(RawState)
     # job_id = install_state.resources["jobs"]["migrate-tables"]
@@ -557,7 +563,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
 ):
     # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore")
+    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=src_schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
@@ -568,7 +574,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, workflows_install = new_installation(product_info=product_info)
+    _, workflows_install = new_installation(product_info=product_info, inventory_schema_suffix="_migrate_inventory")
     installation = product_info.current_installation(ws)
     migrate_rules = [
         Rule(
@@ -594,8 +600,13 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
     # assert the tables are migrated
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-    assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    try:
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    except NotFound:
+        assert (
+            False
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
     # assert the cluster is configured correctly
     install_state = installation.load(RawState)
     job_id = install_state.resources["jobs"]["migrate-tables"]
