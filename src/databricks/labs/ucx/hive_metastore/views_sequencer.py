@@ -73,10 +73,10 @@ class ViewToMigrate:
         return hash(self._view)
 
 
-class ViewsMigrator:
+class ViewsSequencer:
 
-    def __init__(self, crawler: TablesCrawler):
-        self._crawler = crawler
+    def __init__(self, tables: list[Table]):
+        self._tables = tables
         self._result_view_list: list[ViewToMigrate] = []
         self._result_tables_set: set[Table] = set()
 
@@ -89,10 +89,9 @@ class ViewsMigrator:
         # if none, then it's safe to add that view to the next batch of views
         # the complexity for a given set of views v and a dependency depth d looks like Ov^d
         # this seems enormous but in practice d remains small and v decreases rapidly
-        table_list = self._crawler.snapshot()
         all_tables = {}
         views = set()
-        for table in table_list:
+        for table in self._tables:
             all_tables[table.key] = table
             if table.view_text is None:
                 continue
