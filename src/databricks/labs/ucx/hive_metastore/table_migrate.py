@@ -42,7 +42,7 @@ class MigrationStatus:
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
-class TablesMigrate:
+class TablesMigrator:
     def __init__(
         self,
         table_crawler: TablesCrawler,
@@ -51,7 +51,7 @@ class TablesMigrate:
         backend: SqlBackend,
         table_mapping: TableMapping,
         group_manager: GroupManager,
-        migration_status_refresher,
+        migration_status_refresher: 'MigrationStatusRefresher',
         principal_grants: PrincipalACL,
     ):
         self._tc = table_crawler
@@ -112,8 +112,8 @@ class TablesMigrate:
         Threads.strict("migrate tables", tasks)
 
     def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        if self._table_already_upgraded(rule.as_uc_table_key):
-            logger.info(f"Table {src_table.key} already upgraded to {rule.as_uc_table_key}")
+        if self._table_already_migrated(rule.as_uc_table_key):
+            logger.info(f"Table {src_table.key} already migrated to {rule.as_uc_table_key}")
             return True
         if src_table.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table, rule, grants)
@@ -168,13 +168,13 @@ class TablesMigrate:
             self._backend.execute(acl_migrate_sql)
         return True
 
-    def _table_already_upgraded(self, target) -> bool:
+    def _table_already_migrated(self, target) -> bool:
         return target in self._seen_tables
 
     def _get_tables_to_revert(self, schema: str | None = None, table: str | None = None) -> list[Table]:
         schema = schema.lower() if schema else None
         table = table.lower() if table else None
-        upgraded_tables = []
+        migrated_tables = []
         if table and not schema:
             logger.error("Cannot accept 'Table' parameter without 'Schema' parameter")
 
@@ -184,24 +184,24 @@ class TablesMigrate:
             if table and cur_table.name != table:
                 continue
             if cur_table.key in self._seen_tables.values():
-                upgraded_tables.append(cur_table)
-        return upgraded_tables
+                migrated_tables.append(cur_table)
+        return migrated_tables
 
     def revert_migrated_tables(
         self, schema: str | None = None, table: str | None = None, *, delete_managed: bool = False
     ):
         self._init_seen_tables()
-        upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
+        migrated_tables = self._get_tables_to_revert(schema=schema, table=table)
         # reverses the _seen_tables dictionary to key by the source table
         reverse_seen = {v: k for (k, v) in self._seen_tables.items()}
         tasks = []
-        for upgraded_table in upgraded_tables:
-            if upgraded_table.kind == "VIEW" or upgraded_table.object_type == "EXTERNAL" or delete_managed:
-                tasks.append(partial(self._revert_migrated_table, upgraded_table, reverse_seen[upgraded_table.key]))
+        for migrated_table in migrated_tables:
+            if migrated_table.kind == "VIEW" or migrated_table.object_type == "EXTERNAL" or delete_managed:
+                tasks.append(partial(self._revert_migrated_table, migrated_table, reverse_seen[migrated_table.key]))
                 continue
             logger.info(
-                f"Skipping {upgraded_table.object_type} Table {upgraded_table.database}.{upgraded_table.name} "
-                f"upgraded_to {upgraded_table.upgraded_to}"
+                f"Skipping {migrated_table.object_type} Table {migrated_table.database}.{migrated_table.name} "
+                f"upgraded_to {migrated_table.upgraded_to}"
             )
         Threads.strict("revert migrated tables", tasks)
 
@@ -214,10 +214,10 @@ class TablesMigrate:
 
     def _get_revert_count(self, schema: str | None = None, table: str | None = None) -> list[MigrationCount]:
         self._init_seen_tables()
-        upgraded_tables = self._get_tables_to_revert(schema=schema, table=table)
+        migrated_tables = self._get_tables_to_revert(schema=schema, table=table)
 
         table_by_database = defaultdict(list)
-        for cur_table in upgraded_tables:
+        for cur_table in migrated_tables:
             table_by_database[cur_table.database].append(cur_table)
 
         migration_list = []
@@ -230,8 +230,8 @@ class TablesMigrate:
             migration_list.append(MigrationCount(database=cur_database, what_count=what_count))
         return migration_list
 
-    def is_upgraded(self, schema: str, table: str) -> bool:
-        return self._migration_status_refresher.is_upgraded(schema, table)
+    def is_migrated(self, schema: str, table: str) -> bool:
+        return self._migration_status_refresher.is_migrated(schema, table)
 
     def print_revert_report(self, *, delete_managed: bool) -> bool | None:
         migrated_count = self._get_revert_count()
@@ -289,25 +289,20 @@ class TablesMigrate:
         return matched_grants
 
 
-class Index:
+class MigrationIndex:
     def __init__(self, tables: list[MigrationStatus]):
-        self._tables = tables
+        self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
 
-    def is_upgraded(self, schema: str, table: str) -> bool:
-        src_schema = schema.lower()
-        src_table = table.lower()
-        for migration_status in self._tables:
-            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
-                return True
-        return False
+    def is_migrated(self, schema: str, table: str) -> bool:
+        """Check if a table is migrated."""
+        return self.get(schema, table) is not None
 
     def get(self, schema: str, table: str) -> MigrationStatus | None:
-        src_schema = schema.lower()
-        src_table = table.lower()
-        for migration_status in self._tables:
-            if migration_status.src_schema == src_schema and migration_status.src_table == src_table:
-                return migration_status
-        return None
+        """Get the migration status for a table. If the table is not migrated, return None."""
+        dst = self._index.get((schema.lower(), table.lower()))
+        if not dst or not dst.dst_table:
+            return None
+        return dst
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
@@ -319,8 +314,8 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def snapshot(self) -> Iterable[MigrationStatus]:
         return self._snapshot(self._try_fetch, self._crawl)
 
-    def index(self) -> Index:
-        return Index(list(self.snapshot()))
+    def index(self) -> MigrationIndex:
+        return MigrationIndex(list(self.snapshot()))
 
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
@@ -336,13 +331,13 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
                 seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
         return seen_tables
 
-    def is_upgraded(self, schema: str, table: str) -> bool:
+    def is_migrated(self, schema: str, table: str) -> bool:
         result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)}")
         for value in result:
             if value["key"] == "upgraded_to":
-                logger.info(f"{schema}.{table} is set as upgraded")
+                logger.info(f"{schema}.{table} is set as migrated")
                 return True
-        logger.info(f"{schema}.{table} is set as not upgraded")
+        logger.info(f"{schema}.{table} is set as not migrated")
         return False
 
     def _crawl(self) -> Iterable[MigrationStatus]:
@@ -357,7 +352,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
                 src_table=src_table,
                 update_ts=str(timestamp),
             )
-            if table.key in reverse_seen and self.is_upgraded(src_schema, src_table):
+            if table.key in reverse_seen and self.is_migrated(src_schema, src_table):
                 target_table = reverse_seen[table.key]
                 if len(target_table.split(".")) == 3:
                     table_migration_status.dst_catalog = target_table.split(".")[0]

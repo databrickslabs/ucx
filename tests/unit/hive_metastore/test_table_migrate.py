@@ -18,7 +18,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatus,
     MigrationStatusRefresher,
-    TablesMigrate,
+    TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
@@ -52,7 +52,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -93,7 +93,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -120,7 +120,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -154,7 +154,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -200,7 +200,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -227,7 +227,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -253,7 +253,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -277,7 +277,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     ) in backend.queries
 
 
-def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
+def get_table_migrate(backend: SqlBackend) -> TablesMigrator:
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)
     client = workspace_client_mock()
@@ -367,7 +367,7 @@ def get_table_migrate(backend: SqlBackend) -> TablesMigrate:
     table_mapping = table_mapping_mock()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         client,
@@ -438,7 +438,7 @@ def test_no_migrated_tables(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -480,7 +480,7 @@ def test_empty_revert_report(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -511,7 +511,7 @@ def test_is_upgraded(ws):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -522,8 +522,8 @@ def test_is_upgraded(ws):
         principal_grants,
     )
     table_migrate.migrate_tables()
-    assert table_migrate.is_upgraded("schema1", "table1")
-    assert not table_migrate.is_upgraded("schema1", "table2")
+    assert table_migrate.is_migrated("schema1", "table1")
+    assert not table_migrate.is_migrated("schema1", "table2")
 
 
 def test_table_status():
@@ -715,7 +715,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -758,7 +758,7 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
         Grant('spn1', "USE", "hive_metastore"),
     ]
     principal_grants.get_interactive_cluster_grants.return_value = expected_grants
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,

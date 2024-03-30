@@ -11,7 +11,6 @@ from databricks.sdk.service.workspace import AclPermission
 
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
-from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
 from . import apply_tasks
@@ -26,7 +25,6 @@ def test_permissions_for_secrets(
     migrated_group,
     make_secret_scope,
     make_secret_scope_acl,
-    permission_manager: PermissionManager,
     use_permission_migration_api: bool,
 ):
 
@@ -38,7 +36,7 @@ def test_permissions_for_secrets(
     secret_support = SecretScopesSupport(ws)
 
     if use_permission_migration_api:
-        MigrationState([migrated_group]).apply_group_permissions_experimental(ws)
+        MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
     else:
         apply_tasks(secret_support, [migrated_group])
 

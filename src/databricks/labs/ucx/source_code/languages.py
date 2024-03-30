@@ -1,13 +1,13 @@
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migrate import Index
+from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
 from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter
 from databricks.labs.ucx.source_code.pyspark import SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
 class Languages:
-    def __init__(self, index: Index):
+    def __init__(self, index: MigrationIndex):
         self._index = index
         from_table = FromTable(index)
         self._linters = {

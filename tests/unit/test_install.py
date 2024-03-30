@@ -224,7 +224,11 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     )
 
     with pytest.raises(BadRequest) as failure:
-        workspace_installation.run()
+        try:
+            workspace_installation.run()
+        except ManyError as e:
+            assert len(e.errs) == 1
+            raise e.errs[0]
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
 

@@ -1,18 +1,21 @@
 import logging
 import os
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import ExternalLocationInfo
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result, ResultFn
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 logger = logging.getLogger(__name__)
 
@@ -249,3 +252,131 @@ class Mounts(CrawlerBase[Mount]):
             f"SELECT * FROM {escape_sql_identifier(self._schema)}.{escape_sql_identifier(self._table)}"
         ):
             yield Mount(*row)
+
+
+@dataclass
+class TableInMount:
+    format: str
+    is_partitioned: bool
+
+
+class TablesInMounts(CrawlerBase[Table]):
+
+    def __init__(
+        self,
+        backend: SqlBackend,
+        ws: WorkspaceClient,
+        inventory_database: str,
+        mc: Mounts,
+        include_mounts: list[str] | None = None,
+        exclude_paths_in_mount: list[str] | None = None,
+    ):
+        super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
+        self._dbutils = ws.dbutils
+        self._mc = mc
+        self._include_mounts = include_mounts
+
+        irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
+        if exclude_paths_in_mount:
+            irrelevant_patterns.update(exclude_paths_in_mount)
+        self._fiter_paths = irrelevant_patterns
+
+    def snapshot(self) -> list[Table]:
+        return self._snapshot(partial(self._try_load), partial(self._crawl))
+
+    def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
+        logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
+        cached_results = []
+        try:
+            cached_results = list(fetcher())
+        except NotFound:
+            pass
+        logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
+        loaded_records = list(loader())
+        if len(cached_results) > 0:
+            loaded_records = loaded_records + cached_results
+        self._append_records(loaded_records)
+        return loaded_records
+
+    def _append_records(self, items: Sequence[Table]):
+        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
+        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
+
+    def _try_load(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, 'mounted_')"
+        ):
+            yield Table(*row)
+
+    def _crawl(self):
+        all_mounts = self._mc.snapshot()
+        all_tables = []
+        for mount in all_mounts:
+            if self._include_mounts and mount.name not in self._include_mounts:
+                logger.info(f"Filtering mount {mount.name}")
+                continue
+            table_paths = self._find_delta_log_folders(mount.name)
+            logger.info(f"Found {len(table_paths)} in mount {mount.name}")
+            for path, entry in table_paths.items():
+                guess_table = os.path.basename(path)
+                table = Table(
+                    catalog="hive_metastore",
+                    database=f"mounted_{mount.name.replace('/mnt/', '').replace('/', '_')}",
+                    name=guess_table,
+                    object_type="EXTERNAL",
+                    table_format=entry.format,
+                    location=path.replace(f"dbfs:{mount.name}/", mount.source),
+                    is_partitioned=entry.is_partitioned,
+                )
+                all_tables.append(table)
+        return all_tables
+
+    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> dict:
+        if delta_log_folders is None:
+            delta_log_folders = {}
+        logger.info(f"Listing {root_dir}")
+        file_infos = self._dbutils.fs.ls(root_dir)
+        for file_info in file_infos:
+            if self._is_irrelevant(file_info.name) or file_info.path == root_dir:
+                logger.debug(f"Path {file_info.path} is irrelevant")
+                continue
+
+            root_path = os.path.dirname(root_dir)
+            if self._path_is_delta(delta_log_folders, root_path):
+                if self._is_partitioned(file_info.name):
+                    logger.debug(f"Found partitioned delta {root_path}")
+                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
+                    continue
+                logger.debug(f"Path {file_info.path} was identified as Delta, skipping")
+                continue
+
+            if file_info.name == "_delta_log/":
+                logger.debug(f"Found delta table {root_path}")
+                if delta_log_folders.get(root_path) and delta_log_folders.get(root_path).is_partitioned:
+                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
+                else:
+                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=False)
+            elif self._is_partitioned(file_info.name):
+                logger.debug(f"Found partitioned parquet {file_info.path}")
+                delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=True)
+            elif self._is_parquet(file_info.name):
+                logger.debug(f"Found parquet {file_info.path}")
+                delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=False)
+            else:
+                self._find_delta_log_folders(file_info.path, delta_log_folders)
+
+        return delta_log_folders
+
+    def _path_is_delta(self, delta_log_folders, path: str) -> bool:
+        return delta_log_folders.get(path) and delta_log_folders.get(path).format == "DELTA"
+
+    def _is_partitioned(self, file_name: str) -> bool:
+        return '=' in file_name
+
+    def _is_parquet(self, file_name: str) -> bool:
+        parquet_patterns = {'.parquet'}
+        return any(pattern in file_name for pattern in parquet_patterns)
+
+    def _is_irrelevant(self, file_name: str) -> bool:
+        return any(pattern in file_name for pattern in self._fiter_paths)

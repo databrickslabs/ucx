@@ -3,7 +3,7 @@ from datetime import timedelta
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import Installation, MockInstallation
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, SecurableType
@@ -16,7 +16,7 @@ from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
-    TablesMigrate,
+    TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -71,18 +71,16 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     ]
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
-
-    install = Installation.current(ws, 'ucx')
-    principal_grants = PrincipalACL.for_cli(ws, install)
-    migration_status_refresh = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    table_migrate = TablesMigrate(
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
         sql_backend,
         table_mapping,
         group_manager,
-        migration_status_refresh,
+        migration_status_refresher,
         principal_grants,
     )
 
@@ -143,9 +141,8 @@ def test_migrate_tables_with_cache_should_not_create_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    install = Installation.current(ws, 'ucx')
-    principal_grants = PrincipalACL.for_cli(ws, install)
-    table_migrate = TablesMigrate(
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -204,9 +201,8 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
     ]
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    installation = Installation.current(ws, 'ucx')
-    principal_grants = PrincipalACL.for_cli(ws, installation)
-    table_migrate = TablesMigrate(
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -265,9 +261,8 @@ def test_migrate_external_table_failed_sync(
     ]
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    installation = Installation.current(ws, 'ucx')
-    principal_grants = PrincipalACL.for_cli(ws, installation)
-    table_migrate = TablesMigrate(
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -322,9 +317,8 @@ def test_revert_migrated_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    installation = Installation.current(ws, 'ucx')
-    principal_grants = PrincipalACL.for_cli(ws, installation)
-    table_migrate = TablesMigrate(
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -340,11 +334,11 @@ def test_revert_migrated_table(
 
     # Checking that two of the tables were reverted and one was left intact.
     # The first two table belongs to schema 1 and should have not "upgraded_to" property
-    assert not table_migrate.is_upgraded(table_to_revert.schema_name, table_to_revert.name)
+    assert not table_migrate.is_migrated(table_to_revert.schema_name, table_to_revert.name)
     # The second table didn't have the "upgraded_to" property set and should remain that way.
-    assert not table_migrate.is_upgraded(table_not_migrated.schema_name, table_not_migrated.name)
+    assert not table_migrate.is_migrated(table_not_migrated.schema_name, table_not_migrated.name)
     # The third table belongs to schema2 and had the "upgraded_to" property set and should remain that way.
-    assert table_migrate.is_upgraded(table_to_not_revert.schema_name, table_to_not_revert.name)
+    assert table_migrate.is_migrated(table_to_not_revert.schema_name, table_to_not_revert.name)
 
     target_tables_schema1 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema1.full_name}"))
     assert len(target_tables_schema1) == 0
@@ -443,10 +437,8 @@ def test_mapping_reverts_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    installation = Installation.current(ws, 'ucx')
-
-    principal_grants = PrincipalACL.for_cli(ws, installation)
-    table_migrate = TablesMigrate(
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -542,9 +534,8 @@ def test_migrate_managed_tables_with_acl(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    installation = Installation.current(ws, 'ucx')
-    principal_grants = PrincipalACL.for_cli(ws, installation)
-    table_migrate = TablesMigrate(
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,
@@ -653,7 +644,7 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
         mount_crawler,
         AzureACL.for_cli(ws, installation),
     )
-    table_migrate = TablesMigrate(
+    table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
         ws,

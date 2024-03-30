@@ -24,7 +24,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrate
+from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
@@ -205,7 +205,7 @@ def revert_migrated_tables(
         question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
         if not prompts.confirm(question, max_attempts=2):
             return
-    tables_migrate = TablesMigrate.for_cli(w)
+    tables_migrate = TablesMigrator.for_cli(w)
     revert = tables_migrate.print_revert_report(delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
         tables_migrate.revert_migrated_tables(schema, table, delete_managed=delete_managed)
