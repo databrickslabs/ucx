@@ -408,11 +408,13 @@ class AzureACL:
             if location.url is None:
                 continue
             for permission_mapping in permission_mappings:
+                prefix = permission_mapping.prefix
                 if (
                     location.url.startswith(permission_mapping.prefix)
                     and permission_mapping.client_id == spn.application_id
                     and spn.storage_account is not None
-                    and spn.storage_account in permission_mapping.prefix
+                    # check for storage account name starting after @ in the prefix url
+                    and prefix[prefix.index('@') + 1 :].startswith(spn.storage_account)
                 ):
                     matching_location[location.url] = permission_mapping.privilege
         return matching_location
