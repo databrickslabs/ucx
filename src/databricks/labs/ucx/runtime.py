@@ -480,7 +480,7 @@ def migrate_dbfs_root_delta_tables(
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = TableMapping(install, ws, sql_backend)
+    table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
@@ -504,7 +504,7 @@ def migrate_dbfs_root_delta_tables(
         grant_crawler,
         ws,
         sql_backend,
-        table_mapping,
+        table_mappings,
         group_manager,
         migration_status_refresher,
         interactive_grants,
