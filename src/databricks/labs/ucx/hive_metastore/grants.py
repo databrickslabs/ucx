@@ -393,11 +393,11 @@ class AzureACL:
 
         for cluster_spn in spn_cluster_mapping:
             for spn in cluster_spn.spn_info:
-                eligible_locations.update(self._get_external_location(spn, external_locations, permission_mappings))
+                eligible_locations.update(self._get_external_locations(spn, external_locations, permission_mappings))
             cluster_locations[cluster_spn.cluster_id] = eligible_locations
         return cluster_locations
 
-    def _get_external_location(
+    def _get_external_locations(
         self,
         spn: AzureServicePrincipalInfo,
         external_locations: list[ExternalLocationInfo],
