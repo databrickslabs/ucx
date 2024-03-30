@@ -438,7 +438,7 @@ def migrate_external_tables_sync(
     table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
-    interactive_grants = PrincipalACL.for_cli(ws, install)
+    interactive_grants = PrincipalACL.for_cli(ws, install, sql_backend)
     TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -466,7 +466,7 @@ def migrate_dbfs_root_delta_tables(
     table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
-    interactive_grants = PrincipalACL.for_cli(ws, install)
+    interactive_grants = PrincipalACL.for_cli(ws, install, sql_backend)
     TablesMigrator(
         table_crawler,
         grant_crawler,

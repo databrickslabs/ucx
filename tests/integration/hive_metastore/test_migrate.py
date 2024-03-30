@@ -72,7 +72,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -141,7 +141,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -201,7 +201,7 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
     ]
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -261,7 +261,7 @@ def test_migrate_external_table_failed_sync(
     ]
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -317,7 +317,7 @@ def test_revert_migrated_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -437,7 +437,7 @@ def test_mapping_reverts_table(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -534,7 +534,7 @@ def test_migrate_managed_tables_with_acl(
     table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
     group_manager = GroupManager(sql_backend, ws, inventory_schema)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = PrincipalACL.for_cli(ws, MockInstallation())
+    principal_grants = PrincipalACL.for_cli(ws, MockInstallation(), sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,

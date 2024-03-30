@@ -74,7 +74,7 @@ class TablesMigrator:
         grants_crawler = GrantsCrawler(table_crawler, udfs_crawler)
         table_mapping = TableMapping(installation, ws, sql_backend)
         group_manager = GroupManager(sql_backend, ws, config.inventory_database)
-        principal_grants = PrincipalACL.for_cli(ws, installation)
+        principal_grants = PrincipalACL.for_cli(ws, installation, sql_backend)
         migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
         return cls(
             table_crawler,

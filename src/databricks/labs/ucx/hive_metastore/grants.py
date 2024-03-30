@@ -436,10 +436,9 @@ class PrincipalACL:
         self._cluster_locations = cluster_locations
 
     @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
+    def for_cli(cls, ws: WorkspaceClient, installation: Installation, sql_backend: SqlBackend):
         config = installation.load(WorkspaceConfig)
 
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         table_crawler = TablesCrawler(sql_backend, config.inventory_database)
         mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
         if ws.config.is_azure:
