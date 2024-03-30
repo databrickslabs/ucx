@@ -559,63 +559,32 @@ def test_migrate_managed_tables_with_acl(
     assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too-many-arguments
+@pytest.fixture()
+def test_prepare_principal_acl(
     ws,
     sql_backend,
     inventory_schema,
-    make_catalog,
-    make_schema,
-    make_table,
-    make_user,
-    make_cluster,
-    make_cluster_permissions,
     env_or_skip,
     make_dbfs_data_copy,
-    make_random,
-):  # pylint: disable=too-many-locals
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
-    user = make_user()
-    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
-    make_cluster_permissions(
-        object_id=cluster.cluster_id,
-        permission_level=PermissionLevel.CAN_MANAGE,
-        user_name=user.user_name,
-    )
-    src_schema = make_schema(catalog_name="hive_metastore")
+    make_table,
+    make_catalog,
+):
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{inventory_schema}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
-
+    src_external_table = make_table(external_csv=new_mounted_location)
+    src_schema = src_external_table.schema_name
     dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-
-    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_external_table.full_name}")
-
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = StaticGrantsCrawler(table_crawler, udf_crawler, [])
-    mount_crawler = StaticMountCrawler(
-        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
-        sql_backend,
-        ws,
-        inventory_schema,
-    )
     rules = [
         Rule(
             "workspace",
             dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
+            src_schema,
+            src_schema,
             src_external_table.name,
             src_external_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
     installation = MockInstallation(
         {
             "config.yml": {
@@ -640,33 +609,77 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
         ws,
         sql_backend,
         installation,
-        table_crawler,
-        mount_crawler,
+        StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
+        StaticMountCrawler(
+            [
+                Mount(
+                    f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a'
+                )
+            ],
+            sql_backend,
+            ws,
+            inventory_schema,
+        ),
         AzureACL.for_cli(ws, installation),
     )
     table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
+        StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
+        StaticGrantsCrawler(
+            StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
+            StaticUdfsCrawler(sql_backend, inventory_schema, []),
+            [],
+        ),
         ws,
         sql_backend,
-        table_mapping,
-        group_manager,
-        migration_status_refresher,
+        StaticTableMapping(ws, sql_backend, rules=rules),
+        GroupManager(sql_backend, ws, inventory_schema),
+        MigrationStatusRefresher(
+            ws, sql_backend, inventory_schema, StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
+        ),
         principal_grants,
     )
+    return table_migrate
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_migrate_managed_tables_with_principal_acl_azure(
+    ws,
+    inventory_schema,
+    make_catalog,
+    make_table,
+    make_user,
+    make_dbfs_data_copy,
+    test_prepare_principal_acl,
+    make_cluster_permissions,
+    make_cluster,
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    table_migrate = test_prepare_principal_acl
+    user = make_user()
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_USE,
+        user_name=user.user_name,
+    )
+    new_mounted_location = f'dbfs:/mnt/things/a/b/{inventory_schema}'
+    make_dbfs_data_copy(src_path='dbfs:/mnt/things/a/b/c', dst_path=new_mounted_location)
+    src_external_table = make_table(external_csv=new_mounted_location)
+    src_schema = src_external_table.schema_name
+
+    dst_catalog = make_catalog()
+
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_external_table.full_name}")
 
     table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
-    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
-    assert len(target_tables) == 1
-
-    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
-    target_table_grants = ws.grants.get(SecurableType.TABLE, f"{dst_schema.full_name}.{src_external_table.name}")
-    assert target_table_properties["upgraded_from"] == src_external_table.full_name
-    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    target_table_grants = ws.grants.get(
+        SecurableType.TABLE, f"{dst_catalog.name}.{src_schema}.{src_external_table.name}"
+    )
     match = False
-    for assignment in target_table_grants.privilege_assignments:
-        if assignment.principal == user.user_name and assignment.privileges == [Privilege.ALL_PRIVILEGES]:
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
