@@ -465,7 +465,7 @@ def migrate_external_tables_sync(
         group_manager,
         migration_status_refresher,
         interactive_grants,
-    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-tables", job_cluster="table_migration")
@@ -508,7 +508,7 @@ def migrate_dbfs_root_delta_tables(
         group_manager,
         migration_status_refresher,
         interactive_grants,
-    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-groups-experimental", depends_on=[crawl_groups])

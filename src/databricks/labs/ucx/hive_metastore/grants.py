@@ -341,12 +341,12 @@ class AzureACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         spn_crawler: AzureServicePrincipalCrawler,
-        resource_permission: AzureResourcePermissions,
+        resource_permissions: AzureResourcePermissions,
     ):
         self._backend = backend
         self._ws = ws
         self._spn_crawler = spn_crawler
-        self._resource_permission = resource_permission
+        self._resource_permissions = resource_permissions
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
@@ -376,16 +376,16 @@ class AzureACL:
             # if there are no external locations, then throw an error to run migrate_locations cli command
             msg = (
                 "No external location found, If hive metastore tables are created in external storage, "
-                "ensure migrate_locations cli cmd is run to create the required locations."
+                "ensure migrate-locations cli cmd is run to create the required locations."
             )
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._resource_permission.load()
+        permission_mappings = self._resource_permissions.load()
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (
-                "No storage permission file found. Please ensure principal_prefix_access cli "
+                "No storage permission file found. Please ensure principal-prefix-access cli "
                 "cmd is run to create the access permission file."
             )
             logger.error(msg)
@@ -424,22 +424,22 @@ class PrincipalACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         installation: Installation,
-        table_crawler: TablesCrawler,
-        mount_crawler: Mounts,
+        tables_crawler: TablesCrawler,
+        mounts_crawler: Mounts,
         cluster_locations: dict[str, dict],
     ):
         self._backend = backend
         self._ws = ws
         self._installation = installation
-        self._table_crawler = table_crawler
-        self._mount_crawler = mount_crawler
+        self._tables_crawler = tables_crawler
+        self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, installation: Installation, sql_backend: SqlBackend):
         config = installation.load(WorkspaceConfig)
 
-        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        tables_crawler = TablesCrawler(sql_backend, config.inventory_database)
         mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
         if ws.config.is_azure:
             azure_acl = AzureACL.for_cli(ws, installation)
@@ -447,7 +447,7 @@ class PrincipalACL:
                 ws,
                 sql_backend,
                 installation,
-                table_crawler,
+                tables_crawler,
                 mount_crawler,
                 azure_acl.get_eligible_locations_principals(),
             )
@@ -459,16 +459,16 @@ class PrincipalACL:
         return None
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
-        tables = self._table_crawler.snapshot()
-        mounts = list(self._mount_crawler.snapshot())
+        tables = self._tables_crawler.snapshot()
+        mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
 
         for cluster_id, locations in self._cluster_locations.items():
             principals = self._get_cluster_principal_mapping(cluster_id)
             if len(principals) == 0:
                 continue
-            grant = self._get_grants(locations, principals, tables, mounts)
-            grants.update(grant)
+            cluster_usage = self._get_grants(locations, principals, tables, mounts)
+            grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
 
