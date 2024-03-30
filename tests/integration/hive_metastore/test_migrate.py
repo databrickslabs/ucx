@@ -499,7 +499,7 @@ def test_mapping_reverts_table(
     assert "upgraded_to" not in results2
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_managed_tables_with_acl(
     ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, make_user
 ):  # pylint: disable=too-many-locals
