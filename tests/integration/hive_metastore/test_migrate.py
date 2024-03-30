@@ -10,12 +10,9 @@ from databricks.sdk.service.catalog import Privilege, SecurableType
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
+from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
@@ -647,17 +644,14 @@ def test_migrate_managed_tables_with_principal_acl_azure(  # pylint: disable=too
             ],
         }
     )
-    azure_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
-    )
-    locations = ExternalLocations(ws, sql_backend, inventory_schema)
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azurerm = AzureResources(azure_client, graph_client)
-    resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
-    spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, inventory_schema)
+
     principal_grants = PrincipalACL(
-        ws, sql_backend, installation, table_crawler, mount_crawler, spn_crawler, resource_permissions
+        ws,
+        sql_backend,
+        installation,
+        table_crawler,
+        mount_crawler,
+        AzureACL.for_cli(ws, installation),
     )
     table_migrate = TablesMigrate(
         table_crawler,

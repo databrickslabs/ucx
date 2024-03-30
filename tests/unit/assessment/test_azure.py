@@ -230,28 +230,26 @@ def test_get_cluster_to_storage_mapping_no_interactive_cluster_return_empty():
 
 
 def test_get_cluster_to_storage_mapping_interactive_cluster_no_spn_return_empty():
-    ws = workspace_client_mock(cluster_ids=['azure-spn-secret-interactive'])
+    ws = workspace_client_mock(cluster_ids=['azure-spn-secret-interactive-multiple-spn'])
 
     crawler = AzureServicePrincipalCrawler(ws, MockBackend(), "ucx")
     cluster_spn_info = crawler.get_cluster_to_storage_mapping()
-    spn_info = set(
-        [
-            AzureServicePrincipalInfo(
-                application_id='Hello, World!',
-                secret_scope='abcff',
-                secret_key='sp_secret',
-                tenant_id='dedededede',
-                storage_account='abcde',
-            ),
-            AzureServicePrincipalInfo(
-                application_id='Hello, World!',
-                secret_scope='fgh',
-                secret_key='sp_secret2',
-                tenant_id='dedededede',
-                storage_account='fgh',
-            ),
-        ]
-    )
+    spn_info = {
+        AzureServicePrincipalInfo(
+            application_id='Hello, World!',
+            secret_scope='abcff',
+            secret_key='sp_secret',
+            tenant_id='dedededede',
+            storage_account='abcde',
+        ),
+        AzureServicePrincipalInfo(
+            application_id='Hello, World!',
+            secret_scope='fgh',
+            secret_key='sp_secret2',
+            tenant_id='dedededede',
+            storage_account='fgh',
+        ),
+    }
 
     assert cluster_spn_info[0].cluster_id == "azure-spn-secret-interactive"
     assert len(cluster_spn_info[0].spn_info) == 2

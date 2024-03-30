@@ -16,9 +16,9 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
-from databricks.labs.ucx.hive_metastore.locations import Mount
+from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
@@ -60,11 +60,25 @@ def ws():
     return w
 
 
-def principal_acl(w, install, cluster_spn: list):
-
+def azure_acl(w, install, cluster_spn: list):
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     locations = create_autospec(ExternalLocations)
+    azure_client = AzureAPIClient(
+        w.config.arm_environment.resource_manager_endpoint,
+        w.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azurerm = AzureResources(azure_client, graph_client)
+    resource_permissions = AzureResourcePermissions(install, w, azurerm, locations)
+    spn_crawler = create_autospec(AzureServicePrincipalCrawler)
+    spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
+    return AzureACL(w, sql_backend, spn_crawler, resource_permissions)
+
+
+def principal_acl(w, install, cluster_spn: list):
+    config = install.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     table_crawler = create_autospec(TablesCrawler)
     tables = [
         Table(
@@ -100,16 +114,13 @@ def principal_acl(w, install, cluster_spn: list):
     mount_crawler.snapshot.return_value = [
         Mount('/mnt/folder1', 'abfss://container1@storage1.dfs.core.windows.net/folder1')
     ]
-    azure_client = AzureAPIClient(
-        w.config.arm_environment.resource_manager_endpoint,
-        w.config.arm_environment.service_management_endpoint,
-    )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azurerm = AzureResources(azure_client, graph_client)
-    resource_permissions = AzureResourcePermissions(install, w, azurerm, locations)
+
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
-    return PrincipalACL(w, sql_backend, install, table_crawler, mount_crawler, spn_crawler, resource_permissions)
+    azure_locations = azure_acl(w, install, cluster_spn)
+    return PrincipalACL(
+        w, sql_backend, install, table_crawler, mount_crawler, azure_locations.get_eligible_locations_principals()
+    )
 
 
 @pytest.fixture
@@ -147,6 +158,10 @@ def installation():
     )
 
 
+def test_for_cli_azure_acl(ws, installation):
+    assert isinstance(AzureACL.for_cli(ws, installation), AzureACL)
+
+
 def test_for_cli_azure(ws, installation):
     ws.config.is_azure = True
     assert isinstance(PrincipalACL.for_cli(ws, installation), PrincipalACL)
@@ -165,23 +180,23 @@ def test_for_cli_gcp(ws, installation):
     assert PrincipalACL.for_cli(ws, installation) is None
 
 
-def test_interactive_cluster_no_cluster_mapping(ws, installation):
-    grants = principal_acl(ws, installation, [])
-    grants.get_interactive_cluster_grants()
+def test_get_eligible_locations_principals_no_cluster_mapping(ws, installation):
+    locations = azure_acl(ws, installation, [])
+    locations.get_eligible_locations_principals()
     ws.external_locations.list.assert_not_called()
 
 
-def test_interactive_cluster_no_external_location(ws, installation):
+def test_get_eligible_locations_principals_no_external_location(ws, installation):
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
     )
-    grants = principal_acl(ws, installation, [cluster_spn])
+    locations = azure_acl(ws, installation, [cluster_spn])
     ws.external_locations.list.return_value = []
     with pytest.raises(ResourceDoesNotExist):
-        grants = grants.get_interactive_cluster_grants()
+        locations.get_eligible_locations_principals()
 
 
-def test_interactive_cluster_no_permission_mapping(ws):
+def test_get_eligible_locations_principals_no_permission_mapping(ws):
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
     )
@@ -191,10 +206,20 @@ def test_interactive_cluster_no_permission_mapping(ws):
             "azure_storage_account_info.csv": [],
         }
     )
-    grants = principal_acl(ws, install, [cluster_spn])
+    locations = azure_acl(ws, install, [cluster_spn])
 
     with pytest.raises(ResourceDoesNotExist):
-        grants.get_interactive_cluster_grants()
+        locations.get_eligible_locations_principals()
+
+
+def test_get_eligible_locations_principals(ws, installation):
+    cluster_spn = ServicePrincipalClusterMapping(
+        'abc', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
+    )
+    locations = azure_acl(ws, installation, [cluster_spn])
+    eligible_locations = locations.get_eligible_locations_principals()
+    assert len(eligible_locations) == 1
+    assert eligible_locations['abc'] == {'abfss://container1@storage1.dfs.core.windows.net/folder1': 'WRITE_FILES'}
 
 
 def test_interactive_cluster_no_acl(ws, installation):
