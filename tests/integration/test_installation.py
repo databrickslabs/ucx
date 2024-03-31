@@ -651,7 +651,7 @@ def test_table_migration_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
-    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
+    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy, sql_backend
 ):
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
@@ -686,7 +686,24 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         ),
     ]
     installation.save(migrate_rules, filename='mapping.csv')
-
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        Mount,
+    )
+    installation.save(
+        [
+            StoragePermissionMapping(
+                'abfss://things@labsazurethings.dfs.core.windows.net',
+                'dummy_application_id',
+                'principal_1',
+                'WRITE_FILES',
+                'Application',
+                'directory_id_ss1',
+            )
+        ],
+        filename='azure_storage_account_info.csv',
+    )
     workflows_install.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
