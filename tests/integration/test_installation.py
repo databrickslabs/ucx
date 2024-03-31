@@ -24,8 +24,10 @@ from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
+from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
@@ -556,8 +558,17 @@ def test_check_inventory_database_exists(ws, new_installation):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_table_migration_job(
-    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
+    ws,
+    new_installation,
+    make_catalog,
+    make_schema,
+    make_table,
+    env_or_skip,
+    make_random,
+    make_dbfs_data_copy,
+    sql_backend,
 ):
+
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
@@ -585,26 +596,46 @@ def test_table_migration_job(
         inventory_schema_suffix="_migrate_inventory",
     )
     installation = product_info.current_installation(ws)
-    migrate_rules = [
-        Rule(
-            "ws_name",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
-        ),
-        Rule(
-            "ws_name",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_external_table.name,
-            src_external_table.name,
-        ),
-    ]
-    installation.save(migrate_rules, filename='mapping.csv')
 
+    installation.save(
+        [
+            Rule(
+                "ws_name",
+                dst_catalog.name,
+                src_schema.name,
+                dst_schema.name,
+                src_managed_table.name,
+                src_managed_table.name,
+            ),
+            Rule(
+                "ws_name",
+                dst_catalog.name,
+                src_schema.name,
+                dst_schema.name,
+                src_external_table.name,
+                src_external_table.name,
+            ),
+        ],
+        filename='mapping.csv',
+    )
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        Mount,
+    )
+    installation.save(
+        [
+            StoragePermissionMapping(
+                'abfss://things@labsazurethings.dfs.core.windows.net',
+                'dummy_application_id',
+                'principal_1',
+                'WRITE_FILES',
+                'Application',
+                'directory_id_ss1',
+            )
+        ],
+        filename='azure_storage_account_info.csv',
+    )
     workflows_install.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")

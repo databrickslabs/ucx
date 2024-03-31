@@ -8,8 +8,7 @@ from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,

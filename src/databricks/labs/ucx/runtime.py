@@ -15,13 +15,12 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import task, trigger
-from databricks.labs.ucx.hive_metastore import (
-    ExternalLocations,
+from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import (
+    AzureACL,
     GrantsCrawler,
-    Mounts,
-    TablesCrawler,
+    PrincipalACL,
 )
-from databricks.labs.ucx.hive_metastore.grants import AzureACL, PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (

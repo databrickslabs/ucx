@@ -10,8 +10,12 @@ from databricks.sdk.service.catalog import Privilege, SecurableType
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import (
+    AzureACL,
+    Grant,
+    GrantsCrawler,
+    PrincipalACL,
+)
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.table_migrate import (
