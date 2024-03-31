@@ -651,7 +651,15 @@ def test_table_migration_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
-    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy, sql_backend
+    ws,
+    new_installation,
+    make_catalog,
+    make_schema,
+    make_table,
+    env_or_skip,
+    make_random,
+    make_dbfs_data_copy,
+    sql_backend,
 ):
     # create external and managed tables to be migrated
     src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")

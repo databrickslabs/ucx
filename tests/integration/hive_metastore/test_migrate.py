@@ -648,7 +648,6 @@ def test_prepare_principal_acl(
         {
             "config.yml": {
                 'warehouse_id': env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
-                'connect': {'host': 'a', 'token': 'b'},
                 'inventory_database': inventory_schema,
             },
             "azure_storage_account_info.csv": [
