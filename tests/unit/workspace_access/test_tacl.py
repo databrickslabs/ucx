@@ -3,8 +3,8 @@ import json
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState

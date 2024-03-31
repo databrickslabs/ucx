@@ -11,13 +11,15 @@ from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCra
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
+from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import task, trigger
-from databricks.labs.ucx.hive_metastore import (
-    ExternalLocations,
+from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import (
+    AzureACL,
     GrantsCrawler,
-    Mounts,
-    TablesCrawler,
+    PrincipalACL,
 )
 from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
@@ -434,12 +436,35 @@ def migrate_external_tables_sync(
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = TableMapping(install, ws, sql_backend)
+    table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
+    mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
+    cluster_locations = {}
+    if ws.config.is_azure:
+        locations = ExternalLocations(ws, sql_backend, cfg.inventory_database)
+        azure_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_client, graph_client)
+        resource_permissions = AzureResourcePermissions(install, ws, azurerm, locations)
+        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
+        cluster_locations = AzureACL(
+            ws, sql_backend, spn_crawler, resource_permissions
+        ).get_eligible_locations_principals()
+    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
     TablesMigrator(
-        table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-tables", job_cluster="table_migration")
@@ -454,12 +479,35 @@ def migrate_dbfs_root_delta_tables(
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = TableMapping(install, ws, sql_backend)
+    table_mappings = TableMapping(install, ws, sql_backend)
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
+    mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
+    cluster_locations = {}
+    if ws.config.is_azure:
+        locations = ExternalLocations(ws, sql_backend, cfg.inventory_database)
+        azure_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_client, graph_client)
+        resource_permissions = AzureResourcePermissions(install, ws, azurerm, locations)
+        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
+        cluster_locations = AzureACL(
+            ws, sql_backend, spn_crawler, resource_permissions
+        ).get_eligible_locations_principals()
+    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
     TablesMigrator(
-        table_crawler, grant_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
-    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-groups-experimental", depends_on=[crawl_groups])

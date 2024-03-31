@@ -14,8 +14,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
@@ -52,6 +52,7 @@ class TablesMigrator:
         table_mapping: TableMapping,
         group_manager: GroupManager,
         migration_status_refresher: 'MigrationStatusRefresher',
+        principal_grants: PrincipalACL,
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -61,6 +62,7 @@ class TablesMigrator:
         self._group = group_manager
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
+        self._principal_grants = principal_grants
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, product='ucx'):
@@ -72,9 +74,17 @@ class TablesMigrator:
         grants_crawler = GrantsCrawler(table_crawler, udfs_crawler)
         table_mapping = TableMapping(installation, ws, sql_backend)
         group_manager = GroupManager(sql_backend, ws, config.inventory_database)
+        principal_grants = PrincipalACL.for_cli(ws, installation, sql_backend)
         migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
         return cls(
-            table_crawler, grants_crawler, ws, sql_backend, table_mapping, group_manager, migration_status_refresher
+            table_crawler,
+            grants_crawler,
+            ws,
+            sql_backend,
+            table_mapping,
+            group_manager,
+            migration_status_refresher,
+            principal_grants,
         )
 
     def index(self):
@@ -87,6 +97,7 @@ class TablesMigrator:
         if acl_strategy is not None:
             grants_to_migrate = self._gc.snapshot()
             migrated_groups = self._group.snapshot()
+            principal_grants = self._principal_grants.get_interactive_cluster_grants()
         else:
             acl_strategy = []
         for table in tables_to_migrate:
@@ -95,6 +106,8 @@ class TablesMigrator:
                 continue
             if AclMigrationWhat.LEGACY_TACL in acl_strategy:
                 grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
+            if AclMigrationWhat.PRINCIPAL in acl_strategy:
+                grants.extend(self._match_grants(table.src, principal_grants, migrated_groups))
             tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
         Threads.strict("migrate tables", tasks)
 

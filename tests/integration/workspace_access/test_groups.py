@@ -7,8 +7,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, PermissionLevel, ResourceMeta
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,

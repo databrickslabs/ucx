@@ -14,7 +14,8 @@ from databricks.labs.ucx.framework.crawlers import (
     Dataclass,
     DataclassInstance,
 )
-from databricks.labs.ucx.hive_metastore import GrantsCrawler, TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access import generic, redash, scim, secrets
 from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions

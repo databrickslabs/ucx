@@ -47,7 +47,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
             if not location:
                 continue
             if location.startswith("dbfs:/mnt"):
-                location = self._resolve_mount(location, mounts)
+                location = self.resolve_mount(location, mounts)
             if (
                 not location.startswith("dbfs")
                 and (self._prefix_size[0] < location.find(":/") < self._prefix_size[1])
@@ -58,7 +58,8 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                 self._add_jdbc_location(external_locations, location, table)
         return external_locations
 
-    def _resolve_mount(self, location, mounts):
+    @staticmethod
+    def resolve_mount(location, mounts):
         for mount in mounts:
             if location[5:].startswith(mount.name.lower()):
                 location = location[5:].replace(mount.name, mount.source)
