@@ -76,7 +76,7 @@ class GlobalContext:
         return Installation.current(self.workspace_client, self.product_info.product_name())
 
     @property
-    def config(self):
+    def config(self) -> WorkspaceConfig:
         return self.installation.load(WorkspaceConfig)
 
     @property
@@ -293,19 +293,16 @@ class GlobalContext:
         return Languages(index)
 
     @property
-    def local_file_migrator(self):
-        return Files(self.languages)
+    def verify_timeout(self):
+        return timedelta(minutes=2)
 
     @property
     def wheels(self):
         return WheelsV2(self.installation, self.product_info)
 
     @property
-    def verify_timeout(self):
-        return timedelta(minutes=2)
-
-    @property
     def workflows(self):
+        # TODO: decouple to only trigger jobs
         return WorkflowsInstallation(
             self.config,
             self.installation,
@@ -317,10 +314,6 @@ class GlobalContext:
         )
 
     @property
-    def account_workspaces(self):
-        return AccountWorkspaces(self.account_client)
-
-    @property
     def workspace_info(self):
         return WorkspaceInfo(self.installation, self.workspace_client)
 
@@ -330,11 +323,19 @@ class GlobalContext:
 
 
 class RuntimeContext(GlobalContext):
-    def __init__(self, config_path: Path):
+    def __init__(self):
+        # this is a bit of a calculated hack to simplify the UX for task definitions.
+        # generally, we despise the shared mutable state, but in this case, it's
+        # a bit of a necessary evil
+        self._config_path = None
+
+    def set_config_path(self, config_path: Path):
         self._config_path = config_path
 
     @property
-    def config(self):
+    def config(self) -> WorkspaceConfig:
+        if not self._config_path:
+            raise ValueError("Config path not set")
         return Installation.load_local(WorkspaceConfig, self._config_path)
 
     @property
@@ -369,6 +370,10 @@ class WorkspaceContext(CliContext):
     def sql_backend(self) -> SqlBackend:
         return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
 
+    @property
+    def local_file_migrator(self):
+        return Files(self.languages)
+
 
 class AccountContext(CliContext):
     def __init__(self, ac: AccountClient, flags: dict[str, str]):
@@ -380,3 +385,7 @@ class AccountContext(CliContext):
         if not self._ac:
             self._ac = AccountClient()
         return self._ac
+
+    @property
+    def account_workspaces(self):
+        return AccountWorkspaces(self.account_client)

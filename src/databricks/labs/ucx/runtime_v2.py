@@ -1,21 +1,19 @@
 import logging
+from pathlib import Path
 from typing import Callable, Protocol
 
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.factories import GlobalContext
-from databricks.labs.ucx.hive_metastore import (
-    ExternalLocations,
-    Mounts,
-)
+from databricks.labs.ucx.factories import RuntimeContext
+from databricks.labs.ucx.framework.tasks import Task, TaskLogger
+from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
@@ -30,16 +28,21 @@ class Snapshot(Protocol):
     def snapshot(self): ...
 
 
-class Workflow:
-    def __init__(self, name: str, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend):
+class Workflow(RuntimeContext):
+    def __init__(self, name: str):
+        super().__init__()
         self._name = name
-        self.workspace_client = ws
-        self.config = cfg
-        self.sql_backend = sql_backend
+
+    @property
+    def name(self):
+        return self._name
 
     def simple_snapshot(self, crawler_class: type[Snapshot]):
         crawler = crawler_class(self.sql_backend, self.workspace_client, self.config.inventory_database)
         crawler.snapshot()
+
+    def tasks(self) -> list[Task]:
+        return []
 
 
 def task(
@@ -52,9 +55,9 @@ def task(
 ) -> Callable[[Callable], Callable]: ...
 
 
-class Assessment(Workflow, GlobalContext):
-    def __init__(self, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend):
-        super().__init__('assessment', ws, cfg, sql_backend)
+class Assessment(Workflow):
+    def __init__(self):
+        super().__init__('assessment')
 
     @task(notebook="hive_metastore/tables.scala")
     def crawl_tables(*_):
@@ -271,9 +274,9 @@ class Assessment(Workflow, GlobalContext):
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-class GroupMigration(Workflow, GlobalContext):
-    def __init__(self, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend):
-        super().__init__('migrate-groups', ws, cfg, sql_backend)
+class GroupMigration(Workflow):
+    def __init__(self):
+        super().__init__('migrate-groups')
 
     @task(depends_on=[Assessment.crawl_groups])
     def rename_workspace_local_groups(self):
@@ -312,10 +315,9 @@ class GroupMigration(Workflow, GlobalContext):
         self.permission_manager.verify_group_permissions()
 
 
-class TableMigration(Workflow, GlobalContext):
-    def __init__(self, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend, install: Installation):
-        super().__init__('migrate-tables', ws, cfg, sql_backend)
-        self._install = install
+class TableMigration(Workflow):
+    def __init__(self):
+        super().__init__('migrate-tables')
 
     @task(job_cluster="table_migration")
     def migrate_external_tables_sync(self):
@@ -334,3 +336,48 @@ class TableMigration(Workflow, GlobalContext):
         - For AWS: TBD
         """
         self.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+
+class Workflows:
+    def __init__(self, workflows: list[Workflow]):
+        self._tasks: dict[str, Workflow] = {task.name: task for workflow in workflows for task in workflow.tasks()}
+
+    @classmethod
+    def all(cls):
+        return cls([Assessment(), GroupMigration(), TableMigration()])
+
+    def _parse_args(*argv) -> dict[str, str]:
+        args = dict(a[2:].split("=") for a in argv if a[0:2] == "--")
+        if "config" not in args:
+            msg = "no --config specified"
+            raise KeyError(msg)
+        return args
+
+    def trigger(self, *argv):
+        args = self._parse_args(*argv)
+        config_path = Path(args["config"])
+        install_dir = config_path.parent
+
+        task_name = args.get("task", "not specified")
+        if task_name not in self._tasks:
+            msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(self._tasks.keys())}'
+            raise KeyError(msg)
+        print(f"UCX v{__version__}")
+        workflow = self._tasks[task_name]
+        # this line effectively enables further initialization of all dependent factories
+        workflow.set_config_path(config_path)
+        # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
+        workflow_run_id = args.get("parent_run_id", "unknown_run_id")
+        job_id = args.get("job_id", "unknown_job_id")
+        with TaskLogger(
+            install_dir,
+            workflow=workflow.name,
+            workflow_id=job_id,
+            task_name=task_name,
+            workflow_run_id=workflow_run_id,
+            log_level=workflow.config.log_level,
+        ) as task_logger:
+            ucx_logger = logging.getLogger("databricks.labs.ucx")
+            ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
+            current_task = getattr(workflow, task_name)
+            current_task()
