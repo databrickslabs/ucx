@@ -1,5 +1,5 @@
 from databricks.labs.ucx.source_code.base import Deprecation
-from databricks.labs.ucx.source_code.pyspark import SparkSql
+from databricks.labs.ucx.source_code.pyspark import SparkSql, SPARK_MATCHERS
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -47,25 +47,72 @@ for i in range(10):
 
 
 def test_spark_table_match(migration_index):
-    ftf = FromTable(migration_index)
-    sqf = SparkSql(ftf)
-
-    old_code = """
+    # import SPARK_MATCHERS from
+    for method_name in ["cacheTable", "createTable", "createExternalTable", "getTable", "isCached",
+                        "listColumns", "tableExists", "recoverPartitions", "refreshTable", "uncacheTable",
+                        "table", "insertInto", "saveAsTable", "register" ]:
+        ftf = FromTable(migration_index)
+        sqf = SparkSql(ftf)
+        matcher = SPARK_MATCHERS[method_name]
+        args_list = ["a"] * min(5, matcher.max_args)
+        args_list[matcher.table_arg_index] = '"old.things"'
+        args = ",".join(args_list)
+        old_code = f"""
 spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = spark.table("old.things")
+    df = spark.{method_name}({args})
     do_stuff_with_df(df)
 """
-    assert [
-        Deprecation(
-            code='table-migrate',
-            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=4,
-            start_col=9,
-            end_line=4,
-            end_col=34,
-        )
-    ] == list(sqf.lint(old_code))
+        assert [
+            Deprecation(
+                code='table-migrate',
+                message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+                start_line=4,
+                start_col=9,
+                end_line=4,
+                end_col=17+len(method_name)+len(args),
+            )
+        ] == list(sqf.lint(old_code))
+
+
+def test_spark_table_no_match(migration_index):
+    for method_name in ["cacheTable", "createTable", "createExternalTable", "getTable", "isCached",
+                        "listColumns", "tableExists", "recoverPartitions", "refreshTable", "uncacheTable",
+                        "table", "insertInto", "saveAsTable", "register" ]:
+        ftf = FromTable(migration_index)
+        sqf = SparkSql(ftf)
+        matcher = SPARK_MATCHERS[method_name]
+        args_list = ["a"] * min(5, matcher.max_args)
+        args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
+        args = ",".join(args_list)
+        old_code = f"""
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    df = spark.{method_name}({args})
+    do_stuff_with_df(df)
+"""
+        assert [] == list(sqf.lint(old_code))
+
+
+def test_spark_table_too_many_args(migration_index):
+    for method_name in ["cacheTable", "createTable", "createExternalTable", "getTable", "isCached",
+                        "listColumns", "tableExists", "recoverPartitions", "refreshTable", "uncacheTable",
+                        "table", "insertInto", "saveAsTable", "register"]:
+        ftf = FromTable(migration_index)
+        sqf = SparkSql(ftf)
+        matcher = SPARK_MATCHERS[method_name]
+        if matcher.max_args > 100:
+            continue
+        args_list = ["a"] * (matcher.max_args + 1)
+        args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
+        args = ",".join(args_list)
+        old_code = f"""
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    df = spark.{method_name}({args})
+    do_stuff_with_df(df)
+"""
+        assert [] == list(sqf.lint(old_code))
 
 
 def test_spark_sql_fix(migration_index):
