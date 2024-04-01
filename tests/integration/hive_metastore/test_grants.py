@@ -5,7 +5,7 @@ from datetime import timedelta
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
-from databricks.labs.ucx.hive_metastore import GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 
 from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 

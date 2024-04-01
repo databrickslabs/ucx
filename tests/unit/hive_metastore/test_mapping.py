@@ -3,6 +3,7 @@ from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -411,7 +412,11 @@ def test_mismatch_from_table_raises_exception():
         ),
     ]
     with pytest.raises(ResourceConflict):
-        table_mapping.get_tables_to_migrate(tables_crawler)
+        try:
+            table_mapping.get_tables_to_migrate(tables_crawler)
+        except ManyError as e:
+            assert len(e.errs) == 1
+            raise e.errs[0]
 
     assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
 

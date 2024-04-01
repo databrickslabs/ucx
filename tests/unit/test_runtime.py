@@ -36,7 +36,6 @@ from databricks.labs.ucx.runtime import (
     migrate_external_tables_sync,
     reflect_account_groups_on_workspace_experimental,
     rename_workspace_local_groups_experimental,
-    validate_groups_permissions_experimental,
     workspace_listing,
 )
 from tests.unit import GROUPS, PERMISSIONS
@@ -56,6 +55,7 @@ def azure_mock_config() -> WorkspaceConfig:
 def mock_installation() -> MockInstallation:
     return MockInstallation(
         {
+            'config.yml': {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
             'mapping.csv': [
                 {
                     'catalog_name': 'catalog',
@@ -65,7 +65,7 @@ def mock_installation() -> MockInstallation:
                     'src_table': 'table',
                     'workspace_name': 'workspace',
                 },
-            ]
+            ],
         }
     )
 
@@ -322,14 +322,6 @@ def test_reflect_account_groups_on_workspace(caplog):
     reflect_account_groups_on_workspace_experimental(azure_mock_config(), ws, MockBackend(), mock_installation())
 
 
-def test_validate_groups_permissions(caplog):
-    ws = create_autospec(WorkspaceClient)
-    rows = {
-        'SELECT COUNT\\(\\*\\) as cnt FROM hive_metastore.ucx.permissions': PERMISSIONS[("123", "QUERIES", "temp")],
-    }
-    validate_groups_permissions_experimental(azure_mock_config(), ws, MockBackend(rows=rows), mock_installation())
-
-
 def test_migrate_permissions_experimental():
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
@@ -346,9 +338,9 @@ def test_migrate_permissions_experimental():
         azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
     )
     calls = [
-        call("12345678", "workspace_group_1", "account_group_1", size=1000),
-        call("12345678", "workspace_group_2", "account_group_2", size=1000),
-        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+        call("12345678", "temp_1", "account_group_1", size=1000),
+        call("12345678", "temp_2", "account_group_2", size=1000),
+        call("12345678", "temp_3", "account_group_3", size=1000),
     ]
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 
@@ -371,9 +363,9 @@ def test_migrate_permissions_experimental_paginated():
         azure_mock_config(), ws, MockBackend(rows=rows), mock_installation()
     )
     calls = [
-        call("12345678", "workspace_group_1", "account_group_1", size=1000),
-        call("12345678", "workspace_group_2", "account_group_2", size=1000),
-        call("12345678", "workspace_group_3", "account_group_3", size=1000),
+        call("12345678", "temp_1", "account_group_1", size=1000),
+        call("12345678", "temp_2", "account_group_2", size=1000),
+        call("12345678", "temp_3", "account_group_3", size=1000),
     ]
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 

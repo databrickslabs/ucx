@@ -24,7 +24,10 @@ from databricks.sdk.service import compute, sql
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
+from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore.grants import Grant
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
@@ -33,9 +36,15 @@ from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
     Listing,
 )
-from databricks.labs.ucx.workspace_access.groups import GroupManager
+from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
+from tests.integration.conftest import (
+    StaticGrantsCrawler,
+    StaticTablesCrawler,
+    StaticUdfsCrawler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +59,14 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         product_info: ProductInfo | None = None,
         environ: dict[str, str] | None = None,
         extend_prompts: dict[str, str] | None = None,
-        inventory_schema_suffix: str = "",
+        inventory_schema_name: str | None = None,
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
         if not environ:
             environ = {}
+        if not inventory_schema_name:
+            inventory_schema_name = f"ucx_S{make_random(4).lower()}"
         renamed_group_prefix = f"rename-{product_info.product_name()}-"
         prompts = MockPrompts(
             {
@@ -65,9 +76,8 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": f"ucx_S{make_random(4).lower()}{inventory_schema_suffix}",
+                r".*Inventory Database.*": inventory_schema_name,
                 r".*Backup prefix*": renamed_group_prefix,
-                r"Do you want to update the existing installation.*": "yes",
                 r".*": "",
             }
             | (extend_prompts or {})
@@ -122,6 +132,70 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
     for pending in cleanup:
         pending.uninstall()
+
+
+def test_experimental_permissions_migration_for_group_with_same_name(  # pylint: disable=too-many-locals
+    ws,
+    sql_backend,
+    new_installation,
+    make_schema,
+    make_ucx_group,
+    make_table,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+):
+    ws_group, acc_group = make_ucx_group()
+    migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
+    cluster_policy = make_cluster_policy()
+    make_cluster_policy_permissions(
+        object_id=cluster_policy.policy_id,
+        permission_level=PermissionLevel.CAN_USE,
+        group_name=migrated_group.name_in_workspace,
+    )
+    schema_a = make_schema()
+    table_a = make_table(schema_name=schema_a.name)
+    sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{migrated_group.name_in_workspace}`")
+    sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{migrated_group.name_in_workspace}`")
+    sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{migrated_group.name_in_workspace}`")
+
+    workspace_installation, workflow_installation = new_installation(
+        config_transform=lambda wc: replace(wc, include_group_names=[migrated_group.name_in_workspace])
+    )
+    workspace_installation.run()
+
+    inventory_database = workspace_installation.config.inventory_database
+    sql_backend.save_table(f'{inventory_database}.groups', [migrated_group], MigratedGroup)
+
+    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_database, [])
+    tables_crawler = StaticTablesCrawler(sql_backend, inventory_database, [table_a])
+    grants_crawler = StaticGrantsCrawler(
+        tables_crawler,
+        udf_crawler,
+        [
+            Grant(
+                catalog=table_a.catalog_name,
+                database=table_a.schema_name,
+                table=table_a.name,
+                principal=migrated_group.name_in_workspace,
+                action_type="SELECT",
+            ),
+        ],
+    )
+    tacl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    generic_permissions = GenericPermissionsSupport(
+        ws, [Listing(lambda: [cluster_policy], "policy_id", "cluster-policies")]
+    )
+    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions, tacl_support])
+    permission_manager.inventorize_permissions()
+
+    workflow_installation.run_workflow("migrate-groups-experimental")
+
+    object_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    new_schema_grants = grants_crawler.for_schema_info(schema_a)
+
+    assert {"USAGE", "OWN"} == new_schema_grants[migrated_group.name_in_account]
+    assert object_permissions[migrated_group.name_in_account] == PermissionLevel.CAN_USE
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
@@ -389,7 +463,7 @@ def test_global_installation_on_existing_global_install(ws, new_installation):
     reinstall_global.uninstall()
 
 
-def test_user_installation_on_existing_global_install(ws, new_installation):
+def test_user_installation_on_existing_global_install(ws, new_installation, make_random):
     # existing install at global level
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     existing_global_installation, _ = new_installation(
@@ -418,7 +492,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
             r".*UCX is already installed on this workspace.*": 'yes',
             r".*Do you want to update the existing installation?.*": 'yes',
         },
-        inventory_schema_suffix="_reinstall",
+        inventory_schema_name=f"ucx_S{make_random(4)}_reinstall",
     )
     assert reinstall_user_force.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     reinstall_user_force.uninstall()
@@ -461,11 +535,12 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     existing_user_installation.uninstall()
 
 
-def test_check_inventory_database_exists(ws, new_installation):
+def test_check_inventory_database_exists(ws, new_installation, make_random):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     install, _ = new_installation(
         product_info=product_info,
         installation=Installation.assume_global(ws, product_info.product_name()),
+        inventory_schema_name=f"ucx_S{make_random(4)}_exists",
     )
     inventory_database = install.config.inventory_database
 
@@ -480,13 +555,23 @@ def test_check_inventory_database_exists(ws, new_installation):
                 r".*UCX is already installed on this workspace.*": 'yes',
                 r".*Do you want to update the existing installation?.*": 'yes',
             },
+            inventory_schema_name=inventory_database,
         )
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_table_migration_job(
-    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
+    ws,
+    new_installation,
+    make_catalog,
+    make_schema,
+    make_table,
+    env_or_skip,
+    make_random,
+    make_dbfs_data_copy,
+    sql_backend,
 ):
+
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
@@ -511,7 +596,88 @@ def test_table_migration_job(
             r"Max workers for auto-scale.*": "20",
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
         },
-        inventory_schema_suffix="_migrate_inventory",
+        inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
+    )
+    installation = product_info.current_installation(ws)
+
+    installation.save(
+        [
+            Rule(
+                "ws_name",
+                dst_catalog.name,
+                src_schema.name,
+                dst_schema.name,
+                src_managed_table.name,
+                src_managed_table.name,
+            ),
+            Rule(
+                "ws_name",
+                dst_catalog.name,
+                src_schema.name,
+                dst_schema.name,
+                src_external_table.name,
+                src_external_table.name,
+            ),
+        ],
+        filename='mapping.csv',
+    )
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        Mount,
+    )
+    installation.save(
+        [
+            StoragePermissionMapping(
+                'abfss://things@labsazurethings.dfs.core.windows.net',
+                'dummy_application_id',
+                'principal_1',
+                'WRITE_FILES',
+                'Application',
+                'directory_id_ss1',
+            )
+        ],
+        filename='azure_storage_account_info.csv',
+    )
+    workflows_install.run_workflow("migrate-tables")
+    # assert the workflow is successful
+    assert workflows_install.validate_step("migrate-tables")
+    # assert the tables are migrated
+    try:
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+    except NotFound:
+        assert (
+            False
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
+    ws,
+    new_installation,
+    make_catalog,
+    make_schema,
+    make_table,
+    env_or_skip,
+    make_random,
+    make_dbfs_data_copy,
+    sql_backend,
+):
+    # create external and managed tables to be migrated
+    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    src_managed_table = make_table(schema_name=src_schema.name)
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
+    # create destination catalog and schema
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    product_info = ProductInfo.from_class(WorkspaceConfig)
+    _, workflows_install = new_installation(
+        product_info=product_info, inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory"
     )
     installation = product_info.current_installation(ws)
     migrate_rules = [
@@ -533,58 +699,24 @@ def test_table_migration_job(
         ),
     ]
     installation.save(migrate_rules, filename='mapping.csv')
-
-    workflows_install.run_workflow("migrate-tables")
-    # assert the workflow is successful
-    assert workflows_install.validate_step("migrate-tables")
-    # assert the tables are migrated
-    try:
-        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
-    except NotFound:
-        assert (
-            False
-        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
-    ws, new_installation, make_catalog, make_schema, make_table, env_or_skip, make_random, make_dbfs_data_copy
-):
-    # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    src_managed_table = make_table(schema_name=src_schema.name)
-    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
-    # create destination catalog and schema
-    dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-
-    product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, workflows_install = new_installation(product_info=product_info, inventory_schema_suffix="_migrate_inventory")
-    installation = product_info.current_installation(ws)
-    migrate_rules = [
-        Rule(
-            "ws_name",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
-        ),
-        Rule(
-            "ws_name",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_external_table.name,
-            src_external_table.name,
-        ),
-    ]
-    installation.save(migrate_rules, filename='mapping.csv')
-
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        Mount,
+    )
+    installation.save(
+        [
+            StoragePermissionMapping(
+                'abfss://things@labsazurethings.dfs.core.windows.net',
+                'dummy_application_id',
+                'principal_1',
+                'WRITE_FILES',
+                'Application',
+                'directory_id_ss1',
+            )
+        ],
+        filename='azure_storage_account_info.csv',
+    )
     workflows_install.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
