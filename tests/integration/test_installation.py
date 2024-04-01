@@ -115,7 +115,6 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         workflows_installation = WorkflowsDeployment(
             workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=3)
         )
-        workspace_config = workflows_installation.configure()
         workspace_installation = WorkspaceInstallation(
             workspace_config,
             installation,

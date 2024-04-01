@@ -138,33 +138,6 @@ class WorkflowsDeployment(InstallationMixin):
     def state(self):
         return self._state
 
-    def configure(self) -> WorkspaceConfig:
-        # Save configurable spark_conf for table migration cluster
-        # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
-        parallelism = self._prompts.question(
-            "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
-        )
-        spark_conf_dict = self._config.spark_conf
-        if not spark_conf_dict:
-            spark_conf_dict = {}
-        spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
-        # mix max workers for auto-scale migration job cluster
-        min_workers = int(
-            self._prompts.question(
-                "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
-            )
-        )
-        max_workers = int(
-            self._prompts.question(
-                "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
-            )
-        )
-        self._config = replace(
-            self._config, spark_conf=spark_conf_dict, min_workers=min_workers, max_workers=max_workers
-        )
-        self._installation.save(self._config)
-        return self._config
-
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")

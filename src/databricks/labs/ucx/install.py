@@ -145,7 +145,6 @@ class WorkspaceInstaller:
         workflows_installer = WorkflowsDeployment(
             config, self._installation, self._ws, wheels, self._prompts, self._product_info, verify_timeout
         )
-        config = workflows_installer.configure()
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
@@ -238,6 +237,9 @@ class WorkspaceInstaller:
             inventory_database
         )
 
+        # Save configurable values for table migration cluster
+        min_workers, max_workers, spark_conf_dict = self._config_table_migration(spark_conf_dict)
+
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
 
@@ -254,6 +256,8 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            min_workers=min_workers,
+            max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
             is_terraform_used=is_terraform_used,
@@ -264,6 +268,26 @@ class WorkspaceInstaller:
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
+
+    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict]:
+        # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
+        parallelism = self._prompts.question(
+            "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
+        )
+        if int(parallelism) > 200:
+            spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
+        # mix max workers for auto-scale migration job cluster
+        min_workers = int(
+            self._prompts.question(
+                "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
+            )
+        )
+        max_workers = int(
+            self._prompts.question(
+                "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
+            )
+        )
+        return min_workers, max_workers, spark_conf_dict
 
     def _select_databases(self):
         selected_databases = self._prompts.question(
