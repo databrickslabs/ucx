@@ -235,7 +235,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
 
 def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     wheels = create_autospec(WheelsV2)
-    workspace_installation = WorkflowsDeployment(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
         mock_installation,
         ws,
@@ -245,7 +245,7 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
         timedelta(seconds=1),
     )
 
-    workspace_installation.create_jobs()
+    workflows_installation.create_jobs()
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
