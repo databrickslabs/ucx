@@ -159,7 +159,11 @@ class WorkflowsDeployment(InstallationMixin):
                 "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
             )
         )
-        return replace(self._config, spark_conf=spark_conf_dict, min_workers=min_workers, max_workers=max_workers)
+        self._config = replace(
+            self._config, spark_conf=spark_conf_dict, min_workers=min_workers, max_workers=max_workers
+        )
+        self._installation.save(self._config)
+        return self._config
 
     def run_workflow(self, step: str):
         job_id = int(self._state.jobs[step])
