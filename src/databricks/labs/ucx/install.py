@@ -145,6 +145,7 @@ class WorkspaceInstaller:
         workflows_installer = WorkflowsDeployment(
             config, self._installation, self._ws, wheels, self._prompts, self._product_info, verify_timeout
         )
+        config = workflows_installer.configure()
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
