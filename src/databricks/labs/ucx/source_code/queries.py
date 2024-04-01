@@ -11,7 +11,6 @@ class FromTable(Linter, Fixer):
     def __init__(self, index: MigrationIndex):
         self._index = index
 
-
     def index(self):
         return self._index
 
