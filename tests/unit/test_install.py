@@ -1306,6 +1306,48 @@ def test_fresh_install(ws, mock_installation):
     )
 
 
+def test_fresh_install_with_workflow_configs(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
+            r".*": "",
+        }
+    )
+
+    install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
+    sql_backend = MockBackend()
+    wheels = create_autospec(WheelsV2)
+
+    install.run(
+        verify_timeout=timedelta(seconds=10),
+        sql_backend_factory=lambda _: sql_backend,
+        wheel_builder_factory=lambda: wheels,
+    )
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'inventory_database': 'ucx',
+            'log_level': 'INFO',
+            'num_days_submit_runs_history': 30,
+            'num_threads': 8,
+            'policy_id': 'foo',
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'min_workers': 2,
+            'max_workers': 20,
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+        },
+    )
+
+
 def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
     workflows_installation = WorkflowsDeployment(
