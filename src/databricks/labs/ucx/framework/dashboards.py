@@ -227,8 +227,8 @@ class DashboardFromFiles:
                 try:
                     self._ws.dashboard_widgets.delete(widget.id)
                 except TypeError:
-                    logger.warning("Type error in SDK API response, ES-1061370")
-                    # Tracking bug in ES-1061370
+                    pass
+                    # TODO: Tracking bug in ES-1061370. Remove after fix
             return
         dashboard = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
         assert dashboard.id is not None
