@@ -3,7 +3,7 @@ from databricks.labs.ucx.source_code.pyspark import SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
-def test_spark_not_sql(empty_index):
+def test_spark_no_sql(empty_index):
     ftf = FromTable(empty_index)
     sqf = SparkSql(ftf)
 
@@ -42,6 +42,28 @@ for i in range(10):
             start_col=13,
             end_line=4,
             end_col=50,
+        )
+    ] == list(sqf.lint(old_code))
+
+
+def test_spark_table_match(migration_index):
+    ftf = FromTable(migration_index)
+    sqf = SparkSql(ftf)
+
+    old_code = """
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    df = spark.table("old.things")
+    do_stuff_with_df(df)
+"""
+    assert [
+        Deprecation(
+            code='table-migrate',
+            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            start_line=4,
+            start_col=9,
+            end_line=4,
+            end_col=34,
         )
     ] == list(sqf.lint(old_code))
 
