@@ -101,7 +101,7 @@ main(f'--config=/Workspace{config_file}',
 """
 
 
-class WorkflowsInstallation(InstallationMixin):
+class WorkflowsDeployment(InstallationMixin):
     def __init__(
         self,
         config: WorkspaceConfig,
