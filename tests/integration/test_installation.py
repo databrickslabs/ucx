@@ -535,11 +535,12 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
     existing_user_installation.uninstall()
 
 
-def test_check_inventory_database_exists(ws, new_installation):
+def test_check_inventory_database_exists(ws, new_installation, make_random):
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     install, _ = new_installation(
         product_info=product_info,
         installation=Installation.assume_global(ws, product_info.product_name()),
+        inventory_schema_name=f"ucx_S{make_random(4)}_exists",
     )
     inventory_database = install.config.inventory_database
 
@@ -554,6 +555,7 @@ def test_check_inventory_database_exists(ws, new_installation):
                 r".*UCX is already installed on this workspace.*": 'yes',
                 r".*Do you want to update the existing installation?.*": 'yes',
             },
+            inventory_schema_name=inventory_database,
         )
 
 
