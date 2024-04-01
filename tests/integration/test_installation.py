@@ -30,7 +30,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
-from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -112,7 +112,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         # TODO: see if we want to move building wheel as a context manager for yield factory,
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
-        workflows_installation = WorkflowsInstallation(
+        workflows_installation = WorkflowsDeployment(
             workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=3)
         )
         workspace_installation = WorkspaceInstallation(

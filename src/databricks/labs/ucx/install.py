@@ -52,7 +52,7 @@ from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
-from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -142,7 +142,7 @@ class WorkspaceInstaller:
         if not wheel_builder_factory:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
-        workflows_installer = WorkflowsInstallation(
+        workflows_installer = WorkflowsDeployment(
             config, self._installation, self._ws, wheels, self._prompts, self._product_info, verify_timeout
         )
         workspace_installation = WorkspaceInstallation(
@@ -319,7 +319,7 @@ class WorkspaceInstallation(InstallationMixin):
         installation: Installation,
         sql_backend: SqlBackend,
         ws: WorkspaceClient,
-        workflows_installer: WorkflowsInstallation,
+        workflows_installer: WorkflowsDeployment,
         prompts: Prompts,
         product_info: ProductInfo,
     ):
@@ -341,7 +341,7 @@ class WorkspaceInstallation(InstallationMixin):
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        workflows_installer = WorkflowsInstallation(config, installation, ws, wheels, prompts, product_info, timeout)
+        workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, prompts, product_info, timeout)
 
         return cls(config, installation, sql_backend, ws, workflows_installer, prompts, product_info)
 

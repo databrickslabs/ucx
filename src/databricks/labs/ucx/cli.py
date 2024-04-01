@@ -27,7 +27,7 @@ from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.install import WorkspaceInstallation
-from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -44,7 +44,7 @@ CANT_FIND_UCX_MSG = (
 @ucx.command
 def workflows(w: WorkspaceClient):
     """Show deployed workflows and their state"""
-    installation = WorkflowsInstallation.current(w)
+    installation = WorkflowsDeployment.current(w)
     logger.info("Fetching deployed jobs...")
     print(json.dumps(installation.latest_job_status()))
 
@@ -170,7 +170,7 @@ def repair_run(w: WorkspaceClient, step):
     """Repair Run the Failed Job"""
     if not step:
         raise KeyError("You did not specify --step")
-    installation = WorkflowsInstallation.current(w)
+    installation = WorkflowsDeployment.current(w)
     logger.info(f"Repair Running {step} Job")
     installation.repair_run(step)
 
