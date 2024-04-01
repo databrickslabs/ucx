@@ -918,7 +918,7 @@ def sql_backend(ws, env_or_skip) -> StatementExecutionBackend:
 
 
 @pytest.fixture
-def inventory_schema(make_schema):
+def inventory_schema(make_schema, make_random):
     return make_schema(catalog_name="hive_metastore").name
 
 

@@ -59,12 +59,14 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         product_info: ProductInfo | None = None,
         environ: dict[str, str] | None = None,
         extend_prompts: dict[str, str] | None = None,
-        inventory_schema_suffix: str = "",
+        inventory_schema_name: str | None = None,
     ):
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
         if not environ:
             environ = {}
+        if not inventory_schema_name:
+            inventory_schema_name = f"ucx_S{make_random(4).lower()}"
         renamed_group_prefix = f"rename-{product_info.product_name()}-"
         prompts = MockPrompts(
             {
@@ -74,9 +76,8 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
-                r".*Inventory Database.*": f"ucx_S{make_random(4).lower()}{inventory_schema_suffix}",
+                r".*Inventory Database.*": inventory_schema_name,
                 r".*Backup prefix*": renamed_group_prefix,
-                r"Do you want to update the existing installation.*": "yes",
                 r".*": "",
             }
             | (extend_prompts or {})
@@ -462,7 +463,7 @@ def test_global_installation_on_existing_global_install(ws, new_installation):
     reinstall_global.uninstall()
 
 
-def test_user_installation_on_existing_global_install(ws, new_installation):
+def test_user_installation_on_existing_global_install(ws, new_installation, make_random):
     # existing install at global level
     product_info = ProductInfo.for_testing(WorkspaceConfig)
     existing_global_installation, _ = new_installation(
@@ -491,7 +492,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation):
             r".*UCX is already installed on this workspace.*": 'yes',
             r".*Do you want to update the existing installation?.*": 'yes',
         },
-        inventory_schema_suffix="_reinstall",
+        inventory_schema_name=f"ucx_S{make_random(4)}_reinstall",
     )
     assert reinstall_user_force.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     reinstall_user_force.uninstall()
@@ -593,7 +594,7 @@ def test_table_migration_job(
             r"Max workers for auto-scale.*": "20",
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
         },
-        inventory_schema_suffix="_migrate_inventory",
+        inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
     )
     installation = product_info.current_installation(ws)
 
@@ -673,7 +674,9 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, workflows_install = new_installation(product_info=product_info, inventory_schema_suffix="_migrate_inventory")
+    _, workflows_install = new_installation(
+        product_info=product_info, inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory"
+    )
     installation = product_info.current_installation(ws)
     migrate_rules = [
         Rule(
