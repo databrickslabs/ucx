@@ -115,6 +115,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         workflows_installation = WorkflowsDeployment(
             workspace_config, installation, ws, product_info.wheels(ws), prompts, product_info, timedelta(minutes=3)
         )
+        workspace_config = workflows_installation.configure()
         workspace_installation = WorkspaceInstallation(
             workspace_config,
             installation,
@@ -576,20 +577,19 @@ def test_table_migration_job(
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
     # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    src_managed_table = make_table(schema_name=src_schema.name)
+    schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    src_managed_table = make_table(schema_name=schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
+    src_external_table = make_table(schema_name=schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
     dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    make_schema(catalog_name=dst_catalog.name, name=schema.name)
 
-    product_info = ProductInfo.from_class(WorkspaceConfig)
     _, workflows_install = new_installation(
         lambda wc: replace(wc, override_clusters=None),
-        product_info=product_info,
+        product_info=ProductInfo.from_class(WorkspaceConfig),
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
@@ -598,23 +598,23 @@ def test_table_migration_job(
         },
         inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
     )
-    installation = product_info.current_installation(ws)
 
+    installation = ProductInfo.from_class(WorkspaceConfig).current_installation(ws)
     installation.save(
         [
             Rule(
                 "ws_name",
                 dst_catalog.name,
-                src_schema.name,
-                dst_schema.name,
+                schema.name,
+                schema.name,
                 src_managed_table.name,
                 src_managed_table.name,
             ),
             Rule(
                 "ws_name",
                 dst_catalog.name,
-                src_schema.name,
-                dst_schema.name,
+                schema.name,
+                schema.name,
                 src_external_table.name,
                 src_external_table.name,
             ),
@@ -639,17 +639,24 @@ def test_table_migration_job(
         ],
         filename='azure_storage_account_info.csv',
     )
+
     workflows_install.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert workflows_install.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
-        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_external_table.name}").name
     except NotFound:
         assert (
             False
-        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{schema.name}"
+    # assert the cluster is configured correctly
+    job_id = installation.load(RawState).resources["jobs"]["migrate-tables"]
+    for job_cluster in ws.jobs.get(job_id).settings.job_clusters:
+        assert job_cluster.new_cluster.autoscale.min_workers == 2
+        assert job_cluster.new_cluster.autoscale.max_workers == 20
+        assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
