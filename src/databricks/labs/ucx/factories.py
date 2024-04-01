@@ -1,58 +1,55 @@
-import logging
 import os
 from datetime import timedelta
-from typing import Callable, Protocol
+from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
-from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.labs.lsql.backends import (
+    RuntimeBackend,
+    SqlBackend,
+    StatementExecutionBackend,
+)
+from databricks.sdk import AccountClient, WorkspaceClient
 
+from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResources, run_command
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
-from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
-from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.aws.credentials import IamRoleMigration, CredentialManager
+from databricks.labs.ucx.aws.credentials import CredentialManager, IamRoleMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration, StorageCredentialManager
-from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.azure.resources import AzureResources, AzureAPIClient
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore import (
-    ExternalLocations,
-    Mounts,
-    TablesCrawler,
+from databricks.labs.ucx.azure.credentials import (
+    ServicePrincipalMigration,
+    StorageCredentialManager,
 )
+from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler, PrincipalACL, AzureACL
+from databricks.labs.ucx.hive_metastore.grants import (
+    AzureACL,
+    GrantsCrawler,
+    PrincipalACL,
+)
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatusRefresher, TablesMigrator,
+    MigrationStatusRefresher,
+    TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
-from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
 from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
-from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 
-class Factories:
+class GlobalContext:
     flags: dict[str, str]
-
-    _ac: AccountClient
-    _ws: WorkspaceClient
 
     @property
     def workspace_client(self) -> WorkspaceClient:
@@ -147,7 +144,7 @@ class Factories:
     def azure_cli_authenticated(self):
         sdk_config = self.workspace_client.config
         if not sdk_config.is_azure:
-            raise NotImplemented("Azure only")
+            raise NotImplementedError("Azure only")
         if sdk_config.auth_type != "azure-cli":
             raise ValueError("In order to obtain AAD token, Please run azure cli to authenticate.")
         return True
@@ -155,7 +152,7 @@ class Factories:
     @property
     def azure_management_client(self):
         if not self.azure_cli_authenticated:
-            raise NotImplemented
+            raise NotImplementedError
         return AzureAPIClient(
             self.workspace_client.config.arm_environment.resource_manager_endpoint,
             self.workspace_client.config.arm_environment.service_management_endpoint,
@@ -164,7 +161,7 @@ class Factories:
     @property
     def microsoft_graph_client(self):
         if not self.azure_cli_authenticated:
-            raise NotImplemented
+            raise NotImplementedError
         return AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
 
     @property
@@ -200,7 +197,7 @@ class Factories:
     @property
     def principal_acl(self):
         if not self.workspace_client.config.is_azure:
-            raise NotImplemented("Azure only for now")
+            raise NotImplementedError("Azure only for now")
         eligible = self.azure_acl.get_eligible_locations_principals()
         return PrincipalACL(
             self.workspace_client,
@@ -228,7 +225,7 @@ class Factories:
     @property
     def aws_resources(self):
         if not self.workspace_client.config.is_aws:
-            raise NotImplemented("AWS only")
+            raise NotImplementedError("AWS only")
         profile = self.flags.get("aws_profile")
         profile = os.getenv("AWS_DEFAULT_PROFILE", profile)
         return AWSResources(profile, self.aws_cli_run_command)
@@ -331,3 +328,55 @@ class Factories:
     def cluster_access(self):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
+
+class RuntimeContext(GlobalContext):
+    def __init__(self, config_path: Path):
+        self._config_path = config_path
+
+    @property
+    def config(self):
+        return Installation.load_local(WorkspaceConfig, self._config_path)
+
+    @property
+    def workspace_client(self) -> WorkspaceClient:
+        return WorkspaceClient(config=self.config.connect, product='ucx', product_version=__version__)
+
+    @property
+    def sql_backend(self) -> SqlBackend:
+        return RuntimeBackend(debug_truncate_bytes=self.config.connect.debug_truncate_bytes)
+
+    @property
+    def installation(self):
+        install_folder = self._config_path.parent.as_posix().removeprefix("/Workspace")
+        return Installation(self.workspace_client, "ucx", install_folder=install_folder)
+
+
+class CliContext(GlobalContext):
+    def prompts(self) -> Prompts:
+        return Prompts()
+
+
+class WorkspaceContext(CliContext):
+    def __init__(self, ws: WorkspaceClient, flags: dict[str, str]):
+        self.flags = flags
+        self._ws = ws
+
+    @property
+    def workspace_client(self) -> WorkspaceClient:
+        return self._ws
+
+    @property
+    def sql_backend(self) -> SqlBackend:
+        return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
+
+
+class AccountContext(CliContext):
+    def __init__(self, ac: AccountClient, flags: dict[str, str]):
+        self.flags = flags
+        self._ac = ac
+
+    @property
+    def account_client(self) -> AccountClient:
+        if not self._ac:
+            self._ac = AccountClient()
+        return self._ac

@@ -11,25 +11,15 @@ from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.factories import Factories
+from databricks.labs.ucx.factories import GlobalContext
 from databricks.labs.ucx.hive_metastore import (
     ExternalLocations,
-    GrantsCrawler,
     Mounts,
-    TablesCrawler,
-)
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatusRefresher,
-    TablesMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, What
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
-from databricks.labs.ucx.workspace_access.groups import GroupManager
-from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +52,7 @@ def task(
 ) -> Callable[[Callable], Callable]: ...
 
 
-
-class Assessment(Workflow, Factories):
+class Assessment(Workflow, GlobalContext):
     def __init__(self, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend):
         super().__init__('assessment', ws, cfg, sql_backend)
 
@@ -282,7 +271,7 @@ class Assessment(Workflow, Factories):
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-class GroupMigration(Workflow, Factories):
+class GroupMigration(Workflow, GlobalContext):
     def __init__(self, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend):
         super().__init__('migrate-groups', ws, cfg, sql_backend)
 
@@ -323,7 +312,7 @@ class GroupMigration(Workflow, Factories):
         self.permission_manager.verify_group_permissions()
 
 
-class TableMigration(Workflow, Factories):
+class TableMigration(Workflow, GlobalContext):
     def __init__(self, ws: WorkspaceClient, cfg: WorkspaceConfig, sql_backend: SqlBackend, install: Installation):
         super().__init__('migrate-tables', ws, cfg, sql_backend)
         self._install = install
@@ -345,5 +334,3 @@ class TableMigration(Workflow, Factories):
         - For AWS: TBD
         """
         self.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
-
-
