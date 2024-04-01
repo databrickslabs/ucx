@@ -49,38 +49,66 @@ from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 
+class singleton(property):
+    def __init__(self, func):
+        super().__init__(func)
+        self._qualname = func.__qualname__
+
+    def __get__(self, inst, owner=None):
+        if not isinstance(inst, GlobalContext):
+            raise ValueError("bean must be used in a GlobalContext")
+        __tracebackhide__ = True  # pylint: disable=unused-variable
+        if self._qualname in inst.registry:
+            return inst.registry[self._qualname]
+        created = self.fget(inst)
+        inst.registry[self._qualname] = created
+        return created
+
+    def __set__(self, instance, value):
+        if 'PYTEST_CURRENT_TEST' not in os.environ:
+            raise ValueError("Cannot set bean value outside of testing")
+        instance.registry[self._qualname] = value
+
+    def __str__(self):
+        return f"@bean: {self._qualname}"
+
+
 class GlobalContext:
+    # TODO: make flags only available in CLI contexts
     flags: dict[str, str]
 
-    @property
+    def __init__(self):
+        self.registry = {}
+
+    @singleton
     def workspace_client(self) -> WorkspaceClient:
         raise ValueError("Workspace client not set")
 
-    @property
+    @singleton
     def sql_backend(self) -> SqlBackend:
         raise ValueError("SQL backend not set")
 
-    @property
+    @singleton
     def account_client(self) -> AccountClient:
         raise ValueError("Account client not set")
 
-    @property
+    @singleton
     def prompts(self) -> Prompts:
         raise ValueError("Prompts not set")
 
-    @property
+    @singleton
     def product_info(self):
         return ProductInfo.from_class(WorkspaceConfig)
 
-    @property
+    @singleton
     def installation(self):
         return Installation.current(self.workspace_client, self.product_info.product_name())
 
-    @property
+    @singleton
     def config(self) -> WorkspaceConfig:
         return self.installation.load(WorkspaceConfig)
 
-    @property
+    @singleton
     def permission_manager(self):
         return PermissionManager.factory(
             self.workspace_client,
@@ -90,7 +118,7 @@ class GlobalContext:
             workspace_start_path=self.config.workspace_start_path,
         )
 
-    @property
+    @singleton
     def group_manager(self):
         return GroupManager(
             self.sql_backend,
@@ -104,19 +132,19 @@ class GlobalContext:
             external_id_match=self.config.group_match_by_external_id,
         )
 
-    @property
+    @singleton
     def grants_crawler(self):
         return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.config.include_databases)
 
-    @property
+    @singleton
     def udfs_crawler(self):
         return UdfsCrawler(self.sql_backend, self.config.inventory_database, self.config.include_databases)
 
-    @property
+    @singleton
     def tables_crawler(self):
         return TablesCrawler(self.sql_backend, self.config.inventory_database, self.config.include_databases)
 
-    @property
+    @singleton
     def tables_migrator(self):
         return TablesMigrator(
             self.tables_crawler,
@@ -129,19 +157,19 @@ class GlobalContext:
             self.principal_acl,
         )
 
-    @property
+    @singleton
     def table_move(self):
         return TableMove(self.workspace_client, self.sql_backend)
 
-    @property
+    @singleton
     def mounts_crawler(self):
         return Mounts(self.sql_backend, self.workspace_client, self.config.inventory_database)
 
-    @property
+    @singleton
     def azure_service_principal_crawler(self):
         return AzureServicePrincipalCrawler(self.workspace_client, self.sql_backend, self.config.inventory_database)
 
-    @property
+    @singleton
     def azure_cli_authenticated(self):
         sdk_config = self.workspace_client.config
         if not sdk_config.is_azure:
@@ -150,7 +178,7 @@ class GlobalContext:
             raise ValueError("In order to obtain AAD token, Please run azure cli to authenticate.")
         return True
 
-    @property
+    @singleton
     def azure_management_client(self):
         if not self.azure_cli_authenticated:
             raise NotImplementedError
@@ -159,17 +187,17 @@ class GlobalContext:
             self.workspace_client.config.arm_environment.service_management_endpoint,
         )
 
-    @property
+    @singleton
     def microsoft_graph_client(self):
         if not self.azure_cli_authenticated:
             raise NotImplementedError
         return AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
 
-    @property
+    @singleton
     def external_locations(self):
         return ExternalLocations(self.workspace_client, self.sql_backend, self.config.inventory_database)
 
-    @property
+    @singleton
     def azure_resources(self):
         return AzureResources(
             self.azure_management_client,
@@ -177,7 +205,7 @@ class GlobalContext:
             self.flags.get('include_subscriptions'),
         )
 
-    @property
+    @singleton
     def azure_resource_permissions(self):
         return AzureResourcePermissions(
             self.installation,
@@ -186,7 +214,7 @@ class GlobalContext:
             self.external_locations,
         )
 
-    @property
+    @singleton
     def azure_acl(self):
         return AzureACL(
             self.workspace_client,
@@ -195,7 +223,7 @@ class GlobalContext:
             self.azure_resource_permissions,
         )
 
-    @property
+    @singleton
     def principal_acl(self):
         if not self.workspace_client.config.is_azure:
             raise NotImplementedError("Azure only for now")
@@ -209,7 +237,7 @@ class GlobalContext:
             eligible,
         )
 
-    @property
+    @singleton
     def migration_status_refresher(self):
         return MigrationStatusRefresher(
             self.workspace_client,
@@ -218,12 +246,12 @@ class GlobalContext:
             self.tables_crawler,
         )
 
-    @property
+    @singleton
     def aws_cli_run_command(self):
         # this is a convenience method for unit testing
         return run_command
 
-    @property
+    @singleton
     def aws_resources(self):
         if not self.workspace_client.config.is_aws:
             raise NotImplementedError("AWS only")
@@ -231,7 +259,7 @@ class GlobalContext:
         profile = os.getenv("AWS_DEFAULT_PROFILE", profile)
         return AWSResources(profile, self.aws_cli_run_command)
 
-    @property
+    @singleton
     def aws_resource_permissions(self):
         return AWSResourcePermissions(
             self.installation,
@@ -244,11 +272,11 @@ class GlobalContext:
             self.flags.get("kms_key"),
         )
 
-    @property
+    @singleton
     def iam_credential_manager(self):
         return CredentialManager(self.workspace_client)
 
-    @property
+    @singleton
     def iam_role_migration(self):
         return IamRoleMigration(
             self.installation,
@@ -257,11 +285,11 @@ class GlobalContext:
             self.iam_credential_manager,
         )
 
-    @property
+    @singleton
     def azure_credential_manager(self):
         return StorageCredentialManager(self.workspace_client)
 
-    @property
+    @singleton
     def service_principal_migration(self):
         return ServicePrincipalMigration(
             self.installation,
@@ -271,7 +299,7 @@ class GlobalContext:
             self.azure_credential_manager,
         )
 
-    @property
+    @singleton
     def azure_external_locations_migration(self):
         return ExternalLocationsMigration(
             self.workspace_client,
@@ -280,32 +308,32 @@ class GlobalContext:
             self.azure_resources,
         )
 
-    @property
+    @singleton
     def table_mapping(self):
         return TableMapping(self.installation, self.workspace_client, self.sql_backend)
 
-    @property
+    @singleton
     def catalog_schema(self):
         return CatalogSchema(self.workspace_client, self.table_mapping)
 
-    @property
+    @singleton
     def languages(self):
         index = self.tables_migrator.index()
         return Languages(index)
 
-    @property
+    @singleton
     def verify_timeout(self):
         return timedelta(minutes=2)
 
-    @property
+    @singleton
     def wheels(self):
         return WheelsV2(self.installation, self.product_info)
 
-    @property
+    @singleton
     def install_state(self):
         return InstallState.from_installation(self.installation)
 
-    @property
+    @singleton
     def workflows(self):
         # TODO: decouple to only trigger jobs
         return WorkflowsInstallation(
@@ -318,11 +346,11 @@ class GlobalContext:
             self.verify_timeout,
         )
 
-    @property
+    @singleton
     def workspace_info(self):
         return WorkspaceInfo(self.installation, self.workspace_client)
 
-    @property
+    @singleton
     def cluster_access(self):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
@@ -337,45 +365,52 @@ class RuntimeContext(GlobalContext):
     def set_config_path(self, config_path: Path):
         self._config_path = config_path
 
-    @property
+    @singleton
     def config(self) -> WorkspaceConfig:
         if not self._config_path:
             raise ValueError("Config path not set")
         return Installation.load_local(WorkspaceConfig, self._config_path)
 
-    @property
+    @singleton
     def workspace_client(self) -> WorkspaceClient:
         return WorkspaceClient(config=self.config.connect, product='ucx', product_version=__version__)
 
-    @property
+    @singleton
     def sql_backend(self) -> SqlBackend:
         return RuntimeBackend(debug_truncate_bytes=self.config.connect.debug_truncate_bytes)
 
-    @property
+    @singleton
     def installation(self):
         install_folder = self._config_path.parent.as_posix().removeprefix("/Workspace")
         return Installation(self.workspace_client, "ucx", install_folder=install_folder)
 
 
 class CliContext(GlobalContext):
+    def __init__(self, flags: dict[str, str] = None):
+        super().__init__()
+        if not flags:
+            flags = {}
+        self.flags = flags
+
+    @singleton
     def prompts(self) -> Prompts:
         return Prompts()
 
 
 class WorkspaceContext(CliContext):
-    def __init__(self, ws: WorkspaceClient, flags: dict[str, str]):
-        self.flags = flags
+    def __init__(self, ws: WorkspaceClient, flags: dict[str, str] = None):
+        super().__init__(flags)
         self._ws = ws
 
-    @property
+    @singleton
     def workspace_client(self) -> WorkspaceClient:
         return self._ws
 
-    @property
+    @singleton
     def sql_backend(self) -> SqlBackend:
         return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
 
-    @property
+    @singleton
     def local_file_migrator(self):
         return Files(self.languages)
 
@@ -385,12 +420,12 @@ class AccountContext(CliContext):
         self.flags = flags
         self._ac = ac
 
-    @property
+    @singleton
     def account_client(self) -> AccountClient:
         if not self._ac:
             self._ac = AccountClient()
         return self._ac
 
-    @property
+    @singleton
     def account_workspaces(self):
         return AccountWorkspaces(self.account_client)
