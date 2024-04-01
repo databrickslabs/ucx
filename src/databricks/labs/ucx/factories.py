@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import (
@@ -299,6 +300,10 @@ class GlobalContext:
     @property
     def wheels(self):
         return WheelsV2(self.installation, self.product_info)
+
+    @property
+    def install_state(self):
+        return InstallState.from_installation(self.installation)
 
     @property
     def workflows(self):
