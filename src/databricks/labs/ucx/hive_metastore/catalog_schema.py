@@ -26,78 +26,51 @@ class CatalogSchema:
         table_mapping = TableMapping(installation, ws, sql_backend)
         return cls(ws, table_mapping)
 
-    def create_all_catalogs_schemas(self, prompts: Prompts):
-        candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
-        for candidate_catalog in candidate_catalogs:
-            self._create_catalog_validate(candidate_catalog, prompts)
-        for candidate_catalog, schemas in candidate_schemas.items():
-            for candidate_schema in schemas:
-                self._create_schema(candidate_catalog, candidate_schema)
+    def create_all_catalogs_schemas(self, prompts: Prompts) -> None:
+        existing_catalogs: set[str] = self._get_existing_catalogs()
+        all_catalog_schemas: dict[str, set[str]] = self._get_all_catalog_schemas_to_create()
 
-    def _create_catalog_validate(self, catalog, prompts: Prompts):
+        for catalog, all_schemas in all_catalog_schemas.items():
+            if catalog in existing_catalogs:
+                existing_schemas = self._get_schemas_of_catalog(catalog)
+                missing_schemas = all_schemas - existing_schemas
+                if len(missing_schemas) > 0:
+                    self._create_schemas(catalog, missing_schemas)
+            else:
+                # Create a new catalog with it's belonging schemas.
+                self._validate_create_catalog(catalog, prompts)
+                self._create_schemas(catalog, all_schemas)
+
+    def _validate_create_catalog(self, catalog, prompts: Prompts) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
-        # create catalogs
         attempts = 3
-        while True:
+        while attempts > 0:
             catalog_storage = prompts.question(
                 f"Please provide storage location url for catalog:{catalog}.", default="metastore"
             )
-            if self._validate_location(catalog_storage):
-                break
+            if self._is_valid_location(catalog_storage):
+                self._create_catalog(catalog, catalog_storage)
+                return
             attempts -= 1
-            if attempts == 0:
-                raise NotFound(f"Failed to validate location for {catalog} catalog")
-        self._create_catalog(catalog, catalog_storage)
+        raise NotFound(f"Failed to validate location for {catalog} catalog")
 
-    def _list_existing(self) -> tuple[set[str], dict[str, set[str]]]:
-        """generate a list of existing UC catalogs and schema."""
-        logger.info("Listing existing UC catalogs and schemas")
-        existing_catalogs: set[str] = set()
-        for catalog_info in self._ws.catalogs.list():
-            if catalog_info.name:
-                existing_catalogs.add(catalog_info.name)
+    def _get_existing_catalogs(self) -> set[str]:
+        return {catalog.name for catalog in self._ws.catalogs.list()}
 
-        existing_schemas: dict[str, set[str]] = {}  # catalog -> set[schema]
-        for catalog in existing_catalogs:
-            existing_schemas[catalog] = set()
-            for schema in self._ws.schemas.list(catalog, max_results=0):
-                if schema.name:
-                    existing_schemas[catalog].add(schema.name)
+    def _get_schemas_of_catalog(self, catalog: str) -> set[str]:
+        return {schema.name for schema in self._ws.schemas.list(catalog, max_results=0) if schema}
 
-        return existing_catalogs, existing_schemas
+    def _get_all_catalog_schemas_to_create(self) -> dict[str, set[str]]:
+        catalog_schemas: dict[str, set[str]] = {}
+        for table in self._table_mapping.load():
+            catalog, schema = table.catalog_name, table.dst_schema
+            if catalog in catalog_schemas:
+                catalog_schemas[catalog].add(schema)
+            else:
+                catalog_schemas[catalog] = set({schema})
+        return catalog_schemas
 
-    def _list_target(self) -> tuple[set[str], dict[str, set[str]]]:
-        """generate a list of catalogs and schema to be created from table mappings."""
-        target_catalogs: set[str] = set()
-        target_schemas: dict[str, set[str]] = {}  # catalog -> set[schema]
-        table_mappings = self._table_mapping.load()
-        for mappings in table_mappings:
-            target_catalog = mappings.catalog_name
-            target_schema = mappings.dst_schema
-            target_catalogs.add(target_catalog)
-            if target_catalog not in target_schemas:
-                target_schemas[target_catalog] = {target_schema}
-                continue
-            target_schemas[target_catalog].add(target_schema)
-        return target_catalogs, target_schemas
-
-    def _get_missing_catalogs_schemas(self) -> tuple[set[str], dict[str, set[str]]]:
-        """prepare a list of catalogs and schema to be created"""
-        existing_catalogs, existing_schemas = self._list_existing()
-        target_catalogs, target_schemas = self._list_target()
-
-        logger.info("Preparing a list of UC catalogs and schema to be created")
-        # filter out existing catalogs and schemas from target catalogs and schemas to be created.
-        for existing_catalog in existing_catalogs:
-            if existing_catalog in target_catalogs:
-                target_catalogs.remove(existing_catalog)
-
-        for catalog, schemas in existing_schemas.items():
-            if catalog in target_schemas:
-                target_schemas[catalog] = target_schemas[catalog] - schemas
-        return target_catalogs, target_schemas
-
-    def _validate_location(self, location: str):
+    def _is_valid_location(self, location: str) -> bool:
         if location == "metastore":
             return True
         try:
@@ -112,13 +85,14 @@ class CatalogSchema:
                 return True
         return False
 
-    def _create_catalog(self, catalog, catalog_storage):
+    def _create_catalog(self, catalog, catalog_storage) -> None:
         logger.info(f"Creating UC catalog: {catalog}")
         if catalog_storage == "metastore":
             self._ws.catalogs.create(catalog, comment="Created by UCX")
         else:
             self._ws.catalogs.create(catalog, storage_root=catalog_storage, comment="Created by UCX")
 
-    def _create_schema(self, catalog, schema):
-        logger.info(f"Creating UC schema: {schema} in catalog: {catalog}")
-        self._ws.schemas.create(schema, catalog, comment="Created by UCX")
+    def _create_schemas(self, catalog: str, schemas: set[str]) -> None:
+        for schema in schemas:
+            logger.info(f"Creating UC schema: {schema} in catalog: {catalog}")
+            self._ws.schemas.create(schema, catalog, comment="Created by UCX")
