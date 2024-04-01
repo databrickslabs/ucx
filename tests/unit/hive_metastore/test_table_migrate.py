@@ -773,3 +773,52 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     table_migrator.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
+
+
+def test_migrate_tables_and_views_should_be_properly_sequenced(ws):
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = create_autospec(TablesCrawler)
+    grant_crawler = create_autospec(GrantsCrawler)
+    table_mapping = table_mapping_mock()
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "v1_src", "EXTERNAL", "VIEW", None, "select * from db1_src.v3_src"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "v1_src", "v1_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "v2_src", "EXTERNAL", "VIEW", None, "select * from db1_src.t1_src"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "v2_src", "v2_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "t1_src", "EXTERNAL", "TABLE"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "t1_src", "t1_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "v3_src", "EXTERNAL", "VIEW", None, "select * from db1_src.v2_src"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "v3_src", "v3_dst"),
+        ),
+        TableToMigrate(
+            Table("hive_metastore", "db1_src", "t2_src", "EXTERNAL", "TABLE"),
+            Rule("workspace", "catalog", "db1_src", "db1_dst", "t2_src", "t2_dst"),
+        ),
+    ]
+    group_manager = GroupManager(backend, ws, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    table_migrator = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+    tasks = table_migrator.migrate_tables()
+    table_keys = [task.args[0].key for task in tasks]
+    assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
+    assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
+    assert table_keys.index("hive_metastore.db1_src.v2_src") > table_keys.index("hive_metastore.db1_src.t1_src")

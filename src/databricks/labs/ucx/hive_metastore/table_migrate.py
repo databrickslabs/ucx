@@ -24,6 +24,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.views_sequencer import TableMigrationSequencer
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
@@ -93,23 +94,29 @@ class TablesMigrator:
     def migrate_tables(self, *, what: What | None = None, acl_strategy: list[AclMigrationWhat] | None = None):
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
-        tasks = []
         if acl_strategy is not None:
             grants_to_migrate = self._gc.snapshot()
             migrated_groups = self._group.snapshot()
             principal_grants = self._principal_grants.get_interactive_cluster_grants()
         else:
             acl_strategy = []
-        for table in tables_to_migrate:
-            grants = []
-            if what is not None and table.src.what != what:
-                continue
-            if AclMigrationWhat.LEGACY_TACL in acl_strategy:
-                grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
-            if AclMigrationWhat.PRINCIPAL in acl_strategy:
-                grants.extend(self._match_grants(table.src, principal_grants, migrated_groups))
-            tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
-        Threads.strict("migrate tables", tasks)
+        sequencer = TableMigrationSequencer(tables_to_migrate)
+        batches = sequencer.sequence_batches()
+        all_tasks = []
+        for batch in batches:
+            tasks = []
+            for table in batch:
+                grants = []
+                if what is not None and table.src.what != what:
+                    continue
+                if AclMigrationWhat.LEGACY_TACL in acl_strategy:
+                    grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
+                if AclMigrationWhat.PRINCIPAL in acl_strategy:
+                    grants.extend(self._match_grants(table.src, principal_grants, migrated_groups))
+                tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
+            all_tasks.extend(tasks)
+            Threads.strict("migrate tables", tasks)
+        return all_tasks
 
     def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         if self._table_already_migrated(rule.as_uc_table_key):
