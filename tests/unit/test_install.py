@@ -235,7 +235,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
 
 def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     wheels = create_autospec(WheelsV2)
-    workspace_installation = WorkflowsDeployment(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
         mock_installation,
         ws,
@@ -245,7 +245,7 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
         timedelta(seconds=1),
     )
 
-    workspace_installation.create_jobs()
+    workflows_installation.create_jobs()
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
@@ -1279,6 +1279,9 @@ def test_fresh_install(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
             r".*": "",
         }
     )
@@ -1297,8 +1300,9 @@ def test_fresh_install(ws, mock_installation):
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
             'policy_id': 'foo',
-            'min_workers': 1,
-            'max_workers': 10,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'min_workers': 2,
+            'max_workers': 20,
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
