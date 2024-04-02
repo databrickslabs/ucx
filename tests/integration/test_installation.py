@@ -255,7 +255,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, InvalidParameterValue, TimeoutError], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
