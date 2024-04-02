@@ -4,7 +4,13 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter
+from databricks.labs.ucx.source_code.base import (
+    Advice,
+    Advisory,
+    Deprecation,
+    Fixer,
+    Linter,
+)
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -19,8 +25,7 @@ class Matcher(ABC):
     def matches(self, node: ast.AST):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
             return False
-        arg = self._get_table_arg(node)
-        return isinstance(arg, ast.Constant)
+        return self._get_table_arg(node) is not None
 
     @abstractmethod
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
@@ -43,13 +48,22 @@ class QueryMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, ast.Constant)
-        for advice in from_table.lint(table_arg.value):
-            yield advice.replace(
+        if isinstance(table_arg, ast.Constant):
+            for advice in from_table.lint(table_arg.value):
+                yield advice.replace(
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno,
+                    end_col=node.end_col_offset,
+                )
+        else:
+            yield Advisory(
+                code='table-migrate',
+                message="Table",
                 start_line=node.lineno,
                 start_col=node.col_offset,
-                end_line=node.end_lineno,
-                end_col=node.end_col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
@@ -64,13 +78,23 @@ class TableNameMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, ast.Constant)
-        dst = self._find_dest(index, table_arg.value)
-        if dst is not None:
-            yield Deprecation(
+        if isinstance(table_arg, ast.Constant):
+            dst = self._find_dest(index, table_arg.value)
+            if dst is not None:
+                yield Deprecation(
+                    code='table-migrate',
+                    message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
+                    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
+        else:
+            assert isinstance(node.func, ast.Attribute) # always true, avoids a pylint warning
+            yield Advisory(
                 code='table-migrate',
-                message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
-                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                message=f"Can't migrate '{node.func.attr}' because its table name argument is not a constant",
                 start_line=node.lineno,
                 start_col=node.col_offset,
                 end_line=node.end_lineno or 0,

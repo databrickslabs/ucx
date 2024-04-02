@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Deprecation
+from databricks.labs.ucx.source_code.base import Advisory, Deprecation
 from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -170,6 +170,48 @@ for i in range(10):
             start_col=9,
             end_line=4,
             end_col=59,
+        )
+    ] == list(sqf.lint(old_code))
+
+
+def test_spark_table_variable_arg(migration_index):
+    ftf = FromTable(migration_index)
+    sqf = SparkSql(ftf, migration_index)
+    old_code = """
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    df = spark.saveAsTable(name)
+    do_stuff_with_df(df)
+"""
+    assert [
+        Advisory(
+            code='table-migrate',
+            message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
+            start_line=4,
+            start_col=9,
+            end_line=4,
+            end_col=32,
+        )
+    ] == list(sqf.lint(old_code))
+
+
+def test_spark_table_fstring_arg(migration_index):
+    ftf = FromTable(migration_index)
+    sqf = SparkSql(ftf, migration_index)
+    old_code = """
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    df = spark.saveAsTable(f"boop{stuff}")
+    do_stuff_with_df(df)
+"""
+    assert [
+        Advisory(
+            code='table-migrate',
+            message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
+            start_line=4,
+            start_col=9,
+            end_line=4,
+            end_col=42,
         )
     ] == list(sqf.lint(old_code))
 
