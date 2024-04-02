@@ -56,6 +56,9 @@ class TableToMigrate:
     def __hash__(self):
         return hash(self.src)
 
+    def __eq__(self, other):
+        return isinstance(other, TableToMigrate) and self.src == other.src
+
 
 class TableMapping:
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
