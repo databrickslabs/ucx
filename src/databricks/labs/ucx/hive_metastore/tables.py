@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 class What(Enum):
     EXTERNAL_SYNC = auto()
     EXTERNAL_NO_SYNC = auto()
-    EXTERNAL_MOUNT = auto()
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
     VIEW = auto()
@@ -42,6 +41,7 @@ class Table:
 
     location: str | None = None
     view_text: str | None = None
+    # really means migrated_to
     upgraded_to: str | None = None
 
     storage_properties: str | None = None
@@ -129,8 +129,6 @@ class Table:
     def what(self) -> What:
         if self.is_databricks_dataset:
             return What.DB_DATASET
-        if self.database.startswith("mounted_"):
-            return What.EXTERNAL_MOUNT
         if self.is_dbfs_root and self.table_format == "DELTA":
             return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:
