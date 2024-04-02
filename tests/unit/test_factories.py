@@ -1,6 +1,9 @@
+import base64
 from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.factories import WorkspaceContext
@@ -9,8 +12,12 @@ from databricks.labs.ucx.factories import WorkspaceContext
 def test_replace_installation():
     ws = create_autospec(WorkspaceClient)
     ws.config.auth_type = 'azure-cli'
+    ws.secrets.get_secret.return_value.value = base64.b64encode(b'1234').decode('utf-8')
+
+    spn_info_rows = MockBackend.rows('application_id', 'secret_scope', 'secret_key', 'tenant_id', 'storage_account')
+
     ctx = WorkspaceContext(ws)
-    ctx.installation = MockInstallation(
+    mock_installation = MockInstallation(
         {
             'config.yml': {
                 'inventory_database': 'some',
@@ -24,6 +31,7 @@ def test_replace_installation():
                 {
                     'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
                     'client_id': "redacted-for-github-929e765443eb",
+                    'directory_id': 'tenant',
                     'principal': "oneenv-adls",
                     'privilege': "WRITE_FILES",
                     'type': "Application",
@@ -38,6 +46,28 @@ def test_replace_installation():
             ],
         }
     )
+    ctx.__dict__['installation'] = mock_installation
+    ctx.__dict__['sql_backend'] = MockBackend(
+        rows={
+            r'some.azure_service_principals': spn_info_rows[
+                ('redacted-for-github-929e765443eb', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
+                ('redacted-for-github-ebcef6708997', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
+            ]
+        }
+    )
 
-    all_perms = ctx.azure_resource_permissions.load()
-    assert len(all_perms) == 2
+    prompts = MockPrompts({'.*': 'yes'})
+    ctx.service_principal_migration.run(prompts)
+
+    ws.storage_credentials.create.assert_called_once()
+    mock_installation.assert_file_written(
+        'azure_service_principal_migration_result.csv',
+        [
+            {
+                'application_id': 'redacted-for-github-929e765443eb',
+                'directory_id': 'tenant',
+                'name': 'oneenv-adls',
+                'validated_on': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+            }
+        ],
+    )
