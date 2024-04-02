@@ -61,7 +61,7 @@ from databricks.labs.ucx.install import (
     WorkspaceInstaller,
     extract_major_minor,
 )
-from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -203,12 +203,11 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     sql_backend = MockBackend(
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
     )
-    workflows_installation = WorkflowsInstallation(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
         ws,
         create_autospec(WheelsV2),
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -235,17 +234,16 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
 
 def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     wheels = create_autospec(WheelsV2)
-    workspace_installation = WorkflowsInstallation(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
         mock_installation,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
 
-    workspace_installation.create_jobs()
+    workflows_installation.create_jobs(any_prompt)
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
@@ -267,17 +265,16 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
         }
     )
 
-    workflows_installation = WorkflowsInstallation(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
         ws,
         wheels,
-        prompts,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
 
-    workflows_installation.create_jobs()
+    workflows_installation.create_jobs(prompts)
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == "2222-999999-nosecuri"
@@ -305,17 +302,16 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
 def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     wheels = create_autospec(WheelsV2)
-    workflows_installation = WorkflowsInstallation(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
 
-    workflows_installation.create_jobs()
+    workflows_installation.create_jobs(any_prompt)
 
     job = created_job(ws, '[MOCK] assessment')
     job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
@@ -324,7 +320,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert job_clusters["main"].new_cluster.policy_id == "123"
 
 
-def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -350,12 +346,11 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
-    installer = WorkflowsInstallation(
+    installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -365,7 +360,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
     assert str(failure.value) == "stuff: does not compute"
 
 
-def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_run_workflow_run_id_not_found(ws, mocker, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -391,12 +386,11 @@ def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation
     ws.jobs.get_run_output.return_value = jobs.RunOutput(error="does not compute", error_trace="# goes to stderr")
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
-    installer = WorkflowsInstallation(
+    installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -404,9 +398,7 @@ def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation
         installer.run_workflow("assessment")
 
 
-def test_run_workflow_creates_failure_from_mapping(
-    ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs
-):
+def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -434,12 +426,11 @@ def test_run_workflow_creates_failure_from_mapping(
         error="something: PermissionDenied: does not compute", error_trace="# goes to stderr"
     )
     wheels = create_autospec(WheelsV2)
-    installer = WorkflowsInstallation(
+    installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -449,7 +440,7 @@ def test_run_workflow_creates_failure_from_mapping(
     assert str(failure.value) == "does not compute"
 
 
-def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -487,12 +478,11 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_in
     )
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     wheels = create_autospec(WheelsV2)
-    installer = WorkflowsInstallation(
+    installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_with_jobs,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -629,12 +619,11 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
             r".*": "",
         }
     )
-    workflows_installer = WorkflowsInstallation(
+    workflows_installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
         ws,
         create_autospec(WheelsV2),
-        prompts,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -668,7 +657,7 @@ def test_remove_database(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
-    workflow_installer = create_autospec(WorkflowsInstallation)
+    workflow_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
         config, installation, sql_backend, ws, workflow_installer, prompts, PRODUCT_INFO
     )
@@ -689,8 +678,8 @@ def test_remove_jobs_no_state(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
-    workflows_installer = WorkflowsInstallation(
-        config, installation, ws, create_autospec(WheelsV2), prompts, PRODUCT_INFO, timedelta(seconds=1)
+    workflows_installer = WorkflowsDeployment(
+        config, installation, ws, create_autospec(WheelsV2), PRODUCT_INFO, timedelta(seconds=1)
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -713,8 +702,8 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
     )
     config = WorkspaceConfig(inventory_database='ucx')
     installation = mock_installation_with_jobs
-    workflows_installer = WorkflowsInstallation(
-        config, installation, ws, create_autospec(WheelsV2), prompts, PRODUCT_INFO, timedelta(seconds=1)
+    workflows_installer = WorkflowsDeployment(
+        config, installation, ws, create_autospec(WheelsV2), PRODUCT_INFO, timedelta(seconds=1)
     )
     workspace_installation = WorkspaceInstallation(
         config, mock_installation_with_jobs, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -739,7 +728,7 @@ def test_remove_warehouse(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
         config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
@@ -761,7 +750,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
         config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
@@ -780,7 +769,7 @@ def test_remove_secret_scope(ws, caplog):
     )
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = create_autospec(WorkflowsDeployment)
     # ws.secrets.delete_scope.side_effect = NotFound()
     workspace_installation = WorkspaceInstallation(
         config, installation, MockBackend(), ws, workflows_installer, prompts, PRODUCT_INFO
@@ -798,7 +787,7 @@ def test_remove_secret_scope_no_scope(ws, caplog):
     )
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = create_autospec(WorkflowsDeployment)
     ws.secrets.delete_scope.side_effect = NotFound()
     workspace_installation = WorkspaceInstallation(
         config, installation, MockBackend(), ws, workflows_installer, prompts, PRODUCT_INFO
@@ -819,7 +808,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
     ws.cluster_policies.delete.side_effect = NotFound()
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
         config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
@@ -841,7 +830,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
-    workflows_installer = create_autospec(WorkflowsInstallation)
+    workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
         config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
@@ -851,7 +840,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
         assert 'Error accessing warehouse details' in caplog.messages
 
 
-def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_repair_run(ws, mocker, mock_installation_with_jobs):
     mocker.patch("webbrowser.open")
     base = [
         BaseRun(
@@ -869,14 +858,14 @@ def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
 
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, create_autospec(WheelsV2), any_prompt, PRODUCT_INFO, timeout
+    workflows_installer = WorkflowsDeployment(
+        config, mock_installation_with_jobs, ws, create_autospec(WheelsV2), PRODUCT_INFO, timeout
     )
 
     workflows_installer.repair_run("assessment")
 
 
-def test_repair_run_success(ws, caplog, mock_installation_with_jobs, any_prompt):
+def test_repair_run_success(ws, caplog, mock_installation_with_jobs):
     base = [
         BaseRun(
             job_clusters=None,
@@ -894,16 +883,14 @@ def test_repair_run_success(ws, caplog, mock_installation_with_jobs, any_prompt)
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
 
     workflows_installer.repair_run("assessment")
 
     assert "job is not in FAILED state" in caplog.text
 
 
-def test_repair_run_no_job_id(ws, mock_installation, any_prompt, caplog):
+def test_repair_run_no_job_id(ws, mock_installation, caplog):
     base = [
         BaseRun(
             job_clusters=None,
@@ -921,47 +908,41 @@ def test_repair_run_no_job_id(ws, mock_installation, any_prompt, caplog):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation, ws, wheels, PRODUCT_INFO, timeout)
 
     with caplog.at_level('WARNING'):
         workflows_installer.repair_run("assessment")
         assert 'skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
-def test_repair_run_no_job_run(ws, mock_installation_with_jobs, any_prompt, caplog):
+def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
     ws.jobs.list_runs.return_value = ""
     ws.jobs.list_runs.repair_run = None
 
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
 
     with caplog.at_level('WARNING'):
         workflows_installer.repair_run("assessment")
         assert "skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
-def test_repair_run_exception(ws, mock_installation_with_jobs, any_prompt, caplog):
+def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
 
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
 
     with caplog.at_level('WARNING'):
         workflows_installer.repair_run("assessment")
         assert "skipping assessment: Workflow does not exists" in caplog.messages
 
 
-def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_prompt):
+def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
     base = [
         BaseRun(
             job_clusters=None,
@@ -979,9 +960,7 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
 
     workflows_installer.repair_run("assessment")
     assert "Please try after sometime" in caplog.text
@@ -1020,7 +999,7 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
         ),
     ],
 )
-def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, state, expected):
+def test_latest_job_status_states(ws, mock_installation_with_jobs, state, expected):
     base = [
         BaseRun(
             job_id=123,
@@ -1032,9 +1011,7 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, s
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
     ws.jobs.list_runs.return_value = base
     status = workflows_installer.latest_job_status()
     assert len(status) == 1
@@ -1051,9 +1028,7 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, s
         (None, "<never run>"),
     ],
 )
-def test_latest_job_status_success_with_time(
-    mock_datetime, ws, mock_installation_with_jobs, any_prompt, start_time, expected
-):
+def test_latest_job_status_success_with_time(mock_datetime, ws, mock_installation_with_jobs, start_time, expected):
     base = [
         BaseRun(
             job_id=123,
@@ -1068,9 +1043,7 @@ def test_latest_job_status_success_with_time(
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
     ws.jobs.list_runs.return_value = base
     faked_now = datetime(2024, 1, 1, 14, 0, 0)
     mock_datetime.now.return_value = faked_now
@@ -1078,7 +1051,7 @@ def test_latest_job_status_success_with_time(
     assert status[0]["started"] == expected
 
 
-def test_latest_job_status_list(ws, any_prompt):
+def test_latest_job_status_list(ws):
     runs = [
         [
             BaseRun(
@@ -1108,7 +1081,7 @@ def test_latest_job_status_list(ws, any_prompt):
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
     mock_install = MockInstallation({'state.json': {'resources': {'jobs': {"job1": "1", "job2": "2", "job3": "3"}}}})
-    workflows_installer = WorkflowsInstallation(config, mock_install, ws, wheels, any_prompt, PRODUCT_INFO, timeout)
+    workflows_installer = WorkflowsDeployment(config, mock_install, ws, wheels, PRODUCT_INFO, timeout)
     ws.jobs.list_runs.side_effect = iter(runs)
     status = workflows_installer.latest_job_status()
     assert len(status) == 3
@@ -1120,26 +1093,22 @@ def test_latest_job_status_list(ws, any_prompt):
     assert status[2]["state"] == "UNKNOWN"
 
 
-def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs, any_prompt):
+def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
     ws.jobs.list_runs.return_value = ""
     status = workflows_installer.latest_job_status()
     assert len(status) == 1
     assert status[0]["step"] == "assessment"
 
 
-def test_latest_job_status_exception(ws, mock_installation_with_jobs, any_prompt):
+def test_latest_job_status_exception(ws, mock_installation_with_jobs):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
-    workflows_installer = WorkflowsInstallation(
-        config, mock_installation_with_jobs, ws, wheels, any_prompt, PRODUCT_INFO, timeout
-    )
+    workflows_installer = WorkflowsDeployment(config, mock_installation_with_jobs, ws, wheels, PRODUCT_INFO, timeout)
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
     status = workflows_installer.latest_job_status()
     assert len(status) == 0
@@ -1211,9 +1180,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     config = WorkspaceConfig(inventory_database="ucx", policy_id='123')
     wheels = create_autospec(WheelsV2)
     installation = mock_installation
-    workflows_installer = WorkflowsInstallation(
-        config, installation, ws, wheels, prompts, PRODUCT_INFO, timedelta(seconds=1)
-    )
+    workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, PRODUCT_INFO, timedelta(seconds=1))
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -1281,6 +1248,9 @@ def test_fresh_install(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",
             r"Open config file in.*": "no",
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
             r".*": "",
         }
     )
@@ -1299,8 +1269,9 @@ def test_fresh_install(ws, mock_installation):
             'num_days_submit_runs_history': 30,
             'num_threads': 8,
             'policy_id': 'foo',
-            'min_workers': 1,
-            'max_workers': 10,
+            'spark_conf': {'spark.sql.sources.parallelPartitionDiscovery.parallelism': '1000'},
+            'min_workers': 2,
+            'max_workers': 20,
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
@@ -1310,12 +1281,11 @@ def test_fresh_install(ws, mock_installation):
 
 def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
-    workflows_installation = WorkflowsInstallation(
+    workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation_extra_jobs,
         ws,
         create_autospec(WheelsV2),
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
@@ -1490,18 +1460,17 @@ def test_check_inventory_database_exists(ws, mock_installation):
 def test_user_not_admin(ws, mock_installation, any_prompt):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="group1")])
     wheels = create_autospec(WheelsV2)
-    workspace_installation = WorkflowsInstallation(
+    workspace_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', policy_id='123'),
         mock_installation,
         ws,
         wheels,
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
 
     with pytest.raises(PermissionError) as failure:
-        workspace_installation.create_jobs()
+        workspace_installation.create_jobs(any_prompt)
     assert "Current user is not a workspace admin" in str(failure.value)
 
 
@@ -1512,15 +1481,14 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
         (RunState(result_state=RunResultState.FAILED, life_cycle_state=RunLifeCycleState.TERMINATED), False),
     ],
 )
-def test_validate_step(ws, any_prompt, result_state, expected):
+def test_validate_step(ws, result_state, expected):
     installation = create_autospec(Installation)
     installation.load.return_value = RawState({'jobs': {'assessment': '123'}})
-    workflows_installer = WorkflowsInstallation(
+    workflows_installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         installation,
         ws,
         create_autospec(WheelsV2),
-        any_prompt,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )

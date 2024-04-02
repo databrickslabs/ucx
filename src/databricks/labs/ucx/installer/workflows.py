@@ -10,7 +10,6 @@ from typing import Any
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
@@ -101,14 +100,13 @@ main(f'--config=/Workspace{config_file}',
 """
 
 
-class WorkflowsInstallation(InstallationMixin):
+class WorkflowsDeployment(InstallationMixin):
     def __init__(
         self,
         config: WorkspaceConfig,
         installation: Installation,
         ws: WorkspaceClient,
         wheels: WheelsV2,
-        prompts: Prompts,
         product_info: ProductInfo,
         verify_timeout: timedelta,
     ):
@@ -117,7 +115,6 @@ class WorkflowsInstallation(InstallationMixin):
         self._ws = ws
         self._state = InstallState.from_installation(installation)
         self._wheels = wheels
-        self._prompts = prompts
         self._product_info = product_info
         self._verify_timeout = verify_timeout
         self._this_file = Path(__file__)
@@ -129,10 +126,9 @@ class WorkflowsInstallation(InstallationMixin):
         installation = product_info.current_installation(ws)
         config = installation.load(WorkspaceConfig)
         wheels = product_info.wheels(ws)
-        prompts = Prompts()
         timeout = timedelta(minutes=2)
 
-        return cls(config, installation, ws, wheels, prompts, product_info, timeout)
+        return cls(config, installation, ws, wheels, product_info, timeout)
 
     @property
     def state(self):
@@ -151,9 +147,9 @@ class WorkflowsInstallation(InstallationMixin):
             return
         raise NotFound(f"job run not found for {step}")
 
-    def create_jobs(self):
+    def create_jobs(self, prompts):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
-        remote_wheel = self._upload_wheel()
+        remote_wheel = self._upload_wheel(prompts)
         desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -353,15 +349,15 @@ class WorkflowsInstallation(InstallationMixin):
                 return klass(match.group(1))
         return Unknown(haystack)
 
-    def _upload_wheel(self):
+    def _upload_wheel(self, prompts):
         with self._wheels:
             try:
                 self._wheels.upload_to_dbfs()
             except PermissionDenied as err:
-                if not self._prompts:
+                if not prompts:
                     raise RuntimeWarning("no Prompts instance found") from err
                 logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
-                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, self._prompts.choice_from_dict)
+                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, prompts.choice_from_dict)
                 self._config.override_clusters = configure_cluster_overrides.configure()
                 self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()

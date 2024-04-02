@@ -52,7 +52,7 @@ from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
-from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -142,8 +142,8 @@ class WorkspaceInstaller:
         if not wheel_builder_factory:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
-        workflows_installer = WorkflowsInstallation(
-            config, self._installation, self._ws, wheels, self._prompts, self._product_info, verify_timeout
+        workflows_installer = WorkflowsDeployment(
+            config, self._installation, self._ws, wheels, self._product_info, verify_timeout
         )
         workspace_installation = WorkspaceInstallation(
             config,
@@ -237,6 +237,9 @@ class WorkspaceInstaller:
             inventory_database
         )
 
+        # Save configurable values for table migration cluster
+        min_workers, max_workers, spark_conf_dict = self._config_table_migration(spark_conf_dict)
+
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
 
@@ -253,6 +256,8 @@ class WorkspaceInstaller:
             num_threads=num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
+            min_workers=min_workers,
+            max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
             is_terraform_used=is_terraform_used,
@@ -263,6 +268,26 @@ class WorkspaceInstaller:
         if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
+
+    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict]:
+        # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
+        parallelism = self._prompts.question(
+            "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
+        )
+        if int(parallelism) > 200:
+            spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
+        # mix max workers for auto-scale migration job cluster
+        min_workers = int(
+            self._prompts.question(
+                "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
+            )
+        )
+        max_workers = int(
+            self._prompts.question(
+                "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
+            )
+        )
+        return min_workers, max_workers, spark_conf_dict
 
     def _select_databases(self):
         selected_databases = self._prompts.question(
@@ -319,7 +344,7 @@ class WorkspaceInstallation(InstallationMixin):
         installation: Installation,
         sql_backend: SqlBackend,
         ws: WorkspaceClient,
-        workflows_installer: WorkflowsInstallation,
+        workflows_installer: WorkflowsDeployment,
         prompts: Prompts,
         product_info: ProductInfo,
     ):
@@ -341,7 +366,7 @@ class WorkspaceInstallation(InstallationMixin):
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        workflows_installer = WorkflowsInstallation(config, installation, ws, wheels, prompts, product_info, timeout)
+        workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, product_info, timeout)
 
         return cls(config, installation, sql_backend, ws, workflows_installer, prompts, product_info)
 
@@ -362,7 +387,7 @@ class WorkspaceInstallation(InstallationMixin):
                 self._create_database,
             ],
         )
-        self._workflows_installer.create_jobs()
+        self._workflows_installer.create_jobs(self._prompts)
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
