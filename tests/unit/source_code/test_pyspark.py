@@ -48,6 +48,28 @@ for i in range(10):
     ] == list(sqf.lint(old_code))
 
 
+def test_spark_sql_match_named(migration_index):
+    ftf = FromTable(migration_index)
+    sqf = SparkSql(ftf, migration_index)
+
+    old_code = """
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
+    print(len(result))
+"""
+    assert [
+        Deprecation(
+            code='table-migrate',
+            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            start_line=4,
+            start_col=13,
+            end_line=4,
+            end_col=71,
+        )
+    ] == list(sqf.lint(old_code))
+
+
 METHOD_NAMES = [
     "cacheTable",
     "createTable",
@@ -129,6 +151,27 @@ for i in range(10):
     do_stuff_with_df(df)
 """
     assert not list(sqf.lint(old_code))
+
+
+def test_spark_table_named_args(migration_index):
+    ftf = FromTable(migration_index)
+    sqf = SparkSql(ftf, migration_index)
+    old_code = """
+spark.read.csv("s3://bucket/path")
+for i in range(10):
+    df = spark.saveAsTable(format="xyz", name="old.things")
+    do_stuff_with_df(df)
+"""
+    assert [
+        Deprecation(
+            code='table-migrate',
+            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            start_line=4,
+            start_col=9,
+            end_line=4,
+            end_col=59,
+        )
+    ] == list(sqf.lint(old_code))
 
 
 def test_spark_sql_fix(migration_index):

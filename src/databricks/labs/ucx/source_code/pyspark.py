@@ -14,14 +14,13 @@ class Matcher(ABC):
     min_args: int
     max_args: int
     table_arg_index: int
+    table_arg_name: str | None = None
 
     def matches(self, node: ast.AST):
-        return (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and self.min_args <= len(node.args) <= self.max_args
-            and isinstance(node.args[self.table_arg_index], ast.Constant)
-        )
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            return False
+        arg = self._get_table_arg(node)
+        return isinstance(arg, ast.Constant)
 
     @abstractmethod
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
@@ -31,12 +30,19 @@ class Matcher(ABC):
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         raise NotImplementedError()
 
+    def _get_table_arg(self, node: ast.Call):
+        if len(node.args) > 0:
+            return node.args[self.table_arg_index] if self.min_args <= len(node.args) <= self.max_args else None
+        assert self.table_arg_name is not None
+        arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
+        return arg.value if arg is not None else None
+
 
 @dataclass
 class QueryMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
-        table_arg = node.args[self.table_arg_index]
+        table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
         for advice in from_table.lint(table_arg.value):
             yield advice.replace(
@@ -47,7 +53,7 @@ class QueryMatcher(Matcher):
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
-        table_arg = node.args[self.table_arg_index]
+        table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
         new_query = from_table.apply(table_arg.value)
         table_arg.value = new_query
@@ -57,7 +63,7 @@ class QueryMatcher(Matcher):
 class TableNameMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
-        table_arg = node.args[self.table_arg_index]
+        table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
         dst = self._find_dest(index, table_arg.value)
         if dst is not None:
@@ -72,7 +78,7 @@ class TableNameMatcher(Matcher):
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
-        table_arg = node.args[self.table_arg_index]
+        table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
         dst = self._find_dest(index, table_arg.value)
         if dst is not None:
@@ -88,17 +94,17 @@ class SparkMatchers:
 
     def __init__(self):
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.SparkSession.html
-        spark_session_matchers = [QueryMatcher("sql", 1, 1000, 0), TableNameMatcher("table", 1, 1, 0)]
+        spark_session_matchers = [QueryMatcher("sql", 1, 1000, 0, "sqlQuery"), TableNameMatcher("table", 1, 1, 0)]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.Catalog.html
         spark_catalog_matchers = [
-            TableNameMatcher("cacheTable", 1, 2, 0),
-            TableNameMatcher("createTable", 1, 1000, 0),
-            TableNameMatcher("createExternalTable", 1, 1000, 0),
+            TableNameMatcher("cacheTable", 1, 2, 0, "tableName"),
+            TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
+            TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("getTable", 1, 1, 0),
             TableNameMatcher("isCached", 1, 1, 0),
-            TableNameMatcher("listColumns", 1, 2, 0),
-            TableNameMatcher("tableExists", 1, 2, 0),
+            TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
+            TableNameMatcher("tableExists", 1, 2, 0, "tableName"),
             TableNameMatcher("recoverPartitions", 1, 1, 0),
             TableNameMatcher("refreshTable", 1, 1, 0),
             TableNameMatcher("uncacheTable", 1, 1, 0),
@@ -121,14 +127,14 @@ class SparkMatchers:
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html
         spark_dataframereader_matchers = [
-            TableNameMatcher("table", 1, 1, 0),  # TODO good example of collision, see SPARK_SESSION_CALLS
+            TableNameMatcher("table", 1, 1, 0),  # TODO good example of collision, see spark_session_calls
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.html
         spark_dataframewriter_matchers = [
-            TableNameMatcher("insertInto", 1, 2, 0),
+            TableNameMatcher("insertInto", 1, 2, 0, "tableName"),
             # TODO jdbc: could the url be a databricks url, raise warning ?
-            TableNameMatcher("saveAsTable", 1, 4, 0),
+            TableNameMatcher("saveAsTable", 1, 4, 0, "name"),
         ]
 
         # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
@@ -136,7 +142,7 @@ class SparkMatchers:
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDTFRegistration.html
         spark_udtfregistration_matchers = [
-            TableNameMatcher("register", 1, 2, 0),
+            TableNameMatcher("register", 1, 2, 0, "name"),
         ]
 
         # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
