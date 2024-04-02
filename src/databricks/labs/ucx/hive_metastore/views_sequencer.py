@@ -59,14 +59,10 @@ class ViewToMigrate(TableToMigrate):
             assert self.src.view_text is not None
             statements = sqlglot.parse(self.src.view_text)
             if len(statements) != 1 or statements[0] is None:
-                raise ValueError(
-                    f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}"
-                )
+                raise ValueError(f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}")
             return statements[0]
         except ParseError as e:
-            raise ValueError(
-                f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}"
-            ) from e
+            raise ValueError(f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}") from e
 
     # duplicated from FromTable._catalog, not sure if it's worth factorizing
     @staticmethod
@@ -118,13 +114,13 @@ class TableMigrationSequencer:
         if what != What.VIEW:
             return [tables]
         # when migrating views we only want views in n batches
-        batches = []
+        batches: list[list[TableToMigrate]] = []
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)
-            self._result_tables_set.update([v for v in next_batch])
+            self._result_tables_set.update(next_batch)
             views.difference_update(next_batch)
-            batches.append(list(v for v in next_batch))
+            batches.append(list(next_batch))
         return batches
 
     def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, TableToMigrate]) -> set[ViewToMigrate]:
