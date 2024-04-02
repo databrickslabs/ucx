@@ -11,9 +11,6 @@ class FromTable(Linter, Fixer):
     def __init__(self, index: MigrationIndex):
         self._index = index
 
-    def index(self):
-        return self._index
-
     def name(self) -> str:
         return 'table-migrate'
 
