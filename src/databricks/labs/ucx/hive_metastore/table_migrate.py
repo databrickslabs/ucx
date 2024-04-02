@@ -10,11 +10,12 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound, ResourceConflict
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler, TablesInMounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import (
@@ -367,3 +368,85 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def _iter_schemas(self):
         for catalog in self._ws.catalogs.list():
             yield from self._ws.schemas.list(catalog_name=catalog.name)
+
+
+class TablesInMountsMigrator:
+    def __init__(
+        self,
+        tables_in_mounts: TablesInMounts,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+        table_mapping: TableMapping,
+    ):
+        self._backend = backend
+        self._ws = ws
+        self._tm = table_mapping
+        self._tim = tables_in_mounts
+
+    def create_tables_in_uc(self):
+        create_table_tasks = []
+        mapping_keys = {mapping.src_table: mapping for mapping in self._tm.load()}
+        for table in self._tim.fetch_all():
+            if self._tim.TABLE_IN_MOUNT_DB not in table.database:
+                logger.info(f"Path {table.location} hasn't been identified as a table in a mount, ignoring")
+                continue
+            if not table.location:
+                continue
+            if table.location not in mapping_keys:
+                logger.warning(f"Path {table.location} doesn't exist in the table mapping")
+                continue
+            create_table_tasks.append(partial(self._create_table, table, mapping_keys[table.location]))
+        return Threads.strict("create tables in mounts", create_table_tasks)
+
+    def _create_table(self, src_table: Table, rule: Rule):
+        if self._is_valid_in_uc(src_table, rule.as_uc_table_key):
+            return
+        target_table_key = rule.as_uc_table_key
+        fields = []
+        for key, value, _ in self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;"):
+            fields.append(f"{key} {value}")
+        schema = ", ".join(fields)
+        table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, schema)
+        logger.info(
+            f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
+        )
+        self._backend.execute(table_migrate_sql)
+
+    def _is_valid_in_uc(self, src_table: Table, target_key: str):
+        try:
+            target_table = self._ws.tables.get(target_key)
+            if not target_table.columns:
+                return False
+
+            self._validate_location(src_table, target_table)
+            self._validate_columns(src_table, target_key, target_table)
+            return True
+        except NotFound:
+            return False
+
+    def _validate_location(self, src_table, target_table):
+        if target_table.storage_location != src_table.location:
+            raise ResourceConflict(
+                f"Expected to be migrated from {src_table.location}, but got {target_table.storage_location}."
+            )
+
+    def _validate_columns(self, src_table, target_key, target_table):
+        source_columns = {}
+        for col_name, col_type, _ in self._backend.fetch(
+            f"DESCRIBE TABLE delta.{escape_sql_identifier(src_table.location)}"
+        ):
+            source_columns[col_name] = col_type
+        if len(target_table.columns) != len(source_columns):
+            raise ResourceConflict(
+                f"Table {src_table.location} doesn't have the same columns as in UC matching table {target_key}"
+            )
+        for column in target_table.columns:
+            if column.name not in source_columns:
+                raise ResourceConflict(
+                    f"Table {src_table.location} should contain column {column.name} in UC table {target_key}"
+                )
+            if column.name in source_columns and source_columns[column.name] != column.type_text:
+                raise ResourceConflict(
+                    f"Column {column.name} in UC table {target_key} doesn't have the same type as in table {src_table.location} "
+                    f"Expected type: {source_columns[column.name]}, found type in UC table {column.type_text}"
+                )

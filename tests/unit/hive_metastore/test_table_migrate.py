@@ -4,10 +4,19 @@ from itertools import cycle
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
+from databricks.sdk.errors import NotFound
+from databricks.sdk.errors.platform import ResourceConflict
+from databricks.sdk.service.catalog import (
+    CatalogInfo,
+    ColumnInfo,
+    SchemaInfo,
+    TableInfo,
+)
 
+from databricks.labs.ucx.hive_metastore import Mounts, TablesInMounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
@@ -17,6 +26,7 @@ from databricks.labs.ucx.hive_metastore.mapping import (
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatus,
     MigrationStatusRefresher,
+    TablesInMountsMigrator,
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
@@ -770,3 +780,169 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
+
+
+def test_table_in_mount_mapping():
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
+                ("col1", "string", None),
+                ("col2", "decimal", None),
+            ],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    tables_in_mounts = TablesInMounts(backend, client, "test", mounts)
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.load.return_value = [
+        Rule("fake_ws", "cat1", "mounted_datalake", "paths", "abfss://bucket@msft/path/test", "path_test"),
+    ]
+
+    TablesInMountsMigrator(tables_in_mounts, client, backend, table_mapping).create_tables_in_uc()
+
+    assert (
+        "CREATE TABLE IF NOT EXISTS cat1.paths.path_test (col1 string, col2 decimal) LOCATION 'abfss://bucket@msft/path/test';"
+        in backend.queries
+    )
+
+
+def test_if_table_exists_in_uc_should_be_skipped():
+    client = create_autospec(WorkspaceClient)
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.load.return_value = [
+        Rule("fake_ws", "cat1", "mounted_datalake", "paths", "abfss://bucket@msft/path/test", "path_test"),
+    ]
+
+    client.tables.get.side_effect = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="dest2",
+            full_name="cat1.schema2.dest2",
+            properties={},
+            storage_location="abfss://bucket@msft/path/test",
+            columns=[ColumnInfo(name="col1", type_text="string"), ColumnInfo(name="col2", type_text="decimal")],
+        ),
+    ]
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`': [
+                ("col1", "string", None),
+                ("col2", "decimal", None),
+            ],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    tables_in_mounts = TablesInMounts(backend, client, "test", mounts)
+    TablesInMountsMigrator(tables_in_mounts, client, backend, table_mapping).create_tables_in_uc()
+
+    assert [
+        "SELECT * FROM hive_metastore.test.tables WHERE STARTSWITH(database, 'mounted_')",
+        'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`',
+    ] == backend.queries
+
+
+def test_if_table_exists_in_uc_with_diff_paths_should_throw():
+    client = create_autospec(WorkspaceClient)
+
+    client.tables.get.side_effect = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="dest2",
+            full_name="cat1.schema2.dest2",
+            properties={},
+            storage_location="xxx",
+            columns=[ColumnInfo(name="col1", type_text="string")],
+        ),
+    ]
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
+                ("col1", "string", None),
+                ("col2", "decimal", None),
+            ],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    tables_in_mounts = TablesInMounts(backend, client, "test", mounts)
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.load.return_value = [
+        Rule("fake_ws", "cat1", "mounted_datalake", "paths", "abfss://bucket@msft/path/test", "path_test"),
+    ]
+
+    with pytest.raises(ResourceConflict):
+        try:
+            TablesInMountsMigrator(tables_in_mounts, client, backend, table_mapping).create_tables_in_uc()
+        except ManyError as e:
+            assert len(e.errs) == 1
+            raise e.errs[0]
+
+
+def test_if_table_exists_in_uc_with_different_schemas_should_throw():
+    client = create_autospec(WorkspaceClient)
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.load.return_value = [
+        Rule("fake_ws", "cat1", "mounted_datalake", "paths", "abfss://bucket@msft/path/test", "path_test"),
+        Rule("fake_ws", "cat1", "mounted_datalake", "paths", "abfss://bucket@msft/path/test2", "path_test2"),
+        Rule("fake_ws", "cat1", "mounted_datalake", "paths", "abfss://bucket@msft/path/test3", "path_test3"),
+    ]
+
+    client.tables.get.side_effect = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="path_test",
+            full_name="cat1.schema2.dest2",
+            properties={},
+            columns=[ColumnInfo(name="col1", type_text="string")],
+            storage_location="abfss://bucket@msft/path/test",
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="path_test2",
+            full_name="cat1.schema2.path_test2",
+            columns=[ColumnInfo(name="col1", type_text="string")],
+            storage_location="abfss://bucket@msft/path/test2",
+        ),
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema2",
+            name="path_test3",
+            full_name="cat1.schema2.path_test3",
+            columns=[ColumnInfo(name="col2", type_text="timestamp"), ColumnInfo(name="col1", type_text="str")],
+            storage_location="abfss://bucket@msft/path/test3",
+        ),
+    ]
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_database", "name", "object_type", "table_format", "abfss://bucket@msft/path/test"),
+                ("hms", "mounted_database", "name2", "object_type", "table_format", "abfss://bucket@msft/path/test2"),
+                ("hms", "mounted_database", "name3", "object_type", "table_format", "abfss://bucket@msft/path/test3"),
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`': [("col1", "timestamp", None)],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test2`': [("col2", "timestamp", None)],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test3`': [("col2", "timestamp", None)],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    tables_in_mounts = TablesInMounts(backend, client, "test", mounts)
+    with pytest.raises(ResourceConflict):
+        try:
+            TablesInMountsMigrator(tables_in_mounts, client, backend, table_mapping).create_tables_in_uc()
+        except ManyError as e:
+            assert len(e.errs) == 3
+            raise e.errs[0]

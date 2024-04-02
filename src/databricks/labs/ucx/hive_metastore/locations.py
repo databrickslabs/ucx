@@ -261,6 +261,7 @@ class TableInMount:
 
 
 class TablesInMounts(CrawlerBase[Table]):
+    TABLE_IN_MOUNT_DB = "mounted_"
 
     def __init__(
         self,
@@ -306,14 +307,14 @@ class TablesInMounts(CrawlerBase[Table]):
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, 'mounted_')"
+            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, '{self.TABLE_IN_MOUNT_DB}')"
         ):
             yield Table(*row)
 
     def fetch_all(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE STARTSWITH(database, 'mounted_')"
+            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE STARTSWITH(database, '{self.TABLE_IN_MOUNT_DB}')"
         ):
             yield Table(*row)
 
@@ -330,7 +331,7 @@ class TablesInMounts(CrawlerBase[Table]):
                 guess_table = os.path.basename(path)
                 table = Table(
                     catalog="hive_metastore",
-                    database=f"mounted_{mount.name.replace('/mnt/', '').replace('/', '_')}",
+                    database=f"{self.TABLE_IN_MOUNT_DB}{mount.name.replace('/mnt/', '').replace('/', '_')}",
                     name=guess_table,
                     object_type="EXTERNAL",
                     table_format=entry.format,

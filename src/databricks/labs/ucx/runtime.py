@@ -22,9 +22,10 @@ from databricks.labs.ucx.hive_metastore.grants import (
     PrincipalACL,
 )
 from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TablesInMountsMapping
+from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
+    TablesInMountsMigrator,
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
@@ -586,15 +587,16 @@ def migrate_tables_in_mounts_experimental(
     cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
 ):
     """EXPERIMENTAL
-    This workflow migrates Delta tables inside all mount points captured during the assessment.
+    This workflow task migrates the tables from mount points to Unity Catalog.
+    Please run scan-tables-in-mounts-experimental before running this workflow. Additionaly, you must specify
+    mapping.csv file in the UCX installations folder.
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     table_in_mount = TablesInMounts(
         sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
     )
-    table_mappings = TablesInMountsMapping(install, ws, sql_backend)
-    table_mappings.create_tables_in_uc(table_in_mount)
-
+    table_mappings = TableMapping(install, ws, sql_backend)
+    TablesInMountsMigrator(table_in_mount, ws, sql_backend, table_mappings).create_tables_in_uc()
 
 
 def main(*argv):
