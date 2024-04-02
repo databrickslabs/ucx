@@ -22,7 +22,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
     PrincipalACL,
 )
 from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TablesInMountsMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
     TablesMigrator,
@@ -567,7 +567,7 @@ def apply_permissions_to_account_groups_experimental(
     migration_state.apply_to_renamed_groups(ws)
 
 
-@task("migrate-tables-in-mounts-experimental")
+@task("scan-tables-in-mounts-experimental")
 def scan_tables_in_mounts_experimental(
     cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
@@ -579,6 +579,22 @@ def scan_tables_in_mounts_experimental(
     TablesInMounts(
         sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
     ).snapshot()
+
+
+@task("migrate-tables-in-mounts-experimental", job_cluster="table_migration")
+def migrate_tables_in_mounts_experimental(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
+):
+    """EXPERIMENTAL
+    This workflow migrates Delta tables inside all mount points captured during the assessment.
+    """
+    mounts = Mounts(sql_backend, ws, cfg.inventory_database)
+    table_in_mount = TablesInMounts(
+        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
+    )
+    table_mappings = TablesInMountsMapping(install, ws, sql_backend)
+    table_mappings.create_tables_in_uc(table_in_mount)
+
 
 
 def main(*argv):

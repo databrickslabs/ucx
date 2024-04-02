@@ -275,6 +275,7 @@ class TablesInMounts(CrawlerBase[Table]):
         self._dbutils = ws.dbutils
         self._mc = mc
         self._include_mounts = include_mounts
+        self._ws = ws
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
         if exclude_paths_in_mount:
@@ -306,6 +307,13 @@ class TablesInMounts(CrawlerBase[Table]):
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
             f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, 'mounted_')"
+        ):
+            yield Table(*row)
+
+    def fetch_all(self) -> Iterable[Table]:
+        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
+        for row in self._fetch(
+            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE STARTSWITH(database, 'mounted_')"
         ):
             yield Table(*row)
 

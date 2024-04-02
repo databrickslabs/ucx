@@ -724,4 +724,5 @@ def test_migrate_managed_tables_with_principal_acl_azure(
         if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
-    assert match
+    assert match`
+
