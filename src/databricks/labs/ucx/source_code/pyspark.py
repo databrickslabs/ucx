@@ -59,7 +59,7 @@ class QueryMatcher(Matcher):
         else:
             yield Advisory(
                 code='table-migrate',
-                message="Table",
+                message=f"Can't migrate '{node}' because its table name argument is not a constant",
                 start_line=node.lineno,
                 start_col=node.col_offset,
                 end_line=node.end_lineno or 0,
