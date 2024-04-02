@@ -6,6 +6,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
@@ -633,15 +634,16 @@ def test_table_status_reset():
     ]
 
 
-def test_table_status_seen_tables():
+def test_table_status_seen_tables(caplog):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     client = create_autospec(WorkspaceClient)
-    client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
-    client.schemas.list.return_value = [
-        SchemaInfo(catalog_name="cat1", name="schema1"),
+    client.catalogs.list.return_value = [CatalogInfo(name="cat1"), CatalogInfo(name="deleted_cat")]
+    client.schemas.list.side_effect = [
+        [SchemaInfo(catalog_name="cat1", name="schema1")],
+        NotFound()
     ]
     client.tables.list.return_value = [
         TableInfo(
@@ -685,6 +687,7 @@ def test_table_status_seen_tables():
         'cat1.schema1.table2': 'hive_metastore.schema1.table2',
         'cat1.schema1.table3': 'hive_metastore.schema1.table3',
     }
+    assert "Catalog deleted_cat no longer exists. Skipping checking it's migration status." in caplog.text
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
