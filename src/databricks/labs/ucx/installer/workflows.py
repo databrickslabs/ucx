@@ -340,6 +340,7 @@ class WorkflowsDeployment(InstallationMixin):
         constructors: dict[re.Pattern, type[Exception]] = {
             re.compile(r".*\[TABLE_OR_VIEW_NOT_FOUND] (.*)"): NotFound,
             re.compile(r".*\[SCHEMA_NOT_FOUND] (.*)"): NotFound,
+            re.compile(r".*\[TimeoutException] (.*)"): TimeoutError,
         }
         for klass in needles:
             constructors[re.compile(f".*{klass.__name__}: (.*)")] = klass
