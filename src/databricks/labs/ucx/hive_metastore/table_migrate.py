@@ -101,14 +101,12 @@ class TablesMigrator:
         else:
             acl_strategy = []
         sequencer = TableMigrationSequencer(tables_to_migrate)
-        batches = sequencer.sequence_batches()
+        batches = sequencer.sequence_batches(what)
         all_tasks = []
         for batch in batches:
             tasks = []
             for table in batch:
                 grants = []
-                if what is not None and table.src.what != what:
-                    continue
                 if AclMigrationWhat.LEGACY_TACL in acl_strategy:
                     grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
                 if AclMigrationWhat.PRINCIPAL in acl_strategy:
@@ -116,6 +114,8 @@ class TablesMigrator:
                 tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
             all_tasks.extend(tasks)
             Threads.strict("migrate tables", tasks)
+            if len(batches) > 1:
+                self._init_seen_tables()
         return all_tasks
 
     def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):

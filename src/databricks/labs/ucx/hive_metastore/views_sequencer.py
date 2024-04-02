@@ -6,7 +6,7 @@ from sqlglot.expressions import Expression as SqlExpression
 from sqlglot.expressions import Table as SqlTable
 
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.hive_metastore.tables import Table, What
 
 
 class ViewToMigrate:
@@ -25,6 +25,12 @@ class ViewToMigrate:
     @property
     def view(self):
         return self._view
+
+    def table_dependencies(self, all_tables: dict[str, TableToMigrate]) -> list[TableToMigrate]:
+        if self._table_dependencies is None or self._view_dependencies is None:
+            self._compute_dependencies(all_tables)
+        assert self._table_dependencies is not None
+        return self._table_dependencies
 
     def view_dependencies(self, all_tables: dict[str, TableToMigrate]) -> list[TableToMigrate]:
         if self._table_dependencies is None or self._view_dependencies is None:
@@ -86,7 +92,7 @@ class TableMigrationSequencer:
         self._result_view_list: list[ViewToMigrate] = []
         self._result_tables_set: set[TableToMigrate] = set()
 
-    def sequence_batches(self) -> list[list[TableToMigrate]]:
+    def sequence_batches(self, what: What | None) -> list[list[TableToMigrate]]:
         # sequencing is achieved using a very simple algorithm:
         # for each view, we register dependencies (extracted from view_text)
         # then given the remaining set of views to process,
@@ -100,11 +106,22 @@ class TableMigrationSequencer:
         tables = []
         for table in self._tables:
             all_tables[table.src.key] = table
-            if table.src.view_text is None:
-                tables.append(table)
+            # when migrating views we want all tables/views
+            if what == What.VIEW:
+                if table.src.view_text is None:
+                    tables.append(table)
+                else:
+                    views.add(ViewToMigrate(table))
             else:
-                views.add(ViewToMigrate(table))
-        batches = [tables]
+                # when migrating tables we only want specific tables
+                if what is not None and table.src.what != what:
+                    continue
+                tables.append(table)
+        # when migrating tables we only want tables in 1 batch
+        if what != What.VIEW:
+            return [tables]
+        # when migrating views we only want views in n batches
+        batches = []
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)

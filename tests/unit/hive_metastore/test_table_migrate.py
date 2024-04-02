@@ -775,7 +775,7 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
 
 
-def test_migrate_tables_and_views_should_be_properly_sequenced(ws):
+def test_migrate_views_should_be_properly_sequenced(ws):
     errors = {}
     rows = {}
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -817,8 +817,8 @@ def test_migrate_tables_and_views_should_be_properly_sequenced(ws):
         migration_status_refresher,
         principal_grants,
     )
-    tasks = table_migrator.migrate_tables()
+    tasks = table_migrator.migrate_tables(what=What.VIEW)
     table_keys = [task.args[0].key for task in tasks]
     assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
     assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
-    assert table_keys.index("hive_metastore.db1_src.v2_src") > table_keys.index("hive_metastore.db1_src.t1_src")
+    assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
