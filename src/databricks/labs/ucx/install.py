@@ -143,7 +143,7 @@ class WorkspaceInstaller:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
         workflows_installer = WorkflowsDeployment(
-            config, self._installation, self._ws, wheels, self._prompts, self._product_info, verify_timeout
+            config, self._installation, self._ws, wheels, self._product_info, verify_timeout
         )
         workspace_installation = WorkspaceInstallation(
             config,
@@ -366,7 +366,7 @@ class WorkspaceInstallation(InstallationMixin):
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, prompts, product_info, timeout)
+        workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, product_info, timeout)
 
         return cls(config, installation, sql_backend, ws, workflows_installer, prompts, product_info)
 
@@ -387,7 +387,7 @@ class WorkspaceInstallation(InstallationMixin):
                 self._create_database,
             ],
         )
-        self._workflows_installer.create_jobs()
+        self._workflows_installer.create_jobs(self._prompts)
         readme_url = self._create_readme()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
