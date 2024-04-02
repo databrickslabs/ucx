@@ -1,4 +1,5 @@
 from collections.abc import Collection
+from dataclasses import dataclass
 
 import sqlglot
 from sqlglot import ParseError
@@ -9,22 +10,15 @@ from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.hive_metastore.tables import Table, What
 
 
-class ViewToMigrate:
+@dataclass
+class ViewToMigrate(TableToMigrate):
 
-    _view: TableToMigrate
-    _table_dependencies: list[TableToMigrate] | None
-    _view_dependencies: list[TableToMigrate] | None
+    _table_dependencies: list[TableToMigrate] | None = None
+    _view_dependencies: list[TableToMigrate] | None = None
 
-    def __init__(self, table: TableToMigrate):
-        if table.src.view_text is None:
+    def __post_init__(self):
+        if self.src.view_text is None:
             raise RuntimeError("Should never get there! A view must have 'view_text'!")
-        self._view = table
-        self._table_dependencies = None
-        self._view_dependencies = None
-
-    @property
-    def view(self):
-        return self._view
 
     def table_dependencies(self, all_tables: dict[str, TableToMigrate]) -> list[TableToMigrate]:
         if self._table_dependencies is None or self._view_dependencies is None:
@@ -50,7 +44,7 @@ class ViewToMigrate:
             table = all_tables.get(table_with_key.key)
             if table is None:
                 raise ValueError(
-                    f"Unknown schema object: {table_with_key.key} in view SQL: {self._view.src.view_text} of table {self._view.src.key}"
+                    f"Unknown schema object: {table_with_key.key} in view SQL: {self.src.view_text} of table {self.src.key}"
                 )
             if table.src.view_text is None:
                 table_dependencies.add(table)
@@ -62,16 +56,16 @@ class ViewToMigrate:
     def _parse_view_text(self) -> SqlExpression:
         try:
             # below can never happen but avoids a pylint error
-            assert self._view.src.view_text is not None
-            statements = sqlglot.parse(self._view.src.view_text)
+            assert self.src.view_text is not None
+            statements = sqlglot.parse(self.src.view_text)
             if len(statements) != 1 or statements[0] is None:
                 raise ValueError(
-                    f"Could not analyze view SQL: {self._view.src.view_text} of table {self._view.src.key}"
+                    f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}"
                 )
             return statements[0]
         except ParseError as e:
             raise ValueError(
-                f"Could not analyze view SQL: {self._view.src.view_text} of table {self._view.src.key}"
+                f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}"
             ) from e
 
     # duplicated from FromTable._catalog, not sure if it's worth factorizing
@@ -82,7 +76,10 @@ class ViewToMigrate:
         return 'hive_metastore'
 
     def __hash__(self):
-        return hash(self._view)
+        return hash(self.src)
+
+    def __eq__(self, other):
+        return isinstance(other, TableToMigrate) and self.src == other.src
 
 
 class TableMigrationSequencer:
@@ -111,7 +108,7 @@ class TableMigrationSequencer:
                 if table.src.view_text is None:
                     tables.append(table)
                 else:
-                    views.add(ViewToMigrate(table))
+                    views.add(ViewToMigrate(table.src, table.rule))
             else:
                 # when migrating tables we only want specific tables
                 if what is not None and table.src.what != what:
@@ -125,9 +122,9 @@ class TableMigrationSequencer:
         while len(views) > 0:
             next_batch = self._next_batch(views, all_tables)
             self._result_view_list.extend(next_batch)
-            self._result_tables_set.update([v.view for v in next_batch])
+            self._result_tables_set.update([v for v in next_batch])
             views.difference_update(next_batch)
-            batches.append(list(v.view for v in next_batch))
+            batches.append(list(v for v in next_batch))
         return batches
 
     def _next_batch(self, views: set[ViewToMigrate], all_tables: dict[str, TableToMigrate]) -> set[ViewToMigrate]:
