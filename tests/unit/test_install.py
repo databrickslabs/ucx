@@ -320,7 +320,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert job_clusters["main"].new_cluster.policy_id == "123"
 
 
-def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -360,7 +360,7 @@ def test_run_workflow_creates_proper_failure(ws, mocker, any_prompt, mock_instal
     assert str(failure.value) == "stuff: does not compute"
 
 
-def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_run_workflow_run_id_not_found(ws, mocker, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -398,9 +398,7 @@ def test_run_workflow_run_id_not_found(ws, mocker, any_prompt, mock_installation
         installer.run_workflow("assessment")
 
 
-def test_run_workflow_creates_failure_from_mapping(
-    ws, mocker, mock_installation, any_prompt, mock_installation_with_jobs
-):
+def test_run_workflow_creates_failure_from_mapping(ws, mocker, mock_installation, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -442,7 +440,7 @@ def test_run_workflow_creates_failure_from_mapping(
     assert str(failure.value) == "does not compute"
 
 
-def test_run_workflow_creates_failure_many_error(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_with_jobs):
     def run_now(job_id):
         assert job_id == 123
 
@@ -842,7 +840,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
         assert 'Error accessing warehouse details' in caplog.messages
 
 
-def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
+def test_repair_run(ws, mocker, mock_installation_with_jobs):
     mocker.patch("webbrowser.open")
     base = [
         BaseRun(
@@ -867,7 +865,7 @@ def test_repair_run(ws, mocker, any_prompt, mock_installation_with_jobs):
     workflows_installer.repair_run("assessment")
 
 
-def test_repair_run_success(ws, caplog, mock_installation_with_jobs, any_prompt):
+def test_repair_run_success(ws, caplog, mock_installation_with_jobs):
     base = [
         BaseRun(
             job_clusters=None,
@@ -892,7 +890,7 @@ def test_repair_run_success(ws, caplog, mock_installation_with_jobs, any_prompt)
     assert "job is not in FAILED state" in caplog.text
 
 
-def test_repair_run_no_job_id(ws, mock_installation, any_prompt, caplog):
+def test_repair_run_no_job_id(ws, mock_installation, caplog):
     base = [
         BaseRun(
             job_clusters=None,
@@ -917,7 +915,7 @@ def test_repair_run_no_job_id(ws, mock_installation, any_prompt, caplog):
         assert 'skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
-def test_repair_run_no_job_run(ws, mock_installation_with_jobs, any_prompt, caplog):
+def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
     ws.jobs.list_runs.return_value = ""
     ws.jobs.list_runs.repair_run = None
 
@@ -931,7 +929,7 @@ def test_repair_run_no_job_run(ws, mock_installation_with_jobs, any_prompt, capl
         assert "skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
-def test_repair_run_exception(ws, mock_installation_with_jobs, any_prompt, caplog):
+def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
     ws.jobs.list_runs.side_effect = InvalidParameterValue("Workflow does not exists")
 
     wheels = create_autospec(WheelsV2)
@@ -944,7 +942,7 @@ def test_repair_run_exception(ws, mock_installation_with_jobs, any_prompt, caplo
         assert "skipping assessment: Workflow does not exists" in caplog.messages
 
 
-def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_prompt):
+def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
     base = [
         BaseRun(
             job_clusters=None,
@@ -1001,7 +999,7 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs, any_pr
         ),
     ],
 )
-def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, state, expected):
+def test_latest_job_status_states(ws, mock_installation_with_jobs, state, expected):
     base = [
         BaseRun(
             job_id=123,
@@ -1030,9 +1028,7 @@ def test_latest_job_status_states(ws, mock_installation_with_jobs, any_prompt, s
         (None, "<never run>"),
     ],
 )
-def test_latest_job_status_success_with_time(
-    mock_datetime, ws, mock_installation_with_jobs, any_prompt, start_time, expected
-):
+def test_latest_job_status_success_with_time(mock_datetime, ws, mock_installation_with_jobs, start_time, expected):
     base = [
         BaseRun(
             job_id=123,
@@ -1055,7 +1051,7 @@ def test_latest_job_status_success_with_time(
     assert status[0]["started"] == expected
 
 
-def test_latest_job_status_list(ws, any_prompt):
+def test_latest_job_status_list(ws):
     runs = [
         [
             BaseRun(
@@ -1097,7 +1093,7 @@ def test_latest_job_status_list(ws, any_prompt):
     assert status[2]["state"] == "UNKNOWN"
 
 
-def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs, any_prompt):
+def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
@@ -1108,7 +1104,7 @@ def test_latest_job_status_no_job_run(ws, mock_installation_with_jobs, any_promp
     assert status[0]["step"] == "assessment"
 
 
-def test_latest_job_status_exception(ws, mock_installation_with_jobs, any_prompt):
+def test_latest_job_status_exception(ws, mock_installation_with_jobs):
     wheels = create_autospec(WheelsV2)
     config = WorkspaceConfig(inventory_database='ucx')
     timeout = timedelta(seconds=1)
@@ -1485,7 +1481,7 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
         (RunState(result_state=RunResultState.FAILED, life_cycle_state=RunLifeCycleState.TERMINATED), False),
     ],
 )
-def test_validate_step(ws, any_prompt, result_state, expected):
+def test_validate_step(ws, result_state, expected):
     installation = create_autospec(Installation)
     installation.load.return_value = RawState({'jobs': {'assessment': '123'}})
     workflows_installer = WorkflowsDeployment(
