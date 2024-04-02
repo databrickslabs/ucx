@@ -216,6 +216,26 @@ for i in range(10):
     ] == list(sqf.lint(old_code))
 
 
+def test_spark_table_return_value(migration_index):
+    ftf = FromTable(migration_index)
+    sqf = SparkSql(ftf, migration_index)
+    old_code = """
+spark.read.csv("s3://bucket/path")
+for table in spark.listTables():
+    do_stuff_with_table(table)
+"""
+    assert [
+        Advisory(
+            code='table-migrate',
+            message="Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
+            start_line=3,
+            start_col=13,
+            end_line=3,
+            end_col=31,
+        )
+    ] == list(sqf.lint(old_code))
+
+
 def test_spark_sql_fix(migration_index):
     ftf = FromTable(migration_index)
     sqf = SparkSql(ftf, migration_index)

@@ -91,7 +91,7 @@ class TableNameMatcher(Matcher):
                     end_col=node.end_col_offset or 0,
                 )
         else:
-            assert isinstance(node.func, ast.Attribute) # always true, avoids a pylint warning
+            assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
             yield Advisory(
                 code='table-migrate',
                 message=f"Can't migrate '{node.func.attr}' because its table name argument is not a constant",
@@ -114,6 +114,27 @@ class TableNameMatcher(Matcher):
         return None if len(parts) != 2 else index.get(parts[0], parts[1])
 
 
+@dataclass
+class ReturnValueMatcher(Matcher):
+
+    def matches(self, node: ast.AST):
+        return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+        assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
+        yield Advisory(
+            code='table-migrate',
+            message=f"Call to '{node.func.attr}' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
+            start_line=node.lineno,
+            start_col=node.col_offset,
+            end_line=node.end_lineno or 0,
+            end_col=node.end_col_offset or 0,
+        )
+
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+        raise NotImplementedError("Should never get there!")
+
+
 class SparkMatchers:
 
     def __init__(self):
@@ -132,7 +153,7 @@ class SparkMatchers:
             TableNameMatcher("recoverPartitions", 1, 1, 0),
             TableNameMatcher("refreshTable", 1, 1, 0),
             TableNameMatcher("uncacheTable", 1, 1, 0),
-            # TODO listTables: raise warning ?
+            ReturnValueMatcher("listTables", 0, 2, -1),
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
