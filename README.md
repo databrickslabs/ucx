@@ -4,8 +4,9 @@ Databricks Labs UCX
 
 The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
 so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). 
-[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows.
-More workflows, like [migrating tables](docs/table_upgrade.md) and notebook code is coming in the future releases. 
+[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
+Then you can execute [table migration workflow](#table-migration-workflow).
+More workflows, like notebook code migration is coming in the future releases. 
 UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
 
 For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
@@ -208,7 +209,7 @@ Databricks CLI will confirm a few options:
 # Migration process
 
 On the high level, the steps in migration process start with the [assessment workflow](#assessment-workflow), 
-followed by [group migration](#group-migration-workflow), [table migration](#table-migration-commands), 
+followed by [group migration](#group-migration-workflow), [table migration workflow](#table-migration-workflow), 
 finalised with the [code migration](#code-migration-commands). It can be described as:
 
 ```mermaid
@@ -308,7 +309,7 @@ Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow r
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
 Directories, Repos, and Files. 
 
-Once done with the group migration, proceed to [table migration](#table-migration-commands).
+Once done with the group migration, proceed to [table migration workflow](#table-migration-workflow).
 
 Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
 If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
@@ -348,7 +349,7 @@ simply add `--debug` flag to any command.
 
 ## Table Migration Workflow
 
-The `migrate-tables` workflow comprises tasks designed to migrate tables from the Hive Metastore to the Unity Catalog. The subsequent diagram illustrates the workflow's tasks and their dependency CLI commands.
+The `migrate-tables` workflow comprises tasks designed to migrate tables from the Hive Metastore to the Unity Catalog. The subsequent diagram illustrates the workflow's tasks and their dependency CLI commands. 
 ```mermaid
 flowchart TD
     subgraph CLI
@@ -368,6 +369,7 @@ flowchart TD
     external_tables_sync_mt_task[migrate_external_tables_sync]
     end
 ```
+More details can be found in the [design of table migration](docs/table_upgrade.md)
 
 ### Dependency CLI commands
 - [`create-table-mapping`](#create-table-mapping-command) - Create `mapping.csv` which will be used by the workflow to identify the targets catalog, schema, table of the HMS table to be migrated. User should review and update the mapping file accordingly before proceeding with the migration workflow.
@@ -511,7 +513,7 @@ related to multiple installations of `ucx` on the same workspace.
 
 # Table migration commands
 
-These commands are vital part of [table migration](docs/table_upgrade.md) process and require 
+These commands are vital part of [table migration workflow](#table-migration-workflow) process and require 
 the [assessment workflow](#assessment-workflow) and 
 [group migration workflow](#group-migration-workflow) to be completed. 
 See the [migration process diagram](#migration-process) to understand the role of the table migration commands in 
@@ -592,7 +594,7 @@ workspace and configure the [UCX Cluster Policy](#installation) with the details
 service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
 assignment on every storage account using Azure Resource Manager APIs.
 
-Once done, proceed to the launching the [table migration workflow](#table-migration-commands).
+This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -666,6 +668,8 @@ multiple runs of the table migration workflow, you can use the [`revert-migrated
 to revert the tables that were migrated in the previous run. You can also skip the tables that you don't want to migrate
 using the [`skip` command](#skip-command).
 
+This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
+
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
 
 [[back to top](#databricks-labs-ucx)]
@@ -709,9 +713,7 @@ Go back to the [`create-table-mapping` command](#create-table-mapping-command) a
 databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
-This command is supposed to be run before migrating tables to UC.
-
-Once you're done with this command, proceed to the [table migration workflow](#table-migration-commands).
+This command is supposed to be run before migrating tables to UC using [table migration workflow](#table-migration-workflow).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -754,7 +756,7 @@ It can also be used to debug issues related to table aliasing.
 
 See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
 
-After you're done with the [table migration](#table-migration-commands), you can proceed to the code migration.
+After you're done with the [table migration](#table-migration-workflow), you can proceed to the code migration.
 
 Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
 clusters to be UC compatible.
@@ -767,7 +769,7 @@ clusters to be UC compatible.
 databricks labs ucx migrate-local-code
 ```
 
-**(Experimental)** Once [table migration](#table-migration-commands) is complete, you can run this command to 
+**(Experimental)** Once [table migration](#table-migration-workflow) is complete, you can run this command to 
 migrate all python and SQL files in the current working directory. This command is highly experimental and
 at the moment only supports Python and SQL files and discards code comments and formatting during 
 the automated transformation process.
@@ -874,7 +876,7 @@ This command is useful for administrators who want to ensure that the groups hav
 used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and 
 [group migration](#group-migration-workflow) for more details.
 
-Once you're done with this command, proceed to the [table migration](#table-migration-commands).
+Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration workflow](#table-migration-workflow)
 
 [[back to top](#databricks-labs-ucx)]
 
