@@ -30,17 +30,16 @@ class Snapshot(Protocol):
     def snapshot(self): ...
 
 
-class Workflow(RuntimeContext):
+class Workflow:
     def __init__(self, name: str):
-        super().__init__()
         self._name = name
 
     @property
     def name(self):
         return self._name
 
-    def simple_snapshot(self, crawler_class: type[Snapshot]):
-        crawler = crawler_class(self.sql_backend, self.workspace_client, self.config.inventory_database)
+    def simple_snapshot(self, ctx: RuntimeContext, crawler_class: type[Snapshot]):
+        crawler = crawler_class(ctx.sql_backend, ctx.workspace_client, ctx.config.inventory_database)
         crawler.snapshot()
 
     def tasks(self) -> list[Task]:
@@ -92,7 +91,7 @@ class Assessment(Workflow):
         super().__init__('assessment')
 
     @task(notebook="hive_metastore/tables.scala")
-    def crawl_tables(self):
+    def crawl_tables(self, ctx: RuntimeContext):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
         as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
         `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
@@ -100,11 +99,11 @@ class Assessment(Workflow):
         cannot easily be migrated to Unity Catalog."""
 
     @task(job_cluster="tacl")
-    def setup_tacl(self):
+    def setup_tacl(self, ctx: RuntimeContext):
         """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
     @task(depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
-    def crawl_grants(self):
+    def crawl_grants(self, ctx: RuntimeContext):
         """Scans the previously created Delta table named `$inventory_database.tables` and issues a `SHOW GRANTS`
         statement for every object to retrieve the permissions it has assigned to it. The permissions include information
         such as the _principal_, _action type_, and the _table_ it applies to. This is persisted in the Delta table
@@ -113,29 +112,29 @@ class Assessment(Workflow):
 
         Note: This job runs on a separate cluster (named `tacl`) as it requires the proper configuration to have the Table
         ACLs enabled and available for retrieval."""
-        self.grants_crawler.snapshot()
+        ctx.grants_crawler.snapshot()
 
     @task(depends_on=[crawl_tables])
-    def estimate_table_size_for_migration(self):
+    def estimate_table_size_for_migration(self, ctx: RuntimeContext):
         """Scans the previously created Delta table named `$inventory_database.tables` and locate tables that cannot be
         "synced". These tables will have to be cloned in the migration process.
         Assesses the size of these tables and create `$inventory_database.table_size` table to list these sizes.
         The table size is a factor in deciding whether to clone these tables."""
-        table_size = TableSizeCrawler(self.sql_backend, self.config.inventory_database)
+        table_size = TableSizeCrawler(ctx.sql_backend, ctx.config.inventory_database)
         table_size.snapshot()
 
     @task
-    def crawl_mounts(self):
+    def crawl_mounts(self, ctx: RuntimeContext):
         """Defines the scope of the _mount points_ intended for migration into Unity Catalog. As these objects are not
         compatible with the Unity Catalog paradigm, a key component of the migration process involves transferring them
         to Unity Catalog External Locations.
 
         The assessment involves scanning the workspace to compile a list of all existing mount points and subsequently
         storing this information in the `$inventory.mounts` table. This is crucial for planning the migration."""
-        self.simple_snapshot(Mounts)
+        self.simple_snapshot(ctx, Mounts)
 
     @task(depends_on=[crawl_mounts, crawl_tables])
-    def guess_external_locations(self):
+    def guess_external_locations(self, ctx: RuntimeContext):
         """Determines the shared path prefixes of all the tables. Specifically, the focus is on identifying locations that
         utilize mount points. The goal is to identify the _external locations_ necessary for a successful migration and
         store this information in the `$inventory.external_locations` table.
@@ -144,10 +143,10 @@ class Assessment(Workflow):
           - Extracting all the locations associated with tables that do not use DBFS directly, but a mount point instead
           - Scanning all these locations to identify folders that can act as shared path prefixes
           - These identified external locations will be created subsequently prior to the actual table migration"""
-        self.simple_snapshot(ExternalLocations)
+        self.simple_snapshot(ctx, ExternalLocations)
 
     @task
-    def assess_jobs(self):
+    def assess_jobs(self, ctx: RuntimeContext):
         """Scans through all the jobs and identifies those that are not compatible with UC. The list of all the jobs is
         stored in the `$inventory.jobs` table.
 
@@ -157,10 +156,10 @@ class Assessment(Workflow):
           - Clusters with incompatible Spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        self.simple_snapshot(JobsCrawler)
+        self.simple_snapshot(ctx, JobsCrawler)
 
     @task
-    def assess_clusters(self):
+    def assess_clusters(self, ctx: RuntimeContext):
         """Scan through all the clusters and identifies those that are not compatible with UC. The list of all the clusters
         is stored in the`$inventory.clusters` table.
 
@@ -170,10 +169,10 @@ class Assessment(Workflow):
           - Clusters with incompatible spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        self.simple_snapshot(ClustersCrawler)
+        self.simple_snapshot(ctx, ClustersCrawler)
 
     @task
-    def assess_pipelines(self):
+    def assess_pipelines(self, ctx: RuntimeContext):
         """This module scans through all the Pipelines and identifies those pipelines which has Azure Service Principals
         embedded (who has been given access to the Azure storage accounts via spark configurations) in the pipeline
         configurations.
@@ -183,10 +182,10 @@ class Assessment(Workflow):
 
         Subsequently, a list of all the pipelines with matching configurations are stored in the
         `$inventory.pipelines` table."""
-        self.simple_snapshot(PipelinesCrawler)
+        self.simple_snapshot(ctx, PipelinesCrawler)
 
     @task
-    def assess_incompatible_submit_runs(self):
+    def assess_incompatible_submit_runs(self, ctx: RuntimeContext):
         """This module scans through all the Submit Runs and identifies those runs which may become incompatible after
         the workspace attachment.
 
@@ -197,15 +196,15 @@ class Assessment(Workflow):
         Subsequently, a list of all the incompatible runs with failures are stored in the
         `$inventory.submit_runs` table."""
         crawler = SubmitRunsCrawler(
-            self.workspace_client,
-            self.sql_backend,
-            self.config.inventory_database,
-            self.config.num_days_submit_runs_history,
+            ctx.workspace_client,
+            ctx.sql_backend,
+            ctx.config.inventory_database,
+            ctx.config.num_days_submit_runs_history,
         )
         crawler.snapshot()
 
     @task
-    def crawl_cluster_policies(self):
+    def crawl_cluster_policies(self, ctx: RuntimeContext):
         """This module scans through all the Cluster Policies and get the necessary information
 
         It looks for:
@@ -213,10 +212,10 @@ class Assessment(Workflow):
 
           Subsequently, a list of all the policies with matching configurations are stored in the
         `$inventory.policies` table."""
-        self.simple_snapshot(PoliciesCrawler)
+        self.simple_snapshot(ctx, PoliciesCrawler)
 
     @task(cloud="azure")
-    def assess_azure_service_principals(self):
+    def assess_azure_service_principals(self, ctx: RuntimeContext):
         """This module scans through all the clusters configurations, cluster policies, job cluster configurations,
         Pipeline configurations, Warehouse configuration and identifies all the Azure Service Principals who has been
         given access to the Azure storage accounts via spark configurations referred in those entities.
@@ -226,49 +225,49 @@ class Assessment(Workflow):
 
         Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
         in the `$inventory.azure_service_principals` table."""
-        if self.workspace_client.config.is_azure:
-            self.simple_snapshot(AzureServicePrincipalCrawler)
+        if ctx.workspace_client.config.is_azure:
+            self.simple_snapshot(ctx, AzureServicePrincipalCrawler)
 
     @task
-    def assess_global_init_scripts(self):
+    def assess_global_init_scripts(self, ctx: RuntimeContext):
         """This module scans through all the global init scripts and identifies if there is an Azure Service Principal
         who has been given access to the Azure storage accounts via spark configurations referred in those scripts.
 
         It looks in:
           - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
-        self.simple_snapshot(GlobalInitScriptCrawler)
+        self.simple_snapshot(ctx, GlobalInitScriptCrawler)
 
     @task
-    def workspace_listing(self):
+    def workspace_listing(self, ctx: RuntimeContext):
         """Scans the workspace for workspace objects. It recursively list all sub directories
         and compiles a list of directories, notebooks, files, repos and libraries in the workspace.
 
         It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
         It accepts starting path as the parameter defaulted to the root path '/'."""
         crawler = WorkspaceListing(
-            self.workspace_client,
-            self.sql_backend,
-            self.config.inventory_database,
-            self.config.num_threads,
-            self.config.workspace_start_path,
+            ctx.workspace_client,
+            ctx.sql_backend,
+            ctx.config.inventory_database,
+            ctx.config.num_threads,
+            ctx.config.workspace_start_path,
         )
         crawler.snapshot()
 
     @task(depends_on=[crawl_grants, workspace_listing])
-    def crawl_permissions(self):
+    def crawl_permissions(self, ctx: RuntimeContext):
         """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
         Delta table.
 
         This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
         This step includes preparing Legacy Table ACLs for local group migration."""
-        permission_manager = self.permission_manager
+        permission_manager = ctx.permission_manager
         permission_manager.cleanup()
         permission_manager.inventorize_permissions()
 
     @task
-    def crawl_groups(self):
+    def crawl_groups(self, ctx: RuntimeContext):
         """Scans all groups for the local group migration scope"""
-        self.group_manager.snapshot()
+        ctx.group_manager.snapshot()
 
     @task(
         depends_on=[
@@ -287,7 +286,7 @@ class Assessment(Workflow):
         ],
         dashboard="assessment_main",
     )
-    def assessment_report(self):
+    def assessment_report(self, ctx: RuntimeContext):
         """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
@@ -301,7 +300,7 @@ class Assessment(Workflow):
         ],
         dashboard="assessment_estimates",
     )
-    def estimates_report(self):
+    def estimates_report(self, ctx: RuntimeContext):
         """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
@@ -311,21 +310,21 @@ class GroupMigration(Workflow):
         super().__init__('migrate-groups')
 
     @task(depends_on=[Assessment.crawl_groups])
-    def rename_workspace_local_groups(self):
+    def rename_workspace_local_groups(self, ctx: RuntimeContext):
         """Renames workspace local groups by adding `ucx-renamed-` prefix."""
-        verify_has_metastore = VerifyHasMetastore(self.workspace_client)
+        verify_has_metastore = VerifyHasMetastore(ctx.workspace_client)
         if verify_has_metastore.verify_metastore():
             logger.info("Metastore exists in the workspace")
-        self.group_manager.rename_groups()
+        ctx.group_manager.rename_groups()
 
     @task(depends_on=[rename_workspace_local_groups])
-    def reflect_account_groups_on_workspace(self):
+    def reflect_account_groups_on_workspace(self, ctx: RuntimeContext):
         """Adds matching account groups to this workspace. The matching account level group(s) must preexist(s) for this
         step to be successful. This process does not create the account level group(s)."""
-        self.group_manager.reflect_account_groups_on_workspace()
+        ctx.group_manager.reflect_account_groups_on_workspace()
 
     @task(depends_on=[reflect_account_groups_on_workspace], job_cluster="tacl")
-    def apply_permissions_to_account_groups(self):
+    def apply_permissions_to_account_groups(self, ctx: RuntimeContext):
         """Fourth phase of the workspace-local group migration process. It does the following:
           - Assigns the full set of permissions of the original group to the account-level one
 
@@ -335,16 +334,16 @@ class GroupMigration(Workflow):
         permissions, Secret Scopes, Notebooks, Directories, Repos, Files.
 
         See [interactive tutorial here](https://app.getreprise.com/launch/myM3VNn/)."""
-        migration_state = self.group_manager.get_migration_state()
+        migration_state = ctx.group_manager.get_migration_state()
         if len(migration_state.groups) == 0:
             logger.info("Skipping group migration as no groups were found.")
             return
-        self.permission_manager.apply_group_permissions(migration_state)
+        ctx.permission_manager.apply_group_permissions(migration_state)
 
     @task(job_cluster="tacl")
-    def validate_groups_permissions(self):
+    def validate_groups_permissions(self, ctx: RuntimeContext):
         """Validate that all the crawled permissions are applied correctly to the destination groups."""
-        self.permission_manager.verify_group_permissions()
+        ctx.permission_manager.verify_group_permissions()
 
 
 class TableMigration(Workflow):
@@ -352,27 +351,33 @@ class TableMigration(Workflow):
         super().__init__('migrate-tables')
 
     @task(job_cluster="table_migration")
-    def migrate_external_tables_sync(self):
+    def migrate_external_tables_sync(self, ctx: RuntimeContext):
         """This workflow task migrates the *external tables that are supported by SYNC command* from the Hive Metastore to the Unity Catalog.
         Following cli commands are required to be run before running this task:
         - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
         - For AWS: TBD
         """
-        self.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     @task(job_cluster="table_migration")
-    def migrate_dbfs_root_delta_tables(self):
+    def migrate_dbfs_root_delta_tables(self, ctx: RuntimeContext):
         """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
         Following cli commands are required to be run before running this task:
         - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
         - For AWS: TBD
         """
-        self.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
 class Workflows:
+    _tasks: dict[str, Workflow]
+
     def __init__(self, workflows: list[Workflow]):
-        self._tasks: dict[str, Workflow] = {task.name: workflow for workflow in workflows for task in workflow.tasks()}
+        for workflow in workflows:
+            for task_definition in workflow.tasks():
+                if task_definition.name in self._tasks:
+                    raise ValueError(f"Task {task_definition.name} is already defined in another workflow")
+                self._tasks[task_definition.name] = workflow
 
     @classmethod
     def all(cls):
@@ -389,6 +394,9 @@ class Workflows:
     def trigger(self, *argv):
         args = self._parse_args(*argv)
         config_path = Path(args["config"])
+
+        ctx = RuntimeContext(config_path)
+
         install_dir = config_path.parent
 
         task_name = args.get("task", "not specified")
@@ -397,8 +405,6 @@ class Workflows:
             raise KeyError(msg)
         print(f"UCX v{__version__}")
         workflow = self._tasks[task_name]
-        # this line effectively enables further initialization of all dependent factories
-        workflow.set_config_path(config_path)
         # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
         workflow_run_id = args.get("parent_run_id", "unknown_run_id")
         job_id = args.get("job_id", "unknown_job_id")
@@ -408,9 +414,9 @@ class Workflows:
             workflow_id=job_id,
             task_name=task_name,
             workflow_run_id=workflow_run_id,
-            log_level=workflow.config.log_level,
+            log_level=ctx.config.log_level,
         ) as task_logger:
             ucx_logger = logging.getLogger("databricks.labs.ucx")
             ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
             current_task = getattr(workflow, task_name)
-            current_task()
+            current_task(ctx)

@@ -337,20 +337,12 @@ class GlobalContext:
 
 
 class RuntimeContext(GlobalContext):
-    def __init__(self):
+    def __init__(self, config_path: Path):
         super().__init__()
-        # this is a bit of a calculated hack to simplify the UX for task definitions.
-        # generally, we despise the shared mutable state, but in this case, it's
-        # a bit of a necessary evil
-        self._config_path = None
-
-    def set_config_path(self, config_path: Path):
         self._config_path = config_path
 
     @cached_property
     def config(self) -> WorkspaceConfig:
-        if not self._config_path:
-            raise ValueError("Config path not set")
         return Installation.load_local(WorkspaceConfig, self._config_path)
 
     @cached_property
