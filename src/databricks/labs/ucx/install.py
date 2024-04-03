@@ -11,6 +11,7 @@ from typing import Any
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.upgrades import Upgrades
@@ -142,8 +143,9 @@ class WorkspaceInstaller:
         if not wheel_builder_factory:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
+        install_state = InstallState.from_installation(self._installation)
         workflows_installer = WorkflowsDeployment(
-            config, self._installation, self._ws, wheels, self._product_info, verify_timeout
+            config, self._installation, install_state, self._ws, wheels, self._product_info, verify_timeout
         )
         workspace_installation = WorkspaceInstallation(
             config,
@@ -361,12 +363,15 @@ class WorkspaceInstallation(InstallationMixin):
     def current(cls, ws: WorkspaceClient):
         product_info = ProductInfo.from_class(WorkspaceConfig)
         installation = product_info.current_installation(ws)
+        install_state = InstallState.from_installation(installation)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, product_info, timeout)
+        workflows_installer = WorkflowsDeployment(
+            config, installation, install_state, ws, wheels, product_info, timeout
+        )
 
         return cls(config, installation, sql_backend, ws, workflows_installer, prompts, product_info)
 
