@@ -49,6 +49,13 @@ from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
+# "Service Factories" would always have a lot of pulic methods.
+# This is because they are responsible for creating objects that are
+# used throughout the application. That being said, we'll do best
+# effort of splitting the instances between Global, Runtime,
+# Workspace CLI, and Account CLI contexts.
+# pylint: disable=too-many-public-methods
+
 
 class GlobalContext:
     # TODO: make flags only available in CLI contexts
@@ -368,7 +375,7 @@ class RuntimeContext(GlobalContext):
 
 
 class CliContext(GlobalContext):
-    def __init__(self, flags: dict[str, str] = None):
+    def __init__(self, flags: dict[str, str] | None = None):
         super().__init__()
         if not flags:
             flags = {}
@@ -380,7 +387,7 @@ class CliContext(GlobalContext):
 
 
 class WorkspaceContext(CliContext):
-    def __init__(self, ws: WorkspaceClient, flags: dict[str, str] = None):
+    def __init__(self, ws: WorkspaceClient, flags: dict[str, str] | None = None):
         super().__init__(flags)
         self._ws = ws
 
@@ -398,9 +405,8 @@ class WorkspaceContext(CliContext):
 
 
 class AccountContext(CliContext):
-    def __init__(self, ac: AccountClient, flags: dict[str, str]):
+    def __init__(self, ac: AccountClient, flags: dict[str, str] | None = None):
         super().__init__(flags)
-        self.flags = flags
         self._ac = ac
 
     @cached_property

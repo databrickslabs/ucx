@@ -1,6 +1,8 @@
+import functools
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -46,13 +48,43 @@ class Workflow(RuntimeContext):
 
 
 def task(
+    fn=None,
     *,
     depends_on=None,
     job_cluster="main",
     notebook: str | None = None,
     dashboard: str | None = None,
     cloud: str | None = None,
-) -> Callable[[Callable], Callable]: ...
+) -> Callable[[Callable], Callable]:
+    def register(func):
+        if not func.__doc__:
+            raise SyntaxError(f"{func.__name__} must have some doc comment")
+        deps = []
+        if depends_on is not None:
+            if not isinstance(depends_on, list):
+                msg = "depends_on has to be a list"
+                raise SyntaxError(msg)
+            for fn in depends_on:
+                deps.append(fn.__name__)
+        func.__task__ = Task(
+            task_id=-1,
+            workflow='...',
+            name=func.__name__,
+            # doc=remove_extra_indentation(func.__doc__),
+            doc=func.__doc__,
+            fn=func,
+            depends_on=deps,
+            job_cluster=job_cluster,
+            notebook=notebook,
+            dashboard=dashboard,
+            cloud=cloud,
+        )
+        return func
+
+    if fn is None:
+        return functools.partial(register)
+    register(fn)
+    return fn
 
 
 class Assessment(Workflow):
@@ -60,7 +92,7 @@ class Assessment(Workflow):
         super().__init__('assessment')
 
     @task(notebook="hive_metastore/tables.scala")
-    def crawl_tables(*_):
+    def crawl_tables(self):
         """Iterates over all tables in the Hive Metastore of the current workspace and persists their metadata, such
         as _database name_, _table name_, _table type_, _table location_, etc., in the Delta table named
         `$inventory_database.tables`. Note that the `inventory_database` is set in the configuration file. The metadata
@@ -68,7 +100,7 @@ class Assessment(Workflow):
         cannot easily be migrated to Unity Catalog."""
 
     @task(job_cluster="tacl")
-    def setup_tacl(*_):
+    def setup_tacl(self):
         """(Optimization) Starts `tacl` job cluster in parallel to crawling tables."""
 
     @task(depends_on=[crawl_tables, setup_tacl], job_cluster="tacl")
@@ -340,12 +372,13 @@ class TableMigration(Workflow):
 
 class Workflows:
     def __init__(self, workflows: list[Workflow]):
-        self._tasks: dict[str, Workflow] = {task.name: task for workflow in workflows for task in workflow.tasks()}
+        self._tasks: dict[str, Workflow] = {task.name: workflow for workflow in workflows for task in workflow.tasks()}
 
     @classmethod
     def all(cls):
         return cls([Assessment(), GroupMigration(), TableMigration()])
 
+    @staticmethod
     def _parse_args(*argv) -> dict[str, str]:
         args = dict(a[2:].split("=") for a in argv if a[0:2] == "--")
         if "config" not in args:

@@ -30,7 +30,7 @@ def test_replace_installation():
             'azure_storage_account_info.csv': [
                 {
                     'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
-                    'client_id': "redacted-for-github-929e765443eb",
+                    'client_id': "first-application-id",
                     'directory_id': 'tenant',
                     'principal': "oneenv-adls",
                     'privilege': "WRITE_FILES",
@@ -38,7 +38,7 @@ def test_replace_installation():
                 },
                 {
                     'prefix': 'abfss://ucx2@ziyuanqintest.dfs.core.windows.net/',
-                    'client_id': "redacted-for-github-ebcef6708997",
+                    'client_id': "second-application-id",
                     'principal': "ziyuan-user-assigned-mi",
                     'privilege': "WRITE_FILES",
                     'type': "ManagedIdentity",
@@ -50,8 +50,8 @@ def test_replace_installation():
     ctx.__dict__['sql_backend'] = MockBackend(
         rows={
             r'some.azure_service_principals': spn_info_rows[
-                ('redacted-for-github-929e765443eb', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
-                ('redacted-for-github-ebcef6708997', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
+                ('first-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
+                ('second-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
             ]
         }
     )
