@@ -94,22 +94,29 @@ class TablesMigrator:
         self._init_seen_tables()
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tasks = []
-        if acl_strategy is not None:
-            grants_to_migrate = self._gc.snapshot()
-            migrated_groups = self._group.snapshot()
-            principal_grants = self._principal_grants.get_interactive_cluster_grants()
-        else:
-            acl_strategy = []
+        all_grants_to_migrate = None if acl_strategy is None else self._gc.snapshot()
+        all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
+        all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
         for table in tables_to_migrate:
-            grants = []
             if what is not None and table.src.what != what:
                 continue
-            if AclMigrationWhat.LEGACY_TACL in acl_strategy:
-                grants.extend(self._match_grants(table.src, grants_to_migrate, migrated_groups))
-            if AclMigrationWhat.PRINCIPAL in acl_strategy:
-                grants.extend(self._match_grants(table.src, principal_grants, migrated_groups))
+            grants = self._compute_grants(
+                table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+            )
             tasks.append(partial(self._migrate_table, table.src, table.rule, grants))
         Threads.strict("migrate tables", tasks)
+
+    def _compute_grants(
+        self, table: Table, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+    ):
+        if acl_strategy is None:
+            acl_strategy = []
+        grants = []
+        if AclMigrationWhat.LEGACY_TACL in acl_strategy:
+            grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
+        if AclMigrationWhat.PRINCIPAL in acl_strategy:
+            grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
+        return grants
 
     def _migrate_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         if self._table_already_migrated(rule.as_uc_table_key):
