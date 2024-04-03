@@ -342,6 +342,61 @@ simply add `--debug` flag to any command.
 
 [[back to top](#databricks-labs-ucx)]
 
+## Table Migration Workflow
+
+The `migrate-tables` workflow comprises tasks designed to migrate tables from the Hive Metastore to the Unity Catalog. The subsequent diagram illustrates the workflow's tasks and their dependency CLI commands.
+```mermaid
+flowchart TD
+    subgraph CLI
+    create_table_mapping[create-table-mapping] --> create_catalogs_schemas[create-catalogs-schemas]
+    create_uber_principal[create-uber-principal]
+    principal_prefix_access[principal-prefix-access] --> migrate_credentials[migrate-credentials]
+    migrate_credentials --> migrate_locations[migrate-locations]
+    migrate_locations --> create_catalogs_schemas
+    end
+    
+    create_uber_principal --> mt_workflow
+    create_table_mapping --> mt_workflow
+    create_catalogs_schemas --> mt_workflow
+    
+    subgraph mt_workflow[workflow: migrate-tables]
+    dbfs_root_delta_mt_task[migrate_dbfs_root_delta_tables]
+    external_tables_sync_mt_task[migrate_external_tables_sync]
+    end
+```
+
+### Dependency CLI commands
+- [`create-table-mapping`](#create-table-mapping-command) - Create `mapping.csv` which will be used by the workflow to identify the targets catalog, schema, table of the HMS table to be migrated. User should review and update the mapping file accordingly before proceeding with the migration workflow.
+- [`principal-prefix-access`](#principal-prefix-access-command) - Identify all the storages used in the workspace and corresponding Azure Service Principal or IAM role that are used in the workspace. It outputs `azure_storage_account_info.csv` or `uc_roles_access.csv` which will be later used by `migrate-credentials`command to create UC storage credentials. The csv can be edited to control which IAM roles or Azure Service Principals should be used to create UC storage credentials later.
+- [`migrate-credentials`](#migrate-credentials-command) - Create UC storage credentials based on the Azure Service Principal or IAM role (`azure_storage_account_info.csv` or `uc_roles_access.csv`) identified by `principal-prefix-access` command.
+- [`migrate-locations`](#migrate-locations-command) - Create missing external locations in the Unity Catalog. 
+- [`create-catalogs-schemas`](#create-catalogs-schemas-command) - Create missing catalogs and schemas in the Unity Catalog. The candidate catalogs and schemas is based on `mapping.csv`
+- [`create-uber-principal`](#create-uber-principal-command) - Create an Uber Principal with access to all storages used in the workspace. This principal will be used by the workflow job cluster to migrate all the tables in the workspace.
+
+`create-table-mapping` and `create-uber-principal` are required to run the workflow. While other commands are optional, as long as the UC storage credentials, external locations, catalogs and schemas needed for successful migration are created.
+
+To control the scope of the table migration, consider utilizing a combination of editing `mapping.csv`, employing [`skip`](#skip-command) command, and [`revert-migrated-tables`](#revert-migrated-tables-command) command.
+
+See more details in [Table migration commands](#table-migration-commands)
+
+### Table Migration Workflow Tasks
+- `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone.
+- `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command.
+- Following tasks are on the roadmap and being developed:
+  - Migrate view
+  - Migrate tables using CTAS
+  - In place migrate ParquetHiveSerDe, OrcSerde, AvroSerDe, LazySimpleSerDe, JsonSerDe, OpenCSVSerde tables.
+
+### Other considerations
+- You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
+- If your delta tables in DBFS root have large number of files, consider:
+  - Setting higher Min and Max workers for auto-scale when being asked during the UCX installation. More nodes/cores in the cluster means more concurrency for calling cloud storage api to copy files when deep cloning the delta tables.
+  - Setting higher "Parallelism for migrating dbfs root delta tables with deep clone" (default 200) when being asked during the UCX installation. This controls the number of Spark task/partition to be created for deep clone.
+- Consider create an instance pool, and set the instance pool id when being asked during the UCX installation. This instance pool will be put into the cluster policy used by all UCX workflows job clusters.
+- You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
+
+[[back to top](#databricks-labs-ucx)]
+
 # Utility commands
 
 ## `ensure-assessment-run` command
