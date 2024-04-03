@@ -150,6 +150,8 @@ class TablesMigrator:
     def _compute_grants(
         self, table: Table, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
     ):
+        if acl_strategy is None:
+            acl_strategy = []
         grants = []
         if AclMigrationWhat.LEGACY_TACL in acl_strategy:
             grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))

@@ -62,6 +62,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         principal_grants,
     )
     table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    table_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert (
         "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;"
@@ -718,7 +719,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
-    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migration_status_refresher = create_autospec(MigrationStatusRefresher)
     principal_grants = create_autospec(PrincipalACL)
     table_migrator = TablesMigrator(
         table_crawler,
@@ -732,6 +733,10 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     )
     table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
     table_migrator.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    migration_status_refresher.get_seen_tables.return_value = {
+        "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
+    }
+
     table_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
