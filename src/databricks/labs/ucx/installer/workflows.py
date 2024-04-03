@@ -2,6 +2,7 @@ import logging
 import re
 import sys
 import webbrowser
+from collections.abc import Collection
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
@@ -110,6 +111,7 @@ class WorkflowsDeployment(InstallationMixin):
         wheels: WheelsV2,
         product_info: ProductInfo,
         verify_timeout: timedelta,
+        tasks: list[Task] | None = None,
     ):
         self._config = config
         self._installation = installation
@@ -118,8 +120,13 @@ class WorkflowsDeployment(InstallationMixin):
         self._wheels = wheels
         self._product_info = product_info
         self._verify_timeout = verify_timeout
+        self._tasks = self._sort_tasks(tasks if tasks else _TASKS.values())
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
+
+    @staticmethod
+    def _sort_tasks(tasks: Collection[Task]) -> list[Task]:
+        return sorted(tasks, key=lambda x: x.task_id)
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
@@ -148,7 +155,7 @@ class WorkflowsDeployment(InstallationMixin):
     def create_jobs(self, prompts):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel(prompts)
-        desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
+        desired_steps = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
@@ -170,6 +177,7 @@ class WorkflowsDeployment(InstallationMixin):
 
         self._install_state.save()
         self._create_debug(remote_wheel)
+        return self._create_readme()
 
     def repair_run(self, workflow):
         try:
@@ -236,6 +244,52 @@ class WorkflowsDeployment(InstallationMixin):
     @property
     def _config_file(self):
         return f"{self._installation.install_folder()}/config.yml"
+
+    def _create_readme(self) -> str:
+        debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
+        markdown = [
+            "# UCX - The Unity Catalog Migration Assistant",
+            f'To troubleshoot, see {debug_notebook_link}.\n',
+            "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
+            "All jobs are defined with necessary cluster configurations and DBR versions.\n",
+        ]
+        for step_name in self._step_list():
+            if step_name not in self._install_state.jobs:
+                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
+                continue
+            job_id = self._install_state.jobs[step_name]
+            dashboard_link = ""
+            dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
+            for dash in dashboards_per_step:
+                if len(dashboard_link) == 0:
+                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
+                first, second = dash.replace("_", " ").title().split()
+                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
+                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
+            job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
+            markdown.append("---\n\n")
+            markdown.append(f"## {job_link}\n\n")
+            markdown.append(f"{dashboard_link}")
+            markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
+            for task in self._tasks:
+                if task.workflow != step_name:
+                    continue
+                doc = self._config.replace_inventory_variable(task.doc)
+                markdown.append(f"### `{task.name}`\n\n")
+                markdown.append(f"{doc}\n")
+                markdown.append("\n\n")
+        preamble = ["# Databricks notebook source", "# MAGIC %md"]
+        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
+        self._installation.upload('README.py', intro.encode('utf8'))
+        readme_url = self._installation.workspace_link('README')
+        return readme_url
+
+    def _step_list(self) -> list[str]:
+        step_list = []
+        for task in self._tasks:
+            if task.workflow not in step_list:
+                step_list.append(task.workflow)
+        return step_list
 
     def _job_cluster_spark_conf(self, cluster_key: str):
         conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
@@ -390,10 +444,7 @@ class WorkflowsDeployment(InstallationMixin):
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
-        tasks = sorted(
-            [t for t in _TASKS.values() if t.workflow == step_name],
-            key=lambda _: _.name,
-        )
+        tasks = [t for t in self._tasks if t.workflow == step_name]
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -408,7 +459,7 @@ class WorkflowsDeployment(InstallationMixin):
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].dependencies()],
+            depends_on=[jobs.TaskDependency(task_key=d) for d in task.dependencies()],
         )
         if task.dashboard:
             # dashboards are created in parallel to wheel uploads, so we'll just retry

@@ -7,7 +7,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import EndpointInfoWarehouseType
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
 
 logger = logging.getLogger(__name__)
 
@@ -17,18 +16,6 @@ class InstallationMixin:
         self._config = config
         self._installation = installation
         self._ws = ws
-
-    @staticmethod
-    def sorted_tasks() -> list[Task]:
-        return sorted(_TASKS.values(), key=lambda x: x.task_id)
-
-    @classmethod
-    def step_list(cls) -> list[str]:
-        step_list = []
-        for task in cls.sorted_tasks():
-            if task.workflow not in step_list:
-                step_list.append(task.workflow)
-        return step_list
 
     def _name(self, name: str) -> str:
         prefix = os.path.basename(self._installation.install_folder()).removeprefix('.')

@@ -410,8 +410,9 @@ class WorkspaceInstallation(InstallationMixin):
                 self._create_database,
             ],
         )
-        self._workflows_installer.create_jobs(self._prompts)
-        readme_url = self._create_readme()
+        readme_url = self._workflows_installer.create_jobs(self._prompts)
+        if self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+            webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
         if self._prompts.confirm("Do you want to trigger assessment job ?"):
@@ -449,50 +450,6 @@ class WorkspaceInstallation(InstallationMixin):
             query_text_callback=self._config.replace_inventory_variable,
         )
         dash.create_dashboards()
-
-    def _create_readme(self) -> str:
-        debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
-        markdown = [
-            "# UCX - The Unity Catalog Migration Assistant",
-            f'To troubleshoot, see {debug_notebook_link}.\n',
-            "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
-            "All jobs are defined with necessary cluster configurations and DBR versions.\n",
-        ]
-        for step_name in self.step_list():
-            if step_name not in self._install_state.jobs:
-                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
-                continue
-            job_id = self._install_state.jobs[step_name]
-            dashboard_link = ""
-            dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
-            for dash in dashboards_per_step:
-                if len(dashboard_link) == 0:
-                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
-                first, second = dash.replace("_", " ").title().split()
-                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
-                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
-            job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            markdown.append("---\n\n")
-            markdown.append(f"## {job_link}\n\n")
-            markdown.append(f"{dashboard_link}")
-            markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self.sorted_tasks():
-                if task.workflow != step_name:
-                    continue
-                doc = self._config.replace_inventory_variable(task.doc)
-                markdown.append(f"### `{task.name}`\n\n")
-                markdown.append(f"{doc}\n")
-                markdown.append("\n\n")
-        preamble = ["# Databricks notebook source", "# MAGIC %md"]
-        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
-        self._installation.upload('README.py', intro.encode('utf8'))
-        readme_url = self._installation.workspace_link('README')
-        if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
-            webbrowser.open(readme_url)
-        return readme_url
-
-    def _replace_inventory_variable(self, text: str) -> str:
-        return text.replace("$inventory", f"hive_metastore.{self._config.inventory_database}")
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
