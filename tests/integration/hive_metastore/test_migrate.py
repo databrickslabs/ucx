@@ -238,7 +238,7 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
         principal_grants,
     )
 
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -299,7 +299,7 @@ def test_migrate_external_table_failed_sync(
         principal_grants,
     )
 
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
 
 
@@ -717,7 +717,7 @@ def test_migrate_managed_tables_with_principal_acl_azure(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
