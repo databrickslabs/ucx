@@ -380,8 +380,8 @@ To control the scope of the table migration, consider utilizing a combination of
 See more details in [Table migration commands](#table-migration-commands)
 
 ### Table Migration Workflow Tasks
-- `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone.
-- `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command.
+- `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone, along with legacy table ACL migrated if any.
+- `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command, along with legacy table ACL migrated if any.
 - Following tasks are on the roadmap and being developed:
   - Migrate view
   - Migrate tables using CTAS
