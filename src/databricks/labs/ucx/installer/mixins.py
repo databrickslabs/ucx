@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
@@ -30,23 +29,6 @@ class InstallationMixin:
                 msg = "Current user is not a workspace admin"
                 raise PermissionError(msg)
         return self._me.user_name
-
-    @staticmethod
-    def _readable_timedelta(epoch):
-        when = datetime.utcfromtimestamp(epoch)
-        duration = datetime.now() - when
-        data = {}
-        data["days"], remaining = divmod(duration.total_seconds(), 86_400)
-        data["hours"], remaining = divmod(remaining, 3_600)
-        data["minutes"], data["seconds"] = divmod(remaining, 60)
-
-        time_parts = ((name, round(value)) for (name, value) in data.items())
-        time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
-        if len(time_parts) > 0:
-            time_parts.append("ago")
-        if time_parts:
-            return " ".join(time_parts)
-        return "less than 1 second ago"
 
     @property
     def _warehouse_id(self) -> str:

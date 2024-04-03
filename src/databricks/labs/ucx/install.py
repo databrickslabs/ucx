@@ -518,10 +518,6 @@ class WorkspaceInstallation(InstallationMixin):
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
 
-    def validate_and_run(self, step: str):
-        if not self._workflows_installer.validate_step(step):
-            self._workflows_installer.run_workflow(step)
-
     def _trigger_workflow(self, step: str):
         job_id = int(self._install_state.jobs[step])
         job_url = f"{self._ws.config.host}#job/{job_id}"
