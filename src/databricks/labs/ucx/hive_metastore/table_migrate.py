@@ -129,7 +129,7 @@ class TablesMigrator:
                     grants,
                 )
             )
-        Threads.strict("migrate views", tasks)
+        Threads.strict("migrate tables", tasks)
         # the below is useful for testing
         return tasks
 
