@@ -690,8 +690,8 @@ def test_table_status_seen_tables(caplog):
         'cat1.schema1.table2': 'hive_metastore.schema1.table2',
         'cat1.schema1.table3': 'hive_metastore.schema1.table3',
     }
-    assert "Catalog deleted_cat no longer exists. Skipping checking it's migration status." in caplog.text
-    assert "Schema cat1.deleted_schema no longer exists. Skipping checking it's migration status." in caplog.text
+    assert "Catalog deleted_cat no longer exists. Skipping checking its migration status." in caplog.text
+    assert "Schema cat1.deleted_schema no longer exists. Skipping checking its migration status." in caplog.text
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")

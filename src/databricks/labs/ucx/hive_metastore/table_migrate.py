@@ -325,7 +325,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
                 tables = self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name)
             except NotFound:
                 logger.warning(
-                    f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking it's migration status."
+                    f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
                 )
                 continue
             for table in tables:
@@ -377,5 +377,5 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
             try:
                 yield from self._ws.schemas.list(catalog_name=catalog.name)
             except NotFound:
-                logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking it's migration status.")
+                logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
                 continue

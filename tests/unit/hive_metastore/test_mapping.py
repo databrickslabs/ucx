@@ -569,6 +569,33 @@ def test_skipping_rules_target_exists():
     assert len(table_mapping.get_tables_to_migrate(tables_crawler)) == 1
 
 
+def test_database_not_exists_when_checking_inscope(caplog):
+    client = create_autospec(WorkspaceClient)
+    tables_crawler = create_autospec(TablesCrawler)
+    # When check schema properties for UCX_SKIP_PROPERTY, raise NotFound
+    backend = MockBackend(fails_on_first={"DESCRIBE SCHEMA EXTENDED": "SCHEMA_NOT_FOUND"})
+    installation = MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'catalog_name': 'catalog',
+                    'dst_schema': 'deleted_schema',
+                    'dst_table': 'table',
+                    'src_schema': 'deleted_schema',
+                    'src_table': 'table',
+                    'workspace_name': 'workspace',
+                },
+            ]
+        }
+    )
+    table_mapping = TableMapping(installation, client, backend)
+    table_mapping.get_tables_to_migrate(tables_crawler)
+    assert (
+        "Schema hive_metastore.deleted_schema no longer exists. Skipping its properties check and migration."
+        in caplog.text
+    )
+
+
 def test_is_target_exists():
     errors = {}
     rows = {}

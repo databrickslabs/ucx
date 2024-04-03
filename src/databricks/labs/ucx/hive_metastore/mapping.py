@@ -149,8 +149,14 @@ class TableMapping:
 
     def _get_database_in_scope_task(self, database: str) -> str | None:
         describe = {}
-        for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
-            describe[value["database_description_item"]] = value["database_description_value"]
+        try:
+            for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
+                describe[value["database_description_item"]] = value["database_description_value"]
+        except NotFound:
+            logger.warning(
+                f"Schema hive_metastore.{database} no longer exists. Skipping its properties check and migration."
+            )
+            return None
         properties = describe.get("Properties", "")
         if not properties:
             return database
