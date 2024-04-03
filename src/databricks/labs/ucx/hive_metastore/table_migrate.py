@@ -10,6 +10,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
@@ -404,7 +405,14 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
     def get_seen_tables(self) -> dict[str, str]:
         seen_tables: dict[str, str] = {}
         for schema in self._iter_schemas():
-            for table in self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name):
+            try:
+                tables = self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name)
+            except NotFound:
+                logger.warning(
+                    f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
+                )
+                continue
+            for table in tables:
                 if not table.properties:
                     continue
                 if "upgraded_from" not in table.properties:
@@ -450,4 +458,8 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
 
     def _iter_schemas(self):
         for catalog in self._ws.catalogs.list():
-            yield from self._ws.schemas.list(catalog_name=catalog.name)
+            try:
+                yield from self._ws.schemas.list(catalog_name=catalog.name)
+            except NotFound:
+                logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
+                continue

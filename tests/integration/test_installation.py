@@ -255,7 +255,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, InvalidParameterValue, TimeoutError], timeout=timedelta(minutes=10))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -594,6 +594,7 @@ def test_table_migration_job(
             r"Min workers for auto-scale.*": "2",
             r"Max workers for auto-scale.*": "20",
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
+            r".*Do you want to update the existing installation?.*": 'yes',
         },
         inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
     )
@@ -683,7 +684,11 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
     _, workflows_install = new_installation(
-        product_info=product_info, inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory"
+        product_info=product_info,
+        inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
     )
     installation = product_info.current_installation(ws)
     migrate_rules = [
