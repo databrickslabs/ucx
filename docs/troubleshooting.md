@@ -1,6 +1,31 @@
 # UCX Troubleshooting Guide
 This guide will help you trouble shoot potential issues running the UCX toolkit.
 
+- [UCX Troubleshooting Guide](#ucx-troubleshooting-guide)
+  - [Common Errors](#common-errors)
+  - [Locating Error Messages](#locating-error-messages)
+    - [Databricks Workspace](#databricks-workspace)
+      - [Databricks Jobs:](#databricks-jobs)
+      - [Databricks Notebooks:](#databricks-notebooks)
+    - [UCX Command Line](#ucx-command-line)
+    - [UCX Logs Files:](#ucx-logs-files)
+      - [Accessing Databricks UCX Logs through the Databricks UI](#accessing-databricks-ucx-logs-through-the-databricks-ui)
+      - [Accessing Databricks UCX Logs via CLI](#accessing-databricks-ucx-logs-via-cli)
+    - [Reading Log Files](#reading-log-files)
+  - [Getting More Help](#getting-more-help)
+    - [UCX GitHub Repository:](#ucx-github-repository)
+    - [Databricks Community:](#databricks-community)
+    - [Databricks Support](#databricks-support)
+    - [Databricks Partners](#databricks-partners)
+  - [Resolving common UCX errors](#resolving-common-ucx-errors)
+    - [Cryptic errors on authentication](#cryptic-errors-on-authentication)
+    - [Resolving common errors on UCX install](#resolving-common-errors-on-ucx-install)
+      - [Error on installing the ucx inventory database](#error-on-installing-the-ucx-inventory-database)
+      - [Error Installing a Wheel file.](#error-installing-a-wheel-file)
+      - [Error running the assessment job](#error-running-the-assessment-job)
+      - [Specific assessment job tasks fail.](#specific-assessment-job-tasks-fail)
+    - [Resolving other common errors](#resolving-other-common-errors)
+
 ## Common Errors
 Errors may occur during:
 - Installing the `databricks` CLI
@@ -93,30 +118,38 @@ Your account team can direct you to Certified Databricks UC Migration service pa
 
 By following these steps, you should be able to effectively locate, access, and analyze UCX log files to troubleshoot issues and seek additional help when needed.
 
-## Fixing common errors
+## Resolving common UCX errors
+
 ### Cryptic errors on authentication
 - Ensure that your `DATABRICKS_` environment variables are unset if you are using the `--profile <CONFIGPROFILENAME>` option
 - Ensure you did not forget the `--profile <CONFIGPROFILENAME>` to authenticate. If the databricks command cannot authenticate, you may receive a lengthy stack traceback
-- Validate your login with `databricks auth env --profile <CONFIGPROFILENAME>`
+- Validate your login with `databricks auth env --profile <CONFIGPROFILENAME>` which should print out a json structure having about 8 different keys and values and secrets
 
 ### Resolving common errors on UCX install
 
 #### Error on installing the ucx inventory database
 Your platform adminsitrators may have implmented policies in one manner or another to prevent arbitrary database creation. 
-- It may be prohibitive to create a database that stores data on DBFS.
-- You may be required to create a database on an external Hive Meta Store
-- You may need an IAM role to create a database in Glue Catalog.
-- You may be prohibited from creating a database in Glue Catalog.
-- You may need a bucket or storage account for the new database.
+
+-  You may be prohibited to create a database with a default location to `dbfs:/`.
+-  You may be required to create a database on an external Hive Meta Store and need compute configured to do so.
+-  You may need an Instance Profile to create a database in Glue Catalog.
+-  You may be prohibited from creating a database in Glue Catalog.
+-  You may need a bucket or storage account for the new database.
+
 In these cases where it's not immediately available as a workspace admin to create a HMS database, ask your DBA or data admins to create a database. UCX will create close to twenty tables to capture assessment information into it.
 
 #### Error Installing a Wheel file.
-Access to DBFS may be restricted and loading wheel files into DBFS may be restricted. For now, check the github issues for potential resolution.
+Access to DBFS may be restricted and loading wheel files into DBFS may be restricted. For now, check the github issues for potential resolution. More information to be added shortly.
 
 #### Error running the assessment job
-Often the compute type available is restricted, or it needs a special configuration.
-You can either create a cluster policies and re-install, see the installation guide.
-Or, as needed or create two interactive clusters (Legacy Unassigned cluster and Legacy Table ACL clustger) and manually re-configure the assessment job.
+Often the compute type available is restricted, or it needs a special `spark` configuration or Instance Profile.
+- You can either create a cluster policies and re-install; see the installation guide for more information.
+- Or, as needed or create two interactive clusters (Legacy Unassigned cluster and Legacy Table ACL cluster) and manually re-configure the assessment job.
 
 #### Specific assessment job tasks fail.
 See the gathering log information sections elsewhere in this document.
+
+### Resolving other common errors
+-  If you have an external Hive Metastore (HMS) such as Glue Catalog or a MySQL, Postgres or SQL server database, please consult the [External Hive Metastore Integration guide](https://github.com/databrickslabs/ucx/blob/docs/external_hms_glue.md)
+-  If you are running table upgrade commands and workflows. Please consult the [Table Upgrade guide](https://github.com/databrickslabs/ucx/blob/docs/table_upgrade.md)
+-  If you are trying to understand the Assessment report, please consult the [assessment documentation](https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md)
