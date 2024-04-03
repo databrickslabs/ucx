@@ -7,7 +7,7 @@ from sqlglot.expressions import Expression as SqlExpression
 from sqlglot.expressions import Table as SqlTable
 
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
-from databricks.labs.ucx.hive_metastore.tables import Table, What
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @dataclass
@@ -86,7 +86,7 @@ class TableMigrationSequencer:
         self._result_view_list: list[ViewToMigrate] = []
         self._result_tables_set: set[TableToMigrate] = set()
 
-    def sequence_batches(self, what: What | None) -> list[list[TableToMigrate]]:
+    def sequence_batches(self) -> list[list[ViewToMigrate]]:
         # sequencing is achieved using a very simple algorithm:
         # for each view, we register dependencies (extracted from view_text)
         # then given the remaining set of views to process,
@@ -102,24 +102,12 @@ class TableMigrationSequencer:
             if table.src.view_text is not None:
                 table = ViewToMigrate(table.src, table.rule, all_tables.get)
             all_tables[table.src.key] = table
-            # when migrating views we want all tables/views
-            if what == What.VIEW:
-                if isinstance(table, ViewToMigrate):
-                    views.add(table)
-                else:
-                    tables.append(table)
+            if isinstance(table, ViewToMigrate):
+                views.add(table)
             else:
-                # when migrating tables we only want specific tables
-                if what is not None and table.src.what != what:
-                    continue
                 tables.append(table)
-        # when migrating tables we only want tables in 1 batch
-        if what is not None and what != What.VIEW:
-            return [tables]
         # when migrating views we only want views in n batches
-        batches: list[list[TableToMigrate]] = []
-        if what is None:
-            batches.append(tables)
+        batches: list[list[ViewToMigrate]] = []
         while len(views) > 0:
             next_batch = self._next_batch(views)
             self._result_view_list.extend(next_batch)
