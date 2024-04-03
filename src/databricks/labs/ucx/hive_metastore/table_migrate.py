@@ -375,19 +375,19 @@ class TablesInMountsMigrator:
         self,
         tables_in_mounts: TablesInMounts,
         ws: WorkspaceClient,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         table_mapping: TableMapping,
     ):
-        self._backend = backend
+        self._sql_backend = sql_backend
         self._ws = ws
-        self._tm = table_mapping
-        self._tim = tables_in_mounts
+        self._table_mapping = table_mapping
+        self._tables_in_mounts = tables_in_mounts
 
     def create_tables_in_uc(self):
         create_table_tasks = []
-        mapping_keys = {mapping.src_table: mapping for mapping in self._tm.load()}
-        for table in self._tim.fetch_all():
-            if self._tim.TABLE_IN_MOUNT_DB not in table.database:
+        mapping_keys = {mapping.src_table: mapping for mapping in self._table_mapping.load()}
+        for table in self._tables_in_mounts.fetch_all():
+            if self._tables_in_mounts.TABLE_IN_MOUNT_DB not in table.database:
                 logger.info(f"Path {table.location} hasn't been identified as a table in a mount, ignoring")
                 continue
             if not table.location:
@@ -403,14 +403,14 @@ class TablesInMountsMigrator:
             return
         target_table_key = rule.as_uc_table_key
         fields = []
-        for key, value, _ in self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;"):
+        for key, value, _ in self._sql_backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;"):
             fields.append(f"{key} {value}")
         schema = ", ".join(fields)
         table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, schema)
         logger.info(
             f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
         )
-        self._backend.execute(table_migrate_sql)
+        self._sql_backend.execute(table_migrate_sql)
 
     def _is_valid_in_uc(self, src_table: Table, target_key: str):
         try:
@@ -432,7 +432,7 @@ class TablesInMountsMigrator:
 
     def _validate_columns(self, src_table, target_key, target_table):
         source_columns = {}
-        for col_name, col_type, _ in self._backend.fetch(
+        for col_name, col_type, _ in self._sql_backend.fetch(
             f"DESCRIBE TABLE delta.{escape_sql_identifier(src_table.location)}"
         ):
             source_columns[col_name] = col_type

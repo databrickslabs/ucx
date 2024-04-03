@@ -271,12 +271,14 @@ class TablesInMounts(CrawlerBase[Table]):
         mc: Mounts,
         include_mounts: list[str] | None = None,
         exclude_paths_in_mount: list[str] | None = None,
+        include_paths_in_mount: list[str] | None = None,
     ):
         super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
-        self._mc = mc
+        self._mounts_crawler = mc
         self._include_mounts = include_mounts
         self._ws = ws
+        self._include_paths_in_mount = include_paths_in_mount
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
         if exclude_paths_in_mount:
@@ -319,14 +321,19 @@ class TablesInMounts(CrawlerBase[Table]):
             yield Table(*row)
 
     def _crawl(self):
-        all_mounts = self._mc.snapshot()
+        all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
             if self._include_mounts and mount.name not in self._include_mounts:
                 logger.info(f"Filtering mount {mount.name}")
                 continue
-            table_paths = self._find_delta_log_folders(mount.name)
-            logger.info(f"Found {len(table_paths)} in mount {mount.name}")
+            table_paths = {}
+            if self._include_paths_in_mount:
+                for path in self._include_paths_in_mount:
+                    table_paths.update(self._find_delta_log_folders(path))
+            else:
+                table_paths = self._find_delta_log_folders(mount.name)
+
             for path, entry in table_paths.items():
                 guess_table = os.path.basename(path)
                 table = Table(
@@ -341,7 +348,7 @@ class TablesInMounts(CrawlerBase[Table]):
                 all_tables.append(table)
         return all_tables
 
-    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> dict:
+    def _find_delta_log_folders(self, root_dir:str, delta_log_folders=None) -> dict:
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
@@ -369,9 +376,12 @@ class TablesInMounts(CrawlerBase[Table]):
             elif self._is_partitioned(file_info.name):
                 logger.debug(f"Found partitioned parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=True)
-            elif self._is_parquet(file_info.name):
+            elif self._is_csv(file_info.name):
                 logger.debug(f"Found parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=False)
+            elif self._is_parquet(file_info.name):
+                logger.debug(f"Found csv {file_info.path}")
+                delta_log_folders[root_path] = TableInMount(format="CSV", is_partitioned=False)
             else:
                 self._find_delta_log_folders(file_info.path, delta_log_folders)
 
@@ -387,5 +397,11 @@ class TablesInMounts(CrawlerBase[Table]):
         parquet_patterns = {'.parquet'}
         return any(pattern in file_name for pattern in parquet_patterns)
 
+    def _is_csv(self, file_name: str) -> bool:
+        parquet_patterns = {'.csv'}
+        return any(pattern in file_name for pattern in parquet_patterns)
+
     def _is_irrelevant(self, file_name: str) -> bool:
         return any(pattern in file_name for pattern in self._fiter_paths)
+
+

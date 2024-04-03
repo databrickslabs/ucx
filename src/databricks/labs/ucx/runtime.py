@@ -578,7 +578,7 @@ def scan_tables_in_mounts_experimental(
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     TablesInMounts(
-        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
+        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount, cfg.include_paths_in_mount
     ).snapshot()
 
 
@@ -593,7 +593,7 @@ def migrate_tables_in_mounts_experimental(
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     table_in_mount = TablesInMounts(
-        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
+        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount, cfg.include_paths_in_mount
     )
     table_mappings = TableMapping(install, ws, sql_backend)
     TablesInMountsMigrator(table_in_mount, ws, sql_backend, table_mappings).create_tables_in_uc()

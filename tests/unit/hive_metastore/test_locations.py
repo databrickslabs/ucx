@@ -535,3 +535,35 @@ def test_historical_data_should_be_overwritten():
             is_partitioned=False,
         ),
     ]
+
+def test_mount_include_paths():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount/table2/", "table2/", "", "")
+    folder_table1 = FileInfo("dbfs:/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
+    folder_table2 = FileInfo("dbfs:/mnt/test_mount/table2/_SUCCESS", "_SUCCESS", "", "")
+    folder_table3 = FileInfo("dbfs:/mnt/test_mount/table2/1.snappy.parquet", "1.snappy.parquet", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/test_mount":
+            return [first_folder, second_folder]
+        if path == "dbfs:/mnt/test_mount/table1/":
+            return [folder_table1]
+        if path == "dbfs:/mnt/test_mount/table2/":
+            return [folder_table2, folder_table3]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"]).snapshot()
+    assert results == [
+        Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
+    ]
+
