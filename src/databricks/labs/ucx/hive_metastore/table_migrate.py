@@ -99,7 +99,7 @@ class TablesMigrator:
     def index(self):
         return self._migration_status_refresher.index()
 
-    def migrate_tables(self, *, what: What, acl_strategy: list[AclMigrationWhat] | None = None):
+    def migrate_tables(self, what: What, acl_strategy: list[AclMigrationWhat] | None = None):
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type { what.name }")
             return None
