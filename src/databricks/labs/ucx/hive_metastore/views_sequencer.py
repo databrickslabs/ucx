@@ -97,16 +97,13 @@ class TableMigrationSequencer:
         # this seems enormous but in practice d remains small and v decreases rapidly
         all_tables: dict[str, TableToMigrate] = {}
         views = set()
-        tables = []
         for table in self._tables:
             if table.src.view_text is not None:
                 table = ViewToMigrate(table.src, table.rule, all_tables.get)
             all_tables[table.src.key] = table
             if isinstance(table, ViewToMigrate):
                 views.add(table)
-            else:
-                tables.append(table)
-        # when migrating views we only want views in n batches
+        # when migrating views we want them in batches
         batches: list[list[ViewToMigrate]] = []
         while len(views) > 0:
             next_batch = self._next_batch(views)
