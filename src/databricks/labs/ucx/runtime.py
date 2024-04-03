@@ -433,34 +433,6 @@ def migrate_external_tables_sync(
     - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
     - For AWS: TBD
     """
-    migrate_tables(cfg, ws, sql_backend, install, What.EXTERNAL_SYNC)
-
-
-@task("migrate-tables", job_cluster="table_migration")
-def migrate_dbfs_root_delta_tables(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
-):
-    """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
-    Following cli commands are required to be run before running this task:
-    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
-    - For AWS: TBD
-    """
-    migrate_tables(cfg, ws, sql_backend, install, What.DBFS_ROOT_DELTA)
-
-
-@task("migrate-tables", job_cluster="table_migration")
-def migrate_views(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation):
-    """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
-    Following cli commands are required to be run before running this task:
-    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
-    - For AWS: TBD
-    """
-    migrate_tables(cfg, ws, sql_backend, install, What.VIEW)
-
-
-def migrate_tables(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation, what: What
-):
     table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
     udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
@@ -468,21 +440,6 @@ def migrate_tables(
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
-    cluster_locations = build_cluster_locations(cfg, ws, sql_backend, install)
-    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
-    TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        sql_backend,
-        table_mappings,
-        group_manager,
-        migration_status_refresher,
-        interactive_grants,
-    ).migrate_tables(what=what, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
-
-
-def build_cluster_locations(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation):
     cluster_locations = {}
     if ws.config.is_azure:
         locations = ExternalLocations(ws, sql_backend, cfg.inventory_database)
@@ -497,7 +454,60 @@ def build_cluster_locations(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backe
         cluster_locations = AzureACL(
             ws, sql_backend, spn_crawler, resource_permissions
         ).get_eligible_locations_principals()
-    return cluster_locations
+    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
+    TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
+
+
+@task("migrate-tables", job_cluster="table_migration")
+def migrate_dbfs_root_delta_tables(
+    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation
+):
+    """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
+    Following cli commands are required to be run before running this task:
+    - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
+    - For AWS: TBD
+    """
+    table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    table_mappings = TableMapping(install, ws, sql_backend)
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
+    group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
+    mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
+    cluster_locations = {}
+    if ws.config.is_azure:
+        locations = ExternalLocations(ws, sql_backend, cfg.inventory_database)
+        azure_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_client, graph_client)
+        resource_permissions = AzureResourcePermissions(install, ws, azurerm, locations)
+        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
+        cluster_locations = AzureACL(
+            ws, sql_backend, spn_crawler, resource_permissions
+        ).get_eligible_locations_principals()
+    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
+    TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL, AclMigrationWhat.PRINCIPAL])
 
 
 @task("migrate-groups-experimental", depends_on=[crawl_groups])
