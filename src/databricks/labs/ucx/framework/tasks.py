@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import logging
 import os
 from collections.abc import Callable
@@ -266,3 +267,55 @@ def trigger(*argv):
     installation = Installation(workspace_client, "ucx", install_folder=install_folder)
 
     run_task(args, config_path.parent, cfg, workspace_client, sql_backend, installation)
+
+
+class Workflow:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
+
+    def tasks(self) -> list[Task]:
+        return []
+
+
+def job_task(
+    fn=None,
+    *,
+    depends_on=None,
+    job_cluster="main",
+    notebook: str | None = None,
+    dashboard: str | None = None,
+    cloud: str | None = None,
+) -> Callable[[Callable], Callable]:
+    def register(func):
+        if not func.__doc__:
+            raise SyntaxError(f"{func.__name__} must have some doc comment")
+        deps = []
+        if depends_on is not None:
+            if not isinstance(depends_on, list):
+                msg = "depends_on has to be a list"
+                raise SyntaxError(msg)
+            for fn in depends_on:
+                deps.append(fn.__name__)
+        func.__task__ = Task(
+            task_id=-1,
+            workflow='...',
+            name=func.__name__,
+            # doc=remove_extra_indentation(func.__doc__),
+            doc=func.__doc__,
+            fn=func,
+            depends_on=deps,
+            job_cluster=job_cluster,
+            notebook=notebook,
+            dashboard=dashboard,
+            cloud=cloud,
+        )
+        return func
+
+    if fn is None:
+        return functools.partial(register)
+    register(fn)
+    return fn

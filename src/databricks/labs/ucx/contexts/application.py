@@ -1,21 +1,15 @@
 import os
 from datetime import timedelta
 from functools import cached_property
-from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
-from databricks.labs.lsql.backends import (
-    RuntimeBackend,
-    SqlBackend,
-    StatementExecutionBackend,
-)
-from databricks.sdk import AccountClient, WorkspaceClient, core
+from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk import AccountClient, WorkspaceClient
 
-from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResources, run_command
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -43,7 +37,6 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
-from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -334,77 +327,3 @@ class GlobalContext:
     @cached_property
     def cluster_access(self):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
-
-
-class RuntimeContext(GlobalContext):
-    def __init__(self, config_path: Path):
-        super().__init__()
-        self._config_path = config_path
-
-    @cached_property
-    def config(self) -> WorkspaceConfig:
-        return Installation.load_local(WorkspaceConfig, self._config_path)
-
-    @cached_property
-    def connect_config(self) -> core.Config:
-        # this is to calm down mypy:
-        # Argument "config" to "WorkspaceClient" has incompatible
-        # type "Config | None"; expected "Config"  [arg-type]
-        return self.workspace_client.config
-
-    @cached_property
-    def workspace_client(self) -> WorkspaceClient:
-        return WorkspaceClient(config=self.connect_config, product='ucx', product_version=__version__)
-
-    @cached_property
-    def sql_backend(self) -> SqlBackend:
-        return RuntimeBackend(debug_truncate_bytes=self.connect_config.debug_truncate_bytes)
-
-    @cached_property
-    def installation(self):
-        install_folder = self._config_path.parent.as_posix().removeprefix("/Workspace")
-        return Installation(self.workspace_client, "ucx", install_folder=install_folder)
-
-
-class CliContext(GlobalContext):
-    def __init__(self, flags: dict[str, str] | None = None):
-        super().__init__()
-        if not flags:
-            flags = {}
-        self.flags = flags
-
-    @cached_property
-    def prompts(self) -> Prompts:
-        return Prompts()
-
-
-class WorkspaceContext(CliContext):
-    def __init__(self, ws: WorkspaceClient, flags: dict[str, str] | None = None):
-        super().__init__(flags)
-        self._ws = ws
-
-    @cached_property
-    def workspace_client(self) -> WorkspaceClient:
-        return self._ws
-
-    @cached_property
-    def sql_backend(self) -> SqlBackend:
-        return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
-
-    @cached_property
-    def local_file_migrator(self):
-        return Files(self.languages)
-
-
-class AccountContext(CliContext):
-    def __init__(self, ac: AccountClient, flags: dict[str, str] | None = None):
-        super().__init__(flags)
-        self._ac = ac
-
-    @cached_property
-    def account_client(self) -> AccountClient:
-        return self._ac
-
-    @cached_property
-    def account_workspaces(self):
-        return AccountWorkspaces(self.account_client)
