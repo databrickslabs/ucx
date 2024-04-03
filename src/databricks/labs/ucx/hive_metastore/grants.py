@@ -10,11 +10,14 @@ from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.compute import ClusterSource, DataSecurityMode
 
+from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
@@ -335,6 +338,112 @@ class GrantsCrawler(CrawlerBase[Grant]):
             return []
 
 
+class AwsACL:
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        backend: SqlBackend,
+        installation: Installation,
+    ):
+        self._backend = backend
+        self._ws = ws
+        self._installation = installation
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
+        config = installation.load(WorkspaceConfig)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+
+        return cls(ws, sql_backend, installation)
+
+    def _get_cluster_to_instance_profile_mapping(self) -> dict[str, str]:
+        # this function gives a mapping between an interactive cluster and the instance profile used by it
+        # either directly or through a cluster policy.
+        cluster_instance_profiles = {}
+        for cluster in self._ws.clusters.list():
+            if (
+                cluster.cluster_id is None
+                or cluster.cluster_source == ClusterSource.JOB
+                or (cluster.data_security_mode not in [DataSecurityMode.LEGACY_SINGLE_USER, DataSecurityMode.NONE])
+            ):
+                continue
+            if cluster.policy_id is not None:
+                cluster_policy = self._ws.cluster_policies.get(cluster.policy_id)
+                assert cluster_policy is not None
+                # cluster_policy = self._get_cluster_policy(cluster.policy_id)
+                policy_instance_profile = AWSResourcePermissions.get_iam_role_from_cluster_policy(
+                    str(cluster_policy.definition)
+                )
+                if policy_instance_profile is not None:
+                    role_name = AWSInstanceProfile(policy_instance_profile).role_name
+                    assert role_name is not None
+                    cluster_instance_profiles[cluster.cluster_id] = role_name
+                    continue
+            if cluster.aws_attributes is None:
+                continue
+
+            if cluster.aws_attributes.instance_profile_arn is not None:
+                role_name = AWSInstanceProfile(cluster.aws_attributes.instance_profile_arn).role_name
+                assert role_name is not None
+                cluster_instance_profiles[cluster.cluster_id] = role_name
+                continue
+
+        return cluster_instance_profiles
+
+    def get_eligible_locations_principals(self) -> dict[str, dict]:
+        cluster_locations = {}
+        eligible_locations = {}
+        cluster_instance_profiles = self._get_cluster_to_instance_profile_mapping()
+        if len(cluster_instance_profiles) == 0:
+            # if there are no interactive clusters , then return empty grants
+            logger.info("No interactive cluster found with instance profiles configured")
+            return {}
+        external_locations = list(self._ws.external_locations.list())
+        if len(external_locations) == 0:
+            # if there are no external locations, then throw an error to run migrate_locations cli command
+            msg = (
+                "No external location found, If hive metastore tables are created in external storage, "
+                "ensure migrate-locations cli cmd is run to create the required locations."
+            )
+            logger.error(msg)
+            raise ResourceDoesNotExist(msg) from None
+
+        permission_mappings = self._installation.load(
+            list[AWSRoleAction], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES
+        )
+        if len(permission_mappings) == 0:
+            # if permission mapping is empty, raise an error to run principal_prefix cmd
+            msg = (
+                "No instance profile permission file found. Please ensure principal-prefix-access cli "
+                "cmd is run to create the instance profile permission file."
+            )
+            logger.error(msg)
+            raise ResourceDoesNotExist(msg) from None
+
+        for cluster_id, role_name in cluster_instance_profiles.items():
+            eligible_locations.update(self._get_external_locations(role_name, external_locations, permission_mappings))
+            cluster_locations[cluster_id] = eligible_locations
+        return cluster_locations
+
+    def _get_external_locations(
+        self,
+        role_name: str,
+        external_locations: list[ExternalLocationInfo],
+        permission_mappings: list[AWSRoleAction],
+    ) -> dict[str, str]:
+        matching_location = {}
+        for location in external_locations:
+            if location.url is None:
+                continue
+            for permission_mapping in permission_mappings:
+                if (
+                    location.url.startswith(permission_mapping.resource_path)
+                    and permission_mapping.role_name == role_name
+                ):
+                    matching_location[location.url] = permission_mapping.privilege
+        return matching_location
+
+
 class AzureACL:
     def __init__(
         self,
@@ -454,7 +563,15 @@ class PrincipalACL:
                 azure_acl.get_eligible_locations_principals(),
             )
         if ws.config.is_aws:
-            return None
+            aws_acl = AwsACL.for_cli(ws, installation)
+            return cls(
+                ws,
+                sql_backend,
+                installation,
+                tables_crawler,
+                mount_crawler,
+                aws_acl.get_eligible_locations_principals(),
+            )
         if ws.config.is_gcp:
             logger.error("UCX is not supported for GCP yet. Please run it on azure or aws")
             return None

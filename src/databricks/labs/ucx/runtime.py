@@ -17,6 +17,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.tasks import task, trigger
 from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import (
+    AwsACL,
     AzureACL,
     GrantsCrawler,
     PrincipalACL,
@@ -454,6 +455,8 @@ def migrate_external_tables_sync(
         cluster_locations = AzureACL(
             ws, sql_backend, spn_crawler, resource_permissions
         ).get_eligible_locations_principals()
+    if ws.config.is_aws:
+        cluster_locations = AwsACL(ws, sql_backend, install).get_eligible_locations_principals()
     interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
     TablesMigrator(
         table_crawler,
