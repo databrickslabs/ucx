@@ -682,7 +682,7 @@ databricks labs ucx skip --schema X [--table Y]
 
 Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
-This command allows users to skip certain schemas or tables during the [table migration](docs/table_upgrade.md) process.
+This command allows users to skip certain schemas or tables during the [table migration](#table-migration-workflow) process.
 The command takes `--schema` and optionally `--table` flags to specify the schema and table to skip. If no `--table` flag 
 is provided, all tables in the specified HMS database are skipped.
 This command is useful to temporarily disable migration on a particular schema or table.
@@ -699,7 +699,7 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 
 Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
-This command removes the `upgraded_from` property on a migrated table for re-migration in the [table upgrade](docs/table_upgrade.md) process. 
+This command removes the `upgraded_from` property on a migrated table for re-migration in the [table migration](#table-migration-workflow) process. 
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
 
@@ -724,7 +724,7 @@ databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-ca
 ```
 
 This command moves a UC table/tables from one schema to another schema after
-the [table upgrade](docs/table_upgrade.md) process. This is useful for developers and administrators who want 
+the [table migration](#table-migration-workflow) process. This is useful for developers and administrators who want 
 to adjust their catalog structure after tables upgrade.
 
 Users will be prompted whether tables/view are dropped after moving to new schema. This only applies to `MANAGED` tables and views.
@@ -805,7 +805,7 @@ databricks labs ucx sync-workspace-info
 
 **Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces 
 in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](docs/table_upgrade.md) process and is the prerequisite 
+[table migration](#table-migration-workflow) process and is the prerequisite 
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and 
