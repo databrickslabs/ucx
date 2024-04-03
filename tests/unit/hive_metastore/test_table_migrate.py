@@ -248,9 +248,12 @@ def test_migrate_view_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["view"])
+    table_mapping = table_mapping_mock(["managed_dbfs", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
-    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_status_refresher.get_seen_tables.return_value = {
+        "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
+    }
     principal_grants = create_autospec(PrincipalACL)
     table_migrator = TablesMigrator(
         table_crawler,
@@ -262,7 +265,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.VIEW)
 
     assert (
         "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM db1_src.managed_dbfs;"
@@ -818,7 +821,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
         principal_grants,
     )
     tasks = table_migrator.migrate_tables(what=What.VIEW)
-    table_keys = [task.args[0].key for task in tasks]
+    table_keys = [task.args[0].src.key for task in tasks]
     assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")
     assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
     assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
