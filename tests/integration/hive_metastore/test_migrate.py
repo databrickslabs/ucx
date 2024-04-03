@@ -22,7 +22,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
     TablesMigrator,
 )
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 from ..conftest import (
@@ -109,7 +109,7 @@ def test_migrate_managed_tables(ws, sql_backend, inventory_schema, make_catalog,
         principal_grants,
     )
 
-    table_migrate.migrate_tables()
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -179,7 +179,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
     )
 
     # FIXME: flaky: databricks.sdk.errors.platform.NotFound: Catalog 'ucx_cjazg' does not exist.
-    table_migrate.migrate_tables()
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -238,7 +238,7 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
         principal_grants,
     )
 
-    table_migrate.migrate_tables()
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -246,7 +246,8 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
     assert target_table_properties["upgraded_from"] == src_external_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
-    migration_status = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler).snapshot()
+    _migration_status = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler).snapshot()
+    migration_status = list(_migration_status)
     assert len(migration_status) == 1
     assert migration_status[0].src_schema == src_external_table.schema_name
     assert migration_status[0].src_table == src_external_table.name
@@ -298,7 +299,7 @@ def test_migrate_external_table_failed_sync(
         principal_grants,
     )
 
-    table_migrate.migrate_tables()
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
 
 
@@ -353,7 +354,7 @@ def test_revert_migrated_table(
         migration_status_refresher,
         principal_grants,
     )
-    table_migrate.migrate_tables()
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     table_migrate.revert_migrated_tables(src_schema1.name, delete_managed=True)
 
@@ -473,7 +474,7 @@ def test_mapping_reverts_table(
         migration_status_refresher,
         principal_grants,
     )
-    table_migrate.migrate_tables()
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties
     assert target_table_properties["upgraded_from"] == table_to_skip.full_name
@@ -600,7 +601,7 @@ def test_migrate_managed_tables_with_acl(
         principal_grants,
     )
 
-    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -716,7 +717,7 @@ def test_migrate_managed_tables_with_principal_acl_azure(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
