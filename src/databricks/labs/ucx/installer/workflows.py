@@ -105,6 +105,7 @@ class WorkflowsDeployment(InstallationMixin):
         self,
         config: WorkspaceConfig,
         installation: Installation,
+        install_state: InstallState,
         ws: WorkspaceClient,
         wheels: WheelsV2,
         product_info: ProductInfo,
@@ -113,7 +114,7 @@ class WorkflowsDeployment(InstallationMixin):
         self._config = config
         self._installation = installation
         self._ws = ws
-        self._state = InstallState.from_installation(installation)
+        self._install_state = install_state
         self._wheels = wheels
         self._product_info = product_info
         self._verify_timeout = verify_timeout
@@ -124,18 +125,19 @@ class WorkflowsDeployment(InstallationMixin):
     def current(cls, ws: WorkspaceClient):
         product_info = ProductInfo.from_class(WorkspaceConfig)
         installation = product_info.current_installation(ws)
+        install_state = InstallState.from_installation(installation)
         config = installation.load(WorkspaceConfig)
         wheels = product_info.wheels(ws)
         timeout = timedelta(minutes=2)
 
-        return cls(config, installation, ws, wheels, product_info, timeout)
+        return cls(config, installation, install_state, ws, wheels, product_info, timeout)
 
     @property
     def state(self):
-        return self._state
+        return self._install_state
 
     def run_workflow(self, step: str):
-        job_id = int(self._state.jobs[step])
+        job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_initial_run = self._ws.jobs.run_now(job_id)
         if job_initial_run.run_id:
@@ -161,7 +163,7 @@ class WorkflowsDeployment(InstallationMixin):
                 settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
             self._deploy_workflow(step_name, settings)
 
-        for step_name, job_id in self._state.jobs.items():
+        for step_name, job_id in self._install_state.jobs.items():
             if step_name not in desired_steps:
                 try:
                     logger.info(f"Removing job_id={job_id}, as it is no longer needed")
@@ -170,7 +172,7 @@ class WorkflowsDeployment(InstallationMixin):
                     logger.warning(f"step={step_name} does not exist anymore for some reason")
                     continue
 
-        self._state.save()
+        self._install_state.save()
         self._create_debug(remote_wheel)
 
     def repair_run(self, workflow):
@@ -189,7 +191,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
-        for step, job_id in self._state.jobs.items():
+        for step, job_id in self._install_state.jobs.items():
             job_state = None
             start_time = None
             try:
@@ -254,19 +256,19 @@ class WorkflowsDeployment(InstallationMixin):
         return conf_from_installation
 
     def _deploy_workflow(self, step_name: str, settings):
-        if step_name in self._state.jobs:
+        if step_name in self._install_state.jobs:
             try:
-                job_id = int(self._state.jobs[step_name])
+                job_id = int(self._install_state.jobs[step_name])
                 logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
                 return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
             except InvalidParameterValue:
-                del self._state.jobs[step_name]
+                del self._install_state.jobs[step_name]
                 logger.warning(f"step={step_name} does not exist anymore for some reason")
                 return self._deploy_workflow(step_name, settings)
         logger.info(f"Creating new job configuration for step={step_name}")
         new_job = self._ws.jobs.create(**settings)
         assert new_job.job_id is not None
-        self._state.jobs[step_name] = str(new_job.job_id)
+        self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
 
     def _infer_error_from_job_run(self, job_run) -> Exception:
@@ -423,7 +425,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
-        dashboard_id = self._state.dashboards[task.dashboard]
+        dashboard_id = self._install_state.dashboards[task.dashboard]
         return replace(
             jobs_task,
             job_cluster_key=None,
@@ -517,7 +519,7 @@ class WorkflowsDeployment(InstallationMixin):
         readme_link = self._installation.workspace_link('README')
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            for step_name, job_id in self._state.jobs.items()
+            for step_name, job_id in self._install_state.jobs.items()
         )
         content = DEBUG_NOTEBOOK.format(
             remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
@@ -525,7 +527,7 @@ class WorkflowsDeployment(InstallationMixin):
         self._installation.upload('DEBUG.py', content)
 
     def _repair_workflow(self, workflow):
-        job_id = self._state.jobs.get(workflow)
+        job_id = self._install_state.jobs.get(workflow)
         if not job_id:
             raise InvalidParameterValue("job does not exists hence skipping repair")
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))

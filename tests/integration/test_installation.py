@@ -96,6 +96,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
         if not installation:
             installation = Installation(ws, product_info.product_name())
+        install_state = InstallState.from_installation(installation)
         installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
         workspace_config = installer.configure()
         installation = product_info.current_installation(ws)
@@ -113,7 +114,13 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
         workflows_installation = WorkflowsDeployment(
-            workspace_config, installation, ws, product_info.wheels(ws), product_info, timedelta(minutes=3)
+            workspace_config,
+            installation,
+            install_state,
+            ws,
+            product_info.wheels(ws),
+            product_info,
+            timedelta(minutes=3),
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,
