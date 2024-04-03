@@ -1,8 +1,7 @@
 import contextlib
-import functools
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -25,7 +24,6 @@ _TASKS: dict[str, "Task"] = {}
 
 @dataclass
 class Task:
-    task_id: int
     workflow: str
     name: str
     doc: str
@@ -106,7 +104,6 @@ def task(
             raise SyntaxError(msg)
 
         _TASKS[func.__name__] = Task(
-            task_id=len(_TASKS),
             workflow=workflow,
             name=func.__name__,
             doc=remove_extra_indentation(func.__doc__),
@@ -277,8 +274,14 @@ class Workflow:
     def name(self):
         return self._name
 
-    def tasks(self) -> list[Task]:
-        return []
+    def tasks(self) -> Iterable[Task]:
+        # return __task__ from every method in this class that has this attribute
+        for attr in dir(self):
+            if attr.startswith("_"):
+                continue
+            fn = getattr(self, attr)
+            if hasattr(fn, "__task__"):
+                yield fn.__task__
 
 
 def job_task(
@@ -301,11 +304,9 @@ def job_task(
             for fn in depends_on:
                 deps.append(fn.__name__)
         func.__task__ = Task(
-            task_id=-1,
-            workflow='...',
+            workflow='<unknown>',
             name=func.__name__,
-            # doc=remove_extra_indentation(func.__doc__),
-            doc=func.__doc__,
+            doc=remove_extra_indentation(func.__doc__),
             fn=func,
             depends_on=deps,
             job_cluster=job_cluster,
@@ -316,6 +317,6 @@ def job_task(
         return func
 
     if fn is None:
-        return functools.partial(register)
+        return register
     register(fn)
     return fn

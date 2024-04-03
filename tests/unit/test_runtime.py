@@ -86,9 +86,9 @@ def test_azure_crawler(mocker):
 
 def test_tasks():
     tasks = [
-        Task(task_id=0, workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="azure"),
-        Task(task_id=1, workflow="wl_2", name="n2", doc="d2", fn=lambda: None, cloud="aws"),
-        Task(task_id=2, workflow="wl_1", name="n1", doc="d1", fn=lambda: None, cloud="gcp"),
+        Task(workflow="wl_1", name="n3", doc="d3", fn=lambda: None, cloud="azure"),
+        Task(workflow="wl_2", name="n2", doc="d2", fn=lambda: None, cloud="aws"),
+        Task(workflow="wl_1", name="n1", doc="d1", fn=lambda: None, cloud="gcp"),
     ]
 
     assert len([_ for _ in tasks if _.cloud == "azure"]) == 1
