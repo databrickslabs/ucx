@@ -150,6 +150,6 @@ Often the compute type available is restricted, or it needs a special `spark` co
 See the gathering log information sections elsewhere in this document.
 
 ### Resolving other common errors
--  If you have an external Hive Metastore (HMS) such as Glue Catalog or a MySQL, Postgres or SQL server database, please consult the [External Hive Metastore Integration guide](https://github.com/databrickslabs/ucx/blob/docs/external_hms_glue.md)
--  If you are running table upgrade commands and workflows. Please consult the [Table Upgrade guide](https://github.com/databrickslabs/ucx/blob/docs/table_upgrade.md)
--  If you are trying to understand the Assessment report, please consult the [assessment documentation](https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md)
+-  If you have an external Hive Metastore (HMS) such as Glue Catalog or a MySQL, Postgres or SQL server database, please consult the [External Hive Metastore Integration guide](external_hms_glue.md)
+-  If you are running table upgrade commands and workflows. Please consult the [Table Upgrade guide](table_upgrade.md)
+-  If you are trying to understand the Assessment report, please consult the [Assessment documentation](assessment.md)
