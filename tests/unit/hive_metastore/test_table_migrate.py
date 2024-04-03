@@ -642,43 +642,46 @@ def test_table_status_seen_tables(caplog):
     client = create_autospec(WorkspaceClient)
     client.catalogs.list.return_value = [CatalogInfo(name="cat1"), CatalogInfo(name="deleted_cat")]
     client.schemas.list.side_effect = [
-        [SchemaInfo(catalog_name="cat1", name="schema1")],
-        NotFound()
+        [SchemaInfo(catalog_name="cat1", name="schema1"), SchemaInfo(catalog_name="cat1", name="deleted_schema")],
+        NotFound(),
     ]
-    client.tables.list.return_value = [
-        TableInfo(
-            catalog_name="cat1",
-            schema_name="schema1",
-            name="table1",
-            full_name="cat1.schema1.table1",
-            properties={"upgraded_from": "hive_metastore.schema1.table1"},
-        ),
-        TableInfo(
-            catalog_name="cat1",
-            schema_name="schema1",
-            name="table2",
-            full_name="cat1.schema1.table2",
-            properties={"upgraded_from": "hive_metastore.schema1.table2"},
-        ),
-        TableInfo(
-            catalog_name="cat1",
-            schema_name="schema1",
-            name="table3",
-            full_name="cat1.schema1.table3",
-            properties={"upgraded_from": "hive_metastore.schema1.table3"},
-        ),
-        TableInfo(
-            catalog_name="cat1",
-            schema_name="schema1",
-            name="table4",
-            full_name="cat1.schema1.table4",
-        ),
-        TableInfo(
-            catalog_name="cat1",
-            schema_name="schema1",
-            name="table5",
-            properties={"upgraded_from": "hive_metastore.schema1.table2"},
-        ),
+    client.tables.list.side_effect = [
+        [
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="table1",
+                full_name="cat1.schema1.table1",
+                properties={"upgraded_from": "hive_metastore.schema1.table1"},
+            ),
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="table2",
+                full_name="cat1.schema1.table2",
+                properties={"upgraded_from": "hive_metastore.schema1.table2"},
+            ),
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="table3",
+                full_name="cat1.schema1.table3",
+                properties={"upgraded_from": "hive_metastore.schema1.table3"},
+            ),
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="table4",
+                full_name="cat1.schema1.table4",
+            ),
+            TableInfo(
+                catalog_name="cat1",
+                schema_name="schema1",
+                name="table5",
+                properties={"upgraded_from": "hive_metastore.schema1.table2"},
+            ),
+        ],
+        NotFound(),
     ]
     table_status_crawler = MigrationStatusRefresher(client, backend, "ucx", table_crawler)
     seen_tables = table_status_crawler.get_seen_tables()
@@ -688,6 +691,7 @@ def test_table_status_seen_tables(caplog):
         'cat1.schema1.table3': 'hive_metastore.schema1.table3',
     }
     assert "Catalog deleted_cat no longer exists. Skipping checking it's migration status." in caplog.text
+    assert "Schema cat1.deleted_schema no longer exists. Skipping checking it's migration status." in caplog.text
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
