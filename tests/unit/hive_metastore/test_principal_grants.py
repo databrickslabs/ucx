@@ -1,3 +1,4 @@
+import json
 from unittest.mock import create_autospec
 
 import pytest
@@ -7,6 +8,12 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import ExternalLocationInfo
+from databricks.sdk.service.compute import (
+    ClusterDetails,
+    ClusterSource,
+    DataSecurityMode,
+    Policy,
+)
 
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -17,7 +24,12 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import (
+    AwsACL,
+    AzureACL,
+    Grant,
+    PrincipalACL,
+)
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -25,11 +37,13 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 @pytest.fixture
 def ws():
     w = create_autospec(WorkspaceClient)
-    w.config.is_azure = True
     w.external_locations.list.return_value = [
         ExternalLocationInfo(url="abfss://container1@storage1.dfs.core.windows.net/folder1"),
         ExternalLocationInfo(url="abfss://container1@storage2.dfs.core.windows.net/folder2"),
         ExternalLocationInfo(url="abfss://container1@storage3.dfs.core.windows.net/folder3"),
+        ExternalLocationInfo(url="s3://storage1/folder1"),
+        ExternalLocationInfo(url="s3://storage2/folder2"),
+        ExternalLocationInfo(url="s3://storage3/folder3"),
     ]
 
     permissions = {
@@ -57,6 +71,12 @@ def ws():
         'cluster3': iam.ObjectPermissions(object_id='cluster2', object_type="clusters"),
     }
     w.permissions.get.side_effect = lambda _, object_id: permissions[object_id]
+    policies = {
+        'policy1': Policy(definition=json.dumps({"aws_attributes.instance_profile_arn": "arn1"})),
+        'policy2': Policy(definition=json.dumps({"aws_attributes.instance_profile_arn": "arn2"})),
+        'policy3': Policy(definition=json.dumps({"aws_attributes.foo": "bar"})),
+    }
+    w.cluster_policies.get.side_effect = lambda policy_id: policies[policy_id]
     return w
 
 
@@ -74,6 +94,12 @@ def azure_acl(w, install, cluster_spn: list):
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
     return AzureACL(w, sql_backend, spn_crawler, resource_permissions)
+
+
+def aws_acl(w, install):
+    config = install.load(WorkspaceConfig)
+    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
+    return AwsACL(w, sql_backend, install)
 
 
 def principal_acl(w, install, cluster_spn: list):
@@ -172,7 +198,7 @@ def test_for_cli_aws(ws, installation):
     ws.config.is_azure = False
     ws.config.is_aws = True
     sql_backend = StatementExecutionBackend(ws, ws.config.warehouse_id)
-    assert PrincipalACL.for_cli(ws, installation, sql_backend) is None
+    assert isinstance(PrincipalACL.for_cli(ws, installation, sql_backend), PrincipalACL)
 
 
 def test_for_cli_gcp(ws, installation):
@@ -184,12 +210,14 @@ def test_for_cli_gcp(ws, installation):
 
 
 def test_get_eligible_locations_principals_no_cluster_mapping(ws, installation):
+    ws.config.is_azure = True
     locations = azure_acl(ws, installation, [])
     locations.get_eligible_locations_principals()
     ws.external_locations.list.assert_not_called()
 
 
 def test_get_eligible_locations_principals_no_external_location(ws, installation):
+    ws.config.is_azure = True
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
     )
@@ -200,6 +228,7 @@ def test_get_eligible_locations_principals_no_external_location(ws, installation
 
 
 def test_get_eligible_locations_principals_no_permission_mapping(ws):
+    ws.config.is_azure = True
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='Hello, World!', storage_account='abcde')}
     )
@@ -216,6 +245,7 @@ def test_get_eligible_locations_principals_no_permission_mapping(ws):
 
 
 def test_get_eligible_locations_principals(ws, installation):
+    ws.config.is_azure = True
     cluster_spn = ServicePrincipalClusterMapping(
         'abc', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
     )
@@ -226,6 +256,7 @@ def test_get_eligible_locations_principals(ws, installation):
 
 
 def test_interactive_cluster_no_acl(ws, installation):
+    ws.config.is_azure = True
     cluster_spn = ServicePrincipalClusterMapping(
         'cluster3', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
     )
@@ -235,6 +266,7 @@ def test_interactive_cluster_no_acl(ws, installation):
 
 
 def test_interactive_cluster_single_spn(ws, installation):
+    ws.config.is_azure = True
     cluster_spn = ServicePrincipalClusterMapping(
         'cluster1',
         {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')},
@@ -260,6 +292,7 @@ def test_interactive_cluster_single_spn(ws, installation):
 
 
 def test_interactive_cluster_multiple_spn(ws, installation):
+    ws.config.is_azure = True
     cluster_spn = ServicePrincipalClusterMapping(
         'cluster2',
         {
@@ -280,3 +313,47 @@ def test_interactive_cluster_multiple_spn(ws, installation):
     actual_grants = grants.get_interactive_cluster_grants()
     for grant in expected_grants:
         assert grant in actual_grants
+
+
+def test_get_eligible_locations_principals_no_cluster_return_empty(ws, installation):
+    ws.clusters.list.return_value = []
+    locations = aws_acl(ws, installation)
+    locations.get_eligible_locations_principals()
+    ws.external_locations.list.assert_not_called()
+
+
+def test_get_eligible_locations_principals_no_interactive_cluster_return_empty(ws, installation):
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_source=ClusterSource.JOB),
+        ClusterDetails(cluster_source=ClusterSource.UI, data_security_mode=DataSecurityMode.SINGLE_USER),
+    ]
+    locations = aws_acl(ws, installation)
+    locations.get_eligible_locations_principals()
+    ws.external_locations.list.assert_not_called()
+
+
+def test_get_eligible_locations_principals_interactive_no_instance_profiles(ws, installation):
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id='cluster1', cluster_source=ClusterSource.JOB),
+        ClusterDetails(
+            cluster_id='cluster1', cluster_source=ClusterSource.UI, data_security_mode=DataSecurityMode.NONE
+        ),
+    ]
+    locations = aws_acl(ws, installation)
+    locations.get_eligible_locations_principals()
+    ws.external_locations.list.assert_not_called()
+
+
+def test_get_eligible_locations_principals_interactive_instance_profile_from_policy(ws, installation):
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id='cluster1', cluster_source=ClusterSource.JOB),
+        ClusterDetails(
+            cluster_id='cluster1',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            policy_id='policy1',
+        ),
+    ]
+    locations = aws_acl(ws, installation)
+    locations.get_eligible_locations_principals()
+    ws.external_locations.list.assert_not_called()
