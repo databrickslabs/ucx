@@ -47,7 +47,10 @@ If you are running UCX Assessment or other type of UCX job on Databricks, check 
 If you are using UCX within a Databricks notebook, check the notebook output for any error messages or exceptions.
 
 ### UCX Command Line
-UCX CLI Commands: When running UCX commands from the command line, such as databricks labs install ucx, check the terminal output for any error messages or status information.
+UCX CLI Commands: When running UCX commands from the command line, such as databricks labs install ucx, check the terminal output for any error messages or status information. To gather more information on the error, turn on the `--debug` flag, for example:
+```sh
+databricks labs install ucx --debug
+```
 
 ### UCX Logs Files:
 UCX generates log files can provide more detailed information about errors and issues. The location of these log files is discussed in the next section.
@@ -136,7 +139,9 @@ Your platform adminsitrators may have implmented policies in one manner or anoth
 -  You may be prohibited from creating a database in Glue Catalog.
 -  You may need a bucket or storage account for the new database.
 
-In these cases where it's not immediately available as a workspace admin to create a HMS database, ask your DBA or data admins to create a database. UCX will create close to twenty tables to capture assessment information into it.
+It would be good to check the logfiles and in the case of database setup, check the SQL Warehouse [Query History](https://docs.databricks.com/en/sql/user/queries/query-history.html#view-query-history) for queries (e.g. `CREATE DATABASE`, `CREATE TABLE`, `CREATE VIEW`) with errors.
+
+In these cases where it's not immediately possible as a workspace admin to create a HMS database, ask your DBA, data admins or cloud admins to create a database. UCX will create close to twenty tables to stoire assessment information into the database.
 
 #### Error Installing a Wheel file.
 Access to DBFS may be restricted and loading wheel files into DBFS may be restricted. For now, check the github issues for potential resolution. More information to be added shortly.
