@@ -255,7 +255,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue, TimeoutError], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, InvalidParameterValue, TimeoutError], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -388,7 +388,7 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
         ws.groups.get(ws_group_a.id)
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
 def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     install, workflows_install = new_installation()
     mocker.patch("webbrowser.open")
@@ -410,7 +410,7 @@ def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
     assert run_status.value == "SUCCESS"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_uninstallation(ws, sql_backend, new_installation):
     install, _ = new_installation()
     installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
@@ -559,7 +559,7 @@ def test_check_inventory_database_exists(ws, new_installation, make_random):
         )
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=10))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job(
     ws,
     new_installation,
