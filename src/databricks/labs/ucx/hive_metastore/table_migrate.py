@@ -106,45 +106,54 @@ class TablesMigrator:
         all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
         all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
         self._init_seen_tables()
+        if what == What.VIEW:
+            return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
+        return self._migrate_tables(
+            what, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+        )
+
+    def _migrate_tables(
+        self, what: What, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+    ):
+        tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
+        tasks = []
+        for table in tables_in_scope:
+            grants = self._compute_grants(
+                table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+            )
+            tasks.append(
+                partial(
+                    self._migrate_table,
+                    table,
+                    grants,
+                )
+            )
+        Threads.strict("migrate views", tasks)
+        # the below is useful for testing
+        return tasks
+
+    def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
-        if what == What.VIEW:
-            sequencer = TableMigrationSequencer(tables_to_migrate)
-            batches = sequencer.sequence_batches()
-            for batch in batches:
-                tasks = []
-                for view in batch:
-                    grants = self._compute_grants(
-                        view.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
-                    )
-                    tasks.append(
-                        partial(
-                            self._migrate_view,
-                            view,
-                            grants,
-                        )
-                    )
-                Threads.strict("migrate views", tasks)
-                all_tasks.extend(tasks)
-                if len(batches) > 1:
-                    self._init_seen_tables()
-        else:
-            tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
+        sequencer = TableMigrationSequencer(tables_to_migrate)
+        batches = sequencer.sequence_batches()
+        for batch in batches:
             tasks = []
-            for table in tables_in_scope:
+            for view in batch:
                 grants = self._compute_grants(
-                    table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
+                    view.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
                 )
                 tasks.append(
                     partial(
-                        self._migrate_table,
-                        table,
+                        self._migrate_view,
+                        view,
                         grants,
                     )
                 )
             Threads.strict("migrate views", tasks)
-            all_tasks = tasks
-        # the below is useful for testing
+            all_tasks.extend(tasks)
+            self._init_seen_tables()
         return all_tasks
 
     def _compute_grants(
