@@ -448,9 +448,7 @@ def migrate_dbfs_root_delta_tables(
     migrate_tables(cfg, ws, sql_backend, install, What.DBFS_ROOT_DELTA)
 
 
-task("migrate-tables", job_cluster="table_migration")
-
-
+@task("migrate-tables", job_cluster="table_migration")
 def migrate_views(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, install: Installation):
     """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
     Following cli commands are required to be run before running this task:
