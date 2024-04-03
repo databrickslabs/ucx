@@ -64,7 +64,7 @@ def test_replace_installation():
         'azure_service_principal_migration_result.csv',
         [
             {
-                'application_id': 'redacted-for-github-929e765443eb',
+                'application_id': 'first-application-id',
                 'directory_id': 'tenant',
                 'name': 'oneenv-adls',
                 'validated_on': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
