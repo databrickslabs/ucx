@@ -61,7 +61,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     assert (
         "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;"
@@ -129,7 +129,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert backend.queries == [
         "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
@@ -163,7 +163,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
 
 
@@ -209,7 +209,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
 
@@ -236,7 +236,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.UNKNOWN)
 
     assert len(backend.queries) == 0
 
@@ -453,7 +453,7 @@ def test_no_migrated_tables(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrator.revert_migrated_tables("test_schema1", "test_table1")
     ws.catalogs.list.assert_called()
 
@@ -495,7 +495,7 @@ def test_empty_revert_report(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert not table_migrator.print_revert_report(delete_managed=False)
 
 
@@ -526,7 +526,7 @@ def test_is_upgraded(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables()
+    table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert table_migrator.is_migrated("schema1", "table1")
     assert not table_migrator.is_migrated("schema1", "table2")
 
@@ -730,7 +730,9 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables(acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    table_migrator.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    table_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
     assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" not in backend.queries
@@ -773,7 +775,9 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
         migration_status_refresher,
         principal_grants,
     )
-    table_migrator.migrate_tables(acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrator.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
 

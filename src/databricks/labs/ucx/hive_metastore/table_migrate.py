@@ -110,7 +110,7 @@ class TablesMigrator:
         all_tasks = []
         if what == What.VIEW:
             sequencer = TableMigrationSequencer(tables_to_migrate)
-            batches = sequencer.sequence_batches(what)
+            batches = sequencer.sequence_batches()
             for batch in batches:
                 tasks = []
                 for view in batch:
