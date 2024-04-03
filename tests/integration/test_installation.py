@@ -125,6 +125,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         workspace_installation = WorkspaceInstallation(
             workspace_config,
             installation,
+            install_state,
             sql_backend,
             ws,
             workflows_installation,

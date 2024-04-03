@@ -203,10 +203,11 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     sql_backend = MockBackend(
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
     )
+    install_state = InstallState.from_installation(mock_installation)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
-        InstallState.from_installation(mock_installation),
+        install_state,
         ws,
         create_autospec(WheelsV2),
         PRODUCT_INFO,
@@ -216,6 +217,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation,
+        install_state,
         sql_backend,
         ws,
         workflows_installation,
@@ -627,10 +629,11 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
             r".*": "",
         }
     )
+    install_state = InstallState.from_installation(mock_installation)
     workflows_installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
-        InstallState.from_installation(mock_installation),
+        install_state,
         ws,
         create_autospec(WheelsV2),
         PRODUCT_INFO,
@@ -639,6 +642,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
+        install_state,
         sql_backend,
         ws,
         workflows_installer,
@@ -668,7 +672,14 @@ def test_remove_database(ws):
     config = WorkspaceConfig(inventory_database='ucx')
     workflow_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflow_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        sql_backend,
+        ws,
+        workflow_installer,
+        prompts,
+        PRODUCT_INFO,
     )
 
     workspace_installation.uninstall()
@@ -687,17 +698,18 @@ def test_remove_jobs_no_state(ws):
     )
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
+    install_state = InstallState.from_installation(installation)
     workflows_installer = WorkflowsDeployment(
         config,
         installation,
-        InstallState.from_installation(installation),
+        install_state,
         ws,
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
 
     workspace_installation.uninstall()
@@ -717,17 +729,25 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
     )
     config = WorkspaceConfig(inventory_database='ucx')
     installation = mock_installation_with_jobs
+    install_state = InstallState.from_installation(installation)
     workflows_installer = WorkflowsDeployment(
         config,
         installation,
-        InstallState.from_installation(installation),
+        install_state,
         ws,
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
     workspace_installation = WorkspaceInstallation(
-        config, mock_installation_with_jobs, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        mock_installation_with_jobs,
+        install_state,
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
 
     with caplog.at_level('ERROR'):
@@ -751,7 +771,14 @@ def test_remove_warehouse(ws):
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
 
     workspace_installation.uninstall()
@@ -773,7 +800,14 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
 
     workspace_installation.uninstall()
@@ -793,7 +827,14 @@ def test_remove_secret_scope(ws, caplog):
     workflows_installer = create_autospec(WorkflowsDeployment)
     # ws.secrets.delete_scope.side_effect = NotFound()
     workspace_installation = WorkspaceInstallation(
-        config, installation, MockBackend(), ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        MockBackend(),
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
     workspace_installation.uninstall()
     ws.secrets.delete_scope.assert_called_with('ucx')
@@ -811,7 +852,14 @@ def test_remove_secret_scope_no_scope(ws, caplog):
     workflows_installer = create_autospec(WorkflowsDeployment)
     ws.secrets.delete_scope.side_effect = NotFound()
     workspace_installation = WorkspaceInstallation(
-        config, installation, MockBackend(), ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        MockBackend(),
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
     with caplog.at_level('ERROR'):
         workspace_installation.uninstall()
@@ -831,7 +879,14 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
     ws.cluster_policies.delete.side_effect = NotFound()
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
 
     with caplog.at_level('ERROR'):
@@ -853,7 +908,14 @@ def test_remove_warehouse_not_exists(ws, caplog):
     config = WorkspaceConfig(inventory_database='ucx')
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
-        config, installation, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        InstallState.from_installation(installation),
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
     )
 
     with caplog.at_level('ERROR'):
@@ -1287,23 +1349,18 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     config = WorkspaceConfig(inventory_database="ucx", policy_id='123')
     wheels = create_autospec(WheelsV2)
     installation = mock_installation
+    install_state = InstallState.from_installation(installation)
     workflows_installer = WorkflowsDeployment(
         config,
         installation,
-        InstallState.from_installation(installation),
+        install_state,
         ws,
         wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
     )
     workspace_installation = WorkspaceInstallation(
-        config,
-        installation,
-        sql_backend,
-        ws,
-        workflows_installer,
-        prompts,
-        PRODUCT_INFO,
+        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
     workspace_installation.run()
 
@@ -1396,10 +1453,11 @@ def test_fresh_install(ws, mock_installation):
 
 def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
+    install_state = InstallState.from_installation(mock_installation_extra_jobs)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation_extra_jobs,
-        InstallState.from_installation(mock_installation_extra_jobs),
+        install_state,
         ws,
         create_autospec(WheelsV2),
         PRODUCT_INFO,
@@ -1409,6 +1467,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_extra_jobs,
+        install_state,
         sql_backend,
         ws,
         workflows_installation,

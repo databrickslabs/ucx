@@ -132,10 +132,6 @@ class WorkflowsDeployment(InstallationMixin):
 
         return cls(config, installation, install_state, ws, wheels, product_info, timeout)
 
-    @property
-    def state(self):
-        return self._install_state
-
     def run_workflow(self, step: str):
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
@@ -219,7 +215,7 @@ class WorkflowsDeployment(InstallationMixin):
         return latest_status
 
     def validate_step(self, step: str) -> bool:
-        job_id = int(self.state.jobs[step])
+        job_id = int(self._install_state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
