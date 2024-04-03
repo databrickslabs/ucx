@@ -30,7 +30,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.views_sequencer import (
-    TableMigrationSequencer,
+    ViewsMigrationSequencer,
     ViewToMigrate,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
@@ -137,7 +137,7 @@ class TablesMigrator:
     def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
-        sequencer = TableMigrationSequencer(tables_to_migrate)
+        sequencer = ViewsMigrationSequencer(tables_to_migrate)
         batches = sequencer.sequence_batches()
         for batch in batches:
             tasks = []

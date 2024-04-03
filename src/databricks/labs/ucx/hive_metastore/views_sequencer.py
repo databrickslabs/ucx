@@ -79,7 +79,7 @@ class ViewToMigrate(TableToMigrate):
         return isinstance(other, TableToMigrate) and self.src == other.src
 
 
-class TableMigrationSequencer:
+class ViewsMigrationSequencer:
 
     def __init__(self, tables: Collection[TableToMigrate]):
         self._tables = tables
