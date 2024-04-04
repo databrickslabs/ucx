@@ -43,6 +43,16 @@ def test_parse_logs(log_path: Path) -> None:
     assert log_records == LOG_RECORDS
 
 
+def test_parse_logs_file_does_not_exists(tmp_path: Path) -> None:
+    non_existing_log_path = tmp_path / "does_not_exists.log"
+    try:
+        list(logs.parse_logs(non_existing_log_path))
+    except FileNotFoundError:
+        assert False
+    else:
+        assert True
+
+
 def test_logs_processor(log_path: Path):
     backend = MockBackend()
     log_processor = LogsProcessor(backend, "default", log_path)
