@@ -20,7 +20,7 @@ class Snapshot(Protocol):
 class RuntimeContext(GlobalContext):
     @cached_property
     def _config_path(self) -> Path:
-        config = self.flags.get("config")
+        config = self.named_parameters.get("config")
         if not config:
             raise ValueError("config flag is required")
         return Path(config)

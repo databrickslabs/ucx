@@ -94,6 +94,7 @@ dbutils.library.restartPython()
 from databricks.labs.ucx.runtime import main
 
 main(f'--config=/Workspace{config_file}',
+     f'--workflow=' + dbutils.widgets.get('workflow'),
      f'--task=' + dbutils.widgets.get('task'),
      f'--job_id=' + dbutils.widgets.get('job_id'),
      f'--run_id=' + dbutils.widgets.get('run_id'),
@@ -341,24 +342,29 @@ class WorkflowsDeployment(InstallationMixin):
     def create_jobs(self, prompts):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel(prompts)
-        desired_steps = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
+        desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
-        for step_name in desired_steps:
-            settings = self._job_settings(step_name, remote_wheel)
+        for workflow_name in desired_workflows:
+            settings = self._job_settings(workflow_name, remote_wheel)
             if self._config.override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
-            self._deploy_workflow(step_name, settings)
+                settings = self._apply_cluster_overrides(
+                    workflow_name,
+                    settings,
+                    self._config.override_clusters,
+                    wheel_runner,
+                )
+            self._deploy_workflow(workflow_name, settings)
 
-        for step_name, job_id in self._install_state.jobs.items():
-            if step_name not in desired_steps:
+        for workflow_name, job_id in self._install_state.jobs.items():
+            if workflow_name not in desired_workflows:
                 try:
                     logger.info(f"Removing job_id={job_id}, as it is no longer needed")
                     self._ws.jobs.delete(job_id)
                 except InvalidParameterValue:
-                    logger.warning(f"step={step_name} does not exist anymore for some reason")
+                    logger.warning(f"step={workflow_name} does not exist anymore for some reason")
                     continue
 
         self._install_state.save()
@@ -464,7 +470,12 @@ class WorkflowsDeployment(InstallationMixin):
         return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
     @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
+    def _apply_cluster_overrides(
+        workflow_name: str,
+        settings: dict[str, Any],
+        overrides: dict[str, str],
+        wheel_runner: str,
+    ) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -475,8 +486,8 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
-                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
-                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
+                widget_values = {"task": job_task.task_key, 'workflow': workflow_name} | EXTRA_TASK_PARAMS
+                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=widget_values)
         return settings
 
     def _job_settings(self, step_name: str, remote_wheel: str):
@@ -548,16 +559,20 @@ class WorkflowsDeployment(InstallationMixin):
             # Shared mode cluster cannot use dbfs, need to use WSFS
             libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         else:
-            # TODO: check when we can install wheels from WSFS properly
-            # None UC cluster cannot use WSFS, need to use dbfs
+            # TODO: https://github.com/databrickslabs/ucx/issues/1098
             libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
+        named_parameters = {
+            "config": f"/Workspace{self._config_file}",
+            "workflow": task.workflow,
+            "task": task.name,
+        }
         return replace(
             jobs_task,
             libraries=libraries,
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
+                named_parameters=named_parameters | EXTRA_TASK_PARAMS,
             ),
         )
 

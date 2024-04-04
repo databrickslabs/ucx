@@ -18,8 +18,8 @@ class CliContext(GlobalContext, abc.ABC):
 
 
 class WorkspaceContext(CliContext):
-    def __init__(self, ws: WorkspaceClient, flags: dict[str, str] | None = None):
-        super().__init__(flags)
+    def __init__(self, ws: WorkspaceClient, named_parameters: dict[str, str] | None = None):
+        super().__init__(named_parameters)
         self._ws = ws
 
     @cached_property
@@ -40,8 +40,8 @@ class WorkspaceContext(CliContext):
 
 
 class AccountContext(CliContext):
-    def __init__(self, ac: AccountClient, flags: dict[str, str] | None = None):
-        super().__init__(flags)
+    def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):
+        super().__init__(named_parameters)
         self._ac = ac
 
     @cached_property

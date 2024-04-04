@@ -32,21 +32,21 @@ class Workflows:
         return self._tasks
 
     def trigger(self, *argv):
-        args = parse_args(*argv)
-        config_path = Path(args["config"])
+        named_parameters = parse_args(*argv)
+        config_path = Path(named_parameters["config"])
 
-        ctx = RuntimeContext(args)
+        ctx = RuntimeContext(named_parameters)
         install_dir = config_path.parent
-        task_name = args.get("task", "not specified")
-        workflow = args.get("workflow", "not specified")
+        task_name = named_parameters.get("task", "not specified")
+        workflow = named_parameters.get("workflow", "not specified")
         if task_name not in self._workflows:
             msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(self._workflows.keys())}'
             raise KeyError(msg)
         print(f"UCX v{__version__}")
         workflow = self._workflows[task_name]
         # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
-        workflow_run_id = args.get("parent_run_id", "unknown_run_id")
-        job_id = args.get("job_id", "unknown_job_id")
+        workflow_run_id = named_parameters.get("parent_run_id", "unknown_run_id")
+        job_id = named_parameters.get("job_id", "unknown_job_id")
         with TaskLogger(
             install_dir,
             workflow=workflow.name,

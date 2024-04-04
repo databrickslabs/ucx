@@ -50,11 +50,11 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 
 class GlobalContext(abc.ABC):
-    def __init__(self, flags: dict[str, str] | None = None):
+    def __init__(self, named_parameters: dict[str, str] | None = None):
         super().__init__()
-        if not flags:
-            flags = {}
-        self._flags = flags
+        if not named_parameters:
+            named_parameters = {}
+        self._named_parameters = named_parameters
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
@@ -69,8 +69,8 @@ class GlobalContext(abc.ABC):
         raise ValueError("Account client not set")
 
     @cached_property
-    def flags(self) -> dict[str, str]:
-        return self._flags
+    def named_parameters(self) -> dict[str, str]:
+        return self._named_parameters
 
     @cached_property
     def product_info(self):
@@ -178,7 +178,7 @@ class GlobalContext(abc.ABC):
         return AzureResources(
             self.azure_management_client,
             self.microsoft_graph_client,
-            self.flags.get('include_subscriptions'),
+            self.named_parameters.get('include_subscriptions'),
         )
 
     @cached_property
@@ -232,7 +232,7 @@ class GlobalContext(abc.ABC):
     def aws_resources(self):
         if not self.workspace_client.config.is_aws:
             raise NotImplementedError("AWS only")
-        profile = self.flags.get("aws_profile")
+        profile = self.named_parameters.get("aws_profile")
         profile = os.getenv("AWS_DEFAULT_PROFILE", profile)
         return AWSResources(profile, self.aws_cli_run_command)
 
@@ -245,8 +245,8 @@ class GlobalContext(abc.ABC):
             self.aws_resources,
             self.external_locations,
             self.config.inventory_database,
-            self.flags.get("aws_account_id"),
-            self.flags.get("kms_key"),
+            self.named_parameters.get("aws_account_id"),
+            self.named_parameters.get("kms_key"),
         )
 
     @cached_property
