@@ -700,7 +700,7 @@ def test_prepare_principal_acl(
     return table_migrate, f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}", cluster.cluster_id
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_migrate_managed_tables_with_principal_acl_azure(
     ws,
     make_user,
