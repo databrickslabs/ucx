@@ -10,6 +10,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient, core
+from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResources, run_command
@@ -40,8 +41,12 @@ from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
+from databricks.labs.ucx.workspace_access.scim import ScimSupport
+from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
+from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
 # "Service Factories" would always have a lot of pulic methods.
 # This is because they are responsible for creating objects that are
@@ -113,13 +118,69 @@ class GlobalContext(abc.ABC):
         return self.config.inventory_database
 
     @cached_property
-    def permission_manager(self):
-        return PermissionManager.factory(
+    def workspace_listing(self):
+        return generic.WorkspaceListing(
             self.workspace_client,
             self.sql_backend,
             self.inventory_database,
-            num_threads=self.config.num_threads,
-            workspace_start_path=self.config.workspace_start_path,
+            self.config.num_threads,
+            self.config.workspace_start_path,
+        )
+
+    @cached_property
+    def generic_permissions_support(self):
+        models_listing = generic.models_listing(self.workspace_client, self.config.num_threads)
+        acl_listing = [
+            generic.Listing(self.workspace_client.clusters.list, "cluster_id", "clusters"),
+            generic.Listing(self.workspace_client.cluster_policies.list, "policy_id", "cluster-policies"),
+            generic.Listing(self.workspace_client.instance_pools.list, "instance_pool_id", "instance-pools"),
+            generic.Listing(self.workspace_client.warehouses.list, "id", "sql/warehouses"),
+            generic.Listing(self.workspace_client.jobs.list, "job_id", "jobs"),
+            generic.Listing(self.workspace_client.pipelines.list_pipelines, "pipeline_id", "pipelines"),
+            generic.Listing(self.workspace_client.serving_endpoints.list, "id", "serving-endpoints"),
+            generic.Listing(generic.experiments_listing(self.workspace_client), "experiment_id", "experiments"),
+            generic.Listing(models_listing, "id", "registered-models"),
+            generic.Listing(generic.models_root_page, "object_id", "registered-models"),
+            generic.Listing(generic.tokens_and_passwords, "object_id", "authorization"),
+            generic.Listing(generic.feature_store_listing(self.workspace_client), "object_id", "feature-tables"),
+            generic.Listing(generic.feature_tables_root_page, "object_id", "feature-tables"),
+            self.workspace_listing,
+        ]
+        return generic.GenericPermissionsSupport(self.workspace_client, acl_listing)
+
+    @cached_property
+    def redash_permissions_support(self):
+        acl_listing = [
+            redash.Listing(self.workspace_client.alerts.list, sql.ObjectTypePlural.ALERTS),
+            redash.Listing(self.workspace_client.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
+            redash.Listing(self.workspace_client.queries.list, sql.ObjectTypePlural.QUERIES),
+        ]
+        return redash.RedashPermissionsSupport(self.workspace_client, acl_listing)
+
+    @cached_property
+    def scim_entitlements_support(self):
+        return ScimSupport(self.workspace_client)
+
+    @cached_property
+    def secret_scope_acl_support(self):
+        return SecretScopesSupport(self.workspace_client)
+
+    @cached_property
+    def legacy_table_acl_support(self):
+        return TableAclSupport(self.grants_crawler, self.sql_backend)
+
+    @cached_property
+    def permission_manager(self):
+        return PermissionManager(
+            self.sql_backend,
+            self.inventory_database,
+            [
+                self.generic_permissions_support,
+                self.redash_permissions_support,
+                self.secret_scope_acl_support,
+                self.scim_entitlements_support,
+                self.legacy_table_acl_support,
+            ],
         )
 
     @cached_property

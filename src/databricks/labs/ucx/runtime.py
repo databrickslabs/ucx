@@ -226,19 +226,13 @@ def workspace_listing(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: Sq
 
 
 @task("assessment", depends_on=[crawl_grants, workspace_listing])
-def crawl_permissions(cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
+def crawl_permissions(cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend, _install: Installation):
     """Scans the workspace-local groups and all their permissions. The list is stored in the `$inventory.permissions`
     Delta table.
 
     This is the first step for the _group migration_ process, which is continued in the `migrate-groups` workflow.
     This step includes preparing Legacy Table ACLs for local group migration."""
-    permission_manager = PermissionManager.factory(
-        ws,
-        sql_backend,
-        cfg.inventory_database,
-        num_threads=cfg.num_threads,
-        workspace_start_path=cfg.workspace_start_path,
-    )
+    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [])  # TODO: fixme
     permission_manager.cleanup()
     permission_manager.inventorize_permissions()
 
@@ -372,29 +366,17 @@ def apply_permissions_to_account_groups(
         logger.info("Skipping group migration as no groups were found.")
         return
 
-    permission_manager = PermissionManager.factory(
-        ws,
-        sql_backend,
-        cfg.inventory_database,
-        num_threads=cfg.num_threads,
-        workspace_start_path=cfg.workspace_start_path,
-    )
+    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [])  # TODO: fixme
     permission_manager.apply_group_permissions(migration_state)
 
 
 @task("validate-groups-permissions", job_cluster="tacl")
 def validate_groups_permissions(
-    cfg: WorkspaceConfig, ws: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
+    cfg: WorkspaceConfig, _: WorkspaceClient, sql_backend: SqlBackend, _install: Installation
 ):
     """Validate that all the crawled permissions are applied correctly to the destination groups."""
     logger.info("Running validation of permissions applied to destination groups.")
-    permission_manager = PermissionManager.factory(
-        ws,
-        sql_backend,
-        cfg.inventory_database,
-        num_threads=cfg.num_threads,
-        workspace_start_path=cfg.workspace_start_path,
-    )
+    permission_manager = PermissionManager(sql_backend, cfg.inventory_database, [])  # TODO: fixme
     permission_manager.verify_group_permissions()
 
 

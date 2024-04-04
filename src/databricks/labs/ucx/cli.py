@@ -67,7 +67,7 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
     logger.info("Running skip command")
     if not schema:
         logger.error("--schema is a required parameter.")
-        return
+        return None
     ctx = WorkspaceContext(w)
     if table:
         return ctx.table_mapping.skip_table(schema, table)

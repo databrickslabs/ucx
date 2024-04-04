@@ -13,7 +13,6 @@ from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
 
 class RuntimeContext(GlobalContext):
@@ -73,13 +72,3 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def global_init_scripts_crawler(self):
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
-
-    @cached_property
-    def workspace_listing(self):
-        return WorkspaceListing(
-            self.workspace_client,
-            self.sql_backend,
-            self.inventory_database,
-            self.config.num_threads,
-            self.config.workspace_start_path,
-        )

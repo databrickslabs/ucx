@@ -11,9 +11,9 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import iam
 
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
-from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +75,8 @@ def test_apply_group_permissions_experimental_performance(
     logger.info(f"Migration using experimental API takes {process_time() - start}s")
 
     start = process_time()
-    permission_manager = PermissionManager.factory(ws, sql_backend, inventory_schema)
-    permission_manager.apply_group_permissions(MigrationState([migrated_group]))
+    ctx = WorkspaceContext(ws).replace(inventory_schema=inventory_schema, sql_backend=sql_backend)
+    ctx.permission_manager.apply_group_permissions(MigrationState([migrated_group]))
     logger.info(f"Migration using normal approach takes {process_time() - start}s")
 
 
