@@ -57,3 +57,7 @@ class LogsProcessor(CrawlerBase):
         """
         super().__init__(backend, "hive_metastore", schema, "logs", LogRecord)
         self._log_paths = log_paths
+
+    def process(self) -> None:
+        log_records = list(parse_logs(*self._log_paths))
+        self._append_records(log_records)
