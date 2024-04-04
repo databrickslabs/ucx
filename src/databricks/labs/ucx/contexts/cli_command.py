@@ -65,6 +65,13 @@ class WorkspaceContext(CliContext):
             return self.iam_role_migration.run(prompts)
         raise ValueError("Unsupported cloud provider")
 
+    def migrate_locations(self):
+        if self.is_azure:
+            return self.azure_external_locations_migration.run()
+        if self.is_aws:
+            return self.aws_resource_permissions.create_external_locations()
+        raise ValueError("Unsupported cloud provider")
+
 
 class AccountContext(CliContext):
     def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):

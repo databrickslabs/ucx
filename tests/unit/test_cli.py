@@ -344,38 +344,21 @@ def test_create_uber_principal(ws):
 
 
 def test_migrate_locations_azure(ws):
-    ws.config.is_azure = True
-    ws.config.is_aws = False
-    ws.config.is_gcp = False
-    migrate_locations(ws)
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
 
-def test_migrate_locations_aws(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ws.config.is_gcp = False
-    migrate_locations(ws, aws_profile="profile")
+def test_migrate_locations_aws(ws, caplog):
+    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
 
-def test_missing_aws_cli(ws, caplog, mocker):
-    # Test to verify the CLI is called. Fail it intentionally to test the error message.
-    mocker.patch("shutil.which", return_value=None)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ws.config.is_gcp = False
-    migrate_locations(ws, aws_profile="profile")
-    assert "Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/" in caplog.messages
-
-
-def test_migrate_locations_gcp(ws, caplog):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
-    ws.config.is_gcp = True
-    migrate_locations(ws)
-    assert "migrate_locations is not yet supported in GCP" in caplog.messages
+def test_migrate_locations_gcp(ws):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+    with pytest.raises(ValueError):
+        migrate_locations(ws, ctx=ctx)
 
 
 def test_create_catalogs_schemas(ws):

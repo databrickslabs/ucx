@@ -1,6 +1,4 @@
 import json
-import os
-import shutil
 import webbrowser
 from pathlib import Path
 
@@ -8,17 +6,12 @@ from databricks.labs.blueprint.cli import App
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.account import AccountWorkspaces
-from databricks.labs.ucx.assessment.aws import AWSResources
-from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
-from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
@@ -296,39 +289,15 @@ def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceCont
 
 
 @ucx.command
-def migrate_locations(w: WorkspaceClient, aws_profile: str | None = None):
+def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, **named_parameters):
     """This command creates UC external locations. The candidate locations to be created are extracted from
     guess_external_locations task in the assessment job. You can run validate_external_locations command to check
     the candidate locations. Please make sure the credentials haven migrated before running this command. The command
     will only create the locations that have corresponded UC Storage Credentials.
     """
-    if w.config.is_azure:
-        logger.info("Running migrate_locations for Azure")
-        installation = Installation.current(w, 'ucx')
-        service_principal_migration = ExternalLocationsMigration.for_cli(w, installation)
-        service_principal_migration.run()
-    if w.config.is_aws:
-        logger.error("Migrate_locations for AWS")
-        if not shutil.which("aws"):
-            logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
-            return
-        if not aws_profile:
-            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
-        if not aws_profile:
-            logger.error(
-                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
-                "or use the '--aws-profile=[profile-name]' parameter."
-            )
-            return
-        installation = Installation.current(w, 'ucx')
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-        aws = AWSResources(aws_profile)
-        location = ExternalLocations(w, sql_backend, config.inventory_database)
-        aws_permissions = AWSResourcePermissions(installation, w, sql_backend, aws, location, config.inventory_database)
-        aws_permissions.create_external_locations()
-    if w.config.is_gcp:
-        logger.error("migrate_locations is not yet supported in GCP")
+    if not ctx:
+        ctx = WorkspaceContext(w, named_parameters)
+    ctx.migrate_locations()
 
 
 @ucx.command
