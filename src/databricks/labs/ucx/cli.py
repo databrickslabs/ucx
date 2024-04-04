@@ -70,9 +70,8 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
         return
     ctx = WorkspaceContext(w)
     if table:
-        ctx.table_mapping.skip_table(schema, table)
-    else:
-        ctx.table_mapping.skip_schema(schema)
+        return ctx.table_mapping.skip_table(schema, table)
+    return ctx.table_mapping.skip_schema(schema)
 
 
 @ucx.command(is_account=True)
