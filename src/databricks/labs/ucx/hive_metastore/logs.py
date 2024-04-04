@@ -8,6 +8,8 @@ from databricks.labs.lsql.backends import SqlBackend
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
+logger = logging.getLogger(__name__)
+
 
 @dataclasses.dataclass
 class LogRecord:
@@ -38,6 +40,9 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
     pattern = re.compile(log_format)
 
     for log_path in log_paths:
+        if not log_path.is_file():
+            logger.info("Log file does not exists: {%s}", log_path)
+            continue
         with log_path.open("r") as f:
             for line in f.readlines():
                 log_record = parse_log_record(line, pattern)
