@@ -349,25 +349,49 @@ simply add `--debug` flag to any command.
 
 ## Table Migration Workflow
 
-The `migrate-tables` workflow comprises tasks designed to migrate tables from the Hive Metastore to the Unity Catalog. The subsequent diagram illustrates the workflow's tasks and their dependency CLI commands. 
+The table migration workflow comprises multiple workflows and tasks designed to migrate tables from the Hive Metastore to the Unity Catalog. The subsequent diagram illustrates the workflow's tasks and their dependency CLI commands. 
 ```mermaid
-flowchart TD
+flowchart TB
     subgraph CLI
-    create_table_mapping[create-table-mapping] --> create_catalogs_schemas[create-catalogs-schemas]
-    create_uber_principal[create-uber-principal]
-    principal_prefix_access[principal-prefix-access] --> migrate_credentials[migrate-credentials]
-    migrate_credentials --> migrate_locations[migrate-locations]
-    migrate_locations --> create_catalogs_schemas
+      create_table_mapping[create-table-mapping] --> create_catalogs_schemas[create-catalogs-schemas]
+      create_uber_principal[create-uber-principal]
+      principal_prefix_access[principal-prefix-access] --> migrate_credentials[migrate-credentials]
+      migrate_credentials --> migrate_locations[migrate-locations]
+      migrate_locations --> create_catalogs_schemas
     end
     
-    create_uber_principal --> mt_workflow
-    create_table_mapping --> mt_workflow
-    create_catalogs_schemas --> mt_workflow
+    create_uber_principal --> workflow
+    create_table_mapping --> workflow
+    create_catalogs_schemas --> workflow
     
-    subgraph mt_workflow[workflow: migrate-tables]
-    dbfs_root_delta_mt_task[migrate_dbfs_root_delta_tables]
-    external_tables_sync_mt_task[migrate_external_tables_sync]
+    subgraph workflow[Table Migration Workflows]
+      subgraph mt_workflow[workflow: migrate-tables]
+        dbfs_root_delta_mt_task[migrate_dbfs_root_delta_tables]
+        external_tables_sync_mt_task[migrate_external_tables_sync]
+        view_mt_task[roadmap: migrate_views]
+        dbfs_root_delta_mt_task --> view_mt_task
+        external_tables_sync_mt_task --> view_mt_task
+      end
+      
+      subgraph mt_ctas_wf[roadmap workflow: migrate-tables-ctas]
+        ctas_mt_task[migrate_tables_ctas] --> view_mt_task_ctas[roadmap: migrate_views]
+      end
+  
+      subgraph mt_serde_inplace_wf[roadmap workflow: migrate-hiveserde-tables-in-place-experimental]
+        serde_inplace_mt_task[migrate-hiveserde-tables-in-place-experimental] --> view_mt_task_inplace[roadmap: migrate_views]
+      end
+  
+      subgraph mt_in_mounts_wf[roadmap workflow: migrate-tables-in-mounts-experimental]
+        scan_tables_in_mounts_experimental_task[scan_tables_in_mounts_experimental] --> 
+        migrate_tables_in_mounts_experimental[migrate_tables_in_mounts_experimental]
+      end
     end
+    
+    classDef roadmap stroke:Green,stroke-width:2px,color:Green,stroke-dasharray: 8 3
+    class view_mt_task roadmap;
+    class mt_ctas_wf,ctas_mt_task,view_mt_task_ctas roadmap;
+    class mt_serde_inplace_wf,serde_inplace_mt_task,view_mt_task_inplace roadmap;
+    class mt_in_mounts_wf,scan_tables_in_mounts_experimental_task,migrate_tables_in_mounts_experimental roadmap;
 ```
 More details can be found in the [design of table migration](docs/table_upgrade.md)
 
@@ -388,10 +412,11 @@ See more details in [Table migration commands](#table-migration-commands)
 ### Table Migration Workflow Tasks
 - `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone, along with legacy table ACL migrated if any.
 - `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command, along with legacy table ACL migrated if any.
-- Following tasks are on the roadmap and being developed:
+- Following workflows/tasks are on the roadmap and being developed:
   - Migrate view
   - Migrate tables using CTAS
-  - In place migrate ParquetHiveSerDe, OrcSerde, AvroSerDe, LazySimpleSerDe, JsonSerDe, OpenCSVSerde tables.
+  - Optionally and experimentally in place migrate ParquetHiveSerDe, OrcSerde, AvroSerDe, LazySimpleSerDe, JsonSerDe, OpenCSVSerde tables.
+  - Experimentally migrate Delta and Parquet data found in dbfs mount but not registered as Hive Metastore table into UC tables.
 
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
