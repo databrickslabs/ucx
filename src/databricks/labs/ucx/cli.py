@@ -12,8 +12,6 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
-from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -303,18 +301,16 @@ def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, *
 @ucx.command
 def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
-    installation = Installation.current(w, 'ucx')
-    catalog_schema = CatalogSchema.for_cli(w, installation)
-    catalog_schema.create_all_catalogs_schemas(prompts)
+    ctx = WorkspaceContext(w)
+    ctx.catalog_schema.create_all_catalogs_schemas(prompts)
 
 
 @ucx.command
 def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Re-mapping the cluster to UC"""
     logger.info("Remapping the Clusters to UC")
-    installation = Installation.current(w, 'ucx')
-    cluster = ClusterAccess(installation, w, prompts)
-    cluster_list = cluster.list_cluster()
+    ctx = WorkspaceContext(w)
+    cluster_list = ctx.cluster_access.list_cluster()
     if not cluster_list:
         logger.info("No cluster information present in the workspace")
         return
@@ -324,17 +320,17 @@ def cluster_remap(w: WorkspaceClient, prompts: Prompts):
     cluster_ids = prompts.question(
         "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
     )
-    cluster.map_cluster_to_uc(cluster_ids, cluster_list)
+    ctx.cluster_access.map_cluster_to_uc(cluster_ids, cluster_list)
 
 
 @ucx.command
 def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     """Reverting Re-mapping of  clusters from UC"""
     logger.info("Reverting the Remapping of the Clusters from UC")
-    installation = Installation.current(w, 'ucx')
+    ctx = WorkspaceContext(w)
     cluster_ids = [
         cluster_files.path.split("/")[-1].split(".")[0]
-        for cluster_files in installation.files()
+        for cluster_files in ctx.installation.files()
         if cluster_files.path is not None and cluster_files.path.find("backup/clusters") > 0
     ]
     if not cluster_ids:
@@ -345,8 +341,7 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
     cluster_list = prompts.question(
         "Please provide the cluster id's as comma separated value from the above list", default="<ALL>"
     )
-    cluster_details = ClusterAccess(installation, w, prompts)
-    cluster_details.revert_cluster_remap(cluster_list, cluster_ids)
+    ctx.cluster_access.revert_cluster_remap(cluster_list, cluster_ids)
 
 
 @ucx.command
