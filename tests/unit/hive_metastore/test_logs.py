@@ -20,6 +20,14 @@ LOG_RECORDS = (
 )
 
 
+@pytest.fixture()
+def log_path(tmp_path: Path) -> Path:
+    _log_path = tmp_path / "test.log"
+    with _log_path.open("w") as f:
+        f.writelines(LOGS)
+    return _log_path
+
+
 @pytest.mark.parametrize("line,expected_log_record", list(zip(LOGS, LOG_RECORDS)))
 def test_parse_log_record_examples(line: str, expected_log_record: LogRecord) -> None:
     log_format = r"\d+:\d+\s(\w+)\s\[.+\]\s(.+)"
@@ -29,10 +37,6 @@ def test_parse_log_record_examples(line: str, expected_log_record: LogRecord) ->
     assert log_record == expected_log_record
 
 
-def test_parse_logs(tmp_path: Path) -> None:
-    log_path = tmp_path / "test.log"
-    with log_path.open("w") as f:
-        f.writelines(LOGS)
-
+def test_parse_logs(log_path: Path) -> None:
     log_records = tuple(logs.parse_logs(log_path))
     assert log_records == LOG_RECORDS
