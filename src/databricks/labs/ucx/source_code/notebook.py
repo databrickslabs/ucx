@@ -8,6 +8,7 @@ from databricks.sdk.service.workspace import Language
 NOTEBOOK_HEADER = " Databricks notebook source"
 CELL_SEPARATOR = " COMMAND ----------"
 MAGIC_PREFIX = ' MAGIC'
+LANGUAGE_PREFIX = ' %'
 
 
 class Cell(ABC):
@@ -60,12 +61,21 @@ class MarkdownCell(Cell):
         return CellLanguage.MARKDOWN
 
 
+class RunCell(Cell):
+
+    @property
+    def language(self):
+        return CellLanguage.RUN
+
+
 class CellLanguage(Enum):
-    PYTHON = Language.PYTHON, '%python', '#', PythonCell
-    R = Language.R, '%r', '#', RCell
-    SCALA = Language.SCALA, '%scala', '//', ScalaCell
-    SQL = Language.SQL, '%sql', '--', SQLCell
-    MARKDOWN = None, '%md', None, MarkdownCell
+    # long magic_names must come first to avoid shorter ones being matched
+    PYTHON = Language.PYTHON, 'python', '#', PythonCell
+    SCALA = Language.SCALA, 'scala', '//', ScalaCell
+    SQL = Language.SQL, 'sql', '--', SQLCell
+    RUN = None, 'run', None, RunCell
+    MARKDOWN = None, 'md', None, MarkdownCell
+    R = Language.R, 'r', '#', RCell
 
     def __init__(self, *args):
         super().__init__()
@@ -92,13 +102,24 @@ class CellLanguage(Enum):
 
     @classmethod
     def of_magic_name(cls, magic_name: str) -> CellLanguage | None:
-        return next((cl for cl in CellLanguage if cl.magic_name == magic_name), None)
+        return next((cl for cl in CellLanguage if magic_name.startswith(cl.magic_name) ), None)
 
-    def read_cell_language(self, line: str) -> CellLanguage | None:
+    def read_cell_language(self, lines: list[str]) -> CellLanguage | None:
         magic_prefix = f'{self.comment_prefix}{MAGIC_PREFIX}'
-        if not line.startswith(magic_prefix):
-            return None
-        return CellLanguage.of_magic_name(line[len(magic_prefix) :].strip())
+        magic_language_prefix = f'{magic_prefix}{LANGUAGE_PREFIX}'
+        for line in lines:
+            # if we find a non-comment then we're done
+            if not line.startswith(self.comment_prefix):
+                return None
+            # if it's not a magic comment, skip it
+            if not line.startswith(magic_prefix):
+                continue
+            if line.startswith(magic_language_prefix):
+                line = line[len(magic_language_prefix):]
+                return CellLanguage.of_magic_name(line.strip())
+            else:
+                return None
+
 
     def new_cell(self, source: str) -> Cell:
         return self._new_cell(source)
@@ -117,11 +138,9 @@ def extract_cells(source: str, default_language: CellLanguage) -> list[Cell] | N
         # trim trailing blank lines
         while len(lines_) > 0 and len(lines_[-1]) == 0:
             lines_.pop(-1)
-        cell_language = default_language.read_cell_language(lines_[0])
+        cell_language = default_language.read_cell_language(lines_)
         if cell_language is None:
             cell_language = default_language
-        else:
-            lines_.pop(0)
         cell_source = '\n'.join(lines_)
         return cell_language.new_cell(cell_source)
 
@@ -186,8 +205,6 @@ class Notebook:
         header = f"{default_language.comment_prefix}{NOTEBOOK_HEADER}"
         sources = [header]
         for i, cell in enumerate(self._cells):
-            if cell.language != default_language:
-                sources.append(f'{default_language.comment_prefix}{MAGIC_PREFIX} {cell.language.magic_name}')
             sources.append(cell.migrated_code)
             if i < len(self._cells) - 1:
                 sources.append('')
