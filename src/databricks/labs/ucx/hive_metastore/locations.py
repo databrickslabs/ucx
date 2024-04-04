@@ -377,10 +377,10 @@ class TablesInMounts(CrawlerBase[Table]):
                 logger.debug(f"Found partitioned parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=True)
             elif self._is_csv(file_info.name):
-                logger.debug(f"Found parquet {file_info.path}")
+                logger.debug(f"Found csv {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="CSV", is_partitioned=False)
             elif self._is_parquet(file_info.name):
-                logger.debug(f"Found csv {file_info.path}")
+                logger.debug(f"Found parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=False)
             else:
                 self._find_delta_log_folders(file_info.path, delta_log_folders)
