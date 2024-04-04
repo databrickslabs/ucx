@@ -2,9 +2,10 @@ import re
 from pathlib import Path
 
 import pytest
+from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore import logs
-from databricks.labs.ucx.hive_metastore.logs import LogRecord
+from databricks.labs.ucx.hive_metastore.logs import LogRecord, LogsProcessor
 
 LOGS = [
     "07:09 ERROR [module] Message.\n",
@@ -40,3 +41,10 @@ def test_parse_log_record_examples(line: str, expected_log_record: LogRecord) ->
 def test_parse_logs(log_path: Path) -> None:
     log_records = list(logs.parse_logs(log_path))
     assert log_records == LOG_RECORDS
+
+
+def test_logs_processor(log_path: Path):
+    backend = MockBackend()
+    log_processor = LogsProcessor(backend, "default", log_path)
+    snapshot = log_processor.snapshot()
+    assert snapshot == LOG_RECORDS
