@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations  # for type hints
 
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -24,35 +24,35 @@ class Cell(ABC):
 class PythonCell(Cell):
 
     @property
-    def language(self) -> CellLanguage:
+    def language(self):
         return CellLanguage.PYTHON
 
 
 class RCell(Cell):
 
     @property
-    def language(self) -> CellLanguage:
+    def language(self):
         return CellLanguage.R
 
 
 class ScalaCell(Cell):
 
     @property
-    def language(self) -> CellLanguage:
+    def language(self):
         return CellLanguage.SCALA
 
 
 class SQLCell(Cell):
 
     @property
-    def language(self) -> CellLanguage:
+    def language(self):
         return CellLanguage.SQL
 
 
 class MarkdownCell(Cell):
 
     @property
-    def language(self) -> CellLanguage:
+    def language(self):
         return CellLanguage.MARKDOWN
 
 
@@ -63,8 +63,8 @@ class CellLanguage(Enum):
     SQL = Language.SQL, '%sql', '--', SQLCell
     MARKDOWN = None, '%md', None, MarkdownCell
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(self)
+    def __init__(self, *args):
+        super().__init__()
         self._language = args[0]
         self._magic_name = args[1]
         self._comment_prefix = args[2]
@@ -84,11 +84,11 @@ class CellLanguage(Enum):
 
     @classmethod
     def of_language(cls, language: Language) -> CellLanguage:
-        return next((cl for cl in CellLanguage if cl._language == language))
+        return next((cl for cl in CellLanguage if cl.language == language))
 
     @classmethod
     def of_magic_name(cls, magic_name: str) -> CellLanguage | None:
-        return next((cl for cl in CellLanguage if cl._magic_name == magic_name), None)
+        return next((cl for cl in CellLanguage if cl.magic_name == magic_name), None)
 
     def read_cell_language(self, line: str) -> CellLanguage | None:
         magic_prefix = f'{self.comment_prefix}{MAGIC_PREFIX}'
