@@ -98,7 +98,7 @@ Migration Assessment Report
     * [AF313.22 - SparkContext ( `.textFile` )](#af31322---sparkcontext--textfile-)
     * [AF313.23 - SparkContext ( `.uiWebUrl`)](#af31323---sparkcontext--uiweburl)
     * [AF313.24 - SparkContext (`.union`)](#af31324---sparkcontext-union)
-    * [AF313.25 - SparkContext](#af31325---sparkcontext)
+    * [AF313.25 - SparkContext (`.wholeTextFiles`)](#af31325---sparkcontext-wholetextfiles)
   * [AF314.x - Distributed ML](#af314x---distributed-ml)
     * [AF314.1 - Distributed ML (`sparknlp`)](#af3141---distributed-ml-sparknlp)
     * [AF314.2 - Distributed ML (`xgboost.spark`)](#af3142---distributed-ml-xgboostspark)
