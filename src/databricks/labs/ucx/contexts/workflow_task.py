@@ -3,7 +3,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
-from databricks.sdk import WorkspaceClient, core
+from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
@@ -27,13 +27,6 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def config(self) -> WorkspaceConfig:
         return Installation.load_local(WorkspaceConfig, self._config_path)
-
-    @cached_property
-    def connect_config(self) -> core.Config:
-        # this is to calm down mypy:
-        # Argument "config" to "WorkspaceClient" has incompatible
-        # type "Config | None"; expected "Config"  [arg-type]
-        return self.workspace_client.config
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:

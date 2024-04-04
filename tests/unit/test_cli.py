@@ -201,7 +201,7 @@ def test_no_step_in_repair_run(ws):
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
-    ctx = WorkspaceContext(ws).replace(azure_cli_authenticated=True)
+    ctx = WorkspaceContext(ws).replace(azure_cli_authenticated=True, azure_subscription_id='test')
     assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found
@@ -389,25 +389,20 @@ def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
 
 def test_create_master_principal_not_azure(ws):
     ws.config.is_azure = False
+    ws.config.is_aws = False
     prompts = MockPrompts({})
-    create_uber_principal(ws, prompts, subscription_id="")
-    ws.workspace.get_status.assert_not_called()
-
-
-def test_create_master_principal_no_azure_cli(ws):
-    ws.config.auth_type = "azure_clis"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
-    create_uber_principal(ws, prompts, subscription_id="")
-    ws.workspace.get_status.assert_not_called()
+    ctx = WorkspaceContext(ws)
+    with pytest.raises(ValueError):
+        create_uber_principal(ws, prompts, ctx=ctx)
 
 
 def test_create_master_principal_no_subscription(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
     prompts = MockPrompts({})
-    create_uber_principal(ws, prompts, subscription_id="")
-    ws.workspace.get_status.assert_not_called()
+    ctx = WorkspaceContext(ws)
+    with pytest.raises(ValueError):
+        create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
 
 
 def test_create_uber_principal(ws):

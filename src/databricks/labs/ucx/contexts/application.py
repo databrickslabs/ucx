@@ -1,5 +1,7 @@
 import abc
+import logging
 import os
+import shutil
 from datetime import timedelta
 from functools import cached_property
 
@@ -7,7 +9,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient, core
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSResources, run_command
@@ -47,6 +49,8 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 # effort of splitting the instances between Global, Runtime,
 # Workspace CLI, and Account CLI contexts.
 # pylint: disable=too-many-public-methods
+
+logger = logging.getLogger(__name__)
 
 
 class GlobalContext(abc.ABC):
@@ -89,6 +93,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def config(self) -> WorkspaceConfig:
         return self.installation.load(WorkspaceConfig)
+
+    @cached_property
+    def connect_config(self) -> core.Config:
+        return self.workspace_client.config
 
     @cached_property
     def inventory_database(self) -> str:
@@ -157,10 +165,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def azure_cli_authenticated(self):
-        sdk_config = self.workspace_client.config
-        if not sdk_config.is_azure:
+        if not self.connect_config.is_azure:
             raise NotImplementedError("Azure only")
-        if sdk_config.auth_type != "azure-cli":
+        if self.connect_config.auth_type != "azure-cli":
             raise ValueError("In order to obtain AAD token, Please run azure cli to authenticate.")
         return True
 
@@ -184,11 +191,19 @@ class GlobalContext(abc.ABC):
         return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
+    def azure_subscription_id(self):
+        subscription_id = self.named_parameters.get("subscription_id")
+        if not subscription_id:
+            raise ValueError("Please enter subscription id to scan storage accounts in.")
+        return subscription_id
+
+    @cached_property
     def azure_resources(self):
+        # TODO: move to cli_command.py
         return AzureResources(
             self.azure_management_client,
             self.microsoft_graph_client,
-            self.named_parameters.get('include_subscriptions'),
+            [self.azure_subscription_id],
         )
 
     @cached_property
@@ -236,15 +251,28 @@ class GlobalContext(abc.ABC):
     def aws_cli_run_command(self):
         # TODO: slowly move this to cli_command.py
         # this is a convenience method for unit testing
+        if not shutil.which("aws"):
+            raise ValueError("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
         return run_command
 
     @cached_property
+    def aws_profile(self):
+        # TODO: slowly move this to cli_command.py
+        aws_profile = self.named_parameters.get("aws_profile")
+        if not aws_profile:
+            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
+        if not aws_profile:
+            raise ValueError(
+                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
+                "or use the '--aws-profile=[profile-name]' parameter."
+            )
+        return aws_profile
+
+    @cached_property
     def aws_resources(self):
-        if not self.workspace_client.config.is_aws:
+        if not self.connect_config.is_aws:
             raise NotImplementedError("AWS only")
-        profile = self.named_parameters.get("aws_profile")
-        profile = os.getenv("AWS_DEFAULT_PROFILE", profile)
-        return AWSResources(profile, self.aws_cli_run_command)
+        return AWSResources(self.aws_profile, self.aws_cli_run_command)
 
     @cached_property
     def aws_resource_permissions(self):

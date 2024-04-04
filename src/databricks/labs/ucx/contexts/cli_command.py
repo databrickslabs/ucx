@@ -38,6 +38,13 @@ class WorkspaceContext(CliContext):
     def cluster_access(self):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
+    def create_uber_principal(self, prompts: Prompts):
+        if self.connect_config.is_azure:
+            return self.azure_resource_permissions.create_uber_principal(prompts)
+        if self.connect_config.is_aws:
+            return self.aws_resource_permissions.create_uber_principal(prompts)
+        raise ValueError("Unsupported cloud provider")
+
 
 class AccountContext(CliContext):
     def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):
