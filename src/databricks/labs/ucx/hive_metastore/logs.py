@@ -4,6 +4,10 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
+from databricks.labs.lsql.backends import SqlBackend
+
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
+
 
 @dataclasses.dataclass
 class LogRecord:
@@ -38,3 +42,17 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
                 log_record = parse_log_record(line, pattern)
                 if log_record is not None:
                     yield log_record
+
+
+
+class LogsProcessor(CrawlerBase):   # TODO: Is log processer a crawler? -> Rename to be accurate
+    def __init__(self, backend: SqlBackend, schema: str, log_paths: list[Path]):
+        """
+        Initializes a LogProcessor instance.
+
+        Args:
+            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            schema: The schema name for the logs persistence.
+        """
+        super().__init__(backend, "hive_metastore", schema, "logs", LogRecord)
+        self._log_paths = log_paths
