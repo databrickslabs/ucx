@@ -59,6 +59,12 @@ class LogsProcessor(CrawlerBase):
         super().__init__(backend, "hive_metastore", schema, "logs", LogRecord)
         self._log_paths = log_paths
 
-    def process(self) -> None:
-        log_records = list(parse_logs(*self._log_paths))
-        self._append_records(log_records)
+    def snapshot(self) -> list[LogRecord]:
+        return self._snapshot(self._try_fetch, self._crawl)
+
+    def _try_fetch(self) -> Iterator[LogRecord]:
+        for row in self._fetch(f"SELECT * FROM {self.full_name}"):
+            yield LogRecord(*row)
+
+    def _crawl(self) -> Iterator[LogRecord]:
+        yield from parse_logs(*self._log_paths)
