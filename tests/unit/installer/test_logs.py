@@ -1,15 +1,17 @@
+import logging
 import re
 from pathlib import Path
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
+from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
 from databricks.labs.ucx.installer.logs import LogRecord, LogsCrawler
 
 
 MULTILINE_LOG_MESSAGE = (
-    "{MainThread} GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
+    "GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
     "< 200 OK\n"
     "< {\n"
     '<   "Resources": [\n'
@@ -21,13 +23,6 @@ MULTILINE_LOG_MESSAGE = (
     "<       }\n"
     "<     }\n"
 )
-LOGS = [
-    "07:09 ERROR [module] Message.\n",
-    "07:09 INFO [module] Other message.\n",
-    "07:09 WARNING [module] Warning message.\n",
-    "07:09 CRITICAL [module] Watch out!\n",
-    f"04:36 DEBUG [databricks.sdk] {MULTILINE_LOG_MESSAGE}",
-]
 LOG_RECORDS = [
     LogRecord(40, "Message."),
     LogRecord(20, "Other message."),
@@ -39,19 +34,18 @@ LOG_RECORDS = [
 
 @pytest.fixture()
 def log_path(tmp_path: Path) -> Path:
-    _log_path = tmp_path / "test.log"
-    with _log_path.open("w") as f:
-        f.writelines(LOGS)
-    return _log_path
-
-
-@pytest.mark.parametrize("line,expected_log_record", list(zip(LOGS, LOG_RECORDS)))
-def test_parse_log_record_examples(line: str, expected_log_record: LogRecord) -> None:
-    log_format = r"\d+:\d+\s(\w+)\s\[.+\]\s(.+)"
-    pattern = re.compile(log_format)
-
-    log_record = logs.parse_log_record(line, pattern)
-    assert log_record == expected_log_record
+    logger = logging.getLogger("databricks")
+    with TaskLogger(
+        tmp_path,
+        workflow="test",
+        workflow_id="123",
+        task_name="log-crawler",
+        workflow_run_id="abc",
+        log_level=logging.DEBUG,
+    ) as task_logger:
+        for log_record in LOG_RECORDS:
+            logger.log(log_record.level, log_record.msg)
+        yield task_logger.log_file
 
 
 def test_parse_logs(log_path: Path) -> None:
@@ -73,4 +67,4 @@ def test_logs_processor(log_path: Path):
     backend = MockBackend()
     log_processor = LogsCrawler(backend, "default", log_path)
     snapshot = log_processor.snapshot()
-    assert snapshot == LOG_RECORDS
+    assert all(log_record in snapshot for log_record in LOG_RECORDS)

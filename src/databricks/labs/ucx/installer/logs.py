@@ -24,19 +24,8 @@ class LogRecord:
     msg: str
 
 
-def parse_log_record(line: str, pattern: re.Pattern) -> LogRecord | None:
-    match = pattern.match(line)
-    if match is None:
-        log_record = None
-    else:
-        level, msg = match.groups()
-        log_record = LogRecord(logging.getLevelName(level), msg)
-    return log_record
-
-
 def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
-    # TODO: Add test to cover a change to the log format
-    log_format = r"\d+:\d+\s(\w+)\s\[.+\]\s(.+)"
+    log_format = r"\d+:\d+:\d+\s(\w+)\s\[.+\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
     for log_path in log_paths:
