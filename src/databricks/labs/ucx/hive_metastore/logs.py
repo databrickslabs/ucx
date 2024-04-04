@@ -47,13 +47,14 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
 
 # TODO: Is log processor a crawler? -> Rename to be accurate
 class LogsProcessor(CrawlerBase):
-    def __init__(self, backend: SqlBackend, schema: str, log_paths: list[Path]):
+    def __init__(self, backend: SqlBackend, schema: str, *log_paths: Path):
         """
         Initializes a LogProcessor instance.
 
         Args:
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the logs persistence.
+            log_paths: The paths to the log files.
         """
         super().__init__(backend, "hive_metastore", schema, "logs", LogRecord)
         self._log_paths = log_paths
