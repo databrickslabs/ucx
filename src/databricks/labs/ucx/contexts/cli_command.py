@@ -7,7 +7,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.contexts.application import GlobalContext
-from databricks.labs.ucx.source_code.files import Files
+from databricks.labs.ucx.source_code.files import LocalFileMigrator
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
@@ -32,7 +32,7 @@ class WorkspaceContext(CliContext):
 
     @cached_property
     def local_file_migrator(self):
-        return Files(self.languages)
+        return LocalFileMigrator(self.languages)
 
     @cached_property
     def cluster_access(self):

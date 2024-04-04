@@ -56,6 +56,12 @@ class GlobalContext(abc.ABC):
             named_parameters = {}
         self._named_parameters = named_parameters
 
+    def replace(self, **kwargs):
+        """Replace cached properties for unit testing purposes."""
+        for key, value in kwargs.items():
+            self.__dict__[key] = value
+        return self
+
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
         raise ValueError("Workspace client not set")

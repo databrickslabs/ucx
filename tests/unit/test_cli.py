@@ -41,6 +41,7 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
 )
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
 
 @pytest.fixture
@@ -200,11 +201,12 @@ def test_no_step_in_repair_run(ws):
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+    ctx = WorkspaceContext(ws).replace(azure_cli_authenticated=True)
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found
     prompts = MockPrompts({'.*': 'yes'})
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
     assert 'No migrated tables were found.' in caplog.messages
 
 

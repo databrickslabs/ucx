@@ -24,9 +24,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
-from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 ucx = App(__file__)
@@ -177,17 +175,24 @@ def validate_groups_membership(w: WorkspaceClient):
 
 @ucx.command
 def revert_migrated_tables(
-    w: WorkspaceClient, prompts: Prompts, schema: str, table: str, *, delete_managed: bool = False
+    w: WorkspaceClient,
+    prompts: Prompts,
+    schema: str,
+    table: str,
+    *,
+    delete_managed: bool = False,
+    ctx: WorkspaceContext | None = None,
 ):
     """remove notation on a migrated table for re-migration"""
     if not schema and not table:
         question = "You haven't specified a schema or a table. All migrated tables will be reverted. Continue?"
         if not prompts.confirm(question, max_attempts=2):
             return
-    tables_migrate = TablesMigrator.for_cli(w)
-    revert = tables_migrate.print_revert_report(delete_managed=delete_managed)
+    if not ctx:
+        ctx = WorkspaceContext(w)
+    revert = ctx.tables_migrator.print_revert_report(delete_managed=delete_managed)
     if revert and prompts.confirm("Would you like to continue?", max_attempts=2):
-        tables_migrate.revert_migrated_tables(schema, table, delete_managed=delete_managed)
+        ctx.tables_migrator.revert_migrated_tables(schema, table, delete_managed=delete_managed)
 
 
 @ucx.command
@@ -536,11 +541,11 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     """Fix the code files based on their language."""
-    files = Files.for_cli(w)
+    ctx = WorkspaceContext(w)
     working_directory = Path.cwd()
     if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
         return
-    files.apply(working_directory)
+    ctx.local_file_migrator.apply(working_directory)
 
 
 if __name__ == "__main__":

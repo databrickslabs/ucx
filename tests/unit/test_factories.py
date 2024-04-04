@@ -16,7 +16,6 @@ def test_replace_installation():
 
     spn_info_rows = MockBackend.rows('application_id', 'secret_scope', 'secret_key', 'tenant_id', 'storage_account')
 
-    ctx = WorkspaceContext(ws)
     mock_installation = MockInstallation(
         {
             'config.yml': {
@@ -46,16 +45,17 @@ def test_replace_installation():
             ],
         }
     )
-    ctx.__dict__['installation'] = mock_installation
-    ctx.__dict__['sql_backend'] = MockBackend(
-        rows={
-            r'some.azure_service_principals': spn_info_rows[
-                ('first-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
-                ('second-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
-            ]
-        }
+    ctx = WorkspaceContext(ws).replace(
+        installation=mock_installation,
+        sql_backend=MockBackend(
+            rows={
+                r'some.azure_service_principals': spn_info_rows[
+                    ('first-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
+                    ('second-application-id', 'foo', 'bar', 'tenant', 'ziyuanqintest'),
+                ]
+            }
+        ),
     )
-
     prompts = MockPrompts({'.*': 'yes'})
     ctx.service_principal_migration.run(prompts)
 
