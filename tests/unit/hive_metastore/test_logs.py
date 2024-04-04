@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.installer import workflows
-from databricks.labs.ucx.installer.workflows import LogRecord
+from databricks.labs.ucx.hive_metastore import logs
+from databricks.labs.ucx.hive_metastore.logs import LogRecord
 
 LOGS = (
     "07:09 ERROR [module] Message.\n",
@@ -25,7 +25,7 @@ def test_parse_log_record_examples(line: str, expected_log_record: LogRecord) ->
     log_format = r"\d+:\d+\s(\w+)\s\[.+\]\s(.+)"
     pattern = re.compile(log_format)
 
-    log_record = workflows.parse_log_record(line, pattern)
+    log_record = logs.parse_log_record(line, pattern)
     assert log_record == expected_log_record
 
 
@@ -34,5 +34,5 @@ def test_parse_logs(tmp_path: Path) -> None:
     with log_path.open("w") as f:
         f.writelines(LOGS)
 
-    log_records = tuple(workflows.parse_logs(log_path))
+    log_records = tuple(logs.parse_logs(log_path))
     assert log_records == LOG_RECORDS
