@@ -33,6 +33,7 @@ def parse_log_record(line: str, pattern: re.Pattern) -> LogRecord | None:
 
 
 def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
+    # TODO: Add test to cover a change to the log format
     log_format = r"\d+:\d+\s(\w+)\s\[.+\]\s(.+)"
     pattern = re.compile(log_format)
 
@@ -44,8 +45,8 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
                     yield log_record
 
 
-
-class LogsProcessor(CrawlerBase):   # TODO: Is log processer a crawler? -> Rename to be accurate
+# TODO: Is log processor a crawler? -> Rename to be accurate
+class LogsProcessor(CrawlerBase):
     def __init__(self, backend: SqlBackend, schema: str, log_paths: list[Path]):
         """
         Initializes a LogProcessor instance.
