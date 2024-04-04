@@ -12,7 +12,7 @@ from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import ClusterSource, DataSecurityMode
 
-from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
@@ -367,22 +367,11 @@ class AwsACL:
                 or (cluster.data_security_mode not in [DataSecurityMode.LEGACY_SINGLE_USER, DataSecurityMode.NONE])
             ):
                 continue
-            if cluster.policy_id is not None:
-                cluster_policy = self._ws.cluster_policies.get(cluster.policy_id)
-                assert cluster_policy is not None
-                # cluster_policy = self._get_cluster_policy(cluster.policy_id)
-                policy_instance_profile = AWSResourcePermissions.get_iam_role_from_cluster_policy(
-                    str(cluster_policy.definition)
-                )
-                if policy_instance_profile is not None:
-                    role_name = AWSInstanceProfile(policy_instance_profile).role_name
-                    assert role_name is not None
-                    cluster_instance_profiles[cluster.cluster_id] = role_name
-                    continue
             if cluster.aws_attributes is None:
                 continue
             if cluster.aws_attributes.instance_profile_arn is not None:
-                role_name = AWSInstanceProfile(cluster.aws_attributes.instance_profile_arn).role_name
+                # role_name = AWSInstanceProfile(cluster.aws_attributes.instance_profile_arn).role_name
+                role_name = cluster.aws_attributes.instance_profile_arn
                 assert role_name is not None
                 cluster_instance_profiles[cluster.cluster_id] = role_name
                 continue
@@ -421,6 +410,8 @@ class AwsACL:
 
         for cluster_id, role_name in cluster_instance_profiles.items():
             eligible_locations.update(self._get_external_locations(role_name, external_locations, permission_mappings))
+            if len(eligible_locations) == 0:
+                continue
             cluster_locations[cluster_id] = eligible_locations
         return cluster_locations
 
@@ -435,10 +426,12 @@ class AwsACL:
             if location.url is None:
                 continue
             for permission_mapping in permission_mappings:
-                if (
-                    location.url.startswith(permission_mapping.resource_path)
-                    and permission_mapping.role_name == role_name
-                ):
+                # check if resource_path contains "*"
+                if permission_mapping.resource_path.find('*') > 1:
+                    resource_url = permission_mapping.resource_path[: permission_mapping.resource_path.index('*') - 1]
+                else:
+                    resource_url = permission_mapping.resource_path
+                if location.url.startswith(resource_url) and permission_mapping.role_arn == role_name:
                     matching_location[location.url] = permission_mapping.privilege
         return matching_location
 

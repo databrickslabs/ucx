@@ -1,4 +1,3 @@
-import json
 from unittest.mock import create_autospec
 
 import pytest
@@ -9,10 +8,10 @@ from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import (
+    AwsAttributes,
     ClusterDetails,
     ClusterSource,
     DataSecurityMode,
-    Policy,
 )
 
 from databricks.labs.ucx.assessment.azure import (
@@ -71,12 +70,7 @@ def ws():
         'cluster3': iam.ObjectPermissions(object_id='cluster2', object_type="clusters"),
     }
     w.permissions.get.side_effect = lambda _, object_id: permissions[object_id]
-    policies = {
-        'policy1': Policy(definition=json.dumps({"aws_attributes.instance_profile_arn": "arn1"})),
-        'policy2': Policy(definition=json.dumps({"aws_attributes.instance_profile_arn": "arn2"})),
-        'policy3': Policy(definition=json.dumps({"aws_attributes.foo": "bar"})),
-    }
-    w.cluster_policies.get.side_effect = lambda policy_id: policies[policy_id]
+
     return w
 
 
@@ -178,6 +172,14 @@ def installation():
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
                     'directory_id': 'directory_id_ss1',
+                },
+            ],
+            "aws_instance_profile_info.csv": [
+                {
+                    'resource_path': 's3://storage1/*',
+                    'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                    'privilege': 'WRITE_FILES',
+                    'resource_type': 's3',
                 },
             ],
         }
@@ -344,16 +346,79 @@ def test_get_eligible_locations_principals_interactive_no_instance_profiles(ws, 
     ws.external_locations.list.assert_not_called()
 
 
-def test_get_eligible_locations_principals_interactive_instance_profile_from_policy(ws, installation):
+def test_get_eligible_locations_principals_interactive_with_instance_profile(ws, installation):
     ws.clusters.list.return_value = [
         ClusterDetails(cluster_id='cluster1', cluster_source=ClusterSource.JOB),
         ClusterDetails(
             cluster_id='cluster1',
             cluster_source=ClusterSource.UI,
             data_security_mode=DataSecurityMode.NONE,
-            policy_id='policy1',
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
         ),
     ]
     locations = aws_acl(ws, installation)
-    locations.get_eligible_locations_principals()
-    ws.external_locations.list.assert_not_called()
+    ws.external_locations.list.return_value = []
+    with pytest.raises(ResourceDoesNotExist):
+        locations.get_eligible_locations_principals()
+
+
+def test_get_eligible_locations_principals_aws_no_permission_mapping(ws):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id='cluster1', cluster_source=ClusterSource.JOB),
+        ClusterDetails(
+            cluster_id='cluster1',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+
+    install = MockInstallation(
+        {
+            "config.yml": {'warehouse_id': 'abc', 'connect': {'host': 'a', 'token': 'b'}, 'inventory_database': 'ucx'},
+            "aws_instance_profile_info.csv": [],
+        }
+    )
+    locations = aws_acl(ws, install)
+
+    with pytest.raises(ResourceDoesNotExist):
+        locations.get_eligible_locations_principals()
+
+
+def test_get_eligible_locations_principals_aws_no_matching_locations(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id='cluster1', cluster_source=ClusterSource.JOB),
+        ClusterDetails(
+            cluster_id='cluster1',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role2"),
+        ),
+    ]
+
+    locations = aws_acl(ws, installation)
+    eligible_locations = locations.get_eligible_locations_principals()
+    assert len(eligible_locations) == 0
+
+
+def test_get_eligible_locations_principals_aws(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(cluster_id='cluster1', cluster_source=ClusterSource.JOB),
+        ClusterDetails(
+            cluster_id='cluster1',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+
+    locations = aws_acl(ws, installation)
+    eligible_locations = locations.get_eligible_locations_principals()
+    assert len(eligible_locations) == 1
+    assert eligible_locations['cluster1'] == {'s3://storage1/folder1': 'WRITE_FILES'}
