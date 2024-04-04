@@ -1,6 +1,5 @@
 import io
 import json
-import subprocess
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -268,31 +267,17 @@ def test_alias(ws):
     ws.tables.list.assert_called_once()
 
 
-def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
-    ws.config.auth_type = "azure_clis"
+def test_save_storage_and_principal_azure_no_azure_cli(ws):
     ws.config.is_azure = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts, "")
-
-    assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
-
-
-def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts)
-
-    assert "Please enter subscription id to scan storage accounts in." in caplog.messages
+    ctx = WorkspaceContext(ws)
+    with pytest.raises(ValueError):
+        principal_prefix_access(ws, ctx=ctx)
 
 
 def test_save_storage_and_principal_azure(ws, caplog):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
-    principal_prefix_access(ws, prompts, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_resource_permissions=azure_resource_permissions)
+    principal_prefix_access(ws, ctx=ctx)
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
@@ -301,57 +286,17 @@ def test_validate_groups_membership(ws):
     ws.groups.list.assert_called()
 
 
-def test_save_storage_and_principal_aws_no_profile(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts)
-    assert any({"AWS Profile is not specified." in message for message in caplog.messages})
-
-
-def test_save_storage_and_principal_aws_no_connection(ws, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
-    pop = create_autospec(subprocess.Popen)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    pop.communicate.return_value = (bytes("message", "utf-8"), bytes("error", "utf-8"))
-    pop.returncode = 127
-    mocker.patch("subprocess.Popen.__init__", return_value=None)
-    mocker.patch("subprocess.Popen.__enter__", return_value=pop)
-    mocker.patch("subprocess.Popen.__exit__", return_value=None)
-    prompts = MockPrompts({})
-
-    with pytest.raises(ResourceWarning, match="AWS CLI is not configured properly."):
-        principal_prefix_access(ws, prompts, aws_profile="profile")
-
-
-def test_save_storage_and_principal_aws_no_cli(ws, mocker, caplog):
-    mocker.patch("shutil.which", return_value=None)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts, aws_profile="profile")
-    assert any({"Couldn't find AWS" in message for message in caplog.messages})
-
-
-def test_save_storage_and_principal_aws(ws, mocker, caplog):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
+def test_save_storage_and_principal_aws(ws):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    principal_prefix_access(ws, ctx=ctx)
     aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
-def test_save_storage_and_principal_gcp(ws, caplog):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
-    ws.config.is_gcp = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts)
-    assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
+def test_save_storage_and_principal_gcp(ws):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+    with pytest.raises(ValueError):
+        principal_prefix_access(ws, ctx=ctx)
 
 
 def test_migrate_credentials_azure(ws):

@@ -99,6 +99,14 @@ class GlobalContext(abc.ABC):
         return self.workspace_client.config
 
     @cached_property
+    def is_azure(self) -> bool:
+        return self.connect_config.is_azure
+
+    @cached_property
+    def is_aws(self) -> bool:
+        return self.connect_config.is_aws
+
+    @cached_property
     def inventory_database(self) -> str:
         return self.config.inventory_database
 

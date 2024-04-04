@@ -50,20 +50,6 @@ class AzureResourcePermissions:
             "Storage Blob Data Reader": Privilege.READ_FILES,
         }
 
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx', include_subscriptions=None):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azure_mgmt_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_mgmt_client, graph_client, include_subscriptions)
-        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-        return cls(installation, ws, azurerm, locations)
-
     def _map_storage(self, storage: AzureResource) -> list[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.storage_account}")
         out = []

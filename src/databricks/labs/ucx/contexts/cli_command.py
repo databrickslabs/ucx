@@ -1,4 +1,5 @@
 import abc
+import logging
 from functools import cached_property
 
 from databricks.labs.blueprint.tui import Prompts
@@ -9,6 +10,8 @@ from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
+
+logger = logging.getLogger(__name__)
 
 
 class CliContext(GlobalContext, abc.ABC):
@@ -39,10 +42,20 @@ class WorkspaceContext(CliContext):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
     def create_uber_principal(self, prompts: Prompts):
-        if self.connect_config.is_azure:
+        if self.is_azure:
             return self.azure_resource_permissions.create_uber_principal(prompts)
-        if self.connect_config.is_aws:
+        if self.is_aws:
             return self.aws_resource_permissions.create_uber_principal(prompts)
+        raise ValueError("Unsupported cloud provider")
+
+    def principal_prefix_access(self):
+        if self.is_azure:
+            return self.azure_resource_permissions.save_spn_permissions()
+        if self.is_aws:
+            instance_role_path = self.aws_resource_permissions.save_instance_profile_permissions()
+            logger.info(f"Instance profile and bucket info saved {instance_role_path}")
+            logger.info("Generating UC roles and bucket permission info")
+            return self.aws_resource_permissions.save_uc_compatible_roles()
         raise ValueError("Unsupported cloud provider")
 
 
