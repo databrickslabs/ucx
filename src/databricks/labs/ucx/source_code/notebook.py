@@ -143,15 +143,36 @@ def extract_cells(source: str, default_language: CellLanguage) -> list[Cell] | N
     return cells
 
 
+class NotebookDependencyGraph:
+
+    def __init__(self, parent: NotebookDependencyGraph | None):
+        self._paths: dict[str, NotebookDependencyGraph | None] = dict()
+        self._parent = parent
+
+    def __contains__(self, path: str):
+        return self._paths.get(path, None) is not None
+
+    def register(self, path: str) -> NotebookDependencyGraph:
+        assert path not in self
+        child = NotebookDependencyGraph(self)
+        self._paths[path] = child
+        return child
+
+    @property
+    def paths(self) -> list[str]:
+        return list(self._paths.keys())
+
+
 class Notebook:
 
     @staticmethod
-    def parse(source: str, default_language: Language) -> Notebook | None:
+    def parse(path: str, source: str, default_language: Language) -> Notebook | None:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = extract_cells(source, default_cell_language)
-        return None if cells is None else Notebook(default_language, cells, source.endswith('\n'))
+        return None if cells is None else Notebook(path, default_language, cells, source.endswith('\n'))
 
-    def __init__(self, language: Language, cells: list[Cell], ends_with_lf):
+    def __init__(self, path: str, language: Language, cells: list[Cell], ends_with_lf):
+        self._path = path
         self._language = language
         self._cells = cells
         self._ends_with_lf = ends_with_lf
@@ -175,3 +196,9 @@ class Notebook:
         if self._ends_with_lf:
             sources.append('') # following join will append lf
         return '\n'.join(sources)
+
+
+    def build_dependency_graph(self, graph: NotebookDependencyGraph):
+        child = graph.register(self._path)
+#        for cell in self._cells:
+#            cell.build_dependency_graph(child)
