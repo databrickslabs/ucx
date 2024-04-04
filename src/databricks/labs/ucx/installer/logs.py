@@ -44,10 +44,24 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
             logger.info("Log file does not exists: {%s}", log_path)
             continue
         with log_path.open("r") as f:
-            for line in f.readlines():
-                log_record = parse_log_record(line, pattern)
-                if log_record is not None:
-                    yield log_record
+            line = f.readline()
+            while len(line) > 0:
+                match = pattern.match(line)
+
+                # Logs spanning multilines do not match the regex on each subsequent line
+                multi_line_message = ""
+                next_line = f.readline()
+                next_match = pattern.match(next_line)
+                while len(next_line) > 0 and next_match is None:
+                    multi_line_message += "\n" + next_line.rstrip()
+                    next_line = f.readline()
+                    next_match = pattern.match(next_line)
+
+                level, msg = match.groups()
+                log_record = LogRecord(logging.getLevelName(level), msg + multi_line_message)
+                yield log_record
+
+                line = next_line
 
 
 class LogsCrawler(CrawlerBase):
