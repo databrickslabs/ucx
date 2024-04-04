@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from databricks.labs.lsql.backends import MockBackend
 
-from databricks.labs.ucx.hive_metastore import logs
-from databricks.labs.ucx.hive_metastore.logs import LogRecord, LogsCrawler
+from databricks.labs.ucx.installer import logs
+from databricks.labs.ucx.installer.logs import LogRecord, LogsCrawler
 
 LOGS = [
     "07:09 ERROR [module] Message.\n",
