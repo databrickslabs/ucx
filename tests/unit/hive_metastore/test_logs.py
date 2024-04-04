@@ -5,7 +5,7 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore import logs
-from databricks.labs.ucx.hive_metastore.logs import LogRecord, LogsProcessor
+from databricks.labs.ucx.hive_metastore.logs import LogRecord, LogsCrawler
 
 LOGS = [
     "07:09 ERROR [module] Message.\n",
@@ -55,6 +55,6 @@ def test_parse_logs_file_does_not_exists(tmp_path: Path) -> None:
 
 def test_logs_processor(log_path: Path):
     backend = MockBackend()
-    log_processor = LogsProcessor(backend, "default", log_path)
+    log_processor = LogsCrawler(backend, "default", log_path)
     snapshot = log_processor.snapshot()
     assert snapshot == LOG_RECORDS
