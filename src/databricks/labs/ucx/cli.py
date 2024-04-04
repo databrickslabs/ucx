@@ -22,9 +22,8 @@ from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
-from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
+from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
-from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.source_code.files import Files
@@ -86,11 +85,11 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
     if not schema:
         logger.error("--schema is a required parameter.")
         return
-    mapping = TableMapping.current(w)
+    ctx = WorkspaceContext(w)
     if table:
-        mapping.skip_table(schema, table)
+        ctx.table_mapping.skip_table(schema, table)
     else:
-        mapping.skip_schema(schema)
+        ctx.table_mapping.skip_schema(schema)
 
 
 @ucx.command(is_account=True)
@@ -137,13 +136,8 @@ def manual_workspace_info(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def create_table_mapping(w: WorkspaceClient):
     """create initial table mapping for review"""
-    table_mapping = TableMapping.current(w)
-    installation = Installation.current(w, 'ucx')
-    workspace_info = WorkspaceInfo(installation, w)
-    config = installation.load(WorkspaceConfig)
-    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    tables_crawler = TablesCrawler(sql_backend, config.inventory_database)
-    path = table_mapping.save(tables_crawler, workspace_info)
+    ctx = WorkspaceContext(w)
+    path = ctx.table_mapping.save(ctx.tables_crawler, ctx.workspace_info)
     webbrowser.open(f"{w.config.host}/#workspace{path}")
 
 
