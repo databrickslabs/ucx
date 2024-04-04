@@ -30,7 +30,10 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
-from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.installer.workflows import (
+    DeployedWorkflows,
+    WorkflowsDeployment,
+)
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -134,7 +137,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         )
         workspace_installation.run()
         cleanup.append(workspace_installation)
-        return workspace_installation, workflows_installation
+        return workspace_installation, DeployedWorkflows(ws, install_state, timedelta(minutes=3))
 
     yield factory
 
@@ -166,7 +169,7 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
     sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{migrated_group.name_in_workspace}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{migrated_group.name_in_workspace}`")
 
-    workspace_installation, workflow_installation = new_installation(
+    workspace_installation, deployed_workflow = new_installation(
         config_transform=lambda wc: replace(wc, include_group_names=[migrated_group.name_in_workspace])
     )
     workspace_installation.run()
@@ -197,7 +200,7 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
     permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions, tacl_support])
     permission_manager.inventorize_permissions()
 
-    workflow_installation.run_workflow("migrate-groups-experimental")
+    deployed_workflow.run_workflow("migrate-groups-experimental")
 
     object_permissions = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     new_schema_grants = grants_crawler.for_schema_info(schema_a)
@@ -208,12 +211,12 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
-    workspace_installation, workflow_installation = new_installation()
+    workspace_installation, deployed_workflow = new_installation()
 
     sql_backend.execute(f"DROP SCHEMA {workspace_installation.config.inventory_database} CASCADE")
 
     with pytest.raises(NotFound) as failure:
-        workflow_installation.run_workflow("099-destroy-schema")
+        deployed_workflow.run_workflow("099-destroy-schema")
 
     assert "cannot be found" in str(failure.value)
 
@@ -254,10 +257,10 @@ def test_new_job_cluster_with_policy_assessment(
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group_a.display_name,
     )
-    install = new_installation(
+    _, deployed_workflow = new_installation(
         lambda wc: replace(wc, override_clusters=None, include_group_names=[ws_group_a.display_name])
     )
-    install.run_workflow("assessment")
+    deployed_workflow.run_workflow("assessment")
     generic_permissions = GenericPermissionsSupport(ws, [])
     before = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
@@ -276,8 +279,8 @@ def test_running_real_assessment_job(
         group_name=ws_group_a.display_name,
     )
 
-    _, install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    install.run_workflow("assessment")
+    _, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    deployed_workflow.run_workflow("assessment")
 
     generic_permissions = GenericPermissionsSupport(ws, [])
     before = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
@@ -305,12 +308,12 @@ def test_running_real_migrate_groups_job(
         ],
     )
 
-    install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     inventory_database = install.config.inventory_database
     permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
     permission_manager.inventorize_permissions()
 
-    workflows_install.run_workflow("migrate-groups")
+    deployed_workflow.run_workflow("migrate-groups")
 
     found = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
@@ -335,12 +338,12 @@ def test_running_real_validate_groups_permissions_job(
         [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
     )
 
-    install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     permission_manager = PermissionManager(sql_backend, install.config.inventory_database, [redash_permissions])
     permission_manager.inventorize_permissions()
 
     # assert the job does not throw any exception
-    workflows_install.run_workflow("validate-groups-permissions")
+    deployed_workflow.run_workflow("validate-groups-permissions")
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
@@ -363,7 +366,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         ],
     )
 
-    install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     inventory_database = install.config.inventory_database
     permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
     permission_manager.inventorize_permissions()
@@ -374,14 +377,14 @@ def test_running_real_validate_groups_permissions_job_fails(
     )
 
     with pytest.raises(Unknown):
-        workflows_install.run_workflow("validate-groups-permissions")
+        deployed_workflow.run_workflow("validate-groups-permissions")
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
     ws_group_a, _ = make_ucx_group()
 
-    install, workflows_install = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
     cfg = install.config
     group_manager = GroupManager(
         sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
@@ -390,7 +393,7 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
     group_manager.rename_groups()
     group_manager.reflect_account_groups_on_workspace()
 
-    workflows_install.run_workflow("remove-workspace-local-backup-groups")
+    deployed_workflow.run_workflow("remove-workspace-local-backup-groups")
 
     with pytest.raises(NotFound):
         ws.groups.get(ws_group_a.id)
@@ -398,15 +401,15 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
 def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
-    install, workflows_install = new_installation()
+    install, deployed_workflow = new_installation()
     mocker.patch("webbrowser.open")
     sql_backend.execute(f"DROP SCHEMA {install.config.inventory_database} CASCADE")
     with pytest.raises(NotFound):
-        workflows_install.run_workflow("099-destroy-schema")
+        deployed_workflow.run_workflow("099-destroy-schema")
 
     sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.config.inventory_database}")
 
-    workflows_install.repair_run("099-destroy-schema")
+    deployed_workflow.repair_run("099-destroy-schema")
 
     installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
     state = InstallState.from_installation(installation)
@@ -594,7 +597,7 @@ def test_table_migration_job(
     dst_catalog = make_catalog()
     make_schema(catalog_name=dst_catalog.name, name=schema.name)
 
-    _, workflows_install = new_installation(
+    _, deployed_workflow = new_installation(
         lambda wc: replace(wc, override_clusters=None),
         product_info=ProductInfo.from_class(WorkspaceConfig),
         extend_prompts={
@@ -648,9 +651,9 @@ def test_table_migration_job(
         filename='azure_storage_account_info.csv',
     )
 
-    workflows_install.run_workflow("migrate-tables")
+    deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful
-    assert workflows_install.validate_step("migrate-tables")
+    assert deployed_workflow.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
         assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
@@ -691,7 +694,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, workflows_install = new_installation(
+    _, deployed_workflow = new_installation(
         product_info=product_info,
         inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
         extend_prompts={
@@ -736,9 +739,9 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         ],
         filename='azure_storage_account_info.csv',
     )
-    workflows_install.run_workflow("migrate-tables")
+    deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful
-    assert workflows_install.validate_step("migrate-tables")
+    assert deployed_workflow.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
         assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
