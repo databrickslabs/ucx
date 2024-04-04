@@ -1,20 +1,19 @@
 from functools import cached_property
 from pathlib import Path
-from typing import Protocol
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
 from databricks.sdk import WorkspaceClient, core
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
+from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
+from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
+from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
-
-
-class Snapshot(Protocol):
-    def __init__(self, ws: WorkspaceClient, backend: SqlBackend, schema: str): ...
-
-    def snapshot(self): ...
+from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
+from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
 
 class RuntimeContext(GlobalContext):
@@ -49,6 +48,45 @@ class RuntimeContext(GlobalContext):
         install_folder = self._config_path.parent.as_posix().removeprefix("/Workspace")
         return Installation(self.workspace_client, "ucx", install_folder=install_folder)
 
-    def simple_snapshot(self, crawler_class: type[Snapshot]):
-        crawler = crawler_class(self.workspace_client, self.sql_backend, self.config.inventory_database)
-        crawler.snapshot()
+    @cached_property
+    def jobs_crawler(self):
+        return JobsCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def submit_runs_crawler(self):
+        return SubmitRunsCrawler(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.config.num_days_submit_runs_history,
+        )
+
+    @cached_property
+    def clusters_crawler(self):
+        return ClustersCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def pipelines_crawler(self):
+        return PipelinesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def table_size_crawler(self):
+        return TableSizeCrawler(self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def policies_crawler(self):
+        return PoliciesCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def global_init_scripts_crawler(self):
+        return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def workspace_listing(self):
+        return WorkspaceListing(
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+            self.config.num_threads,
+            self.config.workspace_start_path,
+        )

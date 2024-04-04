@@ -1,13 +1,5 @@
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
-from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptCrawler
-from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
-from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
-from databricks.labs.ucx.hive_metastore import ExternalLocations, Mounts
-from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
-from databricks.labs.ucx.workspace_access.generic import WorkspaceListing
 
 
 class Assessment(Workflow):
@@ -44,8 +36,7 @@ class Assessment(Workflow):
         "synced". These tables will have to be cloned in the migration process.
         Assesses the size of these tables and create `$inventory_database.table_size` table to list these sizes.
         The table size is a factor in deciding whether to clone these tables."""
-        table_size = TableSizeCrawler(ctx.sql_backend, ctx.config.inventory_database)
-        table_size.snapshot()
+        ctx.table_size_crawler.snapshot()
 
     @job_task
     def crawl_mounts(self, ctx: RuntimeContext):
@@ -55,7 +46,7 @@ class Assessment(Workflow):
 
         The assessment involves scanning the workspace to compile a list of all existing mount points and subsequently
         storing this information in the `$inventory.mounts` table. This is crucial for planning the migration."""
-        ctx.simple_snapshot(Mounts)  # TODO: fix this
+        ctx.mounts_crawler.snapshot()
 
     @job_task(depends_on=[crawl_mounts, crawl_tables])
     def guess_external_locations(self, ctx: RuntimeContext):
@@ -67,7 +58,7 @@ class Assessment(Workflow):
           - Extracting all the locations associated with tables that do not use DBFS directly, but a mount point instead
           - Scanning all these locations to identify folders that can act as shared path prefixes
           - These identified external locations will be created subsequently prior to the actual table migration"""
-        ctx.simple_snapshot(ExternalLocations)
+        ctx.external_locations.snapshot()
 
     @job_task
     def assess_jobs(self, ctx: RuntimeContext):
@@ -80,7 +71,7 @@ class Assessment(Workflow):
           - Clusters with incompatible Spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.simple_snapshot(JobsCrawler)
+        ctx.jobs_crawler.snapshot()
 
     @job_task
     def assess_clusters(self, ctx: RuntimeContext):
@@ -93,7 +84,7 @@ class Assessment(Workflow):
           - Clusters with incompatible spark config tags
           - Clusters referencing DBFS locations in one or more config options
         """
-        ctx.simple_snapshot(ClustersCrawler)
+        ctx.clusters_crawler.snapshot()
 
     @job_task
     def assess_pipelines(self, ctx: RuntimeContext):
@@ -106,7 +97,7 @@ class Assessment(Workflow):
 
         Subsequently, a list of all the pipelines with matching configurations are stored in the
         `$inventory.pipelines` table."""
-        ctx.simple_snapshot(PipelinesCrawler)
+        ctx.pipelines_crawler.snapshot()
 
     @job_task
     def assess_incompatible_submit_runs(self, ctx: RuntimeContext):
@@ -119,13 +110,7 @@ class Assessment(Workflow):
         It also combines several submit runs under a single pseudo_id based on hash of the submit run configuration.
         Subsequently, a list of all the incompatible runs with failures are stored in the
         `$inventory.submit_runs` table."""
-        crawler = SubmitRunsCrawler(
-            ctx.workspace_client,
-            ctx.sql_backend,
-            ctx.config.inventory_database,
-            ctx.config.num_days_submit_runs_history,
-        )
-        crawler.snapshot()
+        ctx.submit_runs_crawler.snapshot()
 
     @job_task
     def crawl_cluster_policies(self, ctx: RuntimeContext):
@@ -136,7 +121,7 @@ class Assessment(Workflow):
 
           Subsequently, a list of all the policies with matching configurations are stored in the
         `$inventory.policies` table."""
-        ctx.simple_snapshot(PoliciesCrawler)
+        ctx.policies_crawler.snapshot()
 
     @job_task(cloud="azure")
     def assess_azure_service_principals(self, ctx: RuntimeContext):
@@ -150,7 +135,7 @@ class Assessment(Workflow):
         Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
         in the `$inventory.azure_service_principals` table."""
         if ctx.workspace_client.config.is_azure:
-            ctx.simple_snapshot(AzureServicePrincipalCrawler)
+            ctx.azure_service_principal_crawler.snapshot()
 
     @job_task
     def assess_global_init_scripts(self, ctx: RuntimeContext):
@@ -159,7 +144,7 @@ class Assessment(Workflow):
 
         It looks in:
           - the list of all the global init scripts are saved in the `$inventory.azure_service_principals` table."""
-        ctx.simple_snapshot(GlobalInitScriptCrawler)
+        ctx.global_init_scripts_crawler.snapshot()
 
     @job_task
     def workspace_listing(self, ctx: RuntimeContext):
@@ -168,14 +153,7 @@ class Assessment(Workflow):
 
         It uses multi-threading to parallelize the listing process to speed up execution on big workspaces.
         It accepts starting path as the parameter defaulted to the root path '/'."""
-        crawler = WorkspaceListing(
-            ctx.workspace_client,
-            ctx.sql_backend,
-            ctx.config.inventory_database,
-            ctx.config.num_threads,
-            ctx.config.workspace_start_path,
-        )
-        crawler.snapshot()
+        ctx.workspace_listing.snapshot()
 
     @job_task(depends_on=[crawl_grants, workspace_listing])
     def crawl_permissions(self, ctx: RuntimeContext):

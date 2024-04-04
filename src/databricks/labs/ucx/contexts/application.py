@@ -85,11 +85,15 @@ class GlobalContext(abc.ABC):
         return self.installation.load(WorkspaceConfig)
 
     @cached_property
+    def inventory_database(self) -> str:
+        return self.config.inventory_database
+
+    @cached_property
     def permission_manager(self):
         return PermissionManager.factory(
             self.workspace_client,
             self.sql_backend,
-            self.config.inventory_database,
+            self.inventory_database,
             num_threads=self.config.num_threads,
             workspace_start_path=self.config.workspace_start_path,
         )
@@ -99,7 +103,7 @@ class GlobalContext(abc.ABC):
         return GroupManager(
             self.sql_backend,
             self.workspace_client,
-            self.config.inventory_database,
+            self.inventory_database,
             self.config.include_group_names,
             self.config.renamed_group_prefix,
             workspace_group_regex=self.config.workspace_group_regex,
@@ -114,11 +118,11 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def udfs_crawler(self):
-        return UdfsCrawler(self.sql_backend, self.config.inventory_database, self.config.include_databases)
+        return UdfsCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
     def tables_crawler(self):
-        return TablesCrawler(self.sql_backend, self.config.inventory_database, self.config.include_databases)
+        return TablesCrawler(self.sql_backend, self.inventory_database, self.config.include_databases)
 
     @cached_property
     def tables_migrator(self):
@@ -139,11 +143,11 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def mounts_crawler(self):
-        return Mounts(self.sql_backend, self.workspace_client, self.config.inventory_database)
+        return Mounts(self.sql_backend, self.workspace_client, self.inventory_database)
 
     @cached_property
     def azure_service_principal_crawler(self):
-        return AzureServicePrincipalCrawler(self.workspace_client, self.sql_backend, self.config.inventory_database)
+        return AzureServicePrincipalCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def azure_cli_authenticated(self):
@@ -171,7 +175,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def external_locations(self):
-        return ExternalLocations(self.workspace_client, self.sql_backend, self.config.inventory_database)
+        return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
 
     @cached_property
     def azure_resources(self):
@@ -218,7 +222,7 @@ class GlobalContext(abc.ABC):
         return MigrationStatusRefresher(
             self.workspace_client,
             self.sql_backend,
-            self.config.inventory_database,
+            self.inventory_database,
             self.tables_crawler,
         )
 
@@ -244,7 +248,7 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.aws_resources,
             self.external_locations,
-            self.config.inventory_database,
+            self.inventory_database,
             self.named_parameters.get("aws_account_id"),
             self.named_parameters.get("kms_key"),
         )
