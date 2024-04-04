@@ -25,7 +25,7 @@ LOGS = [
     "07:09 INFO [module] Other message.\n",
     "07:09 WARNING [module] Warning message.\n",
     "07:09 CRITICAL [module] Watch out!\n",
-    f"04:36 DEBUG [databricks.sdk] {MULTILINE_LOG_MESSAGE}"
+    f"04:36 DEBUG [databricks.sdk] {MULTILINE_LOG_MESSAGE}",
 ]
 LOG_RECORDS = [
     LogRecord(40, "Message."),

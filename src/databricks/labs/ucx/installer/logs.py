@@ -57,6 +57,7 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
                     next_line = f.readline()
                     next_match = pattern.match(next_line)
 
+                assert match is not None
                 level, msg = match.groups()
                 log_record = LogRecord(logging.getLevelName(level), msg + multi_line_message)
                 yield log_record
