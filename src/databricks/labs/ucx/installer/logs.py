@@ -45,9 +45,8 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
             continue
         with log_path.open("r") as f:
             line = f.readline()
+            match = pattern.match(line)
             while len(line) > 0:
-                match = pattern.match(line)
-
                 # Logs spanning multilines do not match the regex on each subsequent line
                 multi_line_message = ""
                 next_line = f.readline()
@@ -62,7 +61,7 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
                 log_record = LogRecord(logging.getLevelName(level), msg + multi_line_message)
                 yield log_record
 
-                line = next_line
+                line, match = next_line, next_match
 
 
 class LogsCrawler(CrawlerBase):
