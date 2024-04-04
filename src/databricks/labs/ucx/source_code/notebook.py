@@ -13,7 +13,11 @@ MAGIC_PREFIX = ' MAGIC'
 class Cell(ABC):
 
     def __init__(self, source: str):
-        self._source = source
+        self._original_code = source
+
+    @property
+    def migrated_code(self):
+        return self._original_code  # for now since we're not doing any migration yet
 
     @property
     @abstractmethod
@@ -105,28 +109,37 @@ def extract_cells(source: str, default_language: CellLanguage) -> list[Cell] | N
     header = f"{default_language.comment_prefix}{NOTEBOOK_HEADER}"
     if not lines[0].startswith(header):
         raise ValueError("Not a Databricks notebook source!")
+
+    def make_cell(lines_: list[str]):
+        # trim leading blank lines
+        while len(lines_) > 0 and len(lines_[0]) == 0:
+            lines_.pop(0)
+        # trim trailing blank lines
+        while len(lines_) > 0 and len(lines_[-1]) == 0:
+            lines_.pop(-1)
+        cell_language = default_language.read_cell_language(lines_[0])
+        if cell_language is None:
+            cell_language = default_language
+        else:
+            lines_.pop(0)
+        cell_source = '\n'.join(lines_)
+        return cell_language.new_cell(cell_source)
+
     cells = []
     cell_lines: list[str] = []
     separator = f"{default_language.comment_prefix}{CELL_SEPARATOR}"
     for i in range(1, len(lines)):
         line = lines[i].strip()
         if line.startswith(separator):
-            # trim leading blank lines
-            while len(cell_lines) > 0 and len(cell_lines[0]) == 0:
-                cell_lines.pop(0)
-            # trim trailing blank lines
-            while len(cell_lines) > 0 and len(cell_lines[-1]) == 0:
-                cell_lines.pop(-1)
-            cell_language = default_language.read_cell_language(cell_lines[0])
-            if cell_language is None:
-                cell_language = default_language
-            else:
-                cell_lines.pop(0)
-            cell_source = '\n'.join(cell_lines)
-            cells.append(cell_language.new_cell(cell_source))
+            cell = make_cell(cell_lines)
+            cells.append(cell)
             cell_lines = []
         else:
-            cell_lines.append(line)
+            cell_lines.append(lines[i])
+    if len(cell_lines) > 0:
+        cell = make_cell(cell_lines)
+        cells.append(cell)
+
     return cells
 
 
@@ -136,11 +149,29 @@ class Notebook:
     def parse(source: str, default_language: Language) -> Notebook | None:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = extract_cells(source, default_cell_language)
-        return None if cells is None else Notebook(cells)
+        return None if cells is None else Notebook(default_language, cells, source.endswith('\n'))
 
-    def __init__(self, cells: list[Cell]):
+    def __init__(self, language: Language, cells: list[Cell], ends_with_lf):
+        self._language = language
         self._cells = cells
+        self._ends_with_lf = ends_with_lf
 
     @property
     def cells(self) -> list[Cell]:
         return self._cells
+
+    def to_migrated_code(self):
+        default_language = CellLanguage.of_language(self._language)
+        header = f"{default_language.comment_prefix}{NOTEBOOK_HEADER}"
+        sources = [header]
+        for i, cell in enumerate(self._cells):
+            if cell.language != default_language:
+                sources.append(f'{default_language.comment_prefix}{MAGIC_PREFIX} {cell.language.magic_name}')
+            sources.append(cell.migrated_code)
+            if i < len(self._cells) - 1:
+                sources.append('')
+                sources.append(f'{default_language.comment_prefix}{CELL_SEPARATOR}')
+                sources.append('')
+        if self._ends_with_lf:
+            sources.append('') # following join will append lf
+        return '\n'.join(sources)

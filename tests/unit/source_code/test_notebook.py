@@ -114,3 +114,18 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
     assert notebook is not None
     languages = [cell.language.magic_name[1:] for cell in notebook.cells]
     assert languages == source[2]
+
+
+@pytest.mark.parametrize(
+    "source", [PYTHON_NOTEBOOK_SAMPLE, SCALA_NOTEBOOK_SAMPLE, R_NOTEBOOK_SAMPLE, SQL_NOTEBOOK_SAMPLE]
+)
+def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
+    sources: list[str] = _load_sources(Notebook, source[0])
+    assert len(sources) == 1
+    notebook = Notebook.parse(sources[0], source[1])
+    assert notebook is not None
+    new_source = notebook.to_migrated_code()
+    # ignore trailing whitespaces
+    actual_purified = new_source.replace(' \n', '\n')
+    expected_purified = sources[0].replace(' \n', '\n')
+    assert actual_purified == expected_purified
