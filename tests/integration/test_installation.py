@@ -29,6 +29,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
+from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
@@ -637,6 +638,39 @@ def test_table_migration_job(
         [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
         Mount,
     )
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.tables",
+        [
+            Table("hive_metastore", schema.name, src_managed_table.name, "MANAGED", "DELTA", location="dbfs:/test"),
+            Table("hive_metastore", schema.name, src_external_table.name, "EXTERNAL", "CSV"),
+        ],
+        Table,
+    )
+    # inject dummy group and table acl to avoid crawling which will slow down the test
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.groups",
+        [
+            MigratedGroup(
+                "group_id",
+                "test_group_ws",
+                "test_group_ac",
+                "tmp",
+            )
+        ],
+        MigratedGroup,
+    )
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.grants",
+        [
+            Grant(
+                "test_user",
+                "SELECT",
+                database="test_database",
+                table="test_table",
+            )
+        ],
+        Grant,
+    )
     installation.save(
         [
             StoragePermissionMapping(
@@ -683,15 +717,15 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     sql_backend,
 ):
     # create external and managed tables to be migrated
-    src_schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    src_managed_table = make_table(schema_name=src_schema.name)
+    schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    src_managed_table = make_table(schema_name=schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
+    src_external_table = make_table(schema_name=schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
     dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    make_schema(catalog_name=dst_catalog.name, name=schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
     _, deployed_workflow = new_installation(
@@ -706,16 +740,16 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         Rule(
             "ws_name",
             dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
+            schema.name,
+            schema.name,
             src_managed_table.name,
             src_managed_table.name,
         ),
         Rule(
             "ws_name",
             dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
+            schema.name,
+            schema.name,
             src_external_table.name,
             src_external_table.name,
         ),
@@ -725,6 +759,39 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
         [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
         Mount,
+    )
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.tables",
+        [
+            Table("hive_metastore", schema.name, src_managed_table.name, "MANAGED", "DELTA", location="dbfs:/test"),
+            Table("hive_metastore", schema.name, src_external_table.name, "EXTERNAL", "CSV"),
+        ],
+        Table,
+    )
+    # inject dummy group and table acl to avoid crawling which will slow down the test
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.groups",
+        [
+            MigratedGroup(
+                "group_id",
+                "test_group_ws",
+                "test_group_ac",
+                "tmp",
+            )
+        ],
+        MigratedGroup,
+    )
+    sql_backend.save_table(
+        f"{installation.load(WorkspaceConfig).inventory_database}.grants",
+        [
+            Grant(
+                "test_user",
+                "SELECT",
+                database="test_database",
+                table="test_table",
+            )
+        ],
+        Grant,
     )
     installation.save(
         [
@@ -744,12 +811,12 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     assert deployed_workflow.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
-        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_managed_table.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_external_table.name}").name
     except NotFound:
         assert (
             False
-        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{dst_schema.name}"
+        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{schema.name}"
     # assert the cluster is configured correctly
     install_state = installation.load(RawState)
     job_id = install_state.resources["jobs"]["migrate-tables"]
