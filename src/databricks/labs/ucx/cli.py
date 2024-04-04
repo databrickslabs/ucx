@@ -15,8 +15,6 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.aws.credentials import IamRoleMigration
-from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
@@ -278,9 +276,7 @@ def principal_prefix_access(w: WorkspaceClient, ctx: WorkspaceContext | None = N
 
 
 @ucx.command
-def migrate_credentials(
-    w: WorkspaceClient, prompts: Prompts, aws_profile: str | None = None, aws_resources: AWSResources | None = None
-):
+def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None, **named_parameters):
     """For Azure, this command migrates Azure Service Principals, which have Storage Blob Data Contributor,
     Storage Blob Data Reader, Storage Blob Data Owner roles on ADLS Gen2 locations that are being used in
     Databricks, to UC storage credentials.
@@ -294,29 +290,9 @@ def migrate_credentials(
     Please review the file and delete the Instance Profiles you do not want to be migrated.
     Pass aws_profile for aws.
     """
-    installation = Installation.current(w, 'ucx')
-    if w.config.is_azure:
-        logger.info("Running migrate_credentials for Azure")
-        service_principal_migration = ServicePrincipalMigration.for_cli(w, installation, prompts)
-        service_principal_migration.run(prompts)
-        return
-    if w.config.is_aws:
-        if not aws_profile:
-            aws_profile = os.getenv("AWS_DEFAULT_PROFILE")
-        if not aws_profile:
-            logger.error(
-                "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] "
-                "or use the '--aws-profile=[profile-name]' parameter."
-            )
-            return
-        logger.info("Running migrate_credentials for AWS")
-        if not aws_resources:
-            aws_resources = AWSResources(aws_profile)
-        instance_profile_migration = IamRoleMigration.for_cli(w, installation, aws_resources, prompts)
-        instance_profile_migration.run(prompts)
-        return
-    if w.config.is_gcp:
-        logger.error("migrate_credentials is not yet supported in GCP")
+    if not ctx:
+        ctx = WorkspaceContext(w, named_parameters)
+    ctx.migrate_credentials(prompts)
 
 
 @ucx.command

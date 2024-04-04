@@ -100,6 +100,8 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def is_azure(self) -> bool:
+        if self.is_aws:
+            return False
         return self.connect_config.is_azure
 
     @cached_property
@@ -173,11 +175,18 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def azure_cli_authenticated(self):
-        if not self.connect_config.is_azure:
+        if not self.is_azure:
             raise NotImplementedError("Azure only")
         if self.connect_config.auth_type != "azure-cli":
             raise ValueError("In order to obtain AAD token, Please run azure cli to authenticate.")
         return True
+
+    @cached_property
+    def azure_subscription_id(self):
+        subscription_id = self.named_parameters.get("subscription_id")
+        if not subscription_id:
+            raise ValueError("Please enter subscription id to scan storage accounts in.")
+        return subscription_id
 
     @cached_property
     def azure_management_client(self):
@@ -197,13 +206,6 @@ class GlobalContext(abc.ABC):
     @cached_property
     def external_locations(self):
         return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
-
-    @cached_property
-    def azure_subscription_id(self):
-        subscription_id = self.named_parameters.get("subscription_id")
-        if not subscription_id:
-            raise ValueError("Please enter subscription id to scan storage accounts in.")
-        return subscription_id
 
     @cached_property
     def azure_resources(self):
@@ -234,7 +236,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def principal_acl(self):
-        if not self.workspace_client.config.is_azure:
+        if not self.is_azure:
             raise NotImplementedError("Azure only for now")
         eligible = self.azure_acl.get_eligible_locations_principals()
         return PrincipalACL(
@@ -278,7 +280,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def aws_resources(self):
-        if not self.connect_config.is_aws:
+        if not self.is_aws:
             raise NotImplementedError("AWS only")
         return AWSResources(self.aws_profile, self.aws_cli_run_command)
 

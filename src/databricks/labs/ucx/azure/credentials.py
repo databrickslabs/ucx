@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
@@ -19,9 +18,6 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
-from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 
 logger = logging.getLogger(__name__)
 
@@ -159,32 +155,6 @@ class ServicePrincipalMigration(SecretsMixin):
         self._resource_permissions = resource_permissions
         self._sp_crawler = service_principal_crawler
         self._storage_credential_manager = storage_credential_manager
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation, prompts: Prompts):
-        msg = (
-            "Have you reviewed the azure_storage_account_info.csv "
-            "and confirm listed service principals are allowed to be checked for migration?"
-        )
-        if not prompts.confirm(msg):
-            raise SystemExit()
-
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azure_mgmt_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_mgmt_client, graph_client)
-        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
-        sp_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-
-        storage_credential_manager = StorageCredentialManager(ws)
-
-        return cls(installation, ws, resource_permissions, sp_crawler, storage_credential_manager)
 
     def _fetch_client_secret(self, sp_list: list[StoragePermissionMapping]) -> list[ServicePrincipalMigrationInfo]:
         # check AzureServicePrincipalInfo from AzureServicePrincipalCrawler, if AzureServicePrincipalInfo

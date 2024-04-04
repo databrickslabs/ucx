@@ -200,7 +200,7 @@ def test_no_step_in_repair_run(ws):
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
-    ctx = WorkspaceContext(ws).replace(azure_cli_authenticated=True, azure_subscription_id='test')
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
     assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found
@@ -300,36 +300,21 @@ def test_save_storage_and_principal_gcp(ws):
 
 
 def test_migrate_credentials_azure(ws):
-    ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
-    migrate_credentials(ws, prompts)
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
 
 
 def test_migrate_credentials_aws(ws, mocker):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
-    migrate_credentials(ws, prompts, aws_profile="profile", aws_resources=aws_resources)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
+    migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
     aws_resources.update_uc_trust_role.assert_called_once()
-
-
-def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    prompts = MockPrompts({})
-    migrate_credentials(ws, prompts)
-    assert (
-        "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] or use the "
-        "'--aws-profile=[profile-name]' parameter." in caplog.messages
-    )
 
 
 def test_create_master_principal_not_azure(ws):

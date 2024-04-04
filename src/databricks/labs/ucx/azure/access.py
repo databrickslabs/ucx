@@ -4,14 +4,12 @@ from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceAlreadyExists
 from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.assessment.crawlers import logger
 from databricks.labs.ucx.azure.resources import (
-    AzureAPIClient,
     AzureResource,
     AzureResources,
     PrincipalSecret,

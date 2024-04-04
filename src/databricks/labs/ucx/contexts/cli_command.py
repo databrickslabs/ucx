@@ -58,6 +58,13 @@ class WorkspaceContext(CliContext):
             return self.aws_resource_permissions.save_uc_compatible_roles()
         raise ValueError("Unsupported cloud provider")
 
+    def migrate_credentials(self, prompts: Prompts):
+        if self.is_azure:
+            return self.service_principal_migration.run(prompts)
+        if self.is_aws:
+            return self.iam_role_migration.run(prompts)
+        raise ValueError("Unsupported cloud provider")
+
 
 class AccountContext(CliContext):
     def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):
