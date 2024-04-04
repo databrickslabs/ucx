@@ -917,19 +917,19 @@ The `hyperopt` pattern was found. Use "Assigned" access mode compute.
 
 [[back to top](#migration-assessment-report)]
 
-### AF314.6 - Distributed ML
+### AF314.6 - Distributed ML (`SparkTrials`)
 
 The `SparkTrials` pattern was found. Use "Assigned" access mode compute.
 
 [[back to top](#migration-assessment-report)]
 
-### AF314.7 - Distributed ML
+### AF314.7 - Distributed ML (`horovod.spark`)
 
 The `horovod.spark` pattern was found. Use "Assigned" access mode compute.
 
 [[back to top](#migration-assessment-report)]
 
-### AF314.8 - Distributed ML
+### AF314.8 - Distributed ML (`ray.util.spark`)
 
 The `ray.util.spark` pattern was found. Use "Assigned" access mode compute.
 
