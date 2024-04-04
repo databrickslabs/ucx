@@ -35,6 +35,7 @@ from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
     WorkflowsDeployment,
 )
+from databricks.labs.ucx.runtime_v2 import Workflows
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -114,6 +115,9 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
         installation.save(workspace_config)
 
+        # TODO: inject the smallest number of tasks possible for a workflow, to speed up installation in tests
+        tasks = Workflows.all().tasks()
+
         # TODO: see if we want to move building wheel as a context manager for yield factory,
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
@@ -125,6 +129,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             product_info.wheels(ws),
             product_info,
             timedelta(minutes=3),
+            tasks,
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,

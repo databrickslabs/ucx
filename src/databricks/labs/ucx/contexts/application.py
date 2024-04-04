@@ -1,10 +1,10 @@
+import abc
 import os
 from datetime import timedelta
 from functools import cached_property
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -36,9 +36,8 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.installer.workflows import WorkflowsInstallation
+from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
@@ -50,9 +49,12 @@ from databricks.labs.ucx.workspace_access.manager import PermissionManager
 # pylint: disable=too-many-public-methods
 
 
-class GlobalContext:
-    # TODO: make flags only available in CLI contexts
-    flags: dict[str, str]
+class GlobalContext(abc.ABC):
+    def __init__(self, flags: dict[str, str] | None = None):
+        super().__init__()
+        if not flags:
+            flags = {}
+        self._flags = flags
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
@@ -67,8 +69,8 @@ class GlobalContext:
         raise ValueError("Account client not set")
 
     @cached_property
-    def prompts(self) -> Prompts:
-        raise ValueError("Prompts not set")
+    def flags(self) -> dict[str, str]:
+        return self._flags
 
     @cached_property
     def product_info(self):
@@ -222,6 +224,7 @@ class GlobalContext:
 
     @cached_property
     def aws_cli_run_command(self):
+        # TODO: slowly move this to cli_command.py
         # this is a convenience method for unit testing
         return run_command
 
@@ -308,22 +311,9 @@ class GlobalContext:
         return InstallState.from_installation(self.installation)
 
     @cached_property
-    def workflows(self):
-        # TODO: decouple to only trigger jobs
-        return WorkflowsInstallation(
-            self.config,
-            self.installation,
-            self.workspace_client,
-            self.wheels,
-            self.prompts,
-            self.product_info,
-            self.verify_timeout,
-        )
+    def deployed_workflows(self):
+        return DeployedWorkflows(self.workspace_client, self.install_state, self.verify_timeout)
 
     @cached_property
     def workspace_info(self):
         return WorkspaceInfo(self.installation, self.workspace_client)
-
-    @cached_property
-    def cluster_access(self):
-        return ClusterAccess(self.installation, self.workspace_client, self.prompts)

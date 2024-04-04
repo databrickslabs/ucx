@@ -1,3 +1,4 @@
+import abc
 from functools import cached_property
 
 from databricks.labs.blueprint.tui import Prompts
@@ -7,15 +8,10 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.source_code.files import Files
+from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
-class CliContext(GlobalContext):
-    def __init__(self, flags: dict[str, str] | None = None):
-        super().__init__()
-        if not flags:
-            flags = {}
-        self.flags = flags
-
+class CliContext(GlobalContext, abc.ABC):
     @cached_property
     def prompts(self) -> Prompts:
         return Prompts()
@@ -37,6 +33,10 @@ class WorkspaceContext(CliContext):
     @cached_property
     def local_file_migrator(self):
         return Files(self.languages)
+
+    @cached_property
+    def cluster_access(self):
+        return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
 
 class AccountContext(CliContext):

@@ -2,7 +2,6 @@ import logging
 import re
 import sys
 import webbrowser
-from collections.abc import Collection
 from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -43,7 +42,7 @@ from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.runtime import main
 
@@ -317,7 +316,7 @@ class WorkflowsDeployment(InstallationMixin):
         wheels: WheelsV2,
         product_info: ProductInfo,
         verify_timeout: timedelta,
-        tasks: list[Task] | None = None,
+        tasks: list[Task],
     ):
         self._config = config
         self._installation = installation
@@ -326,13 +325,9 @@ class WorkflowsDeployment(InstallationMixin):
         self._wheels = wheels
         self._product_info = product_info
         self._verify_timeout = verify_timeout
-        self._tasks = self._sort_tasks(tasks if tasks else _TASKS.values())
+        self._tasks = tasks
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
-
-    @staticmethod
-    def _sort_tasks(tasks: Collection[Task]) -> list[Task]:
-        return sorted(tasks, key=lambda x: x.task_id)
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient):

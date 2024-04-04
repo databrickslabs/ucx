@@ -11,15 +11,13 @@ from databricks.labs.ucx.workspace_access.workflows import GroupMigration
 
 
 class Workflows:
-    _workflows: dict[str, Workflow] = {}
     _tasks: list[Task] = []
+    _workflows: dict[str, Workflow] = {}
 
     def __init__(self, workflows: list[Workflow]):
         for workflow in workflows:
+            self._workflows[workflow.name] = workflow
             for task_definition in workflow.tasks():
-                if task_definition.name in self._workflows:
-                    raise ValueError(f"Task {task_definition.name} is already defined in another workflow")
-                self._workflows[task_definition.name] = workflow
                 # Add the workflow name to the task definition, because we cannot access
                 # the workflow name from the method decorator
                 with_workflow = dataclasses.replace(task_definition, workflow=workflow.name)
@@ -37,11 +35,10 @@ class Workflows:
         args = parse_args(*argv)
         config_path = Path(args["config"])
 
-        ctx = RuntimeContext(config_path)
-
+        ctx = RuntimeContext(args)
         install_dir = config_path.parent
-
         task_name = args.get("task", "not specified")
+        workflow = args.get("workflow", "not specified")
         if task_name not in self._workflows:
             msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(self._workflows.keys())}'
             raise KeyError(msg)

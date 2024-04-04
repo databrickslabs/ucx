@@ -18,9 +18,12 @@ class Snapshot(Protocol):
 
 
 class RuntimeContext(GlobalContext):
-    def __init__(self, config_path: Path):
-        super().__init__()
-        self._config_path = config_path
+    @cached_property
+    def _config_path(self) -> Path:
+        config = self.flags.get("config")
+        if not config:
+            raise ValueError("config flag is required")
+        return Path(config)
 
     @cached_property
     def config(self) -> WorkspaceConfig:
