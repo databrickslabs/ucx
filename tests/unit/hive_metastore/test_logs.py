@@ -6,18 +6,18 @@ import pytest
 from databricks.labs.ucx.hive_metastore import logs
 from databricks.labs.ucx.hive_metastore.logs import LogRecord
 
-LOGS = (
+LOGS = [
     "07:09 ERROR [module] Message.\n",
     "07:09 INFO [module] Other message.\n",
     "07:09 WARNING [module] Warning message.\n",
     "07:09 CRITICAL [module] Watch out!\n",
-)
-LOG_RECORDS = (
+]
+LOG_RECORDS = [
     LogRecord(40, "Message."),
     LogRecord(20, "Other message."),
     LogRecord(30, "Warning message."),
     LogRecord(50, "Watch out!"),
-)
+]
 
 
 @pytest.fixture()
@@ -38,5 +38,5 @@ def test_parse_log_record_examples(line: str, expected_log_record: LogRecord) ->
 
 
 def test_parse_logs(log_path: Path) -> None:
-    log_records = tuple(logs.parse_logs(log_path))
+    log_records = list(logs.parse_logs(log_path))
     assert log_records == LOG_RECORDS
