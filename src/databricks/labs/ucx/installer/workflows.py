@@ -624,7 +624,7 @@ class WorkflowsDeployment(InstallationMixin):
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in tasks.dependencies()],
+            depends_on=[jobs.TaskDependency(task_key=task.name) for task in tasks],
         )
         return self._job_wheel_task(jobs_task, task, remote_wheel)
 
