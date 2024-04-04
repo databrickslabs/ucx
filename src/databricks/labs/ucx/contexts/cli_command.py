@@ -41,37 +41,6 @@ class WorkspaceContext(CliContext):
     def cluster_access(self):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
-    def create_uber_principal(self, prompts: Prompts):
-        if self.is_azure:
-            return self.azure_resource_permissions.create_uber_principal(prompts)
-        if self.is_aws:
-            return self.aws_resource_permissions.create_uber_principal(prompts)
-        raise ValueError("Unsupported cloud provider")
-
-    def principal_prefix_access(self):
-        if self.is_azure:
-            return self.azure_resource_permissions.save_spn_permissions()
-        if self.is_aws:
-            instance_role_path = self.aws_resource_permissions.save_instance_profile_permissions()
-            logger.info(f"Instance profile and bucket info saved {instance_role_path}")
-            logger.info("Generating UC roles and bucket permission info")
-            return self.aws_resource_permissions.save_uc_compatible_roles()
-        raise ValueError("Unsupported cloud provider")
-
-    def migrate_credentials(self, prompts: Prompts):
-        if self.is_azure:
-            return self.service_principal_migration.run(prompts)
-        if self.is_aws:
-            return self.iam_role_migration.run(prompts)
-        raise ValueError("Unsupported cloud provider")
-
-    def migrate_locations(self):
-        if self.is_azure:
-            return self.azure_external_locations_migration.run()
-        if self.is_aws:
-            return self.aws_resource_permissions.create_external_locations()
-        raise ValueError("Unsupported cloud provider")
-
 
 class AccountContext(CliContext):
     def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):

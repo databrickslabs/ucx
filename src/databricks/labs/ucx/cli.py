@@ -249,7 +249,11 @@ def create_uber_principal(
     Pass subscription_id for azure and aws_profile for aws."""
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
-    ctx.create_uber_principal(prompts)
+    if ctx.is_azure:
+        return ctx.azure_resource_permissions.create_uber_principal(prompts)
+    if ctx.is_aws:
+        return ctx.aws_resource_permissions.create_uber_principal(prompts)
+    raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
@@ -261,9 +265,14 @@ def principal_prefix_access(w: WorkspaceClient, ctx: WorkspaceContext | None = N
     Pass subscription_id for azure and aws_profile for aws."""
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
-    path = ctx.principal_prefix_access()
-    if path:
-        logger.info(f"storage and spn info saved under {path}")
+    if ctx.is_azure:
+        return ctx.azure_resource_permissions.save_spn_permissions()
+    if ctx.is_aws:
+        instance_role_path = ctx.aws_resource_permissions.save_instance_profile_permissions()
+        logger.info(f"Instance profile and bucket info saved {instance_role_path}")
+        logger.info("Generating UC roles and bucket permission info")
+        return ctx.aws_resource_permissions.save_uc_compatible_roles()
+    raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
@@ -283,7 +292,11 @@ def migrate_credentials(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceCont
     """
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
-    ctx.migrate_credentials(prompts)
+    if ctx.is_azure:
+        return ctx.service_principal_migration.run(prompts)
+    if ctx.is_aws:
+        return ctx.iam_role_migration.run(prompts)
+    raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
@@ -295,7 +308,11 @@ def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, *
     """
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
-    ctx.migrate_locations()
+    if ctx.is_azure:
+        return ctx.azure_external_locations_migration.run()
+    if ctx.is_aws:
+        return ctx.aws_resource_permissions.create_external_locations()
+    raise ValueError("Unsupported cloud provider")
 
 
 @ucx.command
