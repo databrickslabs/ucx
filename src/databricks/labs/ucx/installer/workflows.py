@@ -488,6 +488,8 @@ class WorkflowsDeployment(InstallationMixin):
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = [t for t in self._tasks if t.workflow == step_name]
+        job_tasks = [self._job_task(task, remote_wheel) for task in tasks]
+        job_tasks.append(self._job_log_task(tasks, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -495,7 +497,7 @@ class WorkflowsDeployment(InstallationMixin):
             "tags": {"version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
+            "tasks": job_tasks,
         }
 
     def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
@@ -608,6 +610,23 @@ class WorkflowsDeployment(InstallationMixin):
                 )
             )
         return clusters
+
+    def _job_log_task(self, tasks: list[Task], remote_wheel: str) -> jobs.Task:
+        task = Task(
+            task_id=len(tasks),
+            workflow=tasks[0].workflow,
+            name="parse-logs",
+            doc="Parse and store in ucx database.",
+            # fn is never executed
+            fn=lambda *_: None,  # type: ignore
+            depends_on=[task.name for task in tasks],
+        )
+        jobs_task = jobs.Task(
+            task_key=task.name,
+            job_cluster_key=task.job_cluster,
+            depends_on=[jobs.TaskDependency(task_key=d) for d in tasks.dependencies()],
+        )
+        return self._job_wheel_task(jobs_task, task, remote_wheel)
 
     def _create_debug(self, remote_wheel: str):
         readme_link = self._installation.workspace_link('README')
