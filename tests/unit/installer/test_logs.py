@@ -7,6 +7,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.ucx.installer import logs
 from databricks.labs.ucx.installer.logs import LogRecord, LogsCrawler
 
+
 MULTILINE_LOG_MESSAGE = (
     "{MainThread} GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
     "< 200 OK\n"
@@ -18,7 +19,7 @@ MULTILINE_LOG_MESSAGE = (
     '<       "meta": {\n'
     '<         "resourceType": "WorkspaceGroup"\n'
     "<       }\n"
-    "<     }"
+    "<     }\n"
 )
 LOGS = [
     "07:09 ERROR [module] Message.\n",
@@ -32,7 +33,7 @@ LOG_RECORDS = [
     LogRecord(20, "Other message."),
     LogRecord(30, "Warning message."),
     LogRecord(50, "Watch out!"),
-    LogRecord(10, MULTILINE_LOG_MESSAGE),
+    LogRecord(10, MULTILINE_LOG_MESSAGE.rstrip()),
 ]
 
 
