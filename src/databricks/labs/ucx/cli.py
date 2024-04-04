@@ -21,13 +21,12 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
-from databricks.labs.ucx.install import WorkspaceInstallation
-from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -44,16 +43,18 @@ CANT_FIND_UCX_MSG = (
 @ucx.command
 def workflows(w: WorkspaceClient):
     """Show deployed workflows and their state"""
-    installation = WorkflowsDeployment.for_cli(w)
+    ctx = WorkspaceContext(w)
     logger.info("Fetching deployed jobs...")
-    print(json.dumps(installation.latest_job_status()))
+    latest_job_status = ctx.deployed_workflows.latest_job_status()
+    print(json.dumps(latest_job_status))
 
 
 @ucx.command
 def open_remote_config(w: WorkspaceClient):
     """Opens remote configuration in the browser"""
-    installation = WorkspaceInstallation.current(w)
-    webbrowser.open(installation.config_file_link())
+    ctx = WorkspaceContext(w)
+    workspace_link = ctx.installation.workspace_link('config.yml')
+    webbrowser.open(workspace_link)
 
 
 @ucx.command
@@ -161,7 +162,8 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def ensure_assessment_run(w: WorkspaceClient):
     """ensure the assessment job was run on a workspace"""
-    deployed_workflows = WorkflowsDeployment.for_cli(w)
+    ctx = WorkspaceContext(w)
+    deployed_workflows = ctx.deployed_workflows
     if not deployed_workflows.validate_step("assessment"):
         deployed_workflows.run_workflow("assessment")
 
@@ -171,9 +173,9 @@ def repair_run(w: WorkspaceClient, step):
     """Repair Run the Failed Job"""
     if not step:
         raise KeyError("You did not specify --step")
-    installation = WorkflowsDeployment.for_cli(w)
+    ctx = WorkspaceContext(w)
     logger.info(f"Repair Running {step} Job")
-    installation.repair_run(step)
+    ctx.deployed_workflows.repair_run(step)
 
 
 @ucx.command

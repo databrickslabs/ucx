@@ -433,9 +433,6 @@ class WorkspaceInstallation(InstallationMixin):
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
 
-    def config_file_link(self):
-        return self._installation.workspace_link('config.yml')
-
     def _create_database(self):
         try:
             deploy_schema(self._sql_backend, self._config.inventory_database)

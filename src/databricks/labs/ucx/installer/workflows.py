@@ -330,15 +330,6 @@ class WorkflowsDeployment(InstallationMixin):
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient):
-        product_info = ProductInfo.from_class(WorkspaceConfig)
-        installation = product_info.current_installation(ws)
-        install_state = InstallState.from_installation(installation)
-        timeout = timedelta(minutes=2)
-
-        return DeployedWorkflows(ws, install_state, timeout)
-
     def create_jobs(self, prompts):
         logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel(prompts)
