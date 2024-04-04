@@ -13,7 +13,7 @@ from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
@@ -21,14 +21,13 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.source_code.files import Files
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
-from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -96,8 +95,8 @@ def skip(w: WorkspaceClient, schema: str | None = None, table: str | None = None
 def sync_workspace_info(a: AccountClient):
     """upload workspace config to all workspaces in the account where ucx is installed"""
     logger.info(f"Account ID: {a.config.account_id}")
-    workspaces = AccountWorkspaces(a)
-    workspaces.sync_workspace_info()
+    ctx = AccountContext(a)
+    ctx.account_workspaces.sync_workspace_info()
 
 
 @ucx.command(is_account=True)
@@ -128,9 +127,8 @@ def create_account_groups(
 @ucx.command
 def manual_workspace_info(w: WorkspaceClient, prompts: Prompts):
     """only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`"""
-    installation = Installation.current(w, 'ucx')
-    workspace_info = WorkspaceInfo(installation, w)
-    workspace_info.manual_workspace_info(prompts)
+    ctx = WorkspaceContext(w)
+    ctx.workspace_info.manual_workspace_info(prompts)
 
 
 @ucx.command
@@ -144,11 +142,8 @@ def create_table_mapping(w: WorkspaceClient):
 @ucx.command
 def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
     """validates and provides mapping to external table to external location and shared generation tf scripts"""
-    installation = Installation.current(w, 'ucx')
-    config = installation.load(WorkspaceConfig)
-    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    location_crawler = ExternalLocations(w, sql_backend, config.inventory_database)
-    path = location_crawler.save_as_terraform_definitions_on_workspace(installation)
+    ctx = WorkspaceContext(w)
+    path = ctx.external_locations.save_as_terraform_definitions_on_workspace(ctx.installation)
     if path and prompts.confirm(f"external_locations.tf file written to {path}. Do you want to open it?"):
         webbrowser.open(f"{w.config.host}/#workspace{path}")
 
@@ -175,21 +170,8 @@ def repair_run(w: WorkspaceClient, step):
 @ucx.command
 def validate_groups_membership(w: WorkspaceClient):
     """Validate the groups to see if the groups at account level and workspace level has different membership"""
-    installation = Installation.current(w, 'ucx')
-    config = installation.load(WorkspaceConfig)
-    sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    logger.info("Validating Groups which are having different memberships between account and workspace")
-    group_manager = GroupManager(
-        sql_backend=sql_backend,
-        ws=w,
-        inventory_database=config.inventory_database,
-        include_group_names=config.include_group_names,
-        renamed_group_prefix=config.renamed_group_prefix,
-        workspace_group_regex=config.workspace_group_regex,
-        workspace_group_replace=config.workspace_group_replace,
-        account_group_regex=config.account_group_regex,
-    )
-    mismatch_groups = group_manager.validate_group_membership()
+    ctx = WorkspaceContext(w)
+    mismatch_groups = ctx.group_manager.validate_group_membership()
     print(json.dumps(mismatch_groups))
 
 
