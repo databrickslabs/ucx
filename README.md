@@ -377,8 +377,8 @@ flowchart TB
         ctas_mt_task[migrate_tables_ctas] --> view_mt_task_ctas[roadmap: migrate_views]
       end
   
-      subgraph mt_serde_inplace_wf[roadmap workflow: migrate-hiveserde-tables-in-place-experimental]
-        serde_inplace_mt_task[migrate-hiveserde-tables-in-place-experimental] --> view_mt_task_inplace[roadmap: migrate_views]
+      subgraph mt_serde_inplace_wf[roadmap workflow: migrate-external-hiveserde-tables-in-place-experimental]
+        serde_inplace_mt_task[migrate_external_hiveserde_tables_in_place_experimental] --> view_mt_task_inplace[roadmap: migrate_views]
       end
   
       subgraph mt_in_mounts_wf[roadmap workflow: migrate-tables-in-mounts-experimental]
