@@ -7,10 +7,10 @@ from databricks.labs.ucx.installer import workflows
 from databricks.labs.ucx.installer.workflows import LogRecord
 
 LOGS = (
-    "07:09 ERROR [module] Message.",
-    "07:09 INFO [module] Other message.",
-    "07:09 WARNING [module] Warning message.",
-    "07:09 CRITICAL [module] Watch out!",
+    "07:09 ERROR [module] Message.\n",
+    "07:09 INFO [module] Other message.\n",
+    "07:09 WARNING [module] Warning message.\n",
+    "07:09 CRITICAL [module] Watch out!\n",
 )
 LOG_RECORDS = (
     LogRecord(40, "Message."),
@@ -34,5 +34,5 @@ def test_parse_logs(tmp_path: Path) -> None:
     with log_path.open("w") as f:
         f.writelines(LOGS)
 
-    log_records = list(workflows.parse_logs(log_path))
+    log_records = tuple(workflows.parse_logs(log_path))
     assert log_records == LOG_RECORDS
