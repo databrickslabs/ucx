@@ -21,14 +21,14 @@ MULTILINE_LOG_MESSAGE = (
     '<       "meta": {\n'
     '<         "resourceType": "WorkspaceGroup"\n'
     "<       }\n"
-    "<     }\n"
+    "<     }"
 )
 LOG_RECORDS = [
     LogRecord(40, "Message."),
     LogRecord(20, "Other message."),
     LogRecord(30, "Warning message."),
     LogRecord(50, "Watch out!"),
-    LogRecord(10, MULTILINE_LOG_MESSAGE.rstrip()),
+    LogRecord(10, MULTILINE_LOG_MESSAGE),
 ]
 
 
