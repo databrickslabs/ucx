@@ -6,12 +6,11 @@ from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -68,13 +67,6 @@ class TableMapping:
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
-
-    @classmethod
-    def current(cls, ws: WorkspaceClient, product='ucx'):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        return cls(installation, ws, sql_backend)
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
         tables_snapshot = tables.snapshot()
