@@ -110,7 +110,7 @@ def _load_sources(cls: type, *filenames: str):
         return []
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_source(f'{_FOLDERS[cls]}/{_}') for _ in filenames})
     # cleanly avoid mypy error
-    # setattr(installation, "_unmarshal_type", lambda as_dict, filename, type_ref: as_dict)
+    setattr(installation, "_unmarshal_type", lambda as_dict, filename, type_ref: as_dict)
     return [installation.load(cls, filename=_) for _ in filenames]
 
 
