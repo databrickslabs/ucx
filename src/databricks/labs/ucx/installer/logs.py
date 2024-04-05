@@ -26,7 +26,7 @@ class LogRecord:
 
 
 @dataclass
-class PartialLogRecord:
+class _PartialLogRecord:
     """The information found within a log file record."""
     hour: str
     minute: str
@@ -42,7 +42,7 @@ def _get_task_names_at_runtime(log_path: Path) -> list[str]:
     return task_names
 
 
-def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
+def parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
     log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
@@ -61,7 +61,7 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
         assert match is not None
         *groups,  message = match.groups()
 
-        partial_log_record = PartialLogRecord(*groups, message + multi_line_message)
+        partial_log_record = _PartialLogRecord(*groups, message + multi_line_message)
         yield partial_log_record
 
         line, match = next_line, next_match

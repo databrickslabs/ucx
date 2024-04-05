@@ -7,7 +7,7 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import PartialLogRecord, LogsRecorder
+from databricks.labs.ucx.installer.logs import _PartialLogRecord, LogsRecorder
 
 
 COMPONENT = "databricks.logs"
@@ -29,12 +29,12 @@ MULTILINE_LOG_MESSAGE = (
     "<     }"
 )
 PARTIAL_LOG_RECORDS = [
-    PartialLogRecord("15", "07", "10", "ERROR", COMPONENT, "Message."),
-    PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
-    PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
-    PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
-    PartialLogRecord("15", "12", "20", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
-    PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
+    _PartialLogRecord("15", "07", "10", "ERROR", COMPONENT, "Message."),
+    _PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
+    _PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
+    _PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
+    _PartialLogRecord("15", "12", "20", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
+    _PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
 ]
 
 
