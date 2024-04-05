@@ -229,9 +229,10 @@ def extract_cells(source: str, default_language: CellLanguage) -> list[Cell] | N
 
 class NotebookDependencyGraph:
 
-    def __init__(self, path: str, parent: NotebookDependencyGraph | None):
+    def __init__(self, path: str, parent: NotebookDependencyGraph | None, locator: Callable[[str], Notebook]):
         self._path = path
         self._parent = parent
+        self._locator = locator
         self._dependencies: dict[str, NotebookDependencyGraph] = dict()
 
     @property
@@ -243,8 +244,10 @@ class NotebookDependencyGraph:
 
     def register_dependency(self, path: str) -> NotebookDependencyGraph:
         # assert path not in self
-        child_graph = NotebookDependencyGraph(path, self)
+        child_graph = NotebookDependencyGraph(path, self, self._locator)
         self._dependencies[path] = child_graph
+        notebook = self._locator(path)
+        notebook.build_dependency_graph(child_graph)
         return child_graph
 
     @property

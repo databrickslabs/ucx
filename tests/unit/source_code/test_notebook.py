@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import pytest
 from databricks.sdk.service.workspace import Language
 
@@ -154,20 +156,47 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
         assert cell.is_runnable()
 
 
+def notebook_locator(paths: list[str], sources: list[str], languages: list[Language]) -> Callable[[str], Notebook]:
+    def locator(path: str) -> Notebook:
+        local_path = path[2:] if path.startswith('./') else path
+        index = paths.index(local_path)
+        if index < 0:
+            raise ValueError(f"Can't locate notebook {path}")
+        return Notebook.parse(paths[index], sources[index], languages[index])
+    return locator
+
+
 def test_notebook_builds_leaf_dependency_graph():
-    path = "leaf1.py.sample"
-    sources: list[str] = _load_sources(Notebook, path)
-    notebook = Notebook.parse(path, sources[0], Language.PYTHON)
-    graph = NotebookDependencyGraph(path, None)
+    paths = ["leaf1.py.sample"]
+    sources: list[str] = _load_sources(Notebook, *paths)
+    languages = [ Language.PYTHON ] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
     assert graph.paths == { "leaf1.py.sample" }
+
 
 
 def test_notebook_builds_depth1_dependency_graph():
     paths = ["root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
-    notebook = Notebook.parse(paths[0], sources[0], Language.PYTHON)
-    graph = NotebookDependencyGraph(paths[0], None)
+    languages = [ Language.PYTHON ] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    graph = NotebookDependencyGraph(paths[0], None, locator)
+    notebook.build_dependency_graph(graph)
+    actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
+    assert actual == set(paths)
+
+
+def test_notebook_builds_depth2_dependency_graph():
+    paths = ["root2.run.py.sample", "root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
+    sources: list[str] = _load_sources(Notebook, *paths)
+    languages = [ Language.PYTHON ] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
     actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
     assert actual == set(paths)
