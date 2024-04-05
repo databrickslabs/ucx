@@ -1,21 +1,33 @@
 import json
+from itertools import chain
 from pathlib import Path
+from typing import TypeVar
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.views_sequencer import ViewsSequencer
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableToMigrate
+from databricks.labs.ucx.hive_metastore.views_sequencer import ViewsMigrationSequencer
 
 SCHEMA_NAME = "schema"
+
+T = TypeVar('T')
+
+
+def flatten(lists: list[list[T]]) -> list[T]:
+    return list(chain.from_iterable(lists))
 
 
 def test_migrate_no_view_returns_empty_sequence():
     samples = Samples.load("db1.t1", "db2.t1")
     sql_backend = mock_backend(samples, "db1", "db2")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1", "db2"])
-    sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+    sequencer = ViewsMigrationSequencer(tables)
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches))
     assert len(sequence) == 0
 
 
@@ -23,22 +35,26 @@ def test_migrate_direct_view_returns_singleton_sequence() -> None:
     samples = Samples.load("db1.t1", "db1.v1")
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+    sequencer = ViewsMigrationSequencer(tables)
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches))
     assert len(sequence) == 1
     table = sequence[0]
-    assert table.key == "hive_metastore.db1.v1"
+    assert table.src.key == "hive_metastore.db1.v1"
 
 
 def test_migrate_direct_views_returns_sequence() -> None:
     samples = Samples.load("db1.t1", "db1.v1", "db1.t2", "db1.v2")
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+    sequencer = ViewsMigrationSequencer(tables)
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches))
     assert len(sequence) == 2
     expected = {"hive_metastore.db1.v1", "hive_metastore.db1.v2"}
-    actual = {t.key for t in sequence}
+    actual = {t.src.key for t in sequence}
     assert expected == actual
 
 
@@ -46,11 +62,13 @@ def test_migrate_indirect_views_returns_correct_sequence() -> None:
     samples = Samples.load("db1.t1", "db1.v1", "db1.v4")
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+    sequencer = ViewsMigrationSequencer(tables)
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches))
     assert len(sequence) == 2
     expected = ["hive_metastore.db1.v1", "hive_metastore.db1.v4"]
-    actual = [t.key for t in sequence]
+    actual = [t.src.key for t in sequence]
     assert expected == actual
 
 
@@ -58,8 +76,10 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
     samples = Samples.load("db1.t1", "db1.v1", "db1.v4", "db1.v5", "db1.v6", "db1.v7")
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-    sequencer = ViewsSequencer(crawler.snapshot())
-    sequence = sequencer.sequence()
+    tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+    sequencer = ViewsMigrationSequencer(tables)
+    batches = sequencer.sequence_batches()
+    sequence = list(flatten(batches))
     assert len(sequence) == 5
     expected = [
         "hive_metastore.db1.v1",
@@ -68,7 +88,7 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
         "hive_metastore.db1.v6",
         "hive_metastore.db1.v5",
     ]
-    actual = [t.key for t in sequence]
+    actual = [t.src.key for t in sequence]
     assert expected == actual
 
 
@@ -77,8 +97,10 @@ def test_migrate_invalid_sql_raises_value_error() -> None:
         samples = Samples.load("db1.v8")
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        sequencer = ViewsSequencer(crawler.snapshot())
-        sequence = sequencer.sequence()
+        tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+        sequencer = ViewsMigrationSequencer(tables)
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches))
         assert sequence is None  # should never get there
     assert "Could not analyze view SQL:" in str(error)
 
@@ -88,8 +110,10 @@ def test_migrate_invalid_sql_tables_raises_value_error() -> None:
         samples = Samples.load("db1.v9")
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        sequencer = ViewsSequencer(crawler.snapshot())
-        sequence = sequencer.sequence()
+        tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+        sequencer = ViewsMigrationSequencer(tables)
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches))
         assert sequence is None  # should never get there
     assert "Unknown schema object:" in str(error)
 
@@ -99,8 +123,10 @@ def test_migrate_circular_vues_raises_value_error() -> None:
         samples = Samples.load("db1.v10", "db1.v11")
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
-        sequencer = ViewsSequencer(crawler.snapshot())
-        sequence = sequencer.sequence()
+        tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+        sequencer = ViewsMigrationSequencer(tables)
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches))
         assert sequence is None  # should never get there
     assert "Circular view references are preventing migration:" in str(error)
 

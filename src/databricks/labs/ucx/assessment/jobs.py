@@ -14,10 +14,10 @@ from databricks.sdk.service.jobs import (
     BaseRun,
     DbtTask,
     GitSource,
-    ListRunsRunType,
     PythonWheelTask,
     RunConditionTask,
     RunTask,
+    RunType,
     SparkJarTask,
     SqlTask,
 )
@@ -182,7 +182,7 @@ class SubmitRunsCrawler(CrawlerBase[SubmitRunInfo], JobsMixin, CheckClusterMixin
         submit_runs = self._ws.jobs.list_runs(
             expand_tasks=True,
             completed_only=True,
-            run_type=ListRunsRunType.SUBMIT_RUN,
+            run_type=RunType.SUBMIT_RUN,
             start_time_from=start,
             start_time_to=end,
         )

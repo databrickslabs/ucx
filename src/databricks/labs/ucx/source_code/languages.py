@@ -11,11 +11,11 @@ class Languages:
         self._index = index
         from_table = FromTable(index)
         self._linters = {
-            Language.PYTHON: SequentialLinter([SparkSql(from_table)]),
+            Language.PYTHON: SequentialLinter([SparkSql(from_table, index)]),
             Language.SQL: SequentialLinter([from_table]),
         }
         self._fixers: dict[Language, list[Fixer]] = {
-            Language.PYTHON: [SparkSql(from_table)],
+            Language.PYTHON: [SparkSql(from_table, index)],
             Language.SQL: [from_table],
         }
 
