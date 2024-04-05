@@ -1,9 +1,12 @@
 from __future__ import annotations  # for type hints
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
+from ast import parse as parse_python
 
 from databricks.sdk.service.workspace import Language
+from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 NOTEBOOK_HEADER = " Databricks notebook source"
 CELL_SEPARATOR = " COMMAND ----------"
@@ -25,12 +28,32 @@ class Cell(ABC):
     def language(self) -> CellLanguage:
         raise NotImplementedError()
 
+    @abstractmethod
+    def is_runnable(self) -> bool:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        raise NotImplementedError()
+
 
 class PythonCell(Cell):
 
     @property
     def language(self):
         return CellLanguage.PYTHON
+
+    def is_runnable(self) -> bool:
+        try:
+            ast = parse_python(self._original_code)
+            return ast is not None
+        except Exception as e:
+            return False
+
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        pass  # TODO
+        # see https://github.com/databrickslabs/ucx/issues/1200
+        # see https://github.com/databrickslabs/ucx/issues/1202
 
 
 class RCell(Cell):
@@ -39,12 +62,24 @@ class RCell(Cell):
     def language(self):
         return CellLanguage.R
 
+    def is_runnable(self) -> bool:
+        return True # TODO
+
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        pass  # not in scope
+
 
 class ScalaCell(Cell):
 
     @property
     def language(self):
         return CellLanguage.SCALA
+
+    def is_runnable(self) -> bool:
+        return True # TODO
+
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        pass  # TODO
 
 
 class SQLCell(Cell):
@@ -53,6 +88,16 @@ class SQLCell(Cell):
     def language(self):
         return CellLanguage.SQL
 
+    def is_runnable(self) -> bool:
+        try:
+            statements = parse_sql(self._original_code)
+            return len(statements) > 0
+        except SQLParseError as e:
+            return False
+
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        pass  # not in scope
+
 
 class MarkdownCell(Cell):
 
@@ -60,12 +105,32 @@ class MarkdownCell(Cell):
     def language(self):
         return CellLanguage.MARKDOWN
 
+    def is_runnable(self) -> bool:
+        return True # TODO
+
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        pass  # not in scope
+
 
 class RunCell(Cell):
 
     @property
     def language(self):
         return CellLanguage.RUN
+
+    def is_runnable(self) -> bool:
+        return True # TODO
+
+    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+        command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'.strip()
+        lines = self._original_code.split('\n')
+        for line in lines:
+            start = line.index(command)
+            if start >= 0:
+                path = line[start + len(command):].strip()
+                parent.register_dependency(path.strip('"'))
+                return
+        raise ValueError("Missing notebook path in %run command")
 
 
 class CellLanguage(Enum):
@@ -164,22 +229,33 @@ def extract_cells(source: str, default_language: CellLanguage) -> list[Cell] | N
 
 class NotebookDependencyGraph:
 
-    def __init__(self, parent: NotebookDependencyGraph | None):
-        self._paths: dict[str, NotebookDependencyGraph | None] = dict()
+    def __init__(self, path: str, parent: NotebookDependencyGraph | None):
+        self._path = path
         self._parent = parent
-
-    def __contains__(self, path: str):
-        return self._paths.get(path, None) is not None
-
-    def register(self, path: str) -> NotebookDependencyGraph:
-        assert path not in self
-        child = NotebookDependencyGraph(self)
-        self._paths[path] = child
-        return child
+        self._dependencies: dict[str, NotebookDependencyGraph] = dict()
 
     @property
-    def paths(self) -> list[str]:
-        return list(self._paths.keys())
+    def path(self):
+        return self._path
+
+#    def __contains__(self, path: str):
+#        return self._paths.get(path, None) is not None
+
+    def register_dependency(self, path: str) -> NotebookDependencyGraph:
+        # assert path not in self
+        child_graph = NotebookDependencyGraph(path, self)
+        self._dependencies[path] = child_graph
+        return child_graph
+
+    @property
+    def paths(self) -> set[str]:
+        paths: set[str] = set()
+        self.visit(lambda node: paths.add(node.path))
+        return paths
+
+    def visit(self, visit_node: Callable[[NotebookDependencyGraph], None]):
+        visit_node(self)
+        [dependency.visit(visit_node) for dependency in self._dependencies.values()]
 
 
 class Notebook:
@@ -215,7 +291,5 @@ class Notebook:
         return '\n'.join(sources)
 
 
-    def build_dependency_graph(self, graph: NotebookDependencyGraph):
-        child = graph.register(self._path)
-#        for cell in self._cells:
-#            cell.build_dependency_graph(child)
+    def build_dependency_graph(self, graph: NotebookDependencyGraph) -> None:
+        [ cell.build_dependency_graph(graph) for cell in self._cells ]

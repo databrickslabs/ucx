@@ -141,20 +141,33 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
 
 
 @pytest.mark.skip("for now")
+@pytest.mark.parametrize(
+    "source", [PYTHON_NOTEBOOK_SAMPLE, PYTHON_NOTEBOOK_WITH_RUN_SAMPLE, SCALA_NOTEBOOK_SAMPLE, R_NOTEBOOK_SAMPLE, SQL_NOTEBOOK_SAMPLE]
+)
+def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str]]):
+    path = source[0]
+    sources: list[str] = _load_sources(Notebook, path)
+    assert len(sources) == 1
+    notebook = Notebook.parse(path, sources[0], source[1])
+    assert notebook is not None
+    for cell in notebook.cells:
+        assert cell.is_runnable()
+
+
 def test_notebook_builds_leaf_dependency_graph():
-    path = "leaf.py.sample"
+    path = "leaf1.py.sample"
     sources: list[str] = _load_sources(Notebook, path)
     notebook = Notebook.parse(path, sources[0], Language.PYTHON)
-    graph = NotebookDependencyGraph(None)
+    graph = NotebookDependencyGraph(path, None)
     notebook.build_dependency_graph(graph)
-    assert graph.paths == [ "leaf.py.sample" ]
+    assert graph.paths == { "leaf1.py.sample" }
 
 
-@pytest.mark.skip("for now")
-def test_notebook_builds_dag_dependency_graph():
-    paths = ["root.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
+def test_notebook_builds_depth1_dependency_graph():
+    paths = ["root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
     notebook = Notebook.parse(paths[0], sources[0], Language.PYTHON)
-    graph = NotebookDependencyGraph(None)
+    graph = NotebookDependencyGraph(paths[0], None)
     notebook.build_dependency_graph(graph)
-    assert graph.paths == [ "leaf.py.sample" ]
+    actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
+    assert actual == set(paths)
