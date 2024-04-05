@@ -81,7 +81,7 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 
 
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
-def test_logs_processor(tmp_path: Path, log_path: Path, attribute: str):
+def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
     expected_log_records = [
         getattr(partial_log_record, attribute)
         for partial_log_record in PARTIAL_LOG_RECORDS
@@ -107,3 +107,24 @@ def test_logs_processor(tmp_path: Path, log_path: Path, attribute: str):
             for partial_log_record in log_processor.record(TASK_NAME, log, log_creation_timestamp)
         )
     assert log_records == expected_log_records
+
+
+@pytest.mark.parametrize("attribute", ["level", "component", "message"])
+def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path, attribute: str):
+    log_creation_time = log_path.stat().st_ctime
+    log_creation_timestamp = datetime.datetime.utcfromtimestamp(
+        log_creation_time
+    )
+
+    backend = MockBackend()
+    log_processor = LogsRecorder(
+        tmp_path,
+        WORKFLOW,
+        WORKFLOW_ID,
+        WORKFLOW_RUN_ID,
+        backend,
+        "default",
+    )
+    with log_path.open("r") as log:
+        log_records = log_processor.record(TASK_NAME, log, log_creation_timestamp)
+    assert len(log_records) == 4
