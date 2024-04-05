@@ -29,6 +29,7 @@ LOG_RECORDS = [
     LogRecord(30, "Warning message."),
     LogRecord(50, "Watch out!"),
     LogRecord(10, MULTILINE_LOG_MESSAGE),
+    LogRecord(30, "Last message"),
 ]
 
 
@@ -51,6 +52,11 @@ def log_path(tmp_path: Path) -> Path:
 def test_parse_logs(log_path: Path) -> None:
     log_records = list(logs.parse_logs(log_path))
     assert log_records == LOG_RECORDS
+
+
+def test_parse_logs_last_message_is_present(log_path: Path) -> None:
+    log_records = list(logs.parse_logs(log_path))
+    assert log_records[-1] == LOG_RECORDS[-1]
 
 
 def test_parse_logs_file_does_not_exists(tmp_path: Path) -> None:
