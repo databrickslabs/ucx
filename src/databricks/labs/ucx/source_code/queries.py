@@ -41,7 +41,7 @@ class FromTable(Linter, Fixer):
             return table.catalog
         return 'hive_metastore'
 
-    def apply(self, code: str) -> str:
+    def apply(self, code: str, *, use_schema: str = "") -> str:
         new_statements = []
         for statement in sqlglot.parse(code):
             if not statement:
@@ -50,7 +50,8 @@ class FromTable(Linter, Fixer):
                 catalog = self._catalog(old_table)
                 if catalog != 'hive_metastore':
                     continue
-                dst = self._index.get(old_table.db, old_table.name)
+                src_db = old_table.db if old_table.db else use_schema
+                dst = self._index.get(src_db, old_table.name)
                 if not dst:
                     continue
                 new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
