@@ -71,7 +71,6 @@ def test_parse_logs_file_does_not_exists(tmp_path: Path) -> None:
 
 def test_logs_processor(log_path: Path):
     backend = MockBackend()
-    log_processor = LogsCrawler(backend, "default", log_path)
-    snapshot = log_processor.snapshot()
-    assert all(log_record in snapshot for log_record in LOG_RECORDS)
     log_processor = LogsRecorder(backend, "default", log_path)
+    log_records = log_processor.record()
+    assert all(log_record in log_records for log_record in LOG_RECORDS)

@@ -63,15 +63,23 @@ class LogsRecorder:
             schema: The schema name for the logs persistence.
             log_paths: The paths to the log files.
         """
-        super().__init__(backend, "hive_metastore", schema, "logs", LogRecord)
+        self._catalog = "hive_metastore"
+        self._table = "logs"
+
+        self._backend = backend
+        self._schema = schema
         self._log_paths = log_paths
 
-    def snapshot(self) -> list[LogRecord]:
-        return self._snapshot(self._try_fetch, self._crawl)
+    @property
+    def full_name(self) -> str:
+        return f"{self._catalog}.{self._schema}.{self._table}"
 
-    def _try_fetch(self) -> Iterator[LogRecord]:
-        for row in self._fetch(f"SELECT * FROM {self.full_name}"):
-            yield LogRecord(*row)
-
-    def _crawl(self) -> Iterator[LogRecord]:
-        yield from parse_logs(*self._log_paths)
+    def record(self) -> list[LogRecord]:
+        log_records = list(parse_logs(*self._log_paths))
+        self._backend.save_table(
+            self.full_name,
+            log_records,
+            LogRecord,
+            mode="append",
+        )
+        return log_records
