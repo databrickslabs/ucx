@@ -42,25 +42,33 @@ def _get_task_names_at_runtime(log_path: Path) -> list[str]:
     return task_names
 
 
+def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.Match, str]:
+    """
+    A single log record message may span multiple log lines. In this case, the regex on
+    subsequent lines do not match.
+    """
+    multi_line_message = ""
+    next_line = log.readline()
+    next_match = pattern.match(next_line)
+    while len(next_line) > 0 and next_match is None:
+        multi_line_message += "\n" + next_line.rstrip()
+        next_line = log.readline()
+        next_match = pattern.match(next_line)
+    return next_line, next_match, multi_line_message
+
+
 def _parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
+    # This regex matches the log format defined in
     log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
     line = log.readline()
     match = pattern.match(line)
     while len(line) > 0:
-        # Logs spanning multilines do not match the regex on each subsequent line
-        multi_line_message = ""
-        next_line = log.readline()
-        next_match = pattern.match(next_line)
-        while len(next_line) > 0 and next_match is None:
-            multi_line_message += "\n" + next_line.rstrip()
-            next_line = log.readline()
-            next_match = pattern.match(next_line)
-
         assert match is not None
-        *groups,  message = match.groups()
+        *groups, message = match.groups()
 
+        next_line, next_match, multi_line_message = _peak_multi_line_message(log, pattern)
         partial_log_record = _PartialLogRecord(*groups, message + multi_line_message)
         yield partial_log_record
 
