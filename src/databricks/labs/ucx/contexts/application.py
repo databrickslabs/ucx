@@ -39,6 +39,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -60,7 +61,6 @@ logger = logging.getLogger(__name__)
 
 class GlobalContext(abc.ABC):
     def __init__(self, named_parameters: dict[str, str] | None = None):
-        super().__init__()
         if not named_parameters:
             named_parameters = {}
         self._named_parameters = named_parameters
@@ -426,3 +426,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def workspace_info(self):
         return WorkspaceInfo(self.installation, self.workspace_client)
+
+    @cached_property
+    def verify_has_metastore(self):
+        return VerifyHasMetastore(self.workspace_client)

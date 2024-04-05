@@ -65,7 +65,7 @@ from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
     WorkflowsDeployment,
 )
-from databricks.labs.ucx.runtime_v2 import Workflows
+from databricks.labs.ucx.runtime import Workflows
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 

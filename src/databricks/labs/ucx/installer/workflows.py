@@ -44,7 +44,6 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.mixins import InstallationMixin
-from databricks.labs.ucx.runtime import main
 
 logger = logging.getLogger(__name__)
 
@@ -331,7 +330,6 @@ class WorkflowsDeployment(InstallationMixin):
         super().__init__(config, installation, ws)
 
     def create_jobs(self, prompts):
-        logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel(prompts)
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None

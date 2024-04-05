@@ -25,3 +25,15 @@ class TableMigration(Workflow):
         - For AWS: TBD
         """
         ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+
+class MigrateTablesInMounts(Workflow):
+    def __init__(self):
+        super().__init__('migrate-tables-in-mounts-experimental')
+
+    @job_task
+    def scan_tables_in_mounts_experimental(self, ctx: RuntimeContext):
+        """[EXPERIMENTAL] This workflow scans for Delta tables inside all mount points
+        captured during the assessment. It will store the results under the `tables` table
+        located under the assessment."""
+        ctx.tables_in_mounts.snapshot()

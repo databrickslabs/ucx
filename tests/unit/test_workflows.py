@@ -1,4 +1,4 @@
-from databricks.labs.ucx.runtime_v2 import Workflows
+from databricks.labs.ucx.runtime import Workflows
 
 
 def test_tasks_detected():

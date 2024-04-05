@@ -12,6 +12,7 @@ from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
+from databricks.labs.ucx.hive_metastore import TablesInMounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
 
 
@@ -72,3 +73,14 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def global_init_scripts_crawler(self):
         return GlobalInitScriptCrawler(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def tables_in_mounts(self):
+        return TablesInMounts(
+            self.sql_backend,
+            self.workspace_client,
+            self.inventory_database,
+            self.mounts_crawler,
+            self.config.include_mounts,
+            self.config.exclude_paths_in_mount,
+        )

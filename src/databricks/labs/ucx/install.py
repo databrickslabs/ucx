@@ -55,7 +55,7 @@ from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnable
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
-from databricks.labs.ucx.runtime_v2 import Workflows
+from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup

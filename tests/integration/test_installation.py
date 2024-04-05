@@ -35,7 +35,7 @@ from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
     WorkflowsDeployment,
 )
-from databricks.labs.ucx.runtime_v2 import Workflows
+from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,

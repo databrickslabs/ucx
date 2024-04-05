@@ -205,3 +205,14 @@ class Assessment(Workflow):
     def estimates_report(self, ctx: RuntimeContext):
         """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
+
+class DestroySchema(Workflow):
+    def __init__(self):
+        super().__init__('099-destroy-schema')
+
+    @job_task
+    def destroy_schema(self, ctx: RuntimeContext):
+        """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
+        the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
+        ctx.sql_backend.execute(f"DROP DATABASE {ctx.inventory_database} CASCADE")
