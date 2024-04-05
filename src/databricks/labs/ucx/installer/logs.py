@@ -35,7 +35,9 @@ class PartialLogRecord:
 
 
 def _get_task_names_at_runtime(log_path: Path) -> list[str]:
-    return list()
+    log_files = log_path.glob("*.log")
+    task_names = [log_file.stem for log_file in log_files]
+    return task_names
 
 
 def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
