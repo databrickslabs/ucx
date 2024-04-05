@@ -189,42 +189,41 @@ class CellLanguage(Enum):
     def new_cell(self, source: str) -> Cell:
         return self._new_cell(source)
 
+    def extract_cells(self, source: str) -> list[Cell] | None:
+        lines = source.split('\n')
+        header = f"{self.comment_prefix}{NOTEBOOK_HEADER}"
+        if not lines[0].startswith(header):
+            raise ValueError("Not a Databricks notebook source!")
 
-def extract_cells(source: str, default_language: CellLanguage) -> list[Cell] | None:
-    lines = source.split('\n')
-    header = f"{default_language.comment_prefix}{NOTEBOOK_HEADER}"
-    if not lines[0].startswith(header):
-        raise ValueError("Not a Databricks notebook source!")
+        def make_cell(lines_: list[str]):
+            # trim leading blank lines
+            while len(lines_) > 0 and len(lines_[0]) == 0:
+                lines_.pop(0)
+            # trim trailing blank lines
+            while len(lines_) > 0 and len(lines_[-1]) == 0:
+                lines_.pop(-1)
+            cell_language = self.read_cell_language(lines_)
+            if cell_language is None:
+                cell_language = self
+            cell_source = '\n'.join(lines_)
+            return cell_language.new_cell(cell_source)
 
-    def make_cell(lines_: list[str]):
-        # trim leading blank lines
-        while len(lines_) > 0 and len(lines_[0]) == 0:
-            lines_.pop(0)
-        # trim trailing blank lines
-        while len(lines_) > 0 and len(lines_[-1]) == 0:
-            lines_.pop(-1)
-        cell_language = default_language.read_cell_language(lines_)
-        if cell_language is None:
-            cell_language = default_language
-        cell_source = '\n'.join(lines_)
-        return cell_language.new_cell(cell_source)
-
-    cells = []
-    cell_lines: list[str] = []
-    separator = f"{default_language.comment_prefix}{CELL_SEPARATOR}"
-    for i in range(1, len(lines)):
-        line = lines[i].strip()
-        if line.startswith(separator):
+        cells = []
+        cell_lines: list[str] = []
+        separator = f"{self.comment_prefix}{CELL_SEPARATOR}"
+        for i in range(1, len(lines)):
+            line = lines[i].strip()
+            if line.startswith(separator):
+                cell = make_cell(cell_lines)
+                cells.append(cell)
+                cell_lines = []
+            else:
+                cell_lines.append(lines[i])
+        if len(cell_lines) > 0:
             cell = make_cell(cell_lines)
             cells.append(cell)
-            cell_lines = []
-        else:
-            cell_lines.append(lines[i])
-    if len(cell_lines) > 0:
-        cell = make_cell(cell_lines)
-        cells.append(cell)
 
-    return cells
+        return cells
 
 
 class NotebookDependencyGraph:
@@ -299,7 +298,7 @@ class Notebook:
     @staticmethod
     def parse(path: str, source: str, default_language: Language) -> Notebook | None:
         default_cell_language = CellLanguage.of_language(default_language)
-        cells = extract_cells(source, default_cell_language)
+        cells = default_cell_language.extract_cells(source)
         return None if cells is None else Notebook(path, default_language, cells, source.endswith('\n'))
 
     def __init__(self, path: str, language: Language, cells: list[Cell], ends_with_lf):
