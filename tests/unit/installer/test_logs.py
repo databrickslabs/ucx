@@ -7,8 +7,7 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import _PartialLogRecord, LogsRecorder
-
+from databricks.labs.ucx.installer.logs import LogsRecorder, _PartialLogRecord
 
 COMPONENT = "databricks.logs"
 WORKFLOW = "tests"
@@ -63,14 +62,10 @@ def test_get_task_names_at_runtime_one_test_task(log_path: Path) -> None:
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
     expected_partial_log_records = [
-        getattr(partial_log_record, attribute)
-        for partial_log_record in PARTIAL_LOG_RECORDS
+        getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS
     ]
     with log_path.open("r") as f:
-        partial_log_records = list(
-            getattr(partial_log_record, attribute)
-            for partial_log_record in logs._parse_logs(f)
-        )
+        partial_log_records = list(getattr(partial_log_record, attribute) for partial_log_record in logs._parse_logs(f))
     assert partial_log_records == expected_partial_log_records
 
 
@@ -82,15 +77,10 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
-    expected_log_records = [
-        getattr(partial_log_record, attribute)
-        for partial_log_record in PARTIAL_LOG_RECORDS
-    ]
+    expected_log_records = [getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS]
 
     log_creation_time = log_path.stat().st_ctime
-    log_creation_timestamp = datetime.datetime.utcfromtimestamp(
-        log_creation_time
-    )
+    log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
     backend = MockBackend()
     log_processor = LogsRecorder(
@@ -113,9 +103,7 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path, attribute: str):
     log_creation_time = log_path.stat().st_ctime
-    log_creation_timestamp = datetime.datetime.utcfromtimestamp(
-        log_creation_time
-    )
+    log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
     backend = MockBackend()
     log_processor = LogsRecorder(

@@ -8,7 +8,6 @@ from typing import TextIO
 
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +27,7 @@ class LogRecord:
 @dataclass
 class _PartialLogRecord:
     """The information found within a log file record."""
+
     hour: str
     minute: str
     second: str
