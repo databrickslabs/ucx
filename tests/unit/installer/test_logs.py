@@ -100,6 +100,7 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
         WORKFLOW_RUN_ID,
         backend,
         "default",
+        minimum_log_level=logging.DEBUG,
     )
     with log_path.open("r") as log:
         log_records = list(

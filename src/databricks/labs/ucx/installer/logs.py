@@ -84,6 +84,8 @@ class LogsRecorder:
         job_run_id: int,
         backend: SqlBackend,
         schema: str,
+        *,
+        minimum_log_level: int = logging.WARNING,
     ):
         """
         Initializes a LogProcessor instance.
@@ -95,6 +97,7 @@ class LogsRecorder:
             job_run_id (int): The job run id of the job to store the log records for.
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema (str): The schema name for the logs persistence.
+            minimum_log_level (int) : The minimum log level to record, all records with a lower log level are excluded.
         """
         self._catalog = "hive_metastore"
         self._table = "logs"
@@ -104,6 +107,7 @@ class LogsRecorder:
         self._job_run_id = job_run_id
         self._backend = backend
         self._schema = schema
+        self._minimum_log_level = minimum_log_level
 
         self._log_path = install_dir / "logs" / self._workflow / f"run-{self._job_run_id}"
 
@@ -134,6 +138,7 @@ class LogsRecorder:
                 message=partial_log_record.message,
             )
             for partial_log_record in _parse_logs(log)
+            if logging.getLevelName(partial_log_record.level) >= self._minimum_log_level
         ]
         self._backend.save_table(
             self.full_name,
