@@ -7,12 +7,12 @@ from databricks.labs.ucx.source_code.notebook import Notebook, NotebookDependenc
 from tests.unit import _load_sources
 
 PYTHON_NOTEBOOK_SAMPLE = (
-    "00_var_context.py.sample",
+    "00_var_context.py.txt",
     Language.PYTHON,
     ['md', 'md', 'md', 'python', 'python', 'python', 'md', 'python', 'md'],
 )
 PYTHON_NOTEBOOK_WITH_RUN_SAMPLE = (
-    "01_var_market_etl.py.sample",
+    "01_var_market_etl.py.txt",
     Language.PYTHON,
     [
         'md',
@@ -41,7 +41,7 @@ PYTHON_NOTEBOOK_WITH_RUN_SAMPLE = (
     ],
 )
 SCALA_NOTEBOOK_SAMPLE = (
-    "01_HL7Streaming.scala",
+    "01_HL7Streaming.scala.txt",
     Language.SCALA,
     [
         'md',
@@ -76,7 +76,7 @@ SCALA_NOTEBOOK_SAMPLE = (
     ],
 )
 R_NOTEBOOK_SAMPLE = (
-    "3_SparkR_Fine Grained Demand Forecasting.r",
+    "3_SparkR_Fine Grained Demand Forecasting.r.txt",
     Language.R,
     [
         'md',
@@ -131,7 +131,7 @@ R_NOTEBOOK_SAMPLE = (
     ],
 )
 SQL_NOTEBOOK_SAMPLE = (
-    "chf-pqi-scoring.sql",
+    "chf-pqi-scoring.sql.txt",
     Language.SQL,
     [
         'md',
@@ -198,6 +198,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     assert actual_purified == expected_purified
 
 
+
 @pytest.mark.skip("for now")
 @pytest.mark.parametrize(
     "source",
@@ -233,18 +234,18 @@ def notebook_locator(
 
 
 def test_notebook_builds_leaf_dependency_graph():
-    paths = ["leaf1.py.sample"]
+    paths = ["leaf1.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    assert graph.paths == {"leaf1.py.sample"}
+    assert graph.paths == {"leaf1.py.txt"}
 
 
 def test_notebook_builds_depth1_dependency_graph():
-    paths = ["root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
+    paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
@@ -256,7 +257,7 @@ def test_notebook_builds_depth1_dependency_graph():
 
 
 def test_notebook_builds_depth2_dependency_graph():
-    paths = ["root2.run.py.sample", "root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
+    paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
@@ -268,7 +269,7 @@ def test_notebook_builds_depth2_dependency_graph():
 
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates():
-    paths = ["root3.run.py.sample", "root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
+    paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
@@ -286,7 +287,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
 
 
 def test_notebook_builds_cyclical_dependency_graph():
-    paths = ["cyclical1.run.py.sample", "cyclical2.run.py.sample"]
+    paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
