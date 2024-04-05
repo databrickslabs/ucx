@@ -5,9 +5,9 @@ from ast import parse as parse_python
 from collections.abc import Callable
 from enum import Enum
 
-from databricks.sdk.service.workspace import Language
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
+from databricks.sdk.service.workspace import Language
 
 NOTEBOOK_HEADER = " Databricks notebook source"
 CELL_SEPARATOR = " COMMAND ----------"
