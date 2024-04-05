@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class PermissionManager(CrawlerBase[Permissions]):
+    ERRORS_TO_IGNORE = ["FEATURE_DISABLED"]
+
     def __init__(self, backend: SqlBackend, inventory_database: str, crawlers: list[AclSupport]):
         super().__init__(backend, "hive_metastore", inventory_database, "permissions", Permissions)
         self._acl_support = crawlers
@@ -90,8 +92,15 @@ class PermissionManager(CrawlerBase[Permissions]):
         crawler_tasks = list(self._get_crawler_tasks())
         logger.info(f"Starting to crawl permissions. Total tasks: {len(crawler_tasks)}")
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
-        if len(errors) > 0:
-            raise ManyError(errors)
+        acute_errors = []
+        for error in errors:
+            if error.error_code not in self.ERRORS_TO_IGNORE:
+                logger.error(f"Error while crawling permissions: {error}")
+                acute_errors.append(error)
+                continue
+            logger.info(f"Error while crawling permissions: {error}. Skipping")
+        if len(acute_errors) > 0:
+            raise ManyError(acute_errors)
         logger.info(f"Total crawled permissions: {len(items)}")
         self._save(items)
         logger.info(f"Saved {len(items)} to {self.full_name}")

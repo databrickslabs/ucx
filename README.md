@@ -4,11 +4,12 @@ Databricks Labs UCX
 
 The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
 so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). 
-[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows.
-More workflows, like [migrating tables](docs/table_upgrade.md) and notebook code is coming in the future releases. 
+[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
+Then you can execute [table migration workflow](#table-migration-workflow).
+More workflows, like notebook code migration is coming in the future releases. 
 UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
 
-For questions, troubleshooting or bug fixes, please see your Databricks account team or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
+For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](docs/troubleshooting.md) or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 [![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)  [![lines of code](https://tokei.rs/b1/github/databrickslabs/ucx)]([https://codecov.io/github/databrickslabs/ucx](https://github.com/databrickslabs/ucx))
@@ -18,7 +19,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Installation](#installation)
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
-  * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
+  * [\[ADVANCED\] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -28,6 +29,10 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Group migration workflow](#group-migration-workflow)
   * [Debug notebook](#debug-notebook)
   * [Debug logs](#debug-logs)
+  * [Table Migration Workflow](#table-migration-workflow)
+    * [Dependency CLI commands](#dependency-cli-commands)
+    * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
+    * [Other considerations](#other-considerations)
 * [Utility commands](#utility-commands)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
   * [`repair-run` command](#repair-run-command)
@@ -204,7 +209,7 @@ Databricks CLI will confirm a few options:
 # Migration process
 
 On the high level, the steps in migration process start with the [assessment workflow](#assessment-workflow), 
-followed by [group migration](#group-migration-workflow), [table migration](#table-migration-commands), 
+followed by [group migration](#group-migration-workflow), [table migration workflow](#table-migration-workflow), 
 finalised with the [code migration](#code-migration-commands). It can be described as:
 
 ```mermaid
@@ -304,7 +309,7 @@ Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow r
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
 Directories, Repos, and Files. 
 
-Once done with the group migration, proceed to [table migration](#table-migration-commands).
+Once done with the group migration, proceed to [table migration workflow](#table-migration-workflow).
 
 Use [`validate-groups-membership` command](#validate-groups-membership-command) for extra confidence.
 If you don't have matching account groups, please run [`create-account-groups` command](#create-account-groups-command).
@@ -339,6 +344,87 @@ flush the logs every 10 minutes.
 
 To enable debug logs of [command-line interface](#authenticate-databricks-cli), 
 simply add `--debug` flag to any command.
+
+[[back to top](#databricks-labs-ucx)]
+
+## Table Migration Workflow
+
+The table migration workflow comprises multiple workflows and tasks designed to migrate tables from the Hive Metastore to the Unity Catalog. The subsequent diagram illustrates the workflow's tasks and their dependency CLI commands. 
+```mermaid
+flowchart TB
+    subgraph CLI
+      create_table_mapping[create-table-mapping] --> create_catalogs_schemas[create-catalogs-schemas]
+      create_uber_principal[create-uber-principal]
+      principal_prefix_access[principal-prefix-access] --> migrate_credentials[migrate-credentials]
+      migrate_credentials --> migrate_locations[migrate-locations]
+      migrate_locations --> create_catalogs_schemas
+    end
+    
+    create_uber_principal --> workflow
+    create_table_mapping --> workflow
+    create_catalogs_schemas --> workflow
+    
+    subgraph workflow[Table Migration Workflows]
+      subgraph mt_workflow[workflow: migrate-tables]
+        dbfs_root_delta_mt_task[migrate_dbfs_root_delta_tables]
+        external_tables_sync_mt_task[migrate_external_tables_sync]
+        view_mt_task[roadmap: migrate_views]
+        dbfs_root_delta_mt_task --> view_mt_task
+        external_tables_sync_mt_task --> view_mt_task
+      end
+      
+      subgraph mt_ctas_wf[roadmap workflow: migrate-tables-ctas]
+        ctas_mt_task[migrate_tables_ctas] --> view_mt_task_ctas[roadmap: migrate_views]
+      end
+  
+      subgraph mt_serde_inplace_wf[roadmap workflow: migrate-external-hiveserde-tables-in-place-experimental]
+        serde_inplace_mt_task[migrate_external_hiveserde_tables_in_place_experimental] --> view_mt_task_inplace[roadmap: migrate_views]
+      end
+  
+      subgraph mt_in_mounts_wf[roadmap workflow: migrate-tables-in-mounts-experimental]
+        scan_tables_in_mounts_experimental_task[scan_tables_in_mounts_experimental] --> 
+        migrate_tables_in_mounts_experimental[migrate_tables_in_mounts_experimental]
+      end
+    end
+    
+    classDef roadmap stroke:Green,stroke-width:2px,color:Green,stroke-dasharray: 8 3
+    class view_mt_task roadmap;
+    class mt_ctas_wf,ctas_mt_task,view_mt_task_ctas roadmap;
+    class mt_serde_inplace_wf,serde_inplace_mt_task,view_mt_task_inplace roadmap;
+    class mt_in_mounts_wf,scan_tables_in_mounts_experimental_task,migrate_tables_in_mounts_experimental roadmap;
+```
+More details can be found in the [design of table migration](docs/table_upgrade.md)
+
+### Dependency CLI commands
+- [`create-table-mapping`](#create-table-mapping-command) - Create `mapping.csv` which will be used by the workflow to identify the targets catalog, schema, table of the HMS table to be migrated. User should review and update the mapping file accordingly before proceeding with the migration workflow.
+- [`principal-prefix-access`](#principal-prefix-access-command) - Identify all the storages used in the workspace and corresponding Azure Service Principal or IAM role that are used in the workspace. It outputs `azure_storage_account_info.csv` or `uc_roles_access.csv` which will be later used by [`migrate-credentials`](#migrate-credentials-command) command to create UC storage credentials. The csv can be edited to control which IAM roles or Azure Service Principals should be used to create UC storage credentials later.
+- [`migrate-credentials`](#migrate-credentials-command) - Create UC storage credentials based on the Azure Service Principal or IAM role (`azure_storage_account_info.csv` or `uc_roles_access.csv`) identified by [`principal-prefix-access`](#principal-prefix-access-command) command.
+- [`migrate-locations`](#migrate-locations-command) - Create missing external locations in the Unity Catalog. 
+- [`create-catalogs-schemas`](#create-catalogs-schemas-command) - Create missing catalogs and schemas in the Unity Catalog. The candidate catalogs and schemas is based on `mapping.csv`
+- [`create-uber-principal`](#create-uber-principal-command) - Create an Uber Principal with access to all storages used in the workspace. This principal will be used by the workflow job cluster to migrate all the tables in the workspace.
+
+[`create-table-mapping`](#create-table-mapping-command) and [`create-uber-principal`](#create-uber-principal-command) are required to run the workflow. While other commands are optional, as long as the UC storage credentials, external locations, catalogs and schemas needed for successful migration are created.
+
+To control the scope of the table migration, consider utilizing a combination of editing `mapping.csv`, employing [`skip`](#skip-command) command, and [`revert-migrated-tables`](#revert-migrated-tables-command) command.
+
+See more details in [Table migration commands](#table-migration-commands)
+
+### Table Migration Workflow Tasks
+- `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone, along with legacy table ACL migrated if any.
+- `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command, along with legacy table ACL migrated if any.
+- Following workflows/tasks are on the roadmap and being developed:
+  - Migrate view
+  - Migrate tables using CTAS
+  - Optionally and experimentally in place migrate ParquetHiveSerDe, OrcSerde, AvroSerDe, LazySimpleSerDe, JsonSerDe, OpenCSVSerde tables.
+  - Experimentally migrate Delta and Parquet data found in dbfs mount but not registered as Hive Metastore table into UC tables.
+
+### Other considerations
+- You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
+- If your delta tables in DBFS root have large number of files, consider:
+  - Setting higher Min and Max workers for auto-scale when being asked during the UCX installation. More nodes/cores in the cluster means more concurrency for calling cloud storage api to copy files when deep cloning the delta tables.
+  - Setting higher "Parallelism for migrating dbfs root delta tables with deep clone" (default 200) when being asked during the UCX installation. This controls the number of Spark task/partition to be created for deep clone.
+- Consider create an instance pool, and set the instance pool id when being asked during the UCX installation. This instance pool will be put into the cluster policy used by all UCX workflows job clusters.
+- You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -452,7 +538,7 @@ related to multiple installations of `ucx` on the same workspace.
 
 # Table migration commands
 
-These commands are vital part of [table migration](docs/table_upgrade.md) process and require 
+These commands are vital part of [table migration workflow](#table-migration-workflow) process and require 
 the [assessment workflow](#assessment-workflow) and 
 [group migration workflow](#group-migration-workflow) to be completed. 
 See the [migration process diagram](#migration-process) to understand the role of the table migration commands in 
@@ -533,7 +619,7 @@ workspace and configure the [UCX Cluster Policy](#installation) with the details
 service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
 assignment on every storage account using Azure Resource Manager APIs.
 
-Once done, proceed to the launching the [table migration workflow](#table-migration-commands).
+This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -607,6 +693,8 @@ multiple runs of the table migration workflow, you can use the [`revert-migrated
 to revert the tables that were migrated in the previous run. You can also skip the tables that you don't want to migrate
 using the [`skip` command](#skip-command).
 
+This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
+
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
 
 [[back to top](#databricks-labs-ucx)]
@@ -619,7 +707,7 @@ databricks labs ucx skip --schema X [--table Y]
 
 Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
-This command allows users to skip certain schemas or tables during the [table migration](docs/table_upgrade.md) process.
+This command allows users to skip certain schemas or tables during the [table migration](#table-migration-workflow) process.
 The command takes `--schema` and optionally `--table` flags to specify the schema and table to skip. If no `--table` flag 
 is provided, all tables in the specified HMS database are skipped.
 This command is useful to temporarily disable migration on a particular schema or table.
@@ -636,7 +724,7 @@ databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-manage
 
 Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
-This command removes the `upgraded_from` property on a migrated table for re-migration in the [table upgrade](docs/table_upgrade.md) process. 
+This command removes the `upgraded_from` property on a migrated table for re-migration in the [table migration](#table-migration-workflow) process. 
 This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
 to debug issues related to table migration.
 
@@ -650,9 +738,7 @@ Go back to the [`create-table-mapping` command](#create-table-mapping-command) a
 databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
-This command is supposed to be run before migrating tables to UC.
-
-Once you're done with this command, proceed to the [table migration workflow](#table-migration-commands).
+This command is supposed to be run before migrating tables to UC using [table migration workflow](#table-migration-workflow).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -663,7 +749,7 @@ databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-ca
 ```
 
 This command moves a UC table/tables from one schema to another schema after
-the [table upgrade](docs/table_upgrade.md) process. This is useful for developers and administrators who want 
+the [table migration](#table-migration-workflow) process. This is useful for developers and administrators who want 
 to adjust their catalog structure after tables upgrade.
 
 Users will be prompted whether tables/view are dropped after moving to new schema. This only applies to `MANAGED` tables and views.
@@ -695,7 +781,7 @@ It can also be used to debug issues related to table aliasing.
 
 See the [migration process diagram](#migration-process) to understand the role of the code migration commands in the migration process.
 
-After you're done with the [table migration](#table-migration-commands), you can proceed to the code migration.
+After you're done with the [table migration](#table-migration-workflow), you can proceed to the code migration.
 
 Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
 clusters to be UC compatible.
@@ -708,7 +794,7 @@ clusters to be UC compatible.
 databricks labs ucx migrate-local-code
 ```
 
-**(Experimental)** Once [table migration](#table-migration-commands) is complete, you can run this command to 
+**(Experimental)** Once [table migration](#table-migration-workflow) is complete, you can run this command to 
 migrate all python and SQL files in the current working directory. This command is highly experimental and
 at the moment only supports Python and SQL files and discards code comments and formatting during 
 the automated transformation process.
@@ -744,7 +830,7 @@ databricks labs ucx sync-workspace-info
 
 **Requires Databricks Account Administrator privileges.** This command uploads the workspace config to all workspaces 
 in the account where `ucx` is installed. This command is necessary to create an immutable default catalog mapping for
-[table migration](docs/table_upgrade.md) process and is the prerequisite 
+[table migration](#table-migration-workflow) process and is the prerequisite 
 for [`create-table-mapping` command](#create-table-mapping-command).
 
 If you cannot get account administrator privileges in reasonable time, you can take the risk and 
@@ -815,7 +901,7 @@ This command is useful for administrators who want to ensure that the groups hav
 used to debug issues related to group membership. See [group migration](docs/local-group-migration.md) and 
 [group migration](#group-migration-workflow) for more details.
 
-Once you're done with this command, proceed to the [table migration](#table-migration-commands).
+Valid group membership is important to ensure users has correct access after legacy table ACL is migrated in [table migration workflow](#table-migration-workflow)
 
 [[back to top](#databricks-labs-ucx)]
 

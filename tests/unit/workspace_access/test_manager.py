@@ -5,6 +5,7 @@ import pytest
 from databricks.labs.lsql import Row
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.workspace_access.base import AclSupport
@@ -83,6 +84,25 @@ def test_load_all_no_rows_present():
 def test_manager_inventorize(mock_ws, mock_backend, mocker):
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
+    permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
+
+    permission_manager.inventorize_permissions()
+
+    assert [Row(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
+        "hive_metastore.test_database.permissions", "append"
+    )
+
+
+def test_manager_inventorize_ignore_error(mock_ws, mock_backend, mocker):
+    def raise_error():
+        raise DatabricksError(
+            "Model serving is not enabled for your shard. "
+            "Please contact your organization admin or Databricks support.",
+            error_code="FEATURE_DISABLED",
+        )
+
+    some_crawler = mocker.Mock()
+    some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), raise_error]
     permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
 
     permission_manager.inventorize_permissions()
