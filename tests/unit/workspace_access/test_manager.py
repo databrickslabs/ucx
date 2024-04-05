@@ -102,7 +102,7 @@ def test_manager_inventorize_ignore_error(mock_ws, mock_backend, mocker):
         )
 
     some_crawler = mocker.Mock()
-    some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), raise_error()]
+    some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), raise_error]
     permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
 
     permission_manager.inventorize_permissions()
