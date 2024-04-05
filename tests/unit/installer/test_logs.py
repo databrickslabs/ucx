@@ -7,9 +7,10 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import LogRecord, LogsRecorder
+from databricks.labs.ucx.installer.logs import PartialLogRecord, LogsRecorder
 
 
+COMPONENT = "databricks.logs"
 MULTILINE_LOG_MESSAGE = (
     "GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
     "< 200 OK\n"
@@ -23,19 +24,19 @@ MULTILINE_LOG_MESSAGE = (
     "<       }\n"
     "<     }"
 )
-LOG_RECORDS = [
-    LogRecord(40, "Message."),
-    LogRecord(20, "Other message."),
-    LogRecord(30, "Warning message."),
-    LogRecord(50, "Watch out!"),
-    LogRecord(10, MULTILINE_LOG_MESSAGE),
-    LogRecord(30, "Last message"),
+PARTIAL_LOG_RECORDS = [
+    PartialLogRecord("00:00", "ERROR", COMPONENT, "Message."),
+    PartialLogRecord("00:00", "INFO", COMPONENT, "Other message."),
+    PartialLogRecord("00:00", "WARNING", COMPONENT, "Warning message."),
+    PartialLogRecord("00:00", "CRITICAL", COMPONENT, "Watch out!"),
+    PartialLogRecord("00:00", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
+    PartialLogRecord("00:00", "WARNING", COMPONENT, "Last message"),
 ]
 
 
 @pytest.fixture()
 def log_path(tmp_path: Path) -> Path:
-    logger = logging.getLogger("databricks")
+    logger = logging.getLogger(COMPONENT)
     with TaskLogger(
         tmp_path,
         workflow="test",
@@ -44,19 +45,27 @@ def log_path(tmp_path: Path) -> Path:
         workflow_run_id="abc",
         log_level=logging.DEBUG,
     ) as task_logger:
-        for log_record in LOG_RECORDS:
-            logger.log(log_record.level, log_record.msg)
+        for log_record in PARTIAL_LOG_RECORDS:
+            logger.log(logging.getLevelName(log_record.level), log_record.message)
         yield task_logger.log_file
 
 
-def test_parse_logs(log_path: Path) -> None:
-    log_records = list(logs.parse_logs(log_path))
-    assert log_records == LOG_RECORDS
+@pytest.mark.parametrize("attribute", ["level", "component", "message"])
+def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
+    expected_partial_log_records = [
+        getattr(partial_log_record, attribute)
+        for partial_log_record in PARTIAL_LOG_RECORDS
+    ]
+    partial_log_records = list(
+        getattr(partial_log_record, attribute)
+        for partial_log_record in logs.parse_logs(log_path)
+    )
+    assert partial_log_records == expected_partial_log_records
 
 
 def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     log_records = list(logs.parse_logs(log_path))
-    assert log_records[-1] == LOG_RECORDS[-1]
+    assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
 
 
 def test_parse_logs_file_does_not_exists(tmp_path: Path) -> None:
@@ -73,4 +82,4 @@ def test_logs_processor(log_path: Path):
     backend = MockBackend()
     log_processor = LogsRecorder(backend, "default", log_path)
     log_records = log_processor.record()
-    assert all(log_record in log_records for log_record in LOG_RECORDS)
+    assert all(log_record in log_records for log_record in PARTIAL_LOG_RECORDS)

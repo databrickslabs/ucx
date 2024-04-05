@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import re
 from collections.abc import Iterator
@@ -13,19 +14,27 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LogRecord:
-    """A subset from logging.LogRecord.
+    ts: int  # fully specified timestamp in UTC (offset from a workspace fs file creation timestamp)
+    job_id: int  # determined from workspace file path, resolved from the install state
+    workflow_name: str
+    task_name: str
+    job_run_id: int
+    level: str
+    component: str
+    message: str
 
-    Sources
-    -------
-    https://docs.python.org/3/library/logging.html#logging.LogRecord
-    """
 
-    level: int
-    msg: str
+@dataclass
+class PartialLogRecord:
+    """The information found within a log file record."""
+    timestamp_offset: str
+    level: str
+    component: str
+    message: str
 
 
-def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
-    log_format = r"\d+:\d+:\d+\s(\w+)\s\[.+\]\s\{\w+\}\s(.+)"
+def parse_logs(*log_paths: Path) -> Iterator[PartialLogRecord]:
+    log_format = r"(\d+:\d+:\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
     for log_path in log_paths:
@@ -46,9 +55,15 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
                     next_match = pattern.match(next_line)
 
                 assert match is not None
-                level, msg = match.groups()
-                log_record = LogRecord(logging.getLevelName(level), msg + multi_line_message)
-                yield log_record
+                timestamp_offset, level, component, message = match.groups()
+
+                partial_log_record = PartialLogRecord(
+                    timestamp_offset,
+                    level,
+                    component,
+                    message + multi_line_message,
+                )
+                yield partial_log_record
 
                 line, match = next_line, next_match
 
