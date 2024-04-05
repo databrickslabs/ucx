@@ -7,6 +7,8 @@ from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph
 from tests.unit import _load_sources
 
 # fmt: off
+# the following samples are real samples from https://github.com/databricks-industry-solutions
+# please keep them untouched, we want our unit tests to run against genuinely representative data
 PYTHON_NOTEBOOK_SAMPLE = (
     "00_var_context.py.txt",
     Language.PYTHON,
@@ -82,7 +84,6 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     assert actual_purified == expected_purified
 
 
-@pytest.mark.skip("for now")
 @pytest.mark.parametrize(
     "source",
     [
