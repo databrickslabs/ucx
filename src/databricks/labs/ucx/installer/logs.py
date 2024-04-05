@@ -71,28 +71,63 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
 
 
 class LogsRecorder:
-    def __init__(self, backend: SqlBackend, schema: str, *log_paths: Path):
+    def __init__(
+            self,
+            install_dir: Path,
+            job_id: int,
+            job_run_id: int,
+            workflow: str,
+            task_names: list[str],
+            backend: SqlBackend,
+            schema: str,
+    ):
         """
         Initializes a LogProcessor instance.
 
         Args:
+            install_dir (str): The installation folder on WorkspaceFS
+            job_id (int): The job id of the job to store the log records for.
+            job_run_id (int): The job run id of the job to store the log records for.
+            workflow (str): The workflow name.
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
-            schema: The schema name for the logs persistence.
-            log_paths: The paths to the log files.
+            schema (str): The schema name for the logs persistence.
         """
         self._catalog = "hive_metastore"
         self._table = "logs"
 
+        self._workflow = workflow
+        self._job_id = job_id
+        self._job_run_id = job_run_id
         self._backend = backend
         self._schema = schema
-        self._log_paths = log_paths
+
+        self._log_path = install_dir / "logs" / self._workflow / f"run-{self._job_run_id}"
 
     @property
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
-    def record(self) -> list[LogRecord]:
-        log_records = list(parse_logs(*self._log_paths))
+    def get_task_log_path(self, task_name: str) -> Path:
+        return self._log_path / f"{task_name}.json"
+
+    def get_task_names_at_runtime(self) -> list[str]:
+        return _get_task_names_at_runtime(self._log_path)
+
+    def record(self, task_name: str, log: TextIO) -> list[LogRecord]:
+        log_records = [
+            LogRecord(
+                # TODO: Implement offset
+                ts=partial_log_record.timestamp_offset,
+                job_id=self._job_id,
+                workflow_name=self._workflow,
+                task_name=task_name,
+                job_run_id=self._job_run_id,
+                level=partial_log_record.level,
+                component=partial_log_record.component,
+                message=partial_log_record.message,
+            )
+            for partial_log_record in parse_logs(log)
+        ]
         self._backend.save_table(
             self.full_name,
             log_records,
