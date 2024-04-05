@@ -182,6 +182,10 @@ def run_task(
     workflow_run_id = args.get("parent_run_id", "unknown_run_id")
     job_id = args.get("job_id", "unknown_job_id")
 
+    # Workaround to pass workflow ids to `parse_logs` tasks
+    cfg.__workflow_run_id = workflow_run_id
+    cfg.__job_id = job_id
+
     with TaskLogger(
         install_dir,
         workflow=current_task.workflow,
