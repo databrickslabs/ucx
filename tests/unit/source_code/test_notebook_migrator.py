@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 
 
-def test_notebooks_revert_restores_original_code():
+def test_revert_restores_original_code():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = b'original_code'
     languages = create_autospec(Languages)
