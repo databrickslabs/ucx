@@ -11,6 +11,7 @@ from databricks.labs.ucx.installer.logs import PartialLogRecord, LogsRecorder
 
 
 COMPONENT = "databricks.logs"
+TASK_NAME = "parse_logs"
 MULTILINE_LOG_MESSAGE = (
     "GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
     "< 200 OK\n"
@@ -41,13 +42,19 @@ def log_path(tmp_path: Path) -> Path:
         tmp_path,
         workflow="test",
         workflow_id="123",
-        task_name="log-crawler",
+        task_name=TASK_NAME,
         workflow_run_id="abc",
         log_level=logging.DEBUG,
     ) as task_logger:
         for log_record in PARTIAL_LOG_RECORDS:
             logger.log(logging.getLevelName(log_record.level), log_record.message)
         yield task_logger.log_file
+
+
+def test_get_task_names_at_runtime_one_test_task(log_path: Path) -> None:
+    task_names = logs._get_task_names_at_runtime(log_path.parent)
+    assert len(task_names) == 1
+    assert task_names[0] == TASK_NAME
 
 
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])

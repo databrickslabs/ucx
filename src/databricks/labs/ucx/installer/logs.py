@@ -34,6 +34,10 @@ class PartialLogRecord:
     message: str
 
 
+def _get_task_names_at_runtime(log_path: Path) -> list[str]:
+    return list()
+
+
 def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
     log_format = r"(\d+:\d+:\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
