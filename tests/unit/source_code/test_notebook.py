@@ -251,7 +251,7 @@ def test_notebook_builds_depth1_dependency_graph():
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    actual = {[path[2:] if path.startswith('./') else path for path in graph.paths]}
+    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
 
 
@@ -263,7 +263,7 @@ def test_notebook_builds_depth2_dependency_graph():
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    actual = {[path[2:] if path.startswith('./') else path for path in graph.paths]}
+    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
 
 
@@ -293,5 +293,5 @@ def test_notebook_builds_cyclical_dependency_graph():
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    actual = {[path[2:] if path.startswith('./') else path for path in graph.paths]}
+    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
