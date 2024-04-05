@@ -13,12 +13,10 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalInfo,
     ServicePrincipalClusterMapping,
 )
-from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import Mounts, TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import AzureACL, Grant, PrincipalACL
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocations, Mount
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 
@@ -63,17 +61,9 @@ def ws():
 def azure_acl(w, install, cluster_spn: list):
     config = install.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
-    locations = create_autospec(ExternalLocations)
-    azure_client = AzureAPIClient(
-        w.config.arm_environment.resource_manager_endpoint,
-        w.config.arm_environment.service_management_endpoint,
-    )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azurerm = AzureResources(azure_client, graph_client)
-    resource_permissions = AzureResourcePermissions(install, w, azurerm, locations)
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
-    return AzureACL(w, sql_backend, spn_crawler, resource_permissions)
+    return AzureACL(w, sql_backend, spn_crawler, install)
 
 
 def principal_acl(w, install, cluster_spn: list):

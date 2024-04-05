@@ -16,10 +16,8 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalInfo,
 )
 from databricks.labs.ucx.azure.access import (
-    AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -341,27 +339,19 @@ class AzureACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         spn_crawler: AzureServicePrincipalCrawler,
-        resource_permissions: AzureResourcePermissions,
+        installation: Installation,
     ):
         self._backend = backend
         self._ws = ws
         self._spn_crawler = spn_crawler
-        self._resource_permissions = resource_permissions
+        self._installation = installation
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-        azure_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_client, graph_client)
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
         spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-        return cls(ws, sql_backend, spn_crawler, resource_permissions)
+        return cls(ws, sql_backend, spn_crawler, installation)
 
     def get_eligible_locations_principals(self) -> dict[str, dict]:
         cluster_locations = {}
@@ -381,7 +371,9 @@ class AzureACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._resource_permissions.load()
+        permission_mappings = self._installation.load(
+            list[StoragePermissionMapping], filename="azure_storage_account_info.csv"
+        )
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (
