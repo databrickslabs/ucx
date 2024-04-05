@@ -69,14 +69,14 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
     with log_path.open("r") as f:
         partial_log_records = list(
             getattr(partial_log_record, attribute)
-            for partial_log_record in logs.parse_logs(f)
+            for partial_log_record in logs._parse_logs(f)
         )
     assert partial_log_records == expected_partial_log_records
 
 
 def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     with log_path.open("r") as f:
-        log_records = list(logs.parse_logs(f))
+        log_records = list(logs._parse_logs(f))
     assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
 
 

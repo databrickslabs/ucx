@@ -42,7 +42,7 @@ def _get_task_names_at_runtime(log_path: Path) -> list[str]:
     return task_names
 
 
-def parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
+def _parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
     log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
@@ -125,7 +125,7 @@ class LogsRecorder:
                 component=partial_log_record.component,
                 message=partial_log_record.message,
             )
-            for partial_log_record in parse_logs(log)
+            for partial_log_record in _parse_logs(log)
         ]
         self._backend.save_table(
             self.full_name,
