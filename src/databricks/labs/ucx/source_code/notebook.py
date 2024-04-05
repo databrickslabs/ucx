@@ -1,12 +1,13 @@
 from __future__ import annotations  # for type hints
 
 from abc import ABC, abstractmethod
+from ast import parse as parse_python
 from collections.abc import Callable
 from enum import Enum
-from ast import parse as parse_python
 
 from databricks.sdk.service.workspace import Language
-from sqlglot import parse as parse_sql, ParseError as SQLParseError
+from sqlglot import ParseError as SQLParseError
+from sqlglot import parse as parse_sql
 
 NOTEBOOK_HEADER = " Databricks notebook source"
 CELL_SEPARATOR = " COMMAND ----------"
@@ -47,7 +48,7 @@ class PythonCell(Cell):
         try:
             ast = parse_python(self._original_code)
             return ast is not None
-        except Exception as e:
+        except SyntaxError:
             return False
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
@@ -63,7 +64,7 @@ class RCell(Cell):
         return CellLanguage.R
 
     def is_runnable(self) -> bool:
-        return True # TODO
+        return True  # TODO
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
         pass  # not in scope
@@ -76,7 +77,7 @@ class ScalaCell(Cell):
         return CellLanguage.SCALA
 
     def is_runnable(self) -> bool:
-        return True # TODO
+        return True  # TODO
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
         pass  # TODO
@@ -92,7 +93,7 @@ class SQLCell(Cell):
         try:
             statements = parse_sql(self._original_code)
             return len(statements) > 0
-        except SQLParseError as e:
+        except SQLParseError:
             return False
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
@@ -106,7 +107,7 @@ class MarkdownCell(Cell):
         return CellLanguage.MARKDOWN
 
     def is_runnable(self) -> bool:
-        return True # TODO
+        return True  # TODO
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
         pass  # not in scope
@@ -119,7 +120,7 @@ class RunCell(Cell):
         return CellLanguage.RUN
 
     def is_runnable(self) -> bool:
-        return True # TODO
+        return True  # TODO
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'.strip()
@@ -127,7 +128,7 @@ class RunCell(Cell):
         for line in lines:
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command):].strip()
+                path = line[start + len(command) :].strip()
                 parent.register_dependency(path.strip('"'))
                 return
         raise ValueError("Missing notebook path in %run command")
@@ -167,7 +168,7 @@ class CellLanguage(Enum):
 
     @classmethod
     def of_magic_name(cls, magic_name: str) -> CellLanguage | None:
-        return next((cl for cl in CellLanguage if magic_name.startswith(cl.magic_name) ), None)
+        return next((cl for cl in CellLanguage if magic_name.startswith(cl.magic_name)), None)
 
     def read_cell_language(self, lines: list[str]) -> CellLanguage | None:
         magic_prefix = f'{self.comment_prefix}{MAGIC_PREFIX}'
@@ -180,11 +181,10 @@ class CellLanguage(Enum):
             if not line.startswith(magic_prefix):
                 continue
             if line.startswith(magic_language_prefix):
-                line = line[len(magic_language_prefix):]
+                line = line[len(magic_language_prefix) :]
                 return CellLanguage.of_magic_name(line.strip())
-            else:
-                return None
-
+            return None
+        return None
 
     def new_cell(self, source: str) -> Cell:
         return self._new_cell(source)
@@ -233,7 +233,7 @@ class NotebookDependencyGraph:
         self._path = path
         self._parent = parent
         self._locator = locator
-        self._dependencies: dict[str, NotebookDependencyGraph] = dict()
+        self._dependencies: dict[str, NotebookDependencyGraph] = {}
 
     @property
     def path(self):
@@ -252,7 +252,7 @@ class NotebookDependencyGraph:
         notebook.build_dependency_graph(child_graph)
         return child_graph
 
-    def locate_dependency(self, path: str) -> NotebookDependencyGraph:
+    def locate_dependency(self, path: str) -> NotebookDependencyGraph | None:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[NotebookDependencyGraph] = []
         path = path[2:] if path.startswith('./') else path
@@ -263,9 +263,9 @@ class NotebookDependencyGraph:
                 found.append(graph)
                 return True
             return False
+
         self.root.visit(check_registered_dependency)
         return found[0] if len(found) > 0 else None
-
 
     @property
     def root(self):
@@ -323,9 +323,9 @@ class Notebook:
                 sources.append(f'{default_language.comment_prefix}{CELL_SEPARATOR}')
                 sources.append('')
         if self._ends_with_lf:
-            sources.append('') # following join will append lf
+            sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-
     def build_dependency_graph(self, graph: NotebookDependencyGraph) -> None:
-        [ cell.build_dependency_graph(graph) for cell in self._cells ]
+        for cell in self._cells:
+            cell.build_dependency_graph(graph)

@@ -14,7 +14,31 @@ PYTHON_NOTEBOOK_SAMPLE = (
 PYTHON_NOTEBOOK_WITH_RUN_SAMPLE = (
     "01_var_market_etl.py.sample",
     Language.PYTHON,
-    ['md', 'run', 'md', 'python', 'md', 'python', 'python', 'python', 'python', 'md', 'python', 'python', 'md', 'python', 'python', 'python', 'md', 'python', 'md', 'python', 'python', 'md', 'python'],
+    [
+        'md',
+        'run',
+        'md',
+        'python',
+        'md',
+        'python',
+        'python',
+        'python',
+        'python',
+        'md',
+        'python',
+        'python',
+        'md',
+        'python',
+        'python',
+        'python',
+        'md',
+        'python',
+        'md',
+        'python',
+        'python',
+        'md',
+        'python',
+    ],
 )
 SCALA_NOTEBOOK_SAMPLE = (
     "01_HL7Streaming.scala",
@@ -109,12 +133,37 @@ R_NOTEBOOK_SAMPLE = (
 SQL_NOTEBOOK_SAMPLE = (
     "chf-pqi-scoring.sql",
     Language.SQL,
-    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
+    [
+        'md',
+        'sql',
+        'sql',
+        'md',
+        'sql',
+        'python',
+        'sql',
+        'sql',
+        'sql',
+        'md',
+        'sql',
+        'sql',
+        'md',
+        'sql',
+        'sql',
+        'md',
+        'sql',
+    ],
 )
 
 
 @pytest.mark.parametrize(
-    "source", [PYTHON_NOTEBOOK_SAMPLE, PYTHON_NOTEBOOK_WITH_RUN_SAMPLE, SCALA_NOTEBOOK_SAMPLE, R_NOTEBOOK_SAMPLE, SQL_NOTEBOOK_SAMPLE]
+    "source",
+    [
+        PYTHON_NOTEBOOK_SAMPLE,
+        PYTHON_NOTEBOOK_WITH_RUN_SAMPLE,
+        SCALA_NOTEBOOK_SAMPLE,
+        R_NOTEBOOK_SAMPLE,
+        SQL_NOTEBOOK_SAMPLE,
+    ],
 )
 def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]):
     path = source[0]
@@ -127,7 +176,14 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
 
 
 @pytest.mark.parametrize(
-    "source", [PYTHON_NOTEBOOK_SAMPLE, PYTHON_NOTEBOOK_WITH_RUN_SAMPLE, SCALA_NOTEBOOK_SAMPLE, R_NOTEBOOK_SAMPLE, SQL_NOTEBOOK_SAMPLE]
+    "source",
+    [
+        PYTHON_NOTEBOOK_SAMPLE,
+        PYTHON_NOTEBOOK_WITH_RUN_SAMPLE,
+        SCALA_NOTEBOOK_SAMPLE,
+        R_NOTEBOOK_SAMPLE,
+        SQL_NOTEBOOK_SAMPLE,
+    ],
 )
 def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     path = source[0]
@@ -144,7 +200,14 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
 
 @pytest.mark.skip("for now")
 @pytest.mark.parametrize(
-    "source", [PYTHON_NOTEBOOK_SAMPLE, PYTHON_NOTEBOOK_WITH_RUN_SAMPLE, SCALA_NOTEBOOK_SAMPLE, R_NOTEBOOK_SAMPLE, SQL_NOTEBOOK_SAMPLE]
+    "source",
+    [
+        PYTHON_NOTEBOOK_SAMPLE,
+        PYTHON_NOTEBOOK_WITH_RUN_SAMPLE,
+        SCALA_NOTEBOOK_SAMPLE,
+        R_NOTEBOOK_SAMPLE,
+        SQL_NOTEBOOK_SAMPLE,
+    ],
 )
 def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str]]):
     path = source[0]
@@ -156,56 +219,58 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
         assert cell.is_runnable()
 
 
-def notebook_locator(paths: list[str], sources: list[str], languages: list[Language]) -> Callable[[str], Notebook]:
-    def locator(path: str) -> Notebook:
+def notebook_locator(
+    paths: list[str], sources: list[str], languages: list[Language]
+) -> Callable[[str], Notebook | None]:
+    def locator(path: str) -> Notebook | None:
         local_path = path[2:] if path.startswith('./') else path
         index = paths.index(local_path)
         if index < 0:
             raise ValueError(f"Can't locate notebook {path}")
         return Notebook.parse(paths[index], sources[index], languages[index])
+
     return locator
 
 
 def test_notebook_builds_leaf_dependency_graph():
     paths = ["leaf1.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
-    languages = [ Language.PYTHON ] * len(paths)
+    languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    assert graph.paths == { "leaf1.py.sample" }
-
+    assert graph.paths == {"leaf1.py.sample"}
 
 
 def test_notebook_builds_depth1_dependency_graph():
     paths = ["root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
-    languages = [ Language.PYTHON ] * len(paths)
+    languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
+    actual = {[path[2:] if path.startswith('./') else path for path in graph.paths]}
     assert actual == set(paths)
 
 
 def test_notebook_builds_depth2_dependency_graph():
     paths = ["root2.run.py.sample", "root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
-    languages = [ Language.PYTHON ] * len(paths)
+    languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
+    actual = {[path[2:] if path.startswith('./') else path for path in graph.paths]}
     assert actual == set(paths)
 
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates():
     paths = ["root3.run.py.sample", "root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
-    languages = [ Language.PYTHON ] * len(paths)
+    languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
     visited: list[str] = []
@@ -213,6 +278,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     def registering_locator(path: str):
         visited.append(path)
         return locator(path)
+
     graph = NotebookDependencyGraph(paths[0], None, registering_locator)
     notebook.build_dependency_graph(graph)
     # if visited once only, set and list will have same len
@@ -222,11 +288,10 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
 def test_notebook_builds_cyclical_dependency_graph():
     paths = ["cyclical1.run.py.sample", "cyclical2.run.py.sample"]
     sources: list[str] = _load_sources(Notebook, *paths)
-    languages = [ Language.PYTHON ] * len(paths)
+    languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
     graph = NotebookDependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
-    actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
+    actual = {[path[2:] if path.startswith('./') else path for path in graph.paths]}
     assert actual == set(paths)
-
