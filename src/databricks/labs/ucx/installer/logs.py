@@ -53,7 +53,7 @@ def parse_logs(*log_paths: Path) -> Iterator[LogRecord]:
                 line, match = next_line, next_match
 
 
-class LogsCrawler(CrawlerBase):
+class LogsRecorder:
     def __init__(self, backend: SqlBackend, schema: str, *log_paths: Path):
         """
         Initializes a LogProcessor instance.

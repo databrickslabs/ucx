@@ -7,7 +7,7 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import LogRecord, LogsCrawler
+from databricks.labs.ucx.installer.logs import LogRecord, LogsRecorder
 
 
 MULTILINE_LOG_MESSAGE = (
@@ -74,3 +74,4 @@ def test_logs_processor(log_path: Path):
     log_processor = LogsCrawler(backend, "default", log_path)
     snapshot = log_processor.snapshot()
     assert all(log_record in snapshot for log_record in LOG_RECORDS)
+    log_processor = LogsRecorder(backend, "default", log_path)
