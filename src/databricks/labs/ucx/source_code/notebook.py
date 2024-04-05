@@ -34,7 +34,7 @@ class Cell(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         raise NotImplementedError()
 
 
@@ -51,7 +51,7 @@ class PythonCell(Cell):
         except SyntaxError:
             return False
 
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         # TODO https://github.com/databrickslabs/ucx/issues/1200
         # TODO https://github.com/databrickslabs/ucx/issues/1202
         pass
@@ -66,7 +66,7 @@ class RCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         pass  # not in scope
 
 
@@ -79,7 +79,7 @@ class ScalaCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         pass  # TODO
 
 
@@ -96,7 +96,7 @@ class SQLCell(Cell):
         except SQLParseError:
             return False
 
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         pass  # not in scope
 
 
@@ -109,7 +109,7 @@ class MarkdownCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         pass  # not in scope
 
 
@@ -122,7 +122,7 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: NotebookDependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'.strip()
         lines = self._original_code.split('\n')
         for line in lines:
@@ -226,34 +226,34 @@ class CellLanguage(Enum):
         return cells
 
 
-class NotebookDependencyGraph:
+class DependencyGraph:
 
-    def __init__(self, path: str, parent: NotebookDependencyGraph | None, locator: Callable[[str], Notebook]):
+    def __init__(self, path: str, parent: DependencyGraph | None, locator: Callable[[str], Notebook]):
         self._path = path
         self._parent = parent
         self._locator = locator
-        self._dependencies: dict[str, NotebookDependencyGraph] = {}
+        self._dependencies: dict[str, DependencyGraph] = {}
 
     @property
     def path(self):
         return self._path
 
-    def register_dependency(self, path: str) -> NotebookDependencyGraph:
+    def register_dependency(self, path: str) -> DependencyGraph:
         # already registered ?
         child_graph = self.locate_dependency(path)
         if child_graph is not None:
             self._dependencies[path] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = NotebookDependencyGraph(path, self, self._locator)
+        child_graph = DependencyGraph(path, self, self._locator)
         self._dependencies[path] = child_graph
         notebook = self._locator(path)
         notebook.build_dependency_graph(child_graph)
         return child_graph
 
-    def locate_dependency(self, path: str) -> NotebookDependencyGraph | None:
+    def locate_dependency(self, path: str) -> DependencyGraph | None:
         # need a list since unlike JS, Python won't let you assign closure variables
-        found: list[NotebookDependencyGraph] = []
+        found: list[DependencyGraph] = []
         path = path[2:] if path.startswith('./') else path
 
         def check_registered_dependency(graph):
@@ -274,7 +274,7 @@ class NotebookDependencyGraph:
     def paths(self) -> set[str]:
         paths: set[str] = set()
 
-        def add_to_paths(graph: NotebookDependencyGraph) -> bool:
+        def add_to_paths(graph: DependencyGraph) -> bool:
             if graph.path in paths:
                 return True
             paths.add(graph.path)
@@ -284,7 +284,7 @@ class NotebookDependencyGraph:
         return paths
 
     # when visit_node returns True it interrupts the visit
-    def visit(self, visit_node: Callable[[NotebookDependencyGraph], bool | None]) -> bool | None:
+    def visit(self, visit_node: Callable[[DependencyGraph], bool | None]) -> bool | None:
         if visit_node(self):
             return True
         for dependency in self._dependencies.values():
@@ -325,6 +325,6 @@ class Notebook:
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, graph: NotebookDependencyGraph) -> None:
+    def build_dependency_graph(self, graph: DependencyGraph) -> None:
         for cell in self._cells:
             cell.build_dependency_graph(graph)

@@ -3,7 +3,7 @@ from collections.abc import Callable
 import pytest
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.notebook import Notebook, NotebookDependencyGraph
+from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph
 from tests.unit import _load_sources
 
 # fmt: off
@@ -122,7 +122,7 @@ def test_notebook_builds_leaf_dependency_graph():
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
-    graph = NotebookDependencyGraph(paths[0], None, locator)
+    graph = DependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
     assert graph.paths == {"leaf1.py.txt"}
 
@@ -133,7 +133,7 @@ def test_notebook_builds_depth1_dependency_graph():
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
-    graph = NotebookDependencyGraph(paths[0], None, locator)
+    graph = DependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
@@ -145,7 +145,7 @@ def test_notebook_builds_depth2_dependency_graph():
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
-    graph = NotebookDependencyGraph(paths[0], None, locator)
+    graph = DependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
@@ -163,7 +163,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
         visited.append(path)
         return locator(path)
 
-    graph = NotebookDependencyGraph(paths[0], None, registering_locator)
+    graph = DependencyGraph(paths[0], None, registering_locator)
     notebook.build_dependency_graph(graph)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
@@ -175,7 +175,7 @@ def test_notebook_builds_cyclical_dependency_graph():
     languages = [Language.PYTHON] * len(paths)
     locator = notebook_locator(paths, sources, languages)
     notebook = locator(paths[0])
-    graph = NotebookDependencyGraph(paths[0], None, locator)
+    graph = DependencyGraph(paths[0], None, locator)
     notebook.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
