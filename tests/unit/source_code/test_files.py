@@ -68,7 +68,7 @@ def test_files_walks_directory():
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer.return_value = None
     files = Files(languages)
-    path = Path(__file__).parent
+    path = Path(Path(__file__).parent.parent, "aws/")
     files.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
