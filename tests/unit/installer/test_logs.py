@@ -1,5 +1,5 @@
+import datetime
 import logging
-import re
 from pathlib import Path
 
 import pytest
@@ -11,7 +11,10 @@ from databricks.labs.ucx.installer.logs import PartialLogRecord, LogsRecorder
 
 
 COMPONENT = "databricks.logs"
+WORKFLOW = "tests"
+WORKFLOW_ID = "123"
 TASK_NAME = "parse_logs"
+WORKFLOW_RUN_ID = "abc"
 MULTILINE_LOG_MESSAGE = (
     "GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
     "< 200 OK\n"
@@ -26,12 +29,12 @@ MULTILINE_LOG_MESSAGE = (
     "<     }"
 )
 PARTIAL_LOG_RECORDS = [
-    PartialLogRecord("00:00", "ERROR", COMPONENT, "Message."),
-    PartialLogRecord("00:00", "INFO", COMPONENT, "Other message."),
-    PartialLogRecord("00:00", "WARNING", COMPONENT, "Warning message."),
-    PartialLogRecord("00:00", "CRITICAL", COMPONENT, "Watch out!"),
-    PartialLogRecord("00:00", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
-    PartialLogRecord("00:00", "WARNING", COMPONENT, "Last message"),
+    PartialLogRecord("15", "07", "10", "ERROR", COMPONENT, "Message."),
+    PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
+    PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
+    PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
+    PartialLogRecord("15", "12", "20", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
+    PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
 ]
 
 
@@ -40,10 +43,10 @@ def log_path(tmp_path: Path) -> Path:
     logger = logging.getLogger(COMPONENT)
     with TaskLogger(
         tmp_path,
-        workflow="test",
-        workflow_id="123",
+        workflow=WORKFLOW,
+        workflow_id=WORKFLOW_ID,
         task_name=TASK_NAME,
-        workflow_run_id="abc",
+        workflow_run_id=WORKFLOW_RUN_ID,
         log_level=logging.DEBUG,
     ) as task_logger:
         for log_record in PARTIAL_LOG_RECORDS:
@@ -77,8 +80,30 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
 
 
-def test_logs_processor(log_path: Path):
+@pytest.mark.parametrize("attribute", ["level", "component", "message"])
+def test_logs_processor(tmp_path: Path, log_path: Path, attribute: str):
+    expected_log_records = [
+        getattr(partial_log_record, attribute)
+        for partial_log_record in PARTIAL_LOG_RECORDS
+    ]
+
+    log_creation_time = log_path.stat().st_ctime
+    log_creation_timestamp = datetime.datetime.utcfromtimestamp(
+        log_creation_time
+    )
+
     backend = MockBackend()
-    log_processor = LogsRecorder(backend, "default", log_path)
-    log_records = log_processor.record()
-    assert all(log_record in log_records for log_record in PARTIAL_LOG_RECORDS)
+    log_processor = LogsRecorder(
+        tmp_path,
+        WORKFLOW,
+        WORKFLOW_ID,
+        WORKFLOW_RUN_ID,
+        backend,
+        "default",
+    )
+    with log_path.open("r") as log:
+        log_records = list(
+            getattr(partial_log_record, attribute)
+            for partial_log_record in log_processor.record(TASK_NAME, log, log_creation_timestamp)
+        )
+    assert log_records == expected_log_records

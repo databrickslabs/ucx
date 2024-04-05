@@ -1,4 +1,4 @@
-import dataclasses
+import datetime
 import logging
 import re
 from collections.abc import Iterator
@@ -28,7 +28,9 @@ class LogRecord:
 @dataclass
 class PartialLogRecord:
     """The information found within a log file record."""
-    timestamp_offset: str
+    hour: str
+    minute: str
+    second: str
     level: str
     component: str
     message: str
@@ -41,7 +43,7 @@ def _get_task_names_at_runtime(log_path: Path) -> list[str]:
 
 
 def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
-    log_format = r"(\d+:\d+:\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
+    log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
     line = log.readline()
@@ -57,14 +59,9 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
             next_match = pattern.match(next_line)
 
         assert match is not None
-        timestamp_offset, level, component, message = match.groups()
+        *groups,  message = match.groups()
 
-        partial_log_record = PartialLogRecord(
-            timestamp_offset,
-            level,
-            component,
-            message + multi_line_message,
-        )
+        partial_log_record = PartialLogRecord(*groups, message + multi_line_message)
         yield partial_log_record
 
         line, match = next_line, next_match
@@ -72,23 +69,22 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
 
 class LogsRecorder:
     def __init__(
-            self,
-            install_dir: Path,
-            job_id: int,
-            job_run_id: int,
-            workflow: str,
-            task_names: list[str],
-            backend: SqlBackend,
-            schema: str,
+        self,
+        install_dir: Path,
+        workflow: str,
+        job_id: int,
+        job_run_id: int,
+        backend: SqlBackend,
+        schema: str,
     ):
         """
         Initializes a LogProcessor instance.
 
         Args:
             install_dir (str): The installation folder on WorkspaceFS
+            workflow (str): The workflow name.
             job_id (int): The job id of the job to store the log records for.
             job_run_id (int): The job run id of the job to store the log records for.
-            workflow (str): The workflow name.
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema (str): The schema name for the logs persistence.
         """
@@ -113,11 +109,14 @@ class LogsRecorder:
     def get_task_names_at_runtime(self) -> list[str]:
         return _get_task_names_at_runtime(self._log_path)
 
-    def record(self, task_name: str, log: TextIO) -> list[LogRecord]:
+    def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
         log_records = [
             LogRecord(
-                # TODO: Implement offset
-                ts=partial_log_record.timestamp_offset,
+                ts=log_creation_timestamp.replace(
+                    hour=int(partial_log_record.hour),
+                    minute=int(partial_log_record.minute),
+                    second=int(partial_log_record.second),
+                ).timestamp(),
                 job_id=self._job_id,
                 workflow_name=self._workflow,
                 task_name=task_name,
