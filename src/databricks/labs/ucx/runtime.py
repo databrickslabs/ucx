@@ -4,16 +4,10 @@ import os
 import sys
 from pathlib import Path
 
-
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.workflows import Assessment, DestroySchema
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
-from databricks.labs.ucx.framework.tasks import (
-    Task,
-    TaskLogger,
-    Workflow,
-    parse_args,
-)
+from databricks.labs.ucx.framework.tasks import Task, TaskLogger, Workflow, parse_args
 from databricks.labs.ucx.hive_metastore.workflows import (
     MigrateTablesInMounts,
     TableMigration,
@@ -28,10 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class Workflows:
-    _tasks: list[Task] = []
-    _workflows: dict[str, Workflow] = {}
-
     def __init__(self, workflows: list[Workflow]):
+        self._tasks: list[Task] = []
+        self._workflows: dict[str, Workflow] = {}
         for workflow in workflows:
             self._workflows[workflow.name] = workflow
             for task_definition in workflow.tasks():
@@ -54,28 +47,33 @@ class Workflows:
             ]
         )
 
+    @classmethod
+    def for_testing(cls, workflow, task_name, **replace):
+        ctx = RuntimeContext().replace(**replace)
+        current_task = getattr(cls.all()._workflows[workflow], task_name)
+        current_task(ctx)
+
     def tasks(self) -> list[Task]:
         return self._tasks
 
     def trigger(self, *argv):
         named_parameters = parse_args(*argv)
         config_path = Path(named_parameters["config"])
-
         ctx = RuntimeContext(named_parameters)
         install_dir = config_path.parent
         task_name = named_parameters.get("task", "not specified")
-        workflow = named_parameters.get("workflow", "not specified")
-        if task_name not in self._workflows:
-            msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(self._workflows.keys())}'
+        workflow_name = named_parameters.get("workflow", "not specified")
+        if workflow_name not in self._workflows:
+            msg = f'workflow "{workflow_name}" not found. Valid workflows are: {", ".join(self._workflows.keys())}'
             raise KeyError(msg)
         print(f"UCX v{__version__}")
-        workflow = self._workflows[task_name]
+        workflow = self._workflows[workflow_name]
         # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
         workflow_run_id = named_parameters.get("parent_run_id", "unknown_run_id")
         job_id = named_parameters.get("job_id", "unknown_job_id")
         with TaskLogger(
             install_dir,
-            workflow=workflow.name,
+            workflow=workflow_name,
             workflow_id=job_id,
             task_name=task_name,
             workflow_run_id=workflow_run_id,
@@ -87,7 +85,13 @@ class Workflows:
             current_task(ctx)
 
 
+def main(*argv):
+    if len(argv) == 0:
+        argv = sys.argv
+    Workflows.all().trigger(*argv)
+
+
 if __name__ == "__main__":
     if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
         raise SystemExit("Only intended to run in Databricks Runtime")
-    Workflows.all().trigger(*sys.argv)
+    main(*sys.argv)

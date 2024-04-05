@@ -14,30 +14,7 @@ from databricks.labs.ucx.framework.tasks import (  # pylint: disable=import-priv
     _TASKS,
     Task,
 )
-from databricks.labs.ucx.runtime import (
-    apply_permissions_to_account_groups,
-    apply_permissions_to_account_groups_experimental,
-    assess_azure_service_principals,
-    assess_clusters,
-    assess_global_init_scripts,
-    assess_incompatible_submit_runs,
-    assess_jobs,
-    assess_pipelines,
-    crawl_cluster_policies,
-    crawl_grants,
-    crawl_groups,
-    crawl_mounts,
-    crawl_permissions,
-    delete_backup_groups,
-    destroy_schema,
-    estimate_table_size_for_migration,
-    guess_external_locations,
-    migrate_dbfs_root_delta_tables,
-    migrate_external_tables_sync,
-    reflect_account_groups_on_workspace_experimental,
-    rename_workspace_local_groups_experimental,
-    workspace_listing,
-)
+from databricks.labs.ucx.runtime import Workflows
 from tests.unit import GROUPS, PERMISSIONS
 
 
@@ -81,7 +58,15 @@ def test_azure_crawler(mocker):
         sql_backend.fetch.return_value = [
             ["1", "secret_scope", "secret_key", "tenant_id", "storage_account"],
         ]
-        assess_azure_service_principals(cfg, ws, sql_backend, mock_installation())
+
+        Workflows.for_testing(
+            'assessment',
+            'assess_azure_service_principals',
+            workspace_client=ws,
+            sql_backend=sql_backend,
+            installation=mock_installation(),
+            config=cfg,
+        )
 
 
 def test_tasks():
