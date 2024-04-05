@@ -200,3 +200,20 @@ def test_notebook_builds_depth2_dependency_graph():
     notebook.build_dependency_graph(graph)
     actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
     assert actual == set(paths)
+
+
+def test_notebook_builds_dependency_graph_avoiding_duplicates():
+    paths = ["root3.run.py.sample", "root1.run.py.sample", "leaf1.py.sample", "leaf2.py.sample"]
+    sources: list[str] = _load_sources(Notebook, *paths)
+    languages = [ Language.PYTHON ] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    visited: list[str] = []
+
+    def registering_locator(path: str):
+        visited.append(path)
+        return locator(path)
+    graph = NotebookDependencyGraph(paths[0], None, registering_locator)
+    notebook.build_dependency_graph(graph)
+    assert len(set(visited)) == len(visited)
+

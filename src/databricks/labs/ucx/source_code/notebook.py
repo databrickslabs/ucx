@@ -239,16 +239,31 @@ class NotebookDependencyGraph:
     def path(self):
         return self._path
 
-#    def __contains__(self, path: str):
-#        return self._paths.get(path, None) is not None
-
     def register_dependency(self, path: str) -> NotebookDependencyGraph:
-        # assert path not in self
+        # already registered ?
+        child_graph = self.locate_dependency(path)
+        if child_graph is not None:
+            self._dependencies[path] = child_graph
+            return child_graph
+        # nay, create the child graph and populate it
         child_graph = NotebookDependencyGraph(path, self, self._locator)
         self._dependencies[path] = child_graph
         notebook = self._locator(path)
         notebook.build_dependency_graph(child_graph)
         return child_graph
+
+    def locate_dependency(self, path: str) -> NotebookDependencyGraph:
+        # need a list since unlike JS, Python won't let you assign closure variables
+        found: list[NotebookDependencyGraph] = []
+
+        def locate_dependency(graph):
+            if graph.path == path:
+                found.append(graph)
+                return True
+            return False
+        self.visit(locate_dependency)
+        return found[0] if len(found) > 0 else None
+
 
     @property
     def paths(self) -> set[str]:
@@ -256,9 +271,14 @@ class NotebookDependencyGraph:
         self.visit(lambda node: paths.add(node.path))
         return paths
 
-    def visit(self, visit_node: Callable[[NotebookDependencyGraph], None]):
-        visit_node(self)
-        [dependency.visit(visit_node) for dependency in self._dependencies.values()]
+    # when visit_node returns True it interrupts the visit
+    def visit(self, visit_node: Callable[[NotebookDependencyGraph], bool | None]) -> bool | None:
+        if visit_node(self):
+            return True
+        for dependency in self._dependencies.values():
+            if dependency.visit(visit_node):
+                return True
+        return False
 
 
 class Notebook:
