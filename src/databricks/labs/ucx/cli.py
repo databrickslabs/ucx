@@ -420,7 +420,9 @@ def _aws_principal_prefix_access(
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     aws = AWSResources(aws_profile)
     if aws_resource_permissions is None:
-        aws_resource_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
+        aws_resource_permissions = AWSResourcePermissions.for_cli(
+            w, installation, sql_backend, aws, config.inventory_database
+        )
     instance_role_path = aws_resource_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
