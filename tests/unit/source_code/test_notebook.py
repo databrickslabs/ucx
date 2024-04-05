@@ -215,5 +215,18 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
         return locator(path)
     graph = NotebookDependencyGraph(paths[0], None, registering_locator)
     notebook.build_dependency_graph(graph)
+    # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
+
+
+def test_notebook_builds_cyclical_dependency_graph():
+    paths = ["cyclical1.run.py.sample", "cyclical2.run.py.sample"]
+    sources: list[str] = _load_sources(Notebook, *paths)
+    languages = [ Language.PYTHON ] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    graph = NotebookDependencyGraph(paths[0], None, locator)
+    notebook.build_dependency_graph(graph)
+    actual = set([ path[2:] if path.startswith('./') else path for path in graph.paths ])
+    assert actual == set(paths)
 

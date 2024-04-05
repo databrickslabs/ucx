@@ -255,20 +255,33 @@ class NotebookDependencyGraph:
     def locate_dependency(self, path: str) -> NotebookDependencyGraph:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[NotebookDependencyGraph] = []
+        path = path[2:] if path.startswith('./') else path
 
-        def locate_dependency(graph):
-            if graph.path == path:
+        def check_registered_dependency(graph):
+            graph_path = graph.path[2:] if graph.path.startswith('./') else graph.path
+            if graph_path == path:
                 found.append(graph)
                 return True
             return False
-        self.visit(locate_dependency)
+        self.root.visit(check_registered_dependency)
         return found[0] if len(found) > 0 else None
 
 
     @property
+    def root(self):
+        return self if self._parent is None else self._parent.root
+
+    @property
     def paths(self) -> set[str]:
         paths: set[str] = set()
-        self.visit(lambda node: paths.add(node.path))
+
+        def add_to_paths(graph: NotebookDependencyGraph) -> bool:
+            if graph.path in paths:
+                return True
+            paths.add(graph.path)
+            return False
+
+        self.visit(add_to_paths)
         return paths
 
     # when visit_node returns True it interrupts the visit
