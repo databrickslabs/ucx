@@ -274,7 +274,7 @@ def _execute_for_cloud(
     func_aws: Callable,
     azure_resource_permissions: AzureResourcePermissions | None = None,
     subscription_id: str | None = None,
-    aws_permissions: AWSResourcePermissions | None = None,
+    aws_resource_permissions: AWSResourcePermissions | None = None,
     aws_profile: str | None = None,
 ):
     if w.config.is_azure:
@@ -299,7 +299,7 @@ def _execute_for_cloud(
                 "or use the '--aws-profile=[profile-name]' parameter."
             )
             return None
-        return func_aws(w, prompts, aws_profile=aws_profile, aws_permissions=aws_permissions)
+        return func_aws(w, prompts, aws_profile=aws_profile, aws_resource_permissions=aws_resource_permissions)
     logger.error("This cmd is only supported for azure and aws workspaces")
     return None
 
@@ -409,7 +409,7 @@ def _aws_principal_prefix_access(
     _: Prompts,
     *,
     aws_profile: str,
-    aws_permissions: AWSResourcePermissions | None = None,
+    aws_resource_permissions: AWSResourcePermissions | None = None,
 ):
     if not shutil.which("aws"):
         logger.error("Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/")
@@ -419,12 +419,12 @@ def _aws_principal_prefix_access(
     config = installation.load(WorkspaceConfig)
     sql_backend = StatementExecutionBackend(w, config.warehouse_id)
     aws = AWSResources(aws_profile)
-    if aws_permissions is None:
-        aws_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
-    instance_role_path = aws_permissions.save_instance_profile_permissions()
+    if aws_resource_permissions is None:
+        aws_resource_permissions = AWSResourcePermissions.for_cli(w, installation, sql_backend, aws, config.inventory_database)
+    instance_role_path = aws_resource_permissions.save_instance_profile_permissions()
     logger.info(f"Instance profile and bucket info saved {instance_role_path}")
     logger.info("Generating UC roles and bucket permission info")
-    uc_role_path = aws_permissions.save_uc_compatible_roles()
+    uc_role_path = aws_resource_permissions.save_uc_compatible_roles()
     logger.info(f"UC roles and bucket info saved {uc_role_path}")
 
 
