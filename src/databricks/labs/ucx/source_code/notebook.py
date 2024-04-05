@@ -52,9 +52,9 @@ class PythonCell(Cell):
             return False
 
     def build_dependency_graph(self, parent: NotebookDependencyGraph):
-        pass  # TODO
-        # see https://github.com/databrickslabs/ucx/issues/1200
-        # see https://github.com/databrickslabs/ucx/issues/1202
+        # TODO https://github.com/databrickslabs/ucx/issues/1200
+        # TODO https://github.com/databrickslabs/ucx/issues/1202
+        pass
 
 
 class RCell(Cell):
