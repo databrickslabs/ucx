@@ -40,7 +40,7 @@ def ws():
         ExternalLocationInfo(url="abfss://container1@storage1.dfs.core.windows.net/folder1"),
         ExternalLocationInfo(url="abfss://container1@storage2.dfs.core.windows.net/folder2"),
         ExternalLocationInfo(url="abfss://container1@storage3.dfs.core.windows.net/folder3"),
-        ExternalLocationInfo(url="s3://storage1/folder1"),
+        ExternalLocationInfo(url="s3://storage5/folder5"),
         ExternalLocationInfo(url="s3://storage2/folder2"),
         ExternalLocationInfo(url="s3://storage3/folder3"),
     ]
@@ -128,19 +128,30 @@ def principal_acl(w, install, cluster_spn: list):
             'delta',
             location='abfss://container1@storage3.dfs.core.windows.net/folder3/table3',
         ),
+        Table(
+            'hive_metastore',
+            'schema4',
+            'table6',
+            'TABLE',
+            'delta',
+            location='dbfs:/mnt/folder5/table6',
+        ),
     ]
     table_crawler.snapshot.return_value = tables
     mount_crawler = create_autospec(Mounts)
     mount_crawler.snapshot.return_value = [
-        Mount('/mnt/folder1', 'abfss://container1@storage1.dfs.core.windows.net/folder1')
+        Mount('/mnt/folder1', 'abfss://container1@storage1.dfs.core.windows.net/folder1'),
+        Mount('/mnt/folder5', 's3://storage5/folder5'),
     ]
 
     spn_crawler = create_autospec(AzureServicePrincipalCrawler)
     spn_crawler.get_cluster_to_storage_mapping.return_value = cluster_spn
-    azure_locations = azure_acl(w, install, cluster_spn)
-    return PrincipalACL(
-        w, sql_backend, install, table_crawler, mount_crawler, azure_locations.get_eligible_locations_principals()
-    )
+    locations = {}
+    if w.config.is_azure:
+        locations = azure_acl(w, install, cluster_spn).get_eligible_locations_principals()
+    if w.config.is_aws:
+        locations = aws_acl(w, install).get_eligible_locations_principals()
+    return PrincipalACL(w, sql_backend, install, table_crawler, mount_crawler, locations)
 
 
 @pytest.fixture
@@ -176,7 +187,7 @@ def installation():
             ],
             "aws_instance_profile_info.csv": [
                 {
-                    'resource_path': 's3://storage1/*',
+                    'resource_path': 's3://storage5/*',
                     'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
                     'privilege': 'WRITE_FILES',
                     'resource_type': 's3',
@@ -269,6 +280,7 @@ def test_interactive_cluster_no_acl(ws, installation):
 
 def test_interactive_cluster_single_spn(ws, installation):
     ws.config.is_azure = True
+    ws.config.is_aws = False
     cluster_spn = ServicePrincipalClusterMapping(
         'cluster1',
         {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')},
@@ -295,6 +307,7 @@ def test_interactive_cluster_single_spn(ws, installation):
 
 def test_interactive_cluster_multiple_spn(ws, installation):
     ws.config.is_azure = True
+    ws.config.is_aws = False
     cluster_spn = ServicePrincipalClusterMapping(
         'cluster2',
         {
@@ -421,4 +434,45 @@ def test_get_eligible_locations_principals_aws(ws, installation):
     locations = aws_acl(ws, installation)
     eligible_locations = locations.get_eligible_locations_principals()
     assert len(eligible_locations) == 1
-    assert eligible_locations['cluster1'] == {'s3://storage1/folder1': 'WRITE_FILES'}
+    assert eligible_locations['cluster1'] == {'s3://storage5/folder5': 'WRITE_FILES'}
+
+
+def test_interactive_cluster__aws_no_acl(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id='cluster3',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+    grants = principal_acl(ws, installation, [])
+    actual_grants = grants.get_interactive_cluster_grants()
+    assert len(actual_grants) == 0
+
+
+def test_interactive_cluster_aws(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id='cluster2',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+    grants = principal_acl(ws, installation, [])
+    expected_grants = [
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
+        Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema4', 'table6'),
+        Grant('spn1', "USE", "hive_metastore", 'schema1'),
+        Grant('spn1', "USE", "hive_metastore", 'schema4'),
+        Grant('spn1', "USE", "hive_metastore"),
+    ]
+    actual_grants = grants.get_interactive_cluster_grants()
+    for grant in expected_grants:
+        assert grant in actual_grants
