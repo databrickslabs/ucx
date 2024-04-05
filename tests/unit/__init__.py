@@ -15,6 +15,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
+from databricks.labs.ucx.source_code.notebook import Notebook
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -71,6 +72,14 @@ def _load_fixture(filename: str):
         raise NotFound(filename) from err
 
 
+def _load_source(filename: str):
+    try:
+        with (__dir / filename).open("r") as f:
+            return f.read()
+    except FileNotFoundError as err:
+        raise NotFound(filename) from err
+
+
 _FOLDERS = {
     BaseJob: 'assessment/jobs',
     BaseRun: 'assessment/jobruns',
@@ -79,6 +88,7 @@ _FOLDERS = {
     Policy: 'assessment/policies',
     TableToMigrate: 'hive_metastore/tables',
     EndpointConfPair: 'assessment/warehouses',
+    Notebook: 'source_code/notebooks',
 }
 
 
@@ -93,6 +103,15 @@ def _id_list(cls: type, ids=None):
         return []
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_fixture(f'{_FOLDERS[cls]}/{_}.json') for _ in ids})
     return [installation.load(cls, filename=_) for _ in ids]
+
+
+def _load_sources(cls: type, *filenames: str):
+    if not filenames:
+        return []
+    installation = MockInstallation(DEFAULT_CONFIG | {_: _load_source(f'{_FOLDERS[cls]}/{_}') for _ in filenames})
+    # cleanly avoid mypy error
+    setattr(installation, "_unmarshal_type", lambda as_dict, filename, type_ref: as_dict)
+    return [installation.load(cls, filename=_) for _ in filenames]
 
 
 def _cluster_policy(policy_id: str):
