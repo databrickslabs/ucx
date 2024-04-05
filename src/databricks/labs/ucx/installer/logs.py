@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TextIO
 
 from databricks.labs.lsql.backends import SqlBackend
 
@@ -33,39 +34,34 @@ class PartialLogRecord:
     message: str
 
 
-def parse_logs(*log_paths: Path) -> Iterator[PartialLogRecord]:
+def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
     log_format = r"(\d+:\d+:\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
-    for log_path in log_paths:
-        if not log_path.is_file():
-            logger.info("Log file does not exists: {%s}", log_path)
-            continue
-        with log_path.open("r") as f:
-            line = f.readline()
-            match = pattern.match(line)
-            while len(line) > 0:
-                # Logs spanning multilines do not match the regex on each subsequent line
-                multi_line_message = ""
-                next_line = f.readline()
-                next_match = pattern.match(next_line)
-                while len(next_line) > 0 and next_match is None:
-                    multi_line_message += "\n" + next_line.rstrip()
-                    next_line = f.readline()
-                    next_match = pattern.match(next_line)
+    line = log.readline()
+    match = pattern.match(line)
+    while len(line) > 0:
+        # Logs spanning multilines do not match the regex on each subsequent line
+        multi_line_message = ""
+        next_line = log.readline()
+        next_match = pattern.match(next_line)
+        while len(next_line) > 0 and next_match is None:
+            multi_line_message += "\n" + next_line.rstrip()
+            next_line = log.readline()
+            next_match = pattern.match(next_line)
 
-                assert match is not None
-                timestamp_offset, level, component, message = match.groups()
+        assert match is not None
+        timestamp_offset, level, component, message = match.groups()
 
-                partial_log_record = PartialLogRecord(
-                    timestamp_offset,
-                    level,
-                    component,
-                    message + multi_line_message,
-                )
-                yield partial_log_record
+        partial_log_record = PartialLogRecord(
+            timestamp_offset,
+            level,
+            component,
+            message + multi_line_message,
+        )
+        yield partial_log_record
 
-                line, match = next_line, next_match
+        line, match = next_line, next_match
 
 
 class LogsRecorder:
