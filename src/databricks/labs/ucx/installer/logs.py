@@ -1,7 +1,7 @@
-import dataclasses
 import logging
 import re
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -11,7 +11,7 @@ from databricks.labs.ucx.framework.crawlers import CrawlerBase
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
+@dataclass
 class LogRecord:
     """A subset from logging.LogRecord.
 
