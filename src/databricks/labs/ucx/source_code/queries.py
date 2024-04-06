@@ -49,7 +49,7 @@ class FromTable(Linter, Fixer):
                 continue
             for old_table in self.get_dependencies(statement, use_schema=use_schema):
                 catalog = self._catalog(old_table)
-                dst = self._index.get(old_table.database, old_table.name)
+                dst = self._index.get(old_table.db, old_table.name)
                 if not dst:
                     continue
                 new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
