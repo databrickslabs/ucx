@@ -96,6 +96,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             [
                 functools.partial(ws.clusters.ensure_cluster_is_running, default_cluster_id),
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
+                functools.partial(ws.clusters.ensure_cluster_is_running, table_migration_cluster_id),
             ],
         )
 
@@ -272,7 +273,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):
