@@ -6,6 +6,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
+from databricks.labs.ucx.assessment.aws import AWSRoleAction
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
@@ -684,6 +685,10 @@ def test_table_migration_job(
         ],
         filename='azure_storage_account_info.csv',
     )
+    installation.save(
+        [AWSRoleAction('arn:aws:iam::12345:instance-profile/role1', 's3', 'WRITE_FILES', 's3://storage5/*')],
+        filename='aws_instance_profile_info.csv',
+    )
 
     deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful
@@ -805,6 +810,10 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
             )
         ],
         filename='azure_storage_account_info.csv',
+    )
+    installation.save(
+        [AWSRoleAction('arn:aws:iam::12345:instance-profile/role1', 's3', 'WRITE_FILES', 's3://storage5/*')],
+        filename='aws_instance_profile_info.csv',
     )
     deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful

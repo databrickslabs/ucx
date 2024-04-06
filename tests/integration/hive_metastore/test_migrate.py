@@ -15,6 +15,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
     Grant,
     GrantsCrawler,
     PrincipalACL,
+    AwsACL,
 )
 from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
@@ -635,16 +636,7 @@ def test_prepare_principal_acl(
     )
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_external_table.name,
-            src_external_table.name,
-        ),
-    ]
+
     installation = MockInstallation(
         {
             "config.yml": {
@@ -661,9 +653,21 @@ def test_prepare_principal_acl(
                     'directory_id': 'directory_id_ss1',
                 }
             ],
+            "aws_instance_profile_info.csv": [
+                {
+                    'resource_path': 's3://storage5/*',
+                    'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                    'privilege': 'WRITE_FILES',
+                    'resource_type': 's3',
+                },
+            ],
         }
     )
-
+    locations = {}
+    if ws.config.is_azure:
+        locations = AzureACL.for_cli(ws, installation).get_eligible_locations_principals()
+    if ws.config.is_aws:
+        locations = AwsACL.for_cli(ws, installation).get_eligible_locations_principals()
     principal_grants = PrincipalACL(
         ws,
         sql_backend,
@@ -679,7 +683,7 @@ def test_prepare_principal_acl(
             ws,
             inventory_schema,
         ),
-        AzureACL.for_cli(ws, installation).get_eligible_locations_principals(),
+        locations,
     )
     table_migrate = TablesMigrator(
         StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
@@ -690,7 +694,20 @@ def test_prepare_principal_acl(
         ),
         ws,
         sql_backend,
-        StaticTableMapping(ws, sql_backend, rules=rules),
+        StaticTableMapping(
+            ws,
+            sql_backend,
+            rules=[
+                Rule(
+                    "workspace",
+                    dst_catalog.name,
+                    src_schema.name,
+                    dst_schema.name,
+                    src_external_table.name,
+                    src_external_table.name,
+                ),
+            ],
+        ),
         GroupManager(sql_backend, ws, inventory_schema),
         MigrationStatusRefresher(
             ws, sql_backend, inventory_schema, StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
@@ -709,6 +726,34 @@ def test_migrate_managed_tables_with_principal_acl_azure(
     make_cluster,
 ):
     if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    table_migrate, table_full_name, cluster_id = test_prepare_principal_acl
+    user = make_user()
+    make_cluster_permissions(
+        object_id=cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        user_name=user.user_name,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
+def test_migrate_managed_tables_with_principal_acl_aws(
+    ws,
+    make_user,
+    test_prepare_principal_acl,
+    make_cluster_permissions,
+    make_cluster,
+):
+    if not ws.config.is_aws:
         pytest.skip("temporary: only works in azure test env")
     table_migrate, table_full_name, cluster_id = test_prepare_principal_acl
     user = make_user()
