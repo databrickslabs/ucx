@@ -754,7 +754,7 @@ def test_migrate_managed_tables_with_principal_acl_aws(
     make_cluster,
 ):
     if not ws.config.is_aws:
-        pytest.skip("temporary: only works in azure test env")
+        pytest.skip("temporary: only works in aws test env")
     table_migrate, table_full_name, cluster_id = test_prepare_principal_acl
     user = make_user()
     make_cluster_permissions(
