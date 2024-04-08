@@ -33,6 +33,10 @@ class Cell(ABC):
         self._original_code = source
 
     @property
+    def original_code(self):
+        return self._original_code
+
+    @property
     def migrated_code(self):
         # this property is for reading the migrated code, not for generating it
         return self._original_code  # for now since we're not doing any migration yet
@@ -400,17 +404,26 @@ class Notebook:
     def parse(path: str, source: str, default_language: Language) -> Notebook | None:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
-        return None if cells is None else Notebook(path, default_language, cells, source.endswith('\n'))
+        return None if cells is None else Notebook(path, source, default_language, cells, source.endswith('\n'))
 
-    def __init__(self, path: str, language: Language, cells: list[Cell], ends_with_lf):
+    def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
         self._path = path
+        self._source = source
         self._language = language
         self._cells = cells
         self._ends_with_lf = ends_with_lf
 
     @property
+    def path(self) -> str:
+        return self._path
+
+    @property
     def cells(self) -> list[Cell]:
         return self._cells
+
+    @property
+    def original_code(self) -> str:
+        return self._source
 
     def to_migrated_code(self):
         default_language = CellLanguage.of_language(self._language)
