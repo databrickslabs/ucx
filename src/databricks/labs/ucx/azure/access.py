@@ -30,6 +30,8 @@ class StoragePermissionMapping:
 
 
 class AzureResourcePermissions:
+    FILENAME = 'azure_storage_account_info.csv'
+
     def __init__(
         self,
         installation: Installation,
@@ -37,7 +39,6 @@ class AzureResourcePermissions:
         azurerm: AzureResources,
         external_locations: ExternalLocations,
     ):
-        self._filename = 'azure_storage_account_info.csv'
         self._installation = installation
         self._locations = external_locations
         self._azurerm = azurerm
@@ -87,7 +88,7 @@ class AzureResourcePermissions:
         if len(storage_account_infos) == 0:
             logger.error("No storage account found in current tenant with spn permission")
             return None
-        return self._installation.save(storage_account_infos, filename=self._filename)
+        return self._installation.save(storage_account_infos, filename=self.FILENAME)
 
     def _update_cluster_policy_definition(
         self,
@@ -205,7 +206,7 @@ class AzureResourcePermissions:
         self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
 
     def load(self):
-        return self._installation.load(list[StoragePermissionMapping], filename=self._filename)
+        return self._installation.load(list[StoragePermissionMapping], filename=self.FILENAME)
 
     def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()

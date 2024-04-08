@@ -292,7 +292,7 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             self.sql_backend,
             self.azure_service_principal_crawler,
-            self.azure_resource_permissions,
+            self.installation,
         )
 
     @cached_property
