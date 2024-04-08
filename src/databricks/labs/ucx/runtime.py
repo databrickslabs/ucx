@@ -583,7 +583,6 @@ def scan_tables_in_mounts_experimental(
         mounts,
         cfg.include_mounts,
         cfg.exclude_paths_in_mount,
-        cfg.include_paths_in_mount,
     ).snapshot()
 
 

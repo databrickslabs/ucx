@@ -261,7 +261,6 @@ class TableInMount:
 
 
 class TablesInMounts(CrawlerBase[Table]):
-    TABLE_IN_MOUNT_DB = "mounted_"
 
     def __init__(
         self,
@@ -271,14 +270,11 @@ class TablesInMounts(CrawlerBase[Table]):
         mc: Mounts,
         include_mounts: list[str] | None = None,
         exclude_paths_in_mount: list[str] | None = None,
-        include_paths_in_mount: list[str] | None = None,
     ):
         super().__init__(backend, "hive_metastore", inventory_database, "tables", Table)
         self._dbutils = ws.dbutils
-        self._mounts_crawler = mc
+        self._mc = mc
         self._include_mounts = include_mounts
-        self._ws = ws
-        self._include_paths_in_mount = include_paths_in_mount
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
         if exclude_paths_in_mount:
@@ -309,36 +305,24 @@ class TablesInMounts(CrawlerBase[Table]):
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
         for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, '{self.TABLE_IN_MOUNT_DB}')"
-        ):
-            yield Table(*row)
-
-    def fetch_all(self) -> Iterable[Table]:
-        """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
-        for row in self._fetch(
-            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE STARTSWITH(database, '{self.TABLE_IN_MOUNT_DB}')"
+            f"SELECT * FROM {escape_sql_identifier(self.full_name)} WHERE NOT STARTSWITH(database, 'mounted_')"
         ):
             yield Table(*row)
 
     def _crawl(self):
-        all_mounts = self._mounts_crawler.snapshot()
+        all_mounts = self._mc.snapshot()
         all_tables = []
         for mount in all_mounts:
             if self._include_mounts and mount.name not in self._include_mounts:
                 logger.info(f"Filtering mount {mount.name}")
                 continue
-            table_paths = {}
-            if self._include_paths_in_mount:
-                for path in self._include_paths_in_mount:
-                    table_paths.update(self._find_delta_log_folders(path))
-            else:
-                table_paths = self._find_delta_log_folders(mount.name)
-
+            table_paths = self._find_delta_log_folders(mount.name)
+            logger.info(f"Found {len(table_paths)} in mount {mount.name}")
             for path, entry in table_paths.items():
                 guess_table = os.path.basename(path)
                 table = Table(
                     catalog="hive_metastore",
-                    database=f"{self.TABLE_IN_MOUNT_DB}{mount.name.replace('/mnt/', '').replace('/', '_')}",
+                    database=f"mounted_{mount.name.replace('/mnt/', '').replace('/', '_')}",
                     name=guess_table,
                     object_type="EXTERNAL",
                     table_format=entry.format,
@@ -348,7 +332,7 @@ class TablesInMounts(CrawlerBase[Table]):
                 all_tables.append(table)
         return all_tables
 
-    def _find_delta_log_folders(self, root_dir: str, delta_log_folders=None) -> dict:
+    def _find_delta_log_folders(self, root_dir, delta_log_folders=None) -> dict:
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
