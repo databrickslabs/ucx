@@ -54,12 +54,6 @@ def log_path(tmp_path: Path) -> Iterator[Path]:
         yield task_logger.log_file
 
 
-def test_get_task_names_at_runtime_one_test_task(log_path: Path) -> None:
-    task_names = logs.get_task_names_at_runtime(log_path.parent)
-    assert len(task_names) == 1
-    assert task_names[0] == TASK_NAME
-
-
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
     expected_partial_log_records = [

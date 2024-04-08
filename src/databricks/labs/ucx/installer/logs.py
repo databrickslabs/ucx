@@ -35,12 +35,6 @@ class PartialLogRecord:
     message: str
 
 
-def get_task_names_at_runtime(log_path: Path) -> list[str]:
-    log_files = log_path.glob("*.log")
-    task_names = [log_file.stem for log_file in log_files]
-    return task_names
-
-
 def peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.Match | None, str]:
     """
     A single log record message may span multiple log lines. In this case, the regex on
@@ -111,17 +105,11 @@ class LogsRecorder:
         self._schema = schema
         self._minimum_log_level = minimum_log_level
 
-        self._log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
+        self.log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
 
     @property
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
-
-    def get_task_log_path(self, task_name: str) -> Path:
-        return self._log_path / f"{task_name}.json"
-
-    def get_task_names_at_runtime(self) -> list[str]:
-        return get_task_names_at_runtime(self._log_path)
 
     def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
         log_records = [
