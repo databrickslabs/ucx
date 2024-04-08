@@ -12,7 +12,6 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.hive_metastore.grants import (
     AzureACL,
     Grant,
-    GrantsCrawler,
     PrincipalACL,
 )
 from databricks.labs.ucx.hive_metastore.locations import Mount
@@ -490,24 +489,16 @@ def test_migrate_managed_tables_with_acl(
     assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
-@pytest.fixture()
-def test_prepare_principal_acl(
-    ws,
-    sql_backend,
-    inventory_schema,
-    env_or_skip,
-    make_dbfs_data_copy,
-    make_table,
-    make_catalog,
-    make_schema,
-    make_cluster,
-):
+@pytest.fixture
+def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_catalog, make_schema, make_cluster):
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{inventory_schema}'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{runtime_ctx.inventory_database}'
     make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
     src_schema = make_schema(catalog_name="hive_metastore")
-    src_external_table = make_table(
-        catalog_name=src_schema.catalog_name, schema_name=src_schema.name, external_csv=new_mounted_location
+    src_external_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+        external_csv=new_mounted_location,
     )
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -521,72 +512,25 @@ def test_prepare_principal_acl(
             src_external_table.name,
         ),
     ]
-    installation = MockInstallation(
-        {
-            "config.yml": {
-                'warehouse_id': env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
-                'inventory_database': inventory_schema,
-            },
-            "azure_storage_account_info.csv": [
-                {
-                    'prefix': 'abfss://things@labsazurethings.dfs.core.windows.net',
-                    'client_id': 'dummy_application_id',
-                    'principal': 'principal_1',
-                    'privilege': 'WRITE_FILES',
-                    'type': 'Application',
-                    'directory_id': 'directory_id_ss1',
-                }
-            ],
-        }
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+    return (
+        runtime_ctx.tables_migrator,
+        f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
+        cluster.cluster_id,
     )
 
-    principal_grants = PrincipalACL(
-        ws,
-        sql_backend,
-        installation,
-        StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
-        StaticMountCrawler(
-            [
-                Mount(
-                    f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a'
-                )
-            ],
-            sql_backend,
-            ws,
-            inventory_schema,
-        ),
-        AzureACL.for_cli(ws, installation).get_eligible_locations_principals(),
-    )
-    table_migrate = TablesMigrator(
-        StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
-        StaticGrantsCrawler(
-            StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table]),
-            StaticUdfsCrawler(sql_backend, inventory_schema, []),
-            [],
-        ),
-        ws,
-        sql_backend,
-        StaticTableMapping(ws, sql_backend, rules=rules),
-        GroupManager(sql_backend, ws, inventory_schema),
-        MigrationStatusRefresher(
-            ws, sql_backend, inventory_schema, StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
-        ),
-        principal_grants,
-    )
-    return table_migrate, f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}", cluster.cluster_id
 
-
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables_with_principal_acl_azure(
     ws,
     make_user,
-    test_prepare_principal_acl,
+    prepared_principal_acl,
     make_cluster_permissions,
-    make_cluster,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    table_migrate, table_full_name, cluster_id = test_prepare_principal_acl
+    table_migrate, table_full_name, cluster_id = prepared_principal_acl
     user = make_user()
     make_cluster_permissions(
         object_id=cluster_id,

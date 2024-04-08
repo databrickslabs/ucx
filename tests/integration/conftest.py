@@ -209,30 +209,31 @@ class StaticMountCrawler(Mounts):
 
 
 class TestRuntimeContext(RuntimeContext):
-    def __init__(self, make_table_fixture, make_schema_fixture, make_udf_fixture):
+    def __init__(self, make_table_fixture, make_schema_fixture, make_udf_fixture, env_or_skip_fixture):
         super().__init__()
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
+        self._env_or_skip = env_or_skip_fixture
         self._tables = []
         self._schemas = []
         self._udfs = []
         # TODO: add methods to pre-populate the following:
         self._grants = []
         self._spn_infos = []
-        self._mounts = []
 
     def with_dummy_azure_resource_permission(self):
-        # TODO: in most cases it's just a sign of a bad logic, fix it
+        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
         self.with_azure_storage_permissions(
             [
                 StoragePermissionMapping(
-                    prefix='dummy_prefix',
+                    # TODO: replace with env variable
+                    prefix='abfss://things@labsazurethings.dfs.core.windows.net',
                     client_id='dummy_application_id',
-                    principal='dummy_principal',
+                    principal='principal_1',
                     privilege='WRITE_FILES',
                     type='Application',
-                    directory_id='dummy_directory',
+                    directory_id='directory_id_ss1',
                 )
             ]
         )
@@ -277,6 +278,7 @@ class TestRuntimeContext(RuntimeContext):
     @cached_property
     def config(self) -> WorkspaceConfig:
         return WorkspaceConfig(
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
             connect=self.workspace_client.config,
         )
@@ -313,8 +315,11 @@ class TestRuntimeContext(RuntimeContext):
 
     @cached_property
     def mounts_crawler(self):
+        # TODO: replace with env variable and make AWS and Azure versions
+        real_location = 'abfss://things@labsazurethings.dfs.core.windows.net/a'
+        mount = Mount(f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', real_location)
         return StaticMountCrawler(
-            self._mounts,
+            [mount],
             self.sql_backend,
             self.workspace_client,
             self.inventory_database,
@@ -322,6 +327,6 @@ class TestRuntimeContext(RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf):
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf)
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, env_or_skip):
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)

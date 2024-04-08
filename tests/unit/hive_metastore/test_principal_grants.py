@@ -148,10 +148,6 @@ def installation():
     )
 
 
-def test_for_cli_azure_acl(ws, installation):
-    assert isinstance(AzureACL.for_cli(ws, installation), AzureACL)
-
-
 def test_get_eligible_locations_principals_no_cluster_mapping(ws, installation):
     locations = azure_acl(ws, installation, [])
     locations.get_eligible_locations_principals()
