@@ -72,7 +72,7 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
 
         next_line, next_match, multi_line_message = peak_multi_line_message(log, pattern)
 
-        # Mypy can't determine length of unpacked starred regex expressions
+        # Mypy can't determine length of regex expressions
         partial_log_record = PartialLogRecord(*groups, message + multi_line_message)  # type: ignore
 
         yield partial_log_record
