@@ -39,6 +39,10 @@ def peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.M
     """
     A single log record message may span multiple log lines. In this case, the regex on
     subsequent lines do not match.
+
+    Args:
+         log (TextIO): The log file IO.
+         pattern (re.Pattern): The regex pattern for a log line.
     """
     multi_line_message = ""
     line = log.readline()
@@ -51,7 +55,12 @@ def peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.M
 
 
 def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
-    # This regex matches the log format defined in
+    """Parse the logs to retrieve values for PartialLogRecord fields.
+
+    Args:
+         log (TextIO): The log file IO.
+    """
+    # This regex matches the log format defined in databricks.labs.ucx.installer.logs.TaskLogger
     log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
@@ -112,6 +121,13 @@ class LogsRecorder:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
     def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
+        """Record the logs of a given task.
+
+        Args:
+            task_name (str): The name of the task
+            log (TextIO): The task log
+            log_creation_timestamp (datetime.datetime): The log creation timestamp.
+        """
         log_records = [
             LogRecord(
                 timestamp=int(
