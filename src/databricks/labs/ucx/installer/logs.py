@@ -24,7 +24,7 @@ class LogRecord:
 
 
 @dataclass
-class _PartialLogRecord:
+class PartialLogRecord:
     """The information found within a log file record."""
 
     hour: str
@@ -35,13 +35,13 @@ class _PartialLogRecord:
     message: str
 
 
-def _get_task_names_at_runtime(log_path: Path) -> list[str]:
+def get_task_names_at_runtime(log_path: Path) -> list[str]:
     log_files = log_path.glob("*.log")
     task_names = [log_file.stem for log_file in log_files]
     return task_names
 
 
-def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.Match | None, str]:
+def peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.Match | None, str]:
     """
     A single log record message may span multiple log lines. In this case, the regex on
     subsequent lines do not match.
@@ -56,7 +56,7 @@ def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.
     return next_line, next_match, multi_line_message
 
 
-def _parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
+def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
     # This regex matches the log format defined in
     log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
@@ -67,10 +67,10 @@ def _parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
         assert match is not None
         *groups, message = match.groups()
 
-        next_line, next_match, multi_line_message = _peak_multi_line_message(log, pattern)
+        next_line, next_match, multi_line_message = peak_multi_line_message(log, pattern)
 
         # Mypy can't determine length of unpacked starred regex expressions
-        partial_log_record = _PartialLogRecord(*groups, message + multi_line_message)  # type: ignore
+        partial_log_record = PartialLogRecord(*groups, message + multi_line_message)  # type: ignore
 
         yield partial_log_record
 
@@ -121,7 +121,7 @@ class LogsRecorder:
         return self._log_path / f"{task_name}.json"
 
     def get_task_names_at_runtime(self) -> list[str]:
-        return _get_task_names_at_runtime(self._log_path)
+        return get_task_names_at_runtime(self._log_path)
 
     def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
         log_records = [
@@ -141,7 +141,7 @@ class LogsRecorder:
                 component=partial_log_record.component,
                 message=partial_log_record.message,
             )
-            for partial_log_record in _parse_logs(log)
+            for partial_log_record in parse_logs(log)
             if logging.getLevelName(partial_log_record.level) >= self._minimum_log_level
         ]
         self._backend.save_table(

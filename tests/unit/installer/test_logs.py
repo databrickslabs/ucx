@@ -8,7 +8,7 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import LogsRecorder, _PartialLogRecord
+from databricks.labs.ucx.installer.logs import LogsRecorder, PartialLogRecord
 
 COMPONENT = "databricks.logs"
 WORKFLOW = "tests"
@@ -29,12 +29,12 @@ MULTILINE_LOG_MESSAGE = (
     "<     }"
 )
 PARTIAL_LOG_RECORDS = [
-    _PartialLogRecord("15", "07", "10", "ERROR", COMPONENT, "Message."),
-    _PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
-    _PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
-    _PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
-    _PartialLogRecord("15", "12", "20", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
-    _PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
+    PartialLogRecord("15", "07", "10", "ERROR", COMPONENT, "Message."),
+    PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
+    PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
+    PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
+    PartialLogRecord("15", "12", "20", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
+    PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
 ]
 
 
@@ -55,7 +55,7 @@ def log_path(tmp_path: Path) -> Iterator[Path]:
 
 
 def test_get_task_names_at_runtime_one_test_task(log_path: Path) -> None:
-    task_names = logs._get_task_names_at_runtime(log_path.parent)
+    task_names = logs.get_task_names_at_runtime(log_path.parent)
     assert len(task_names) == 1
     assert task_names[0] == TASK_NAME
 
@@ -66,13 +66,13 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
         getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS
     ]
     with log_path.open("r") as f:
-        partial_log_records = list(getattr(partial_log_record, attribute) for partial_log_record in logs._parse_logs(f))
+        partial_log_records = list(getattr(partial_log_record, attribute) for partial_log_record in logs.parse_logs(f))
     assert partial_log_records == expected_partial_log_records
 
 
 def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     with log_path.open("r") as f:
-        log_records = list(logs._parse_logs(f))
+        log_records = list(logs.parse_logs(f))
     assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
 
 
