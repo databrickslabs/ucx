@@ -842,6 +842,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     assert table_keys.index("hive_metastore.db1_src.v3_src") > table_keys.index("hive_metastore.db1_src.v2_src")
     assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
 
+
 def test_table_in_mount_mapping():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
@@ -880,7 +881,7 @@ def test_table_in_mount_mapping():
         migration_status_refresher,
         principal_grants,
     )
-        table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
+    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
         "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal) LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries

@@ -181,8 +181,8 @@ class TablesMigrator:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
-        if src_table.what == What.TABLE_IN_MOUNT:
-            return self._migrate_table_in_mount(src_table, rule)
+        if src_table.src.what == What.TABLE_IN_MOUNT:
+            return self._migrate_table_in_mount(src_table.src, src_table.rule)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
