@@ -1,13 +1,9 @@
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
-import sqlglot
-from sqlglot import ParseError
-from sqlglot.expressions import Expression as SqlExpression
-from sqlglot.expressions import Table as SqlTable
 
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
-from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.source_code.queries import FromTable
 
 
 @dataclass
@@ -36,12 +32,7 @@ class ViewToMigrate(TableToMigrate):
     def _compute_dependencies(self):
         table_dependencies = set()
         view_dependencies = set()
-        statement = self._parse_view_text()
-        for sql_table in statement.find_all(SqlTable):
-            catalog = self._catalog(sql_table)
-            if catalog != 'hive_metastore':
-                continue
-            table_with_key = Table(catalog, sql_table.db, sql_table.name, "type", "")
+        for table_with_key in FromTable.get_view_sql_dependencies(self.src.view_text, use_schema=self.src.database):
             table = self._fetch_table(table_with_key.key)
             if table is None:
                 raise ValueError(
@@ -53,24 +44,6 @@ class ViewToMigrate(TableToMigrate):
                 view_dependencies.add(table)
         self._table_dependencies = list(table_dependencies)
         self._view_dependencies = list(view_dependencies)
-
-    def _parse_view_text(self) -> SqlExpression:
-        try:
-            # below can never happen but avoids a pylint error
-            assert self.src.view_text is not None
-            statements = sqlglot.parse(self.src.view_text)
-            if len(statements) != 1 or statements[0] is None:
-                raise ValueError(f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}")
-            return statements[0]
-        except ParseError as e:
-            raise ValueError(f"Could not analyze view SQL: {self.src.view_text} of table {self.src.key}") from e
-
-    # duplicated from FromTable._catalog, not sure if it's worth factorizing
-    @staticmethod
-    def _catalog(table):
-        if table.catalog:
-            return table.catalog
-        return 'hive_metastore'
 
     def __hash__(self):
         return hash(self.src)

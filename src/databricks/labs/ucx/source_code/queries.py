@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 
 import sqlglot
+from sqlglot import ParseError
 from sqlglot.expressions import Table, Expression
 
 import databricks.labs.ucx.hive_metastore.tables
@@ -9,8 +10,9 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Lin
 
 
 class FromTable(Linter, Fixer):
-    def __init__(self, index: MigrationIndex):
+    def __init__(self, index: MigrationIndex, *, use_schema: str = ""):
         self._index = index
+        self._use_schema = use_schema
 
     def name(self) -> str:
         return 'table-migrate'
@@ -42,14 +44,14 @@ class FromTable(Linter, Fixer):
             return table.catalog
         return 'hive_metastore'
 
-    def apply(self, code: str, *, use_schema: str = "") -> str:
+    def apply(self, code: str) -> str:
         new_statements = []
         for statement in self.get_statements(code):
             if not statement:
                 continue
-            for old_table in self.get_dependencies(statement, use_schema=use_schema):
-                catalog = self._catalog(old_table)
-                dst = self._index.get(old_table.db, old_table.name)
+            for old_table in self.get_dependencies(statement, use_schema=self._use_schema):
+                src_db = old_table.db if old_table.db else self._use_schema
+                dst = self._index.get(src_db, old_table.name)
                 if not dst:
                     continue
                 new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
@@ -69,14 +71,19 @@ class FromTable(Linter, Fixer):
             catalog = cls._catalog(old_table)
             if catalog != 'hive_metastore':
                 continue
-            src_db = old_table.db if old_table.db else use_schema
-            dependencies.append(Table(catalog=catalog, db=src_db, name=old_table.name))
+            dependencies.append(old_table)
         return dependencies
 
     @classmethod
-    def get_dependencies_as_tables(cls, statement: Expression, *, use_schema: str = ""):
+    # This method is used to get the dependencies for a query as a list of tables
+    def get_view_sql_dependencies(cls, code: str, *, use_schema: str = ""):
+        try:
+            statements = sqlglot.parse(code)
+            if len(statements) != 1 or statements[0] is None:
+                raise ValueError(f"Could not analyze view SQL: {code}")
+        except ParseError as e:
+            raise ValueError(f"Could not analyze view SQL: {code}") from e
+        statement = statements[0]
         for table in cls.get_dependencies(statement, use_schema=use_schema):
-            yield databricks.labs.ucx.hive_metastore.tables.Table(table.catalog,
-                                                                  table.db,
-                                                                  table.name, "type", "")
-
+            src_db = table.db if table.db else use_schema
+            yield databricks.labs.ucx.hive_metastore.tables.Table(table.catalog, src_db, table.name, "type", "")

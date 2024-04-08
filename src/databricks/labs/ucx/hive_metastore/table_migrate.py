@@ -30,6 +30,7 @@ from databricks.labs.ucx.hive_metastore.views_sequencer import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
+from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
@@ -208,13 +209,17 @@ class TablesMigrator:
         return self._migrate_acl(src_table, rule, grants)
 
     def _migrate_view_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        target_table_key = rule.as_uc_table_key
-        table_migrate_sql = src_table.sql_migrate_view(target_table_key)
+        table_migrate_sql = self._get_view_update_sql(src_table, rule)
         logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
+
+    def _get_view_update_sql(self, src_table: Table, rule: Rule) -> str:
+        from_table = FromTable(self._migration_status_refresher.index(), use_schema=src_table.database)
+        new_view_text = from_table.apply(src_table.view_text)
+        return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} AS {new_view_text};"
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
         if grants is None:
