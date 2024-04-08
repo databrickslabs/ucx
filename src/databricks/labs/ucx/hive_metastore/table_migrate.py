@@ -218,6 +218,8 @@ class TablesMigrator:
 
     def _get_view_update_sql(self, src_table: Table, rule: Rule) -> str:
         from_table = FromTable(self._migration_status_refresher.index(), use_schema=src_table.database)
+        if not src_table.view_text:
+            raise ValueError(f"Table{src_table.key} is not a view.")
         new_view_text = from_table.apply(src_table.view_text)
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} AS {new_view_text};"
 
