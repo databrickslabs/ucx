@@ -78,7 +78,7 @@ def _parse_logs(log: TextIO) -> Iterator[_PartialLogRecord]:
 class LogsRecorder:
     def __init__(
         self,
-        install_dir: Path,
+        install_dir: Path | str,
         workflow: str,
         job_id: int,
         job_run_id: int,
@@ -91,7 +91,7 @@ class LogsRecorder:
         Initializes a LogProcessor instance.
 
         Args:
-            install_dir (str): The installation folder on WorkspaceFS
+            install_dir (Path | str): The installation folder on WorkspaceFS
             workflow (str): The workflow name.
             job_id (int): The job id of the job to store the log records for.
             job_run_id (int): The job run id of the job to store the log records for.
@@ -109,7 +109,7 @@ class LogsRecorder:
         self._schema = schema
         self._minimum_log_level = minimum_log_level
 
-        self._log_path = install_dir / "logs" / self._workflow / f"run-{self._job_run_id}"
+        self._log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
 
     @property
     def full_name(self) -> str:
