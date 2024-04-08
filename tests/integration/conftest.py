@@ -223,14 +223,19 @@ class TestRuntimeContext(RuntimeContext):
         self._mounts = []
 
     def with_dummy_azure_resource_permission(self):
-        self.with_azure_storage_permissions([StoragePermissionMapping(
-            prefix='dummy_prefix',
-            client_id='dummy_application_id',
-            principal='dummy_principal',
-            privilege='WRITE_FILES',
-            type='Application',
-            directory_id='dummy_directory',
-        )])
+        # TODO: in most cases it's just a sign of a bad logic, fix it
+        self.with_azure_storage_permissions(
+            [
+                StoragePermissionMapping(
+                    prefix='dummy_prefix',
+                    client_id='dummy_application_id',
+                    principal='dummy_principal',
+                    privilege='WRITE_FILES',
+                    type='Application',
+                    directory_id='dummy_directory',
+                )
+            ]
+        )
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
@@ -243,16 +248,18 @@ class TestRuntimeContext(RuntimeContext):
         src_table: str,
         dst_table: str,
     ):
-        self.with_table_mapping_rules([
-            Rule(
-                workspace_name="workspace",
-                catalog_name=catalog_name,
-                src_schema=src_schema,
-                dst_schema=dst_schema,
-                src_table=src_table,
-                dst_table=dst_table,
-            )
-        ])
+        self.with_table_mapping_rules(
+            [
+                Rule(
+                    workspace_name="workspace",
+                    catalog_name=catalog_name,
+                    src_schema=src_schema,
+                    dst_schema=dst_schema,
+                    src_table=src_table,
+                    dst_table=dst_table,
+                )
+            ]
+        )
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)

@@ -1,6 +1,5 @@
 import logging
 from datetime import timedelta
-from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -48,6 +47,7 @@ _SPARK_CONF = {
 
 
 def principal_acl(ws, inventory_schema, sql_backend):
+    # FIXME!!!! REMOVE
     installation = MockInstallation(
         {
             "config.yml": {
@@ -70,7 +70,6 @@ def principal_acl(ws, inventory_schema, sql_backend):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog, make_schema, make_table):
-    # pylint: disable=too-many-locals
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
@@ -104,10 +103,15 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog, make
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_tables_with_cache_should_not_create_table(
-    ws, sql_backend, inventory_schema, make_random, make_catalog, make_schema, make_table
-):  # pylint: disable=too-many-locals
+    ws,
+    sql_backend,
+    runtime_ctx,
+    make_random,
+    make_catalog,
+    make_schema,
+):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
@@ -116,13 +120,13 @@ def test_migrate_tables_with_cache_should_not_create_table(
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     table_name = make_random().lower()
-    src_managed_table = make_table(
+    src_managed_table = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name,
         schema_name=src_schema.name,
         name=table_name,
         tbl_properties={"upgraded_from": f"{dst_schema.full_name}.{table_name}"},
     )
-    dst_managed_table = make_table(
+    dst_managed_table = runtime_ctx.make_table(
         catalog_name=dst_schema.catalog_name,
         schema_name=dst_schema.name,
         name=table_name,
@@ -135,9 +139,6 @@ def test_migrate_tables_with_cache_should_not_create_table(
         f"target_managed_table={dst_managed_table}"
     )
 
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     rules = [
         Rule(
             "workspace",
@@ -148,23 +149,11 @@ def test_migrate_tables_with_cache_should_not_create_table(
             dst_managed_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = principal_acl(ws, inventory_schema, sql_backend)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        sql_backend,
-        table_mapping,
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
-    )
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
 
     # FIXME: flaky: databricks.sdk.errors.platform.NotFound: Catalog 'ucx_cjazg' does not exist.
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -173,7 +162,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_migrate_external_table(  # pylint: disable=too-many-locals
+def test_migrate_external_table(
     ws,
     sql_backend,
     runtime_ctx,
@@ -383,9 +372,7 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_mapping_reverts_table(
-    ws, sql_backend, runtime_ctx, make_schema, make_catalog
-):  # pylint: disable=too-many-locals
+def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_schema, make_catalog):
     src_schema = make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
