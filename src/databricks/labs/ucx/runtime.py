@@ -602,8 +602,7 @@ def migrate_tables_in_mounts_experimental(
     migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
-    cluster_locations = {}
-    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
+    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, {})
     TablesMigrator(
         table_crawler,
         grant_crawler,
