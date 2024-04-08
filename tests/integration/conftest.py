@@ -200,7 +200,13 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
 
 
 class StaticMountCrawler(Mounts):
-    def __init__(self, mounts: list[Mount], sb: SqlBackend, workspace_client: WorkspaceClient, inventory_database: str,):
+    def __init__(
+        self,
+        mounts: list[Mount],
+        sb: SqlBackend,
+        workspace_client: WorkspaceClient,
+        inventory_database: str,
+    ):
         super().__init__(sb, workspace_client, inventory_database)
         self._mounts = mounts
 
@@ -275,7 +281,7 @@ class TestRuntimeContext(RuntimeContext):
         self._udfs.append(udf_info)
         return udf_info
 
-    def make_grant( # pylint: disable=too-many-arguments
+    def make_grant(  # pylint: disable=too-many-arguments
         self,
         principal: str,
         action_type: str,
