@@ -197,3 +197,26 @@ def test_detects_call_to_dbutils_notebook_run_in_python_code_():
             end_col=50,
         )
     ] == advices
+
+
+def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
+    source = """
+import stuff
+do_something_with_stuff(stuff)
+stuff2 = dbutils.notebook.run("where is notebook 1?")
+stuff3 = dbutils.notebook.run("where is notebook 2?")
+"""
+    linter = PythonLinter()
+    advices = list(linter.lint(source))
+    assert len(advices) == 2
+
+
+def test_does_not_detect_partial_call_to_dbutils_notebook_run_in_python_code_():
+    source = """
+import stuff
+do_something_with_stuff(stuff)
+stuff2 = notebook.run("where is notebook 1?")
+"""
+    linter = PythonLinter()
+    advices = list(linter.lint(source))
+    assert len(advices) == 0
