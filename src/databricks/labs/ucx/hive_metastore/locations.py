@@ -348,7 +348,7 @@ class TablesInMounts(CrawlerBase[Table]):
                 all_tables.append(table)
         return all_tables
 
-    def _find_delta_log_folders(self, root_dir:str, delta_log_folders=None) -> dict:
+    def _find_delta_log_folders(self, root_dir: str, delta_log_folders=None) -> dict:
         if delta_log_folders is None:
             delta_log_folders = {}
         logger.info(f"Listing {root_dir}")
@@ -376,9 +376,6 @@ class TablesInMounts(CrawlerBase[Table]):
             elif self._is_partitioned(file_info.name):
                 logger.debug(f"Found partitioned parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=True)
-            elif self._is_csv(file_info.name):
-                logger.debug(f"Found csv {file_info.path}")
-                delta_log_folders[root_path] = TableInMount(format="CSV", is_partitioned=False)
             elif self._is_parquet(file_info.name):
                 logger.debug(f"Found parquet {file_info.path}")
                 delta_log_folders[root_path] = TableInMount(format="PARQUET", is_partitioned=False)
@@ -397,11 +394,5 @@ class TablesInMounts(CrawlerBase[Table]):
         parquet_patterns = {'.parquet'}
         return any(pattern in file_name for pattern in parquet_patterns)
 
-    def _is_csv(self, file_name: str) -> bool:
-        parquet_patterns = {'.csv'}
-        return any(pattern in file_name for pattern in parquet_patterns)
-
     def _is_irrelevant(self, file_name: str) -> bool:
         return any(pattern in file_name for pattern in self._fiter_paths)
-
-

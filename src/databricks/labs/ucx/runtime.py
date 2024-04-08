@@ -25,7 +25,6 @@ from databricks.labs.ucx.hive_metastore.locations import TablesInMounts
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
-    TablesInMountsMigrator,
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
@@ -578,7 +577,13 @@ def scan_tables_in_mounts_experimental(
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     TablesInMounts(
-        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount, cfg.include_paths_in_mount
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        mounts,
+        cfg.include_mounts,
+        cfg.exclude_paths_in_mount,
+        cfg.include_paths_in_mount,
     ).snapshot()
 
 
@@ -591,12 +596,38 @@ def migrate_tables_in_mounts_experimental(
     Please run scan-tables-in-mounts-experimental before running this workflow. Additionaly, you must specify
     mapping.csv file in the UCX installations folder.
     """
-    mounts = Mounts(sql_backend, ws, cfg.inventory_database)
-    table_in_mount = TablesInMounts(
-        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount, cfg.include_paths_in_mount
-    )
+    table_crawler = TablesCrawler(sql_backend, cfg.inventory_database)
+    udf_crawler = UdfsCrawler(sql_backend, cfg.inventory_database)
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     table_mappings = TableMapping(install, ws, sql_backend)
-    TablesInMountsMigrator(table_in_mount, ws, sql_backend, table_mappings).create_tables_in_uc()
+    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, cfg.inventory_database, table_crawler)
+    group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
+    mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
+    cluster_locations = {}
+    if ws.config.is_azure:
+        locations = ExternalLocations(ws, sql_backend, cfg.inventory_database)
+        azure_client = AzureAPIClient(
+            ws.config.arm_environment.resource_manager_endpoint,
+            ws.config.arm_environment.service_management_endpoint,
+        )
+        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+        azurerm = AzureResources(azure_client, graph_client)
+        resource_permissions = AzureResourcePermissions(install, ws, azurerm, locations)
+        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
+        cluster_locations = AzureACL(
+            ws, sql_backend, spn_crawler, resource_permissions
+        ).get_eligible_locations_principals()
+    interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
+    TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        sql_backend,
+        table_mappings,
+        group_manager,
+        migration_status_refresher,
+        interactive_grants,
+    ).migrate_tables(what=What.TABLE_IN_MOUNT)
 
 
 def main(*argv):

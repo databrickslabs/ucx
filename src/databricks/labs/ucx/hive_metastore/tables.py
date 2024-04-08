@@ -22,6 +22,7 @@ class What(Enum):
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
     VIEW = auto()
+    TABLE_IN_MOUNT = auto()
     DB_DATASET = auto()
     UNKNOWN = auto()
 
@@ -72,6 +73,8 @@ class Table:
 
     @property
     def key(self) -> str:
+        if self.is_table_in_mount:
+            return f"{self.catalog}.{self.database}.{self.location}".lower()
         return f"{self.catalog}.{self.database}.{self.name}".lower()
 
     def __hash__(self):
@@ -89,6 +92,12 @@ class Table:
             f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
             f"('upgraded_from' = '{self.key}'"
             f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
+        )
+
+    def sql_table_in_mount_alter_from(self, target_table_key):
+        return (
+            f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
+            f"('upgraded_from' = '{self.location}');"
         )
 
     def sql_unset_upgraded_to(self):
@@ -126,9 +135,15 @@ class Table:
         return False
 
     @property
+    def is_table_in_mount(self) -> bool:
+        return self.database.startswith("mounted_")
+
+    @property
     def what(self) -> What:
         if self.is_databricks_dataset:
             return What.DB_DATASET
+        if self.is_table_in_mount:
+            return What.TABLE_IN_MOUNT
         if self.is_dbfs_root and self.table_format == "DELTA":
             return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:

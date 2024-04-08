@@ -536,6 +536,7 @@ def test_historical_data_should_be_overwritten():
         ),
     ]
 
+
 def test_mount_include_paths():
     client = create_autospec(WorkspaceClient)
 
@@ -562,8 +563,9 @@ def test_mount_include_paths():
         }
     )
     mounts = Mounts(backend, client, "test")
-    results = TablesInMounts(backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"]).snapshot()
+    results = TablesInMounts(
+        backend, client, "test", mounts, include_paths_in_mount=["dbfs:/mnt/test_mount/table2/"]
+    ).snapshot()
     assert results == [
         Table("hive_metastore", "mounted_test_mount", "table2", "EXTERNAL", "PARQUET", "adls://bucket/table2"),
     ]
-
