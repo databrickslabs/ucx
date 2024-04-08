@@ -1,5 +1,6 @@
 import datetime
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -38,7 +39,7 @@ PARTIAL_LOG_RECORDS = [
 
 
 @pytest.fixture()
-def log_path(tmp_path: Path) -> Path:
+def log_path(tmp_path: Path) -> Iterator[Path]:
     logger = logging.getLogger(COMPONENT)
     with TaskLogger(
         tmp_path,
