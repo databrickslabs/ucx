@@ -60,7 +60,7 @@ class ASTLinter:
         self._module: ast.Module | None = None
 
     def parse(self, code: str):
-        self._module = ast.parse((code))
+        self._module = ast.parse(code)
 
     def locate(self, node_type: type, match_nodes: list[tuple[str, type]]) -> list[Segment]:
         assert self._module is not None
