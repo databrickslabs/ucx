@@ -35,7 +35,7 @@ class Mount:
 class ExternalLocations(CrawlerBase[ExternalLocation]):
     _prefix_size: ClassVar[list[int]] = [1, 12]
 
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str):
         super().__init__(sbe, "hive_metastore", schema, "external_locations", ExternalLocation)
         self._ws = ws
 

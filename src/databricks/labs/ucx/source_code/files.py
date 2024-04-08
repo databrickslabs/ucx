@@ -1,28 +1,19 @@
 import logging
 from pathlib import Path
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migrate import TablesMigrator
 from databricks.labs.ucx.source_code.languages import Languages
 
 logger = logging.getLogger(__name__)
 
 
-class Files:
+class LocalFileMigrator:
     """The Files class is responsible for fixing code files based on their language."""
 
     def __init__(self, languages: Languages):
         self._languages = languages
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient):
-        tables_migrate = TablesMigrator.for_cli(ws)
-        index = tables_migrate.index()
-        languages = Languages(index)
-        return cls(languages)
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():

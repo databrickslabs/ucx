@@ -138,7 +138,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
 
 
 class ClustersCrawler(CrawlerBase[ClusterInfo], CheckClusterMixin):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema):
+    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema: str):
         super().__init__(sbe, "hive_metastore", schema, "clusters", ClusterInfo)
         self._ws = ws
 

@@ -21,6 +21,7 @@ class AccountWorkspaces:
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
     def __init__(self, account_client: AccountClient, new_workspace_client=WorkspaceClient):
+        # TODO: new_workspace_client is a design flaw, remove it
         self._new_workspace_client = new_workspace_client
         self._ac = account_client
 
