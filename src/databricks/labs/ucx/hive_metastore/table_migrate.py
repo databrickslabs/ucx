@@ -216,12 +216,14 @@ class TablesMigrator:
         return self._migrate_acl(src_table, rule, grants)
 
     def _get_view_update_sql(self, src_table: Table, rule: Rule) -> str:
-        def lookup_dst_table(src_db: str, src_name: str) -> Table:
+        def lookup_dst_table(src_db: str, src_name: str) -> Table | None:
             dst = self._migration_status_refresher.index().get(src_db, src_name)
             if dst is None:
-                raise ValueError(f"Unknown schema object: {src_db}.{src_name}")
+                logger.info(f"Unknown schema object: {src_db}.{src_name}")
+                return None
             if not dst.dst_table or not dst.dst_catalog or not dst.dst_schema:
-                raise ValueError(f"Table {src_db}.{src_name} is not migrated.")
+                logger.info(f"Table {src_db}.{src_name} is not migrated.")
+                return None
             return Table(dst.dst_catalog, dst.dst_schema, dst.dst_table, "type", "")
 
         if not src_table.view_text:

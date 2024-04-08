@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Lin
 
 class FromTable(Linter, Fixer):
     def __init__(self, dst_lookup, *, use_schema: str = ""):
-        self._dst_lookup: Callable[[str, str], ucx_tables.Table] = dst_lookup
+        self._dst_lookup: Callable[[str, str], ucx_tables.Table | None] = dst_lookup
         self._use_schema = use_schema
 
     def name(self) -> str:
@@ -25,7 +25,7 @@ class FromTable(Linter, Fixer):
                 catalog = self._catalog(table)
                 if catalog != 'hive_metastore':
                     continue
-                dst: ucx_tables.Table = self._dst_lookup(table.db, table.name)
+                dst = self._dst_lookup(table.db, table.name)
                 if not dst:
                     continue
                 yield Deprecation(
@@ -51,7 +51,7 @@ class FromTable(Linter, Fixer):
                 continue
             for old_table in self.get_dependencies(statement):
                 src_db = old_table.db if old_table.db else self._use_schema
-                dst: ucx_tables.Table = self._dst_lookup(src_db, old_table.name)
+                dst = self._dst_lookup(src_db, old_table.name)
                 if not dst:
                     continue
                 new_table = Table(catalog=dst.catalog, db=dst.database, this=dst.name)
