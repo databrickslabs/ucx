@@ -17,10 +17,9 @@ from databricks.labs.ucx.hive_metastore.mapping import (
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatus,
-    MigrationStatusRefresher,
     TablesMigrator,
-    MigrationIndex,
 )
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher, MigrationIndex
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
     Table,

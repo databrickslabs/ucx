@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Lin
 
 
 class FromTable(Linter, Fixer):
-    def __init__(self, dst_lookup, *, use_schema: str = ""):
+    def __init__(self, migration_index, *, use_schema: str = ""):
         self._dst_lookup: Callable[[str, str], ucx_tables.Table | None] = dst_lookup
         self._use_schema = use_schema
 

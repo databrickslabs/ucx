@@ -3,9 +3,9 @@ from functools import partial
 import pytest
 
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationIndex,
     MigrationStatus,
 )
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.hive_metastore.tables import Table
 
 

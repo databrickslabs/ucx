@@ -9,7 +9,7 @@ from databricks.labs.lsql.backends import MockBackend, SqlBackend
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableToMigrate
-from databricks.labs.ucx.hive_metastore.views_sequencer import ViewsMigrationSequencer
+from databricks.labs.ucx.hive_metastore.view_migrate import ViewsMigrationSequencer
 
 SCHEMA_NAME = "schema"
 
