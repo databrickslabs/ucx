@@ -489,7 +489,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         tasks = [t for t in self._tasks if t.workflow == step_name]
         job_tasks = [self._job_task(task, remote_wheel) for task in tasks]
-        job_tasks.append(self._job_log_task(tasks, remote_wheel))
+        job_tasks.append(self._job_parse_logs_task(tasks, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -611,7 +611,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_log_task(self, tasks: list[Task], remote_wheel: str) -> jobs.Task:
+    def _job_parse_logs_task(self, tasks: list[Task], remote_wheel: str) -> jobs.Task:
         task = Task(
             task_id=len(tasks),
             workflow=tasks[0].workflow,
