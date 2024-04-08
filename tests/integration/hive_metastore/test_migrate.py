@@ -432,49 +432,27 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
     assert len(table_mapping.get_tables_to_migrate(table_crawler)) == 1
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_mapping_reverts_table(
-    ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog
+    ws, sql_backend, runtime_ctx, make_schema, make_catalog
 ):  # pylint: disable=too-many-locals
     src_schema = make_schema(catalog_name="hive_metastore")
-    table_to_revert = make_table(schema_name=src_schema.name)
-    table_to_skip = make_table(schema_name=src_schema.name)
-    all_tables = [
-        table_to_revert,
-        table_to_skip,
-    ]
+    table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
+    table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            table_to_skip.name,
-            table_to_skip.name,
-        ),
-    ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    principal_grants = principal_acl(ws, inventory_schema, sql_backend)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        sql_backend,
-        table_mapping,
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
+    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_table_mapping_rule(
+        catalog_name=dst_catalog.name,
+        src_schema=src_schema.name,
+        dst_schema=dst_schema.name,
+        src_table=table_to_skip.name,
+        dst_table=table_to_skip.name,
     )
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
+
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties
     assert target_table_properties["upgraded_from"] == table_to_skip.full_name
@@ -507,7 +485,7 @@ def test_mapping_reverts_table(
         ),
     ]
     table_mapping2 = StaticTableMapping(ws, sql_backend, rules=rules2)
-    mapping2 = table_mapping2.get_tables_to_migrate(table_crawler)
+    mapping2 = table_mapping2.get_tables_to_migrate(runtime_ctx.tables_crawler)
 
     # Checking to validate that table_to_skip was omitted from the list of rules
     assert len(mapping2) == 1
@@ -534,6 +512,7 @@ def test_migrate_managed_tables_with_acl(
     src_schema = make_schema(catalog_name="hive_metastore")
     src_managed_table = make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
+    # TODO: make these real grants
     src_grant = [
         Grant(principal=user.user_name, action_type="SELECT", table=src_managed_table.name, database=src_schema.name),
         Grant(principal=user.user_name, action_type="MODIFY", table=src_managed_table.name, database=src_schema.name),

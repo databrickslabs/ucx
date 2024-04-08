@@ -60,10 +60,10 @@ class TableToMigrate:
 
 
 class TableMapping:
+    FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
     def __init__(self, installation: Installation, ws: WorkspaceClient, sql_backend: SqlBackend):
-        self._filename = 'mapping.csv'
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
@@ -80,11 +80,11 @@ class TableMapping:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
         current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
-        return self._installation.save(list(current_tables), filename=self._filename)
+        return self._installation.save(list(current_tables), filename=self.FILENAME)
 
     def load(self) -> list[Rule]:
         try:
-            return self._installation.load(list[Rule], filename=self._filename)
+            return self._installation.load(list[Rule], filename=self.FILENAME)
         except NotFound:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None

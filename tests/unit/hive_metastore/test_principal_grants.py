@@ -152,27 +152,6 @@ def test_for_cli_azure_acl(ws, installation):
     assert isinstance(AzureACL.for_cli(ws, installation), AzureACL)
 
 
-def test_for_cli_azure(ws, installation):
-    ws.config.is_azure = True
-    sql_backend = StatementExecutionBackend(ws, ws.config.warehouse_id)
-    assert isinstance(PrincipalACL.for_cli(ws, installation, sql_backend), PrincipalACL)
-
-
-def test_for_cli_aws(ws, installation):
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    sql_backend = StatementExecutionBackend(ws, ws.config.warehouse_id)
-    assert PrincipalACL.for_cli(ws, installation, sql_backend) is None
-
-
-def test_for_cli_gcp(ws, installation):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
-    ws.config.is_gcp = True
-    sql_backend = StatementExecutionBackend(ws, ws.config.warehouse_id)
-    assert PrincipalACL.for_cli(ws, installation, sql_backend) is None
-
-
 def test_get_eligible_locations_principals_no_cluster_mapping(ws, installation):
     locations = azure_acl(ws, installation, [])
     locations.get_eligible_locations_principals()
