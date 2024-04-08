@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
 
 logger = logging.getLogger(__name__)
 # use a specific logger for sqlglot warnings so we can disable them selectively
-sqlglot_logger = logging.getLogger(f"sqlglot in {__name__}")
+sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 
 NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
