@@ -187,14 +187,13 @@ def test_migrate_tables_with_cache_should_not_create_table(
     assert target_tables[0]["tableName"] == table_name
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table(  # pylint: disable=too-many-locals
     ws,
     sql_backend,
-    inventory_schema,
+    runtime_ctx,
     make_catalog,
     make_schema,
-    make_table,
     env_or_skip,
     make_random,
     make_dbfs_data_copy,
@@ -207,13 +206,10 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
+    src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_external_table])
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     rules = [
         Rule(
             "workspace",
@@ -224,21 +220,10 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
             src_external_table.name,
         ),
     ]
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = principal_acl(ws, inventory_schema, sql_backend)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        sql_backend,
-        StaticTableMapping(ws, sql_backend, rules=rules),
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
-    )
 
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
@@ -246,7 +231,7 @@ def test_migrate_external_table(  # pylint: disable=too-many-locals
     assert target_table_properties["upgraded_from"] == src_external_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
 
-    _migration_status = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler).snapshot()
+    _migration_status = runtime_ctx.migration_status_refresher.snapshot()
     migration_status = list(_migration_status)
     assert len(migration_status) == 1
     assert migration_status[0].src_schema == src_external_table.schema_name
