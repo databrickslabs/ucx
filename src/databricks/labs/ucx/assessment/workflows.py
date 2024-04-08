@@ -134,7 +134,7 @@ class Assessment(Workflow):
 
         Subsequently, the list of all the Azure Service Principals referred in those configurations are saved
         in the `$inventory.azure_service_principals` table."""
-        if ctx.workspace_client.config.is_azure:
+        if ctx.is_azure:
             ctx.azure_service_principal_crawler.snapshot()
 
     @job_task
