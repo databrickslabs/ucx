@@ -1,22 +1,13 @@
 import ast
 import logging
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Segment:
-    start_line: int
-    start_col: int
-    end_line: int
-    end_col: int
-
-
-class LocatingVisitor(ast.NodeVisitor):
+class MatchingVisitor(ast.NodeVisitor):
 
     def __init__(self, node_type: type, match_nodes: list[tuple[str, type]]):
-        self.locations: list[Segment] = []
+        self.matched_nodes: list[ast.AST] = []
         self._node_type = node_type
         self._match_nodes = match_nodes
 
@@ -26,9 +17,7 @@ class LocatingVisitor(ast.NodeVisitor):
             return
         try:
             if self._matches(node.func, 0):
-                self.locations.append(
-                    Segment(node.lineno, node.col_offset, node.end_lineno or 0, node.end_col_offset or 0)
-                )
+                self.matched_nodes.append(node)
         except NotImplementedError as e:
             logger.warning(f"Missing implementation: {e.args[0]}")
 
@@ -62,8 +51,8 @@ class ASTLinter:
     def parse(self, code: str):
         self._module = ast.parse(code)
 
-    def locate(self, node_type: type, match_nodes: list[tuple[str, type]]) -> list[Segment]:
+    def locate(self, node_type: type, match_nodes: list[tuple[str, type]]) -> list[ast.AST]:
         assert self._module is not None
-        visitor = LocatingVisitor(node_type, match_nodes)
+        visitor = MatchingVisitor(node_type, match_nodes)
         visitor.visit(self._module)
-        return visitor.locations
+        return visitor.matched_nodes

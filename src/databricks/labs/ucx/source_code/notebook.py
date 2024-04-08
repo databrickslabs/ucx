@@ -54,18 +54,37 @@ class Cell(ABC):
 class PythonLinter(ASTLinter, Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         self.parse(code)
-        sections = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        return [
-            Advisory(
+        nodes = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        return [ self._convert_dbutils_notebook_run_to_advice(node) for node in nodes ]
+
+    @classmethod
+    def _convert_dbutils_notebook_run_to_advice(cls, node: ast.AST) -> Advisory:
+        assert isinstance(node, ast.Call)
+        path = cls.get_dbutils_notebook_run_path_arg(node)
+        if isinstance(path, ast.Constant):
+            return Advisory(
                 'code-migrate',
                 "Call to 'dbutils.notebook.run' may require adjusting the notebook path",
-                section.start_line,
-                section.start_col,
-                section.end_line,
-                section.end_col,
+                node.lineno,
+                node.col_offset,
+                node.end_lineno or 0,
+                node.end_col_offset or 0,
             )
-            for section in sections
-        ]
+        return Advisory(
+            'code-migrate',
+            "Call to 'dbutils.notebook.run' may require adjusting the notebook path",
+            node.lineno,
+            node.col_offset,
+            node.end_lineno or 0,
+            node.end_col_offset or 0,
+        )
+
+    @staticmethod
+    def get_dbutils_notebook_run_path_arg(node: ast.Call):
+        if len(node.args) > 0:
+            return node.args[0]
+        arg = next(kw for kw in node.keywords if kw.arg == "path")
+        return arg.value if arg is not None else None
 
 
 class PythonCell(Cell):
@@ -82,9 +101,16 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        # TODO https://github.com/databrickslabs/ucx/issues/1200
         # TODO https://github.com/databrickslabs/ucx/issues/1202
-        pass
+        linter = ASTLinter()
+        linter.parse(self._original_code)
+        nodes = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        for node in nodes:
+            assert isinstance(node, ast.Call)
+            path = PythonLinter.get_dbutils_notebook_run_path_arg(node)
+            if isinstance(path, ast.Constant):
+                parent.register_dependency(path.value.strip("'").strip('"'))
+
 
 
 class RCell(Cell):

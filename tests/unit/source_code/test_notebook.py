@@ -183,6 +183,18 @@ def test_notebook_builds_cyclical_dependency_graph():
     assert actual == set(paths)
 
 
+def test_notebook_builds_python_dependency_graph():
+    paths = ["root4.py.txt", "leaf3.py.txt"]
+    sources: list[str] = _load_sources(Notebook, *paths)
+    languages = [Language.PYTHON] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    graph = DependencyGraph(paths[0], None, locator)
+    notebook.build_dependency_graph(graph)
+    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
+    assert actual == set(paths)
+
+
 def test_detects_call_to_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(Notebook, "run_notebooks.py.txt")
     linter = PythonLinter()
