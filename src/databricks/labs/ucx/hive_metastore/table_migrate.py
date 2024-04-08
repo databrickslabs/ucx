@@ -3,7 +3,6 @@ import datetime
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
@@ -38,19 +37,6 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MigrationStatus:
-    src_schema: str
-    src_table: str
-    dst_catalog: str | None = None
-    dst_schema: str | None = None
-    dst_table: str | None = None
-    update_ts: str | None = None
-
-    def destination(self):
-        return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
 class TablesMigrator:
@@ -221,19 +207,11 @@ class TablesMigrator:
         return self._migrate_acl(src_table, rule, grants)
 
     def _get_view_update_sql(self, src_table: Table, rule: Rule) -> str:
-        def lookup_dst_table(src_db: str, src_name: str) -> Table | None:
-            dst = self._migration_status_refresher.index().get(src_db, src_name)
-            if dst is None:
-                logger.info(f"Unknown schema object: {src_db}.{src_name}")
-                return None
-            if not dst.dst_table or not dst.dst_catalog or not dst.dst_schema:
-                logger.info(f"Table {src_db}.{src_name} is not migrated.")
-                return None
-            return Table(dst.dst_catalog, dst.dst_schema, dst.dst_table, "type", "")
-
         if not src_table.view_text:
             raise ValueError(f"Table{src_table.key} is not a view.")
-        new_view_text = ViewToMigrate.get_view_updated_text(src_table.view_text, lookup_dst_table, src_table.database)
+        new_view_text = ViewToMigrate.get_view_updated_text(
+            src_table.view_text, self._migration_status_refresher.index(), src_table.database
+        )
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} AS {new_view_text};"
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):

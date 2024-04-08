@@ -1,17 +1,16 @@
 from collections.abc import Iterable
-from collections.abc import Callable
 
 import sqlglot
 from sqlglot import ParseError
 from sqlglot.expressions import Table, Expression
-
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 import databricks.labs.ucx.hive_metastore.tables as ucx_tables
 from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter
 
 
 class FromTable(Linter, Fixer):
-    def __init__(self, migration_index, *, use_schema: str = ""):
-        self._dst_lookup: Callable[[str, str], ucx_tables.Table | None] = dst_lookup
+    def __init__(self, index: MigrationIndex, *, use_schema: str = ""):
+        self._index = index
         self._use_schema = use_schema
 
     def name(self) -> str:
@@ -25,12 +24,12 @@ class FromTable(Linter, Fixer):
                 catalog = self._catalog(table)
                 if catalog != 'hive_metastore':
                     continue
-                dst = self._dst_lookup(table.db, table.name)
+                dst = self._index.get(table.db, table.name)
                 if not dst:
                     continue
                 yield Deprecation(
                     code='table-migrate',
-                    message=f"Table {table.db}.{table.name} is migrated to {dst.key} in Unity Catalog",
+                    message=f"Table {table.db}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
                     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                     start_line=0,
                     start_col=0,
@@ -51,10 +50,10 @@ class FromTable(Linter, Fixer):
                 continue
             for old_table in self.get_dependencies(statement):
                 src_db = old_table.db if old_table.db else self._use_schema
-                dst = self._dst_lookup(src_db, old_table.name)
+                dst = self._index.get(src_db, old_table.name)
                 if not dst:
                     continue
-                new_table = Table(catalog=dst.catalog, db=dst.database, this=dst.name)
+                new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
                 old_table.replace(new_table)
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)

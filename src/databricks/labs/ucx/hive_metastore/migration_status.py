@@ -1,5 +1,7 @@
 import datetime
-from typing import Iterable
+import logging
+from dataclasses import dataclass
+from collections.abc import Iterable
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -8,7 +10,21 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus, logger
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MigrationStatus:
+    src_schema: str
+    src_table: str
+    dst_catalog: str | None = None
+    dst_schema: str | None = None
+    dst_table: str | None = None
+    update_ts: str | None = None
+
+    def destination(self):
+        return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
 class MigrationIndex:
@@ -100,6 +116,3 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
             except NotFound:
                 logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
                 continue
-
-
-

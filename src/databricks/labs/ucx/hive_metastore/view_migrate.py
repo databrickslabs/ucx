@@ -1,7 +1,7 @@
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
-
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -30,8 +30,8 @@ class ViewToMigrate(TableToMigrate):
         return self._view_dependencies
 
     @staticmethod
-    def get_view_updated_text(src, dst_lookup, schema):
-        from_table = FromTable(dst_lookup, use_schema=schema)
+    def get_view_updated_text(src, index: MigrationIndex, schema):
+        from_table = FromTable(index, use_schema=schema)
         return from_table.apply(src)
 
     def _compute_dependencies(self):
