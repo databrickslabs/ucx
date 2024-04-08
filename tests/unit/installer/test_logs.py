@@ -101,8 +101,7 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
     assert log_records == expected_log_records
 
 
-@pytest.mark.parametrize("attribute", ["level", "component", "message"])
-def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path, attribute: str):
+def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path):
     log_creation_time = log_path.stat().st_ctime
     log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
