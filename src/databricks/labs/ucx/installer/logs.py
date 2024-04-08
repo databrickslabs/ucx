@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LogRecord:
-    timestamp: int  # fully specified timestamp in UTC (offset from a workspace fs file creation timestamp)
-    job_id: int  # determined from workspace file path, resolved from the install state
+    timestamp: int
+    job_id: int
     workflow_name: str
     task_name: str
     job_run_id: int
