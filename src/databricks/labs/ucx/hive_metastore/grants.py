@@ -6,7 +6,7 @@ from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
@@ -19,7 +19,6 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -346,13 +345,6 @@ class AzureACL:
         self._ws = ws
         self._spn_crawler = spn_crawler
         self._installation = installation
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-        return cls(ws, sql_backend, spn_crawler, installation)
 
     def get_eligible_locations_principals(self) -> dict[str, dict]:
         cluster_locations = {}

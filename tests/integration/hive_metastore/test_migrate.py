@@ -2,33 +2,18 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, SecurableType
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore.grants import (
-    AzureACL,
-    Grant,
-    PrincipalACL,
-)
-from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import Rule
-from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatusRefresher,
-    TablesMigrator,
-)
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
-from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 from ..conftest import (
-    StaticGrantsCrawler,
-    StaticMountCrawler,
     StaticTableMapping,
     StaticTablesCrawler,
-    StaticUdfsCrawler,
 )
 
 logger = logging.getLogger(__name__)
@@ -399,29 +384,31 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_schema, make_c
     assert "upgraded_to" not in results2
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_acl(
-    ws, sql_backend, inventory_schema, make_catalog, make_schema, make_table, make_user
-):  # pylint: disable=too-many-locals
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_schema, make_user):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
-    src_managed_table = make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
-    # TODO: make these real grants
-    src_grant = [
-        Grant(principal=user.user_name, action_type="SELECT", table=src_managed_table.name, database=src_schema.name),
-        Grant(principal=user.user_name, action_type="MODIFY", table=src_managed_table.name, database=src_schema.name),
-    ]
+
+    runtime_ctx.make_grant(
+        principal=user.user_name,
+        action_type="SELECT",
+        table=src_managed_table.name,
+        database=src_schema.name,
+    )
+    runtime_ctx.make_grant(
+        principal=user.user_name,
+        action_type="MODIFY",
+        table=src_managed_table.name,
+        database=src_schema.name,
+    )
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-
     logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
 
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table])
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = StaticGrantsCrawler(table_crawler, udf_crawler, src_grant)
     rules = [
         Rule(
             "workspace",
@@ -432,51 +419,10 @@ def test_migrate_managed_tables_with_acl(
             src_managed_table.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    installation = MockInstallation(
-        {
-            "config.yml": {
-                'inventory_database': inventory_schema,
-            },
-            "azure_storage_account_info.csv": [
-                {
-                    'prefix': 'dummy_prefix',
-                    'client_id': 'dummy_application_id',
-                    'principal': 'dummy_principal',
-                    'privilege': 'WRITE_FILES',
-                    'type': 'Application',
-                    'directory_id': 'dummy_directory',
-                }
-            ],
-        }
-    )
-    principal_grants = PrincipalACL(
-        ws,
-        sql_backend,
-        installation,
-        StaticTablesCrawler(sql_backend, inventory_schema, [src_managed_table]),
-        StaticMountCrawler(
-            [Mount('dummy_mount', 'abfss://dummy@dummy.dfs.core.windows.net/a')],
-            sql_backend,
-            ws,
-            inventory_schema,
-        ),
-        AzureACL.for_cli(ws, installation).get_eligible_locations_principals(),
-    )
-    table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        sql_backend,
-        table_mapping,
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
-    )
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
 
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1

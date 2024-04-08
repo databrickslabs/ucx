@@ -200,8 +200,8 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
 
 
 class StaticMountCrawler(Mounts):
-    def __init__(self, mounts: list[Mount], sql_backend: SqlBackend, ws: WorkspaceClient, inventory_database: str):
-        super().__init__(sql_backend, ws, inventory_database)
+    def __init__(self, mounts: list[Mount], sb: SqlBackend, workspace_client: WorkspaceClient, inventory_database: str,):
+        super().__init__(sb, workspace_client, inventory_database)
         self._mounts = mounts
 
     def snapshot(self) -> list[Mount]:
@@ -218,8 +218,8 @@ class TestRuntimeContext(RuntimeContext):
         self._tables = []
         self._schemas = []
         self._udfs = []
-        # TODO: add methods to pre-populate the following:
         self._grants = []
+        # TODO: add methods to pre-populate the following:
         self._spn_infos = []
 
     def with_dummy_azure_resource_permission(self):
@@ -274,6 +274,34 @@ class TestRuntimeContext(RuntimeContext):
         udf_info = self._make_udf(**kwargs)
         self._udfs.append(udf_info)
         return udf_info
+
+    def make_grant( # pylint: disable=too-many-arguments
+        self,
+        principal: str,
+        action_type: str,
+        catalog: str | None = None,
+        database: str | None = None,
+        table: str | None = None,
+        view: str | None = None,
+        udf: str | None = None,
+        any_file: bool = False,
+        anonymous_function: bool = False,
+    ):
+        grant = Grant(
+            principal=principal,
+            action_type=action_type,
+            catalog=catalog,
+            database=database,
+            table=table,
+            view=view,
+            udf=udf,
+            any_file=any_file,
+            anonymous_function=anonymous_function,
+        )
+        for query in grant.hive_grant_sql():
+            self.sql_backend.execute(query)
+        self._grants.append(grant)
+        return grant
 
     @cached_property
     def config(self) -> WorkspaceConfig:
