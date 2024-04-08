@@ -1,9 +1,15 @@
 import logging
 from pathlib import PurePath
+import dataclasses
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.labs.lsql.backends import StatementExecutionBackend, SqlBackend
+from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
+from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, Mounts
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, AzureACL, Grant
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
@@ -14,17 +20,41 @@ logger = logging.getLogger(__name__)
 
 
 class CatalogSchema:
-    def __init__(self, ws: WorkspaceClient, table_mapping: TableMapping):
+    def __init__(self, ws: WorkspaceClient, table_mapping: TableMapping, principal_grants: PrincipalACL, sql_backend: SqlBackend):
         self._ws = ws
         self._table_mapping = table_mapping
         self._external_locations = self._ws.external_locations.list()
+        self._principal_grants = principal_grants
+        self._backend = sql_backend
 
     @classmethod
     def for_cli(cls, ws: WorkspaceClient, installation: Installation):
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         table_mapping = TableMapping(installation, ws, sql_backend)
-        return cls(ws, table_mapping)
+        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
+        mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
+        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+        cluster_locations = {}
+        if ws.config.is_azure:
+            locations = ExternalLocations(ws, sql_backend, config.inventory_database)
+            azure_client = AzureAPIClient(
+                ws.config.arm_environment.resource_manager_endpoint,
+                ws.config.arm_environment.service_management_endpoint,
+            )
+            graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+            azurerm = AzureResources(azure_client, graph_client)
+            resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+            spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
+            cluster_locations = AzureACL(
+                ws, sql_backend, spn_crawler, resource_permissions
+            ).get_eligible_locations_principals()
+        if ws.config.is_aws:
+            pass
+        principal_grants = PrincipalACL(ws, sql_backend, installation, table_crawler, mount_crawler, cluster_locations)
+
+
+        return cls(ws, table_mapping, principal_grants, sql_backend)
 
     def create_all_catalogs_schemas(self, prompts: Prompts):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
@@ -33,6 +63,30 @@ class CatalogSchema:
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 self._create_schema(candidate_catalog, candidate_schema)
+        self._update_principal_acl()
+
+
+    def _get_catalog_schema_grants(self):
+        catalog_grants: set[Grant] = set()
+        src_trg_schema_mapping = self._get_src_database_target_mapping()
+        grants = self._principal_grants.get_interactive_cluster_grants()
+        database_grants = [grant for grant in grants if grant.table is None or grant.view is None]
+        new_grants = [dataclasses.replace(db_grant, database=src_trg_schema_mapping[db_grant.database]['target_schema'],catalog=src_trg_schema_mapping[db_grant.database]['target_catalog']) for db_grant in database_grants]
+        for grant in new_grants:
+            catalog_grants.add(dataclasses.replace(grant, database=""))
+        new_grants.extend(catalog_grants)
+        return new_grants
+
+    def _update_principal_acl(self):
+        grants = self._get_catalog_schema_grants()
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql()
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {grant.this_type_and_key()}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
+            self._backend.execute(acl_migrate_sql)
+
 
     def _create_catalog_validate(self, catalog, prompts: Prompts):
         logger.info(f"Creating UC catalog: {catalog}")
@@ -80,6 +134,16 @@ class CatalogSchema:
                 continue
             target_schemas[target_catalog].add(target_schema)
         return target_catalogs, target_schemas
+
+    def _get_src_database_target_mapping(self) -> dict[str, dict]:
+        """generate a list of catalogs and schema to be created from table mappings."""
+        src_trg_schema_mapping: dict[str, dict] = {}
+        table_mappings = self._table_mapping.load()
+        for mappings in table_mappings:
+            if mappings.src_schema not in src_trg_schema_mapping:
+                src_trg_schema_mapping[mappings.src_schema] = {'target_catalog':mappings.catalog_name, 'target_schema': mappings.dst_schema}
+                continue
+        return src_trg_schema_mapping
 
     def _get_missing_catalogs_schemas(self) -> tuple[set[str], dict[str, set[str]]]:
         """prepare a list of catalogs and schema to be created"""
