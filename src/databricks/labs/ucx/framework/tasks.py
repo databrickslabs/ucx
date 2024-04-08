@@ -183,9 +183,9 @@ def run_task(
     job_id = args.get("job_id", "unknown_job_id")
 
     # Workaround to pass workflow ids to `parse_logs` tasks
-    cfg.__workflow = current_task.workflow  # type: ignore  # pylint: disable=protected-access
-    cfg.__workflow_run_id = workflow_run_id  # type: ignore  # pylint: disable=protected-access
-    cfg.__job_id = job_id  # type: ignore  # pylint: disable=protected-access
+    cfg.dynamically_set_attribute__workflow = current_task.workflow  # type: ignore
+    cfg.dynamically_set_attribute__workflow_run_id = workflow_run_id  # type: ignore
+    cfg.dynamically_set_attribute__job_id = job_id  # type: ignore
 
     with TaskLogger(
         install_dir,
