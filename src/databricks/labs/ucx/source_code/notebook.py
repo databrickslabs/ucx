@@ -1,14 +1,19 @@
 from __future__ import annotations  # for type hints
 
+import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language
+
+from databricks.labs.ucx.source_code.astlinter import ASTLinter
+from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
+
 
 logger = logging.getLogger(__name__)
 # use a specific logger for sqlglot warnings so we can disable them selectively
@@ -20,6 +25,7 @@ MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'
 LANGUAGE_PI = 'LANGUAGE'
 COMMENT_PI = 'COMMENT'
+
 
 class Cell(ABC):
 
@@ -45,6 +51,23 @@ class Cell(ABC):
         raise NotImplementedError()
 
 
+class PythonLinter(ASTLinter, Linter):
+    def lint(self, code: str) -> Iterable[Advice]:
+        self.parse(code)
+        sections = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        return [
+            Advisory(
+                'code-migrate',
+                "Call to 'dbutils.notebook.run' may require adjusting the notebook path",
+                section.start_line,
+                section.start_col,
+                section.end_line,
+                section.end_col,
+            )
+            for section in sections
+        ]
+
+
 class PythonCell(Cell):
 
     @property
@@ -53,8 +76,8 @@ class PythonCell(Cell):
 
     def is_runnable(self) -> bool:
         try:
-            ast = parse_python(self._original_code)
-            return ast is not None
+            tree = parse_python(self._original_code)
+            return tree is not None
         except SyntaxError:
             return True
 
@@ -149,7 +172,7 @@ class CellLanguage(Enum):
     SQL = Language.SQL, 'sql', '--', True, SQLCell
     RUN = None, 'run', '', False, RunCell
     # see https://spec.commonmark.org/0.31.2/#html-comment
-    MARKDOWN = None, 'md', "<!--->", False,  MarkdownCell
+    MARKDOWN = None, 'md', "<!--->", False, MarkdownCell
     R = Language.R, 'r', '#', True, RCell
 
     def __init__(self, *args):
@@ -158,6 +181,7 @@ class CellLanguage(Enum):
         self._magic_name = args[1]
         self._comment_prefix = args[2]
         # PI stands for Processing Instruction
+        # pylint: disable=invalid-name
         self._requires_isolated_PI = args[3]
         self._new_cell = args[4]
 
@@ -245,7 +269,7 @@ class CellLanguage(Enum):
     def _make_runnable(self, lines: list[str], cell_language: CellLanguage):
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
         prefix_len = len(prefix)
-        comment_prefix_len = len(self.comment_prefix)
+        # pylint: disable=too-many-nested-blocks
         for i, line in enumerate(lines):
             if line.startswith(prefix):
                 line = line[prefix_len:]
