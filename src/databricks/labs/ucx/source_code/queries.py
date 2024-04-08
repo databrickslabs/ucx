@@ -1,17 +1,17 @@
 from collections.abc import Iterable
+from collections.abc import Callable
 
 import sqlglot
 from sqlglot import ParseError
 from sqlglot.expressions import Table, Expression
 
-import databricks.labs.ucx.hive_metastore.tables
-from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
+import databricks.labs.ucx.hive_metastore.tables as ucx_tables
 from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter
 
 
 class FromTable(Linter, Fixer):
-    def __init__(self, index: MigrationIndex, *, use_schema: str = ""):
-        self._index = index
+    def __init__(self, dst_lookup, *, use_schema: str = ""):
+        self._dst_lookup: Callable[[str, str], ucx_tables.Table] = dst_lookup
         self._use_schema = use_schema
 
     def name(self) -> str:
@@ -25,12 +25,12 @@ class FromTable(Linter, Fixer):
                 catalog = self._catalog(table)
                 if catalog != 'hive_metastore':
                     continue
-                dst = self._index.get(table.db, table.name)
+                dst: ucx_tables.Table = self._dst_lookup(table.db, table.name)
                 if not dst:
                     continue
                 yield Deprecation(
                     code='table-migrate',
-                    message=f"Table {table.db}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
+                    message=f"Table {table.db}.{table.name} is migrated to {dst.key} in Unity Catalog",
                     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                     start_line=0,
                     start_col=0,
@@ -49,12 +49,12 @@ class FromTable(Linter, Fixer):
         for statement in self.get_statements(code):
             if not statement:
                 continue
-            for old_table in self.get_dependencies(statement, use_schema=self._use_schema):
+            for old_table in self.get_dependencies(statement):
                 src_db = old_table.db if old_table.db else self._use_schema
-                dst = self._index.get(src_db, old_table.name)
+                dst: ucx_tables.Table = self._dst_lookup(src_db, old_table.name)
                 if not dst:
                     continue
-                new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
+                new_table = Table(catalog=dst.catalog, db=dst.database, this=dst.name)
                 old_table.replace(new_table)
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)
@@ -65,7 +65,7 @@ class FromTable(Linter, Fixer):
         return sqlglot.parse(code)
 
     @classmethod
-    def get_dependencies(cls, statement: Expression, *, use_schema: str = ""):
+    def get_dependencies(cls, statement: Expression):
         dependencies = []
         for old_table in statement.find_all(Table):
             catalog = cls._catalog(old_table)
@@ -84,6 +84,6 @@ class FromTable(Linter, Fixer):
         except ParseError as e:
             raise ValueError(f"Could not analyze view SQL: {code}") from e
         statement = statements[0]
-        for table in cls.get_dependencies(statement, use_schema=use_schema):
+        for table in cls.get_dependencies(statement):
             src_db = table.db if table.db else use_schema
-            yield databricks.labs.ucx.hive_metastore.tables.Table(table.catalog, src_db, table.name, "type", "")
+            yield ucx_tables.Table(table.catalog, src_db, table.name, "type", "")

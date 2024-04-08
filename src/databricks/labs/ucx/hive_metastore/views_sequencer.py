@@ -29,6 +29,11 @@ class ViewToMigrate(TableToMigrate):
         assert self._view_dependencies is not None
         return self._view_dependencies
 
+    @staticmethod
+    def get_view_updated_text(src, dst_lookup, schema):
+        from_table = FromTable(dst_lookup, use_schema=schema)
+        return from_table.apply(src)
+
     def _compute_dependencies(self):
         table_dependencies = set()
         view_dependencies = set()

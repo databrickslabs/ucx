@@ -30,7 +30,6 @@ from databricks.labs.ucx.hive_metastore.views_sequencer import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
-from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
@@ -77,7 +76,7 @@ class TablesMigrator:
 
     def migrate_tables(self, what: What, acl_strategy: list[AclMigrationWhat] | None = None):
         if what in [What.DB_DATASET, What.UNKNOWN]:
-            logger.error(f"Can't migrate tables with type { what.name }")
+            logger.error(f"Can't migrate tables with type {what.name}")
             return None
         all_grants_to_migrate = None if acl_strategy is None else self._gc.snapshot()
         all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
@@ -217,10 +216,17 @@ class TablesMigrator:
         return self._migrate_acl(src_table, rule, grants)
 
     def _get_view_update_sql(self, src_table: Table, rule: Rule) -> str:
-        from_table = FromTable(self._migration_status_refresher.index(), use_schema=src_table.database)
+        def lookup_dst_table(src_db: str, src_name: str) -> Table:
+            dst = self._migration_status_refresher.index().get(src_db, src_name)
+            if dst is None:
+                raise ValueError(f"Unknown schema object: {src_db}.{src_name}")
+            if not dst.dst_table or not dst.dst_catalog or not dst.dst_schema:
+                raise ValueError(f"Table {src_db}.{src_name} is not migrated.")
+            return Table(dst.dst_catalog, dst.dst_schema, dst.dst_table, "type", "")
+
         if not src_table.view_text:
             raise ValueError(f"Table{src_table.key} is not a view.")
-        new_view_text = from_table.apply(src_table.view_text)
+        new_view_text = ViewToMigrate.get_view_updated_text(src_table.view_text, lookup_dst_table, src_table.database)
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} AS {new_view_text};"
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
