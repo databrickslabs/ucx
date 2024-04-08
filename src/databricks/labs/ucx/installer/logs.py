@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LogRecord:
-    ts: int  # fully specified timestamp in UTC (offset from a workspace fs file creation timestamp)
+    timestamp: int  # fully specified timestamp in UTC (offset from a workspace fs file creation timestamp)
     job_id: int  # determined from workspace file path, resolved from the install state
     workflow_name: str
     task_name: str
@@ -126,7 +126,7 @@ class LogsRecorder:
     def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
         log_records = [
             LogRecord(
-                ts=int(
+                timestamp=int(
                     log_creation_timestamp.replace(
                         hour=int(partial_log_record.hour),
                         minute=int(partial_log_record.minute),
