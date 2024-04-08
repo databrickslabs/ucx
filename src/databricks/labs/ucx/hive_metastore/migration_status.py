@@ -27,6 +27,16 @@ class MigrationStatus:
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
+@dataclass
+class TableView:
+    catalog: str
+    schema: str
+    name: str
+
+    def key(self):
+        return f"{self.catalog}.{self.schema}.{self.name}".lower()
+
+
 class MigrationIndex:
     def __init__(self, tables: list[MigrationStatus]):
         self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}

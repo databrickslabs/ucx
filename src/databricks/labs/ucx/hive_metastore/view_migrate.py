@@ -30,15 +30,15 @@ class ViewToMigrate(TableToMigrate):
         return self._view_dependencies
 
     @staticmethod
-    def get_view_updated_text(src, index: MigrationIndex, schema):
+    def get_view_updated_text(src: str, index: MigrationIndex, schema: str):
         from_table = FromTable(index, use_schema=schema)
         return from_table.apply(src)
 
     def _compute_dependencies(self):
         table_dependencies = set()
         view_dependencies = set()
-        for table_with_key in FromTable.get_view_sql_dependencies(self.src.view_text, use_schema=self.src.database):
-            table = self._fetch_table(table_with_key.key)
+        for table_with_key in FromTable.view_dependencies(self.src.view_text, use_schema=self.src.database):
+            table = self._fetch_table(table_with_key.key())
             if table is None:
                 raise ValueError(
                     f"Unknown schema object: {table_with_key.key} in view SQL: {self.src.view_text} of table {self.src.key}"
