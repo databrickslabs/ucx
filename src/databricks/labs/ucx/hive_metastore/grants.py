@@ -431,29 +431,6 @@ class PrincipalACL:
         self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
 
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation, sql_backend: SqlBackend):
-        config = installation.load(WorkspaceConfig)
-
-        tables_crawler = TablesCrawler(sql_backend, config.inventory_database)
-        mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
-        if ws.config.is_azure:
-            azure_acl = AzureACL.for_cli(ws, installation)
-            return cls(
-                ws,
-                sql_backend,
-                installation,
-                tables_crawler,
-                mount_crawler,
-                azure_acl.get_eligible_locations_principals(),
-            )
-        if ws.config.is_aws:
-            return None
-        if ws.config.is_gcp:
-            logger.error("UCX is not supported for GCP yet. Please run it on azure or aws")
-            return None
-        return None
-
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
         mounts = list(self._mounts_crawler.snapshot())

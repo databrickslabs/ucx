@@ -46,30 +46,8 @@ _SPARK_CONF = {
 }
 
 
-def principal_acl(ws, inventory_schema, sql_backend):
-    # FIXME!!!! REMOVE
-    installation = MockInstallation(
-        {
-            "config.yml": {
-                'inventory_database': inventory_schema,
-            },
-            "azure_storage_account_info.csv": [
-                {
-                    'prefix': 'dummy_prefix',
-                    'client_id': 'dummy_application_id',
-                    'principal': 'dummy_principal',
-                    'privilege': 'WRITE_FILES',
-                    'type': 'Application',
-                    'directory_id': 'dummy_directory',
-                }
-            ],
-        }
-    )
-    return PrincipalACL.for_cli(ws, installation, sql_backend)
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog, make_schema, make_table):
+def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
@@ -242,24 +220,17 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, make_schema
     assert "SYNC command failed to migrate" in caplog.text
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_revert_migrated_table(
-    ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog
-):  # pylint: disable=too-many-locals
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_revert_migrated_table(sql_backend, runtime_ctx, make_schema, make_catalog):
     src_schema1 = make_schema(catalog_name="hive_metastore")
     src_schema2 = make_schema(catalog_name="hive_metastore")
-    table_to_revert = make_table(schema_name=src_schema1.name)
-    table_not_migrated = make_table(schema_name=src_schema1.name)
-    table_to_not_revert = make_table(schema_name=src_schema2.name)
-    all_tables = [table_to_revert, table_not_migrated, table_to_not_revert]
+    table_to_revert = runtime_ctx.make_table(schema_name=src_schema1.name)
+    table_not_migrated = runtime_ctx.make_table(schema_name=src_schema1.name)
+    table_to_not_revert = runtime_ctx.make_table(schema_name=src_schema2.name)
 
     dst_catalog = make_catalog()
     dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
     dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
-
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
 
     rules = [
         Rule(
@@ -279,31 +250,20 @@ def test_revert_migrated_table(
             table_to_not_revert.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = principal_acl(ws, inventory_schema, sql_backend)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        sql_backend,
-        table_mapping,
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
-    )
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
 
-    table_migrate.revert_migrated_tables(src_schema1.name, delete_managed=True)
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+
+    runtime_ctx.tables_migrator.revert_migrated_tables(src_schema1.name, delete_managed=True)
 
     # Checking that two of the tables were reverted and one was left intact.
     # The first two table belongs to schema 1 and should have not "upgraded_to" property
-    assert not table_migrate.is_migrated(table_to_revert.schema_name, table_to_revert.name)
+    assert not runtime_ctx.tables_migrator.is_migrated(table_to_revert.schema_name, table_to_revert.name)
     # The second table didn't have the "upgraded_to" property set and should remain that way.
-    assert not table_migrate.is_migrated(table_not_migrated.schema_name, table_not_migrated.name)
+    assert not runtime_ctx.tables_migrator.is_migrated(table_not_migrated.schema_name, table_not_migrated.name)
     # The third table belongs to schema2 and had the "upgraded_to" property set and should remain that way.
-    assert table_migrate.is_migrated(table_to_not_revert.schema_name, table_to_not_revert.name)
+    assert runtime_ctx.tables_migrator.is_migrated(table_to_not_revert.schema_name, table_to_not_revert.name)
 
     target_tables_schema1 = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema1.full_name}"))
     assert len(target_tables_schema1) == 0
