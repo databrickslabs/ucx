@@ -41,7 +41,7 @@ def _get_task_names_at_runtime(log_path: Path) -> list[str]:
     return task_names
 
 
-def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.Match, str]:
+def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.Match | None, str]:
     """
     A single log record message may span multiple log lines. In this case, the regex on
     subsequent lines do not match.
@@ -53,7 +53,6 @@ def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.
         multi_line_message += "\n" + next_line.rstrip()
         next_line = log.readline()
         next_match = pattern.match(next_line)
-    assert next_match is not None
     return next_line, next_match, multi_line_message
 
 
