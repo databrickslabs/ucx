@@ -44,7 +44,7 @@ def mock_installation() -> MockInstallation:
 
 @pytest.fixture
 def run_workflow(mocker):
-    def inner(callable, **replace) -> RuntimeContext:
+    def inner(cb, **replace) -> RuntimeContext:
         with _lock, patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
             pyspark_sql_session = mocker.Mock()
             sys.modules["pyspark.sql.session"] = pyspark_sql_session
@@ -57,13 +57,15 @@ def run_workflow(mocker):
                 replace['sql_backend'] = MockBackend()
             if 'config' not in replace:
                 replace['config'] = installation.load(WorkspaceConfig)
-            ctx = RuntimeContext().replace(**replace)
 
-            module = __import__(callable.__module__, fromlist=[callable.__name__])
-            klass, method = callable.__qualname__.split('.', 1)
+            module = __import__(cb.__module__, fromlist=[cb.__name__])
+            klass, method = cb.__qualname__.split('.', 1)
             workflow = getattr(module, klass)()
             current_task = getattr(workflow, method)
+
+            ctx = RuntimeContext().replace(**replace)
             current_task(ctx)
+
             return ctx
 
     yield inner

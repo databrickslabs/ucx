@@ -30,7 +30,9 @@ class RuntimeContext(GlobalContext):
 
     @cached_property
     def connect_config(self) -> core.Config:
-        return self.config.connect
+        connect = self.config.connect
+        assert connect, "connect is required"
+        return connect
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
