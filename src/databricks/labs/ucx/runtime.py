@@ -16,6 +16,7 @@ from databricks.labs.ucx.workspace_access.workflows import (
     GroupMigration,
     PermissionsMigrationAPI,
     RemoveWorkspaceLocalGroups,
+    ValidateGroupPermissions,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class Workflows:
                 Assessment(),
                 GroupMigration(),
                 TableMigration(),
+                ValidateGroupPermissions(),
                 RemoveWorkspaceLocalGroups(),
                 MigrateTablesInMounts(),
                 PermissionsMigrationAPI(),

@@ -88,6 +88,16 @@ class PermissionsMigrationAPI(Workflow):
         migration_state.apply_to_renamed_groups(ctx.workspace_client)
 
 
+class ValidateGroupPermissions(Workflow):
+    def __init__(self):
+        super().__init__('validate-groups-permissions')
+
+    @job_task(job_cluster="tacl")
+    def validate_groups_permissions(self, ctx: RuntimeContext):
+        """Validate that all the crawled permissions are applied correctly to the destination groups."""
+        ctx.permission_manager.verify_group_permissions()
+
+
 class RemoveWorkspaceLocalGroups(Workflow):
     def __init__(self):
         super().__init__('remove-workspace-local-backup-groups')
