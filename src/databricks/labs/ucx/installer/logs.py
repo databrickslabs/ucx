@@ -84,7 +84,7 @@ class LogsRecorder:
         workflow: str,
         job_id: int,
         job_run_id: int,
-        backend: SqlBackend,
+        sql_backend: SqlBackend,
         schema: str,
         *,
         minimum_log_level: int = logging.WARNING,
@@ -97,7 +97,7 @@ class LogsRecorder:
             workflow (str): The workflow name.
             job_id (int): The job id of the job to store the log records for.
             job_run_id (int): The job run id of the job to store the log records for.
-            backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
+            sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema (str): The schema name for the logs persistence.
             minimum_log_level (int) : The minimum log level to record, all records with a lower log level are excluded.
         """
@@ -107,7 +107,7 @@ class LogsRecorder:
         self._workflow = workflow
         self._job_id = job_id
         self._job_run_id = job_run_id
-        self._backend = backend
+        self._sql_backend = sql_backend
         self._schema = schema
         self._minimum_log_level = minimum_log_level
 
@@ -144,7 +144,7 @@ class LogsRecorder:
             for partial_log_record in parse_logs(log)
             if logging.getLevelName(partial_log_record.level) >= self._minimum_log_level
         ]
-        self._backend.save_table(
+        self._sql_backend.save_table(
             self.full_name,
             log_records,
             LogRecord,
