@@ -11,6 +11,7 @@ from typing import Any
 import databricks.sdk.errors
 from databricks.labs.blueprint.entrypoint import get_logger
 from databricks.labs.blueprint.installation import Installation, SerdeError
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.upgrades import Upgrades
@@ -142,12 +143,14 @@ class WorkspaceInstaller:
         if not wheel_builder_factory:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
+        install_state = InstallState.from_installation(self._installation)
         workflows_installer = WorkflowsDeployment(
-            config, self._installation, self._ws, wheels, self._product_info, verify_timeout
+            config, self._installation, install_state, self._ws, wheels, self._product_info, verify_timeout
         )
         workspace_installation = WorkspaceInstallation(
             config,
             self._installation,
+            install_state,
             sql_backend_factory(config),
             self._ws,
             workflows_installer,
@@ -342,6 +345,7 @@ class WorkspaceInstallation(InstallationMixin):
         self,
         config: WorkspaceConfig,
         installation: Installation,
+        install_state: InstallState,
         sql_backend: SqlBackend,
         ws: WorkspaceClient,
         workflows_installer: WorkflowsDeployment,
@@ -350,6 +354,7 @@ class WorkspaceInstallation(InstallationMixin):
     ):
         self._config = config
         self._installation = installation
+        self._install_state = install_state
         self._ws = ws
         self._sql_backend = sql_backend
         self._workflows_installer = workflows_installer
@@ -361,14 +366,32 @@ class WorkspaceInstallation(InstallationMixin):
     def current(cls, ws: WorkspaceClient):
         product_info = ProductInfo.from_class(WorkspaceConfig)
         installation = product_info.current_installation(ws)
+        install_state = InstallState.from_installation(installation)
         config = installation.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
-        workflows_installer = WorkflowsDeployment(config, installation, ws, wheels, product_info, timeout)
+        workflows_installer = WorkflowsDeployment(
+            config,
+            installation,
+            install_state,
+            ws,
+            wheels,
+            product_info,
+            timeout,
+        )
 
-        return cls(config, installation, sql_backend, ws, workflows_installer, prompts, product_info)
+        return cls(
+            config,
+            installation,
+            install_state,
+            sql_backend,
+            ws,
+            workflows_installer,
+            prompts,
+            product_info,
+        )
 
     @property
     def config(self):
@@ -387,8 +410,9 @@ class WorkspaceInstallation(InstallationMixin):
                 self._create_database,
             ],
         )
-        self._workflows_installer.create_jobs(self._prompts)
-        readme_url = self._create_readme()
+        readme_url = self._workflows_installer.create_jobs(self._prompts)
+        if self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+            webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
         if self._prompts.confirm("Do you want to trigger assessment job ?"):
@@ -418,7 +442,7 @@ class WorkspaceInstallation(InstallationMixin):
         local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         dash = DashboardFromFiles(
             self._ws,
-            state=self._workflows_installer.state,
+            state=self._install_state,
             local_folder=local_query_files,
             remote_folder=f"{self._installation.install_folder()}/queries",
             name_prefix=self._name("UCX "),
@@ -426,54 +450,6 @@ class WorkspaceInstallation(InstallationMixin):
             query_text_callback=self._config.replace_inventory_variable,
         )
         dash.create_dashboards()
-
-    def _create_readme(self) -> str:
-        debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
-        markdown = [
-            "# UCX - The Unity Catalog Migration Assistant",
-            f'To troubleshoot, see {debug_notebook_link}.\n',
-            "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
-            "All jobs are defined with necessary cluster configurations and DBR versions.\n",
-        ]
-        for step_name in self.step_list():
-            if step_name not in self._workflows_installer.state.jobs:
-                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
-                continue
-            job_id = self._workflows_installer.state.jobs[step_name]
-            dashboard_link = ""
-            dashboards_per_step = [
-                d for d in self._workflows_installer.state.dashboards.keys() if d.startswith(step_name)
-            ]
-            for dash in dashboards_per_step:
-                if len(dashboard_link) == 0:
-                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
-                first, second = dash.replace("_", " ").title().split()
-                dashboard_url = (
-                    f"{self._ws.config.host}/sql/dashboards/{self._workflows_installer.state.dashboards[dash]}"
-                )
-                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
-            job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            markdown.append("---\n\n")
-            markdown.append(f"## {job_link}\n\n")
-            markdown.append(f"{dashboard_link}")
-            markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
-            for task in self.sorted_tasks():
-                if task.workflow != step_name:
-                    continue
-                doc = self._config.replace_inventory_variable(task.doc)
-                markdown.append(f"### `{task.name}`\n\n")
-                markdown.append(f"{doc}\n")
-                markdown.append("\n\n")
-        preamble = ["# Databricks notebook source", "# MAGIC %md"]
-        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
-        self._installation.upload('README.py', intro.encode('utf8'))
-        readme_url = self._installation.workspace_link('README')
-        if self._prompts and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
-            webbrowser.open(readme_url)
-        return readme_url
-
-    def _replace_inventory_variable(self, text: str) -> str:
-        return text.replace("$inventory", f"hive_metastore.{self._config.inventory_database}")
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
@@ -522,10 +498,10 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _remove_jobs(self):
         logger.info("Deleting jobs")
-        if not self._workflows_installer.state.jobs:
+        if not self._install_state.jobs:
             logger.error("No jobs present or jobs already deleted")
             return
-        for step_name, job_id in self._workflows_installer.state.jobs.items():
+        for step_name, job_id in self._install_state.jobs.items():
             try:
                 logger.info(f"Deleting {step_name} job_id={job_id}.")
                 self._ws.jobs.delete(job_id)
@@ -542,12 +518,8 @@ class WorkspaceInstallation(InstallationMixin):
         except InvalidParameterValue:
             logger.error("Error accessing warehouse details")
 
-    def validate_and_run(self, step: str):
-        if not self._workflows_installer.validate_step(step):
-            self._workflows_installer.run_workflow(step)
-
     def _trigger_workflow(self, step: str):
-        job_id = int(self._workflows_installer.state.jobs[step])
+        job_id = int(self._install_state.jobs[step])
         job_url = f"{self._ws.config.host}#job/{job_id}"
         logger.debug(f"triggering {step} job: {self._ws.config.host}#job/{job_id}")
         self._ws.jobs.run_now(job_id)

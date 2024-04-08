@@ -5,7 +5,7 @@
     "name": "view_src",
     "object_type": "VIEW",
     "table_format": "VIEW",
-    "view_text": "SELECT * FROM table"
+    "view_text": "SELECT * FROM db1_src.managed_dbfs"
   },
   "rule": {
     "workspace_name": "workspace",

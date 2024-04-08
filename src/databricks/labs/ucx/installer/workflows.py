@@ -2,14 +2,16 @@ import logging
 import re
 import sys
 import webbrowser
+from collections.abc import Collection
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
+from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
@@ -100,42 +102,14 @@ main(f'--config=/Workspace{config_file}',
 """
 
 
-class WorkflowsDeployment(InstallationMixin):
-    def __init__(
-        self,
-        config: WorkspaceConfig,
-        installation: Installation,
-        ws: WorkspaceClient,
-        wheels: WheelsV2,
-        product_info: ProductInfo,
-        verify_timeout: timedelta,
-    ):
-        self._config = config
-        self._installation = installation
+class DeployedWorkflows:
+    def __init__(self, ws: WorkspaceClient, install_state: InstallState, verify_timeout: timedelta):
         self._ws = ws
-        self._state = InstallState.from_installation(installation)
-        self._wheels = wheels
-        self._product_info = product_info
+        self._install_state = install_state
         self._verify_timeout = verify_timeout
-        self._this_file = Path(__file__)
-        super().__init__(config, installation, ws)
-
-    @classmethod
-    def current(cls, ws: WorkspaceClient):
-        product_info = ProductInfo.from_class(WorkspaceConfig)
-        installation = product_info.current_installation(ws)
-        config = installation.load(WorkspaceConfig)
-        wheels = product_info.wheels(ws)
-        timeout = timedelta(minutes=2)
-
-        return cls(config, installation, ws, wheels, product_info, timeout)
-
-    @property
-    def state(self):
-        return self._state
 
     def run_workflow(self, step: str):
-        job_id = int(self._state.jobs[step])
+        job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_initial_run = self._ws.jobs.run_now(job_id)
         if job_initial_run.run_id:
@@ -146,32 +120,6 @@ class WorkflowsDeployment(InstallationMixin):
                 raise self._infer_error_from_job_run(job_run) from err
             return
         raise NotFound(f"job run not found for {step}")
-
-    def create_jobs(self, prompts):
-        logger.debug(f"Creating jobs from tasks in {main.__name__}")
-        remote_wheel = self._upload_wheel(prompts)
-        desired_steps = {t.workflow for t in _TASKS.values() if t.cloud_compatible(self._ws.config)}
-        wheel_runner = None
-
-        if self._config.override_clusters:
-            wheel_runner = self._upload_wheel_runner(remote_wheel)
-        for step_name in desired_steps:
-            settings = self._job_settings(step_name, remote_wheel)
-            if self._config.override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
-            self._deploy_workflow(step_name, settings)
-
-        for step_name, job_id in self._state.jobs.items():
-            if step_name not in desired_steps:
-                try:
-                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
-                    self._ws.jobs.delete(job_id)
-                except InvalidParameterValue:
-                    logger.warning(f"step={step_name} does not exist anymore for some reason")
-                    continue
-
-        self._state.save()
-        self._create_debug(remote_wheel)
 
     def repair_run(self, workflow):
         try:
@@ -189,7 +137,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def latest_job_status(self) -> list[dict]:
         latest_status = []
-        for step, job_id in self._state.jobs.items():
+        for step, job_id in self._install_state.jobs.items():
             job_state = None
             start_time = None
             try:
@@ -217,7 +165,7 @@ class WorkflowsDeployment(InstallationMixin):
         return latest_status
 
     def validate_step(self, step: str) -> bool:
-        job_id = int(self.state.jobs[step])
+        job_id = int(self._install_state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
@@ -235,39 +183,47 @@ class WorkflowsDeployment(InstallationMixin):
                 return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
         return False
 
-    @property
-    def _config_file(self):
-        return f"{self._installation.install_folder()}/config.yml"
+    @staticmethod
+    def _readable_timedelta(epoch):
+        when = datetime.utcfromtimestamp(epoch)
+        duration = datetime.now() - when
+        data = {}
+        data["days"], remaining = divmod(duration.total_seconds(), 86_400)
+        data["hours"], remaining = divmod(remaining, 3_600)
+        data["minutes"], data["seconds"] = divmod(remaining, 60)
 
-    def _job_cluster_spark_conf(self, cluster_key: str):
-        conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
-        if cluster_key == "main":
-            spark_conf = {
-                "spark.databricks.cluster.profile": "singleNode",
-                "spark.master": "local[*]",
-            }
-            return spark_conf | conf_from_installation
-        if cluster_key == "tacl":
-            return {"spark.databricks.acl.sqlOnly": "true"} | conf_from_installation
-        if cluster_key == "table_migration":
-            return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
-        return conf_from_installation
+        time_parts = ((name, round(value)) for (name, value) in data.items())
+        time_parts = [f"{value} {name[:-1] if value == 1 else name}" for name, value in time_parts if value > 0]
+        if len(time_parts) > 0:
+            time_parts.append("ago")
+        if time_parts:
+            return " ".join(time_parts)
+        return "less than 1 second ago"
 
-    def _deploy_workflow(self, step_name: str, settings):
-        if step_name in self._state.jobs:
-            try:
-                job_id = int(self._state.jobs[step_name])
-                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
-                return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
-            except InvalidParameterValue:
-                del self._state.jobs[step_name]
-                logger.warning(f"step={step_name} does not exist anymore for some reason")
-                return self._deploy_workflow(step_name, settings)
-        logger.info(f"Creating new job configuration for step={step_name}")
-        new_job = self._ws.jobs.create(**settings)
-        assert new_job.job_id is not None
-        self._state.jobs[step_name] = str(new_job.job_id)
-        return None
+    def _repair_workflow(self, workflow):
+        job_id = self._install_state.jobs.get(workflow)
+        if not job_id:
+            raise InvalidParameterValue("job does not exists hence skipping repair")
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        if not job_runs:
+            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
+        latest_job_run = job_runs[0]
+        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
+        retried_check = retry_on_attribute_error(self._get_result_state)
+        state_value = retried_check(job_id)
+        logger.info(f"The status for the latest run is {state_value}")
+        if state_value != "FAILED":
+            raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
+        run_id = latest_job_run.run_id
+        return job_id, run_id
+
+    def _get_result_state(self, job_id):
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        latest_job_run = job_runs[0]
+        if not latest_job_run.state.result_state:
+            raise AttributeError("no result state in job run")
+        job_state = latest_job_run.state.result_state.value
+        return job_state
 
     def _infer_error_from_job_run(self, job_run) -> Exception:
         errors: list[Exception] = []
@@ -340,6 +296,7 @@ class WorkflowsDeployment(InstallationMixin):
         constructors: dict[re.Pattern, type[Exception]] = {
             re.compile(r".*\[TABLE_OR_VIEW_NOT_FOUND] (.*)"): NotFound,
             re.compile(r".*\[SCHEMA_NOT_FOUND] (.*)"): NotFound,
+            re.compile(r".*\[TimeoutException] (.*)"): TimeoutError,
         }
         for klass in needles:
             constructors[re.compile(f".*{klass.__name__}: (.*)")] = klass
@@ -349,7 +306,151 @@ class WorkflowsDeployment(InstallationMixin):
                 return klass(match.group(1))
         return Unknown(haystack)
 
-    def _upload_wheel(self, prompts):
+
+class WorkflowsDeployment(InstallationMixin):
+    def __init__(
+        self,
+        config: WorkspaceConfig,
+        installation: Installation,
+        install_state: InstallState,
+        ws: WorkspaceClient,
+        wheels: WheelsV2,
+        product_info: ProductInfo,
+        verify_timeout: timedelta,
+        tasks: list[Task] | None = None,
+    ):
+        self._config = config
+        self._installation = installation
+        self._ws = ws
+        self._install_state = install_state
+        self._wheels = wheels
+        self._product_info = product_info
+        self._verify_timeout = verify_timeout
+        self._tasks = self._sort_tasks(tasks if tasks else _TASKS.values())
+        self._this_file = Path(__file__)
+        super().__init__(config, installation, ws)
+
+    @staticmethod
+    def _sort_tasks(tasks: Collection[Task]) -> list[Task]:
+        return sorted(tasks, key=lambda x: x.task_id)
+
+    @classmethod
+    def for_cli(cls, ws: WorkspaceClient):
+        product_info = ProductInfo.from_class(WorkspaceConfig)
+        installation = product_info.current_installation(ws)
+        install_state = InstallState.from_installation(installation)
+        timeout = timedelta(minutes=2)
+
+        return DeployedWorkflows(ws, install_state, timeout)
+
+    def create_jobs(self, prompts):
+        logger.debug(f"Creating jobs from tasks in {main.__name__}")
+        remote_wheel = self._upload_wheel(prompts)
+        desired_steps = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
+        wheel_runner = None
+
+        if self._config.override_clusters:
+            wheel_runner = self._upload_wheel_runner(remote_wheel)
+        for step_name in desired_steps:
+            settings = self._job_settings(step_name, remote_wheel)
+            if self._config.override_clusters:
+                settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
+            self._deploy_workflow(step_name, settings)
+
+        for step_name, job_id in self._install_state.jobs.items():
+            if step_name not in desired_steps:
+                try:
+                    logger.info(f"Removing job_id={job_id}, as it is no longer needed")
+                    self._ws.jobs.delete(job_id)
+                except InvalidParameterValue:
+                    logger.warning(f"step={step_name} does not exist anymore for some reason")
+                    continue
+
+        self._install_state.save()
+        self._create_debug(remote_wheel)
+        return self._create_readme()
+
+    @property
+    def _config_file(self):
+        return f"{self._installation.install_folder()}/config.yml"
+
+    def _create_readme(self) -> str:
+        debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
+        markdown = [
+            "# UCX - The Unity Catalog Migration Assistant",
+            f'To troubleshoot, see {debug_notebook_link}.\n',
+            "Here are the URLs and descriptions of workflows that trigger various stages of migration.",
+            "All jobs are defined with necessary cluster configurations and DBR versions.\n",
+        ]
+        for step_name in self._step_list():
+            if step_name not in self._install_state.jobs:
+                logger.warning(f"Skipping step '{step_name}' since it was not deployed.")
+                continue
+            job_id = self._install_state.jobs[step_name]
+            dashboard_link = ""
+            dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
+            for dash in dashboards_per_step:
+                if len(dashboard_link) == 0:
+                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
+                first, second = dash.replace("_", " ").title().split()
+                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
+                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
+            job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
+            markdown.append("---\n\n")
+            markdown.append(f"## {job_link}\n\n")
+            markdown.append(f"{dashboard_link}")
+            markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
+            for task in self._tasks:
+                if task.workflow != step_name:
+                    continue
+                doc = self._config.replace_inventory_variable(task.doc)
+                markdown.append(f"### `{task.name}`\n\n")
+                markdown.append(f"{doc}\n")
+                markdown.append("\n\n")
+        preamble = ["# Databricks notebook source", "# MAGIC %md"]
+        intro = "\n".join(preamble + [f"# MAGIC {line}" for line in markdown])
+        self._installation.upload('README.py', intro.encode('utf8'))
+        readme_url = self._installation.workspace_link('README')
+        return readme_url
+
+    def _step_list(self) -> list[str]:
+        step_list = []
+        for task in self._tasks:
+            if task.workflow not in step_list:
+                step_list.append(task.workflow)
+        return step_list
+
+    def _job_cluster_spark_conf(self, cluster_key: str):
+        conf_from_installation = self._config.spark_conf if self._config.spark_conf else {}
+        if cluster_key == "main":
+            spark_conf = {
+                "spark.databricks.cluster.profile": "singleNode",
+                "spark.master": "local[*]",
+            }
+            return spark_conf | conf_from_installation
+        if cluster_key == "tacl":
+            return {"spark.databricks.acl.sqlOnly": "true"} | conf_from_installation
+        if cluster_key == "table_migration":
+            return {"spark.sql.sources.parallelPartitionDiscovery.parallelism": "200"} | conf_from_installation
+        return conf_from_installation
+
+    def _deploy_workflow(self, step_name: str, settings):
+        if step_name in self._install_state.jobs:
+            try:
+                job_id = int(self._install_state.jobs[step_name])
+                logger.info(f"Updating configuration for step={step_name} job_id={job_id}")
+                return self._ws.jobs.reset(job_id, jobs.JobSettings(**settings))
+            except InvalidParameterValue:
+                del self._install_state.jobs[step_name]
+                logger.warning(f"step={step_name} does not exist anymore for some reason")
+                return self._deploy_workflow(step_name, settings)
+        logger.info(f"Creating new job configuration for step={step_name}")
+        new_job = self._ws.jobs.create(**settings)
+        assert new_job.job_id is not None
+        self._install_state.jobs[step_name] = str(new_job.job_id)
+        return None
+
+    def _upload_wheel(self, prompts: Prompts):
         with self._wheels:
             try:
                 self._wheels.upload_to_dbfs()
@@ -391,10 +492,7 @@ class WorkflowsDeployment(InstallationMixin):
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
-        tasks = sorted(
-            [t for t in _TASKS.values() if t.workflow == step_name],
-            key=lambda _: _.name,
-        )
+        tasks = [t for t in self._tasks if t.workflow == step_name]
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -409,7 +507,7 @@ class WorkflowsDeployment(InstallationMixin):
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
-            depends_on=[jobs.TaskDependency(task_key=d) for d in _TASKS[task.name].dependencies()],
+            depends_on=[jobs.TaskDependency(task_key=d) for d in task.dependencies()],
         )
         if task.dashboard:
             # dashboards are created in parallel to wheel uploads, so we'll just retry
@@ -422,7 +520,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
-        dashboard_id = self._state.dashboards[task.dashboard]
+        dashboard_id = self._install_state.dashboards[task.dashboard]
         return replace(
             jobs_task,
             job_cluster_key=None,
@@ -516,34 +614,9 @@ class WorkflowsDeployment(InstallationMixin):
         readme_link = self._installation.workspace_link('README')
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
-            for step_name, job_id in self._state.jobs.items()
+            for step_name, job_id in self._install_state.jobs.items()
         )
         content = DEBUG_NOTEBOOK.format(
             remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
-
-    def _repair_workflow(self, workflow):
-        job_id = self._state.jobs.get(workflow)
-        if not job_id:
-            raise InvalidParameterValue("job does not exists hence skipping repair")
-        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-        if not job_runs:
-            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
-        latest_job_run = job_runs[0]
-        retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
-        retried_check = retry_on_attribute_error(self._get_result_state)
-        state_value = retried_check(job_id)
-        logger.info(f"The status for the latest run is {state_value}")
-        if state_value != "FAILED":
-            raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
-        run_id = latest_job_run.run_id
-        return job_id, run_id
-
-    def _get_result_state(self, job_id):
-        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-        latest_job_run = job_runs[0]
-        if not latest_job_run.state.result_state:
-            raise AttributeError("no result state in job run")
-        job_state = latest_job_run.state.result_state.value
-        return job_state

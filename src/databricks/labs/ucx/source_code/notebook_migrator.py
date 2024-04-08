@@ -4,7 +4,7 @@ from databricks.sdk.service.workspace import ExportFormat, ObjectInfo
 from databricks.labs.ucx.source_code.languages import Languages
 
 
-class Notebooks:
+class NotebookMigrator:
     def __init__(self, ws: WorkspaceClient, languages: Languages):
         self._ws = ws
         self._languages = languages
