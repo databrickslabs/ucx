@@ -40,6 +40,7 @@ PARTIAL_LOG_RECORDS = [
 
 @pytest.fixture()
 def log_path(tmp_path: Path) -> Iterator[Path]:
+    """The TaskLogger is reused so that parsing works against the currnet log format."""
     logger = logging.getLogger(COMPONENT)
     with TaskLogger(
         tmp_path,
@@ -56,6 +57,10 @@ def log_path(tmp_path: Path) -> Iterator[Path]:
 
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
+    """Verify the parsing of the logs.
+
+    The time attribute are not tested as these are set differently on each test run.
+    """
     expected_partial_log_records = [
         getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS
     ]
@@ -65,6 +70,7 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
 
 
 def test_parse_logs_last_message_is_present(log_path: Path) -> None:
+    """Verify if the last log message is present."""
     with log_path.open("r") as f:
         log_records = list(logs.parse_logs(f))
     assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
@@ -72,6 +78,7 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
+    """End-to-end test for parsing logs with LogsRecorder."""
     expected_log_records = [getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS]
 
     log_creation_time = log_path.stat().st_ctime
@@ -96,6 +103,7 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
 
 
 def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path):
+    """Parse a subset of the log records using the default minimum_log_level."""
     log_creation_time = log_path.stat().st_ctime
     log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
