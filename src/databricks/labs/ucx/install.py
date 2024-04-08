@@ -23,7 +23,7 @@ from databricks.labs.blueprint.wheels import (
 )
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
@@ -135,9 +135,11 @@ class WorkspaceInstaller:
         verify_timeout=timedelta(minutes=2),
         sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
         wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+        config: WorkspaceConfig | None = None,
     ):
         logger.info(f"Installing UCX v{self._product_info.version()}")
-        config = self.configure()
+        if config is None:
+            config = self.configure()
         if not sql_backend_factory:
             sql_backend_factory = self._new_sql_backend
         if not wheel_builder_factory:
@@ -531,11 +533,28 @@ if __name__ == "__main__":
     logger = get_logger(__file__)
     logger.setLevel("INFO")
     app = ProductInfo.from_class(WorkspaceConfig)
-    workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    try:
-        current = app.current_installation(workspace_client)
-    except NotFound:
-        current = Installation.assume_global(workspace_client, app.product_name())
+
     prmpts = Prompts()
-    installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
-    installer.run()
+    if prmpts.confirm("Do you want to install UCX on all the workspaces in the current Databricks account?"):
+        account_client = AccountClient(product="ucx", product_version=__version__)
+        if not account_client.config.is_account_client:
+            raise SystemExit("Cannot install UCX on all workspaces from a non-account client. Exiting...")
+        for workspace in account_client.workspaces.list():
+            logger.info(f"Processing workspace {workspace.workspace_name}")
+            host = account_client.config.host.replace('accounts', workspace.deployment_name)
+            workspace_client = WorkspaceClient(host=host)
+            try:
+                current = app.current_installation(workspace_client)
+            except NotFound:
+                current = Installation.assume_global(workspace_client, app.product_name())
+            installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
+            installer.run()
+    else:
+        workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
+        try:
+            current = app.current_installation(workspace_client)
+        except NotFound:
+            current = Installation.assume_global(workspace_client, app.product_name())
+        prmpts = Prompts()
+        installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
+        installer.run()

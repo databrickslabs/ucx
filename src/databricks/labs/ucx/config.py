@@ -52,6 +52,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_mounts: list[str] | None = None
     exclude_paths_in_mount: list[str] | None = None
 
+    # Whether ucx is installed on all workspaces
+    installed_workspace_ids: list[str] | None = None
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
