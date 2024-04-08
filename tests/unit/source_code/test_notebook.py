@@ -195,14 +195,14 @@ def test_notebook_builds_python_dependency_graph():
     assert actual == set(paths)
 
 
-def test_detects_call_to_dbutils_notebook_run_in_python_code_():
+def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(Notebook, "run_notebooks.py.txt")
     linter = PythonLinter()
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
-            code='code-migrate',
-            message="Call to 'dbutils.notebook.run' may require adjusting the notebook path",
+            code='notebook-manual-migrate',
+            message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
             start_line=14,
             start_col=13,
             end_line=14,
@@ -210,6 +210,21 @@ def test_detects_call_to_dbutils_notebook_run_in_python_code_():
         )
     ] == advices
 
+
+def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
+    sources: list[str] = _load_sources(Notebook, "root4.py.txt")
+    linter = PythonLinter()
+    advices = list(linter.lint(sources[0]))
+    assert [
+        Advisory(
+            code='notebook-auto-migrate',
+            message="Call to 'dbutils.notebook.run' will be migrated automatically",
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=38,
+        )
+    ] == advices
 
 def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
     source = """

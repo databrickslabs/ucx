@@ -63,16 +63,16 @@ class PythonLinter(ASTLinter, Linter):
         path = cls.get_dbutils_notebook_run_path_arg(node)
         if isinstance(path, ast.Constant):
             return Advisory(
-                'code-migrate',
-                "Call to 'dbutils.notebook.run' may require adjusting the notebook path",
+                'notebook-auto-migrate',
+                "Call to 'dbutils.notebook.run' will be migrated automatically",
                 node.lineno,
                 node.col_offset,
                 node.end_lineno or 0,
                 node.end_col_offset or 0,
             )
         return Advisory(
-            'code-migrate',
-            "Call to 'dbutils.notebook.run' may require adjusting the notebook path",
+            'notebook-manual-migrate',
+            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
             node.lineno,
             node.col_offset,
             node.end_lineno or 0,
