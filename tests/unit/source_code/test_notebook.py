@@ -3,7 +3,8 @@ from collections.abc import Callable
 import pytest
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph
+from databricks.labs.ucx.source_code.base import Advisory
+from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph, PythonLinter
 from tests.unit import _load_sources
 
 # fmt: off
@@ -180,3 +181,19 @@ def test_notebook_builds_cyclical_dependency_graph():
     notebook.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
+
+
+def test_detects_call_to_dbutils_notebook_run_in_python_code_():
+    sources: list[str] = _load_sources(Notebook, "run_notebooks.py.txt")
+    linter = PythonLinter()
+    advices = list(linter.lint(sources[0]))
+    assert [
+        Advisory(
+            code='code-migrate',
+            message="Call to 'dbutils.notebook.run' may require adjusting the notebook path",
+            start_line=14,
+            start_col=13,
+            end_line=14,
+            end_col=50,
+        )
+    ] == advices
