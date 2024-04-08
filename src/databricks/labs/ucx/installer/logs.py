@@ -41,13 +41,13 @@ def peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.M
     subsequent lines do not match.
     """
     multi_line_message = ""
-    next_line = log.readline()
-    next_match = pattern.match(next_line)
-    while len(next_line) > 0 and next_match is None:
-        multi_line_message += "\n" + next_line.rstrip()
-        next_line = log.readline()
-        next_match = pattern.match(next_line)
-    return next_line, next_match, multi_line_message
+    line = log.readline()
+    match = pattern.match(line)
+    while len(line) > 0 and match is None:
+        multi_line_message += "\n" + line.rstrip()
+        line = log.readline()
+        match = pattern.match(line)
+    return line, match, multi_line_message
 
 
 def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
