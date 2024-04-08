@@ -734,7 +734,7 @@ def test_migrate_managed_tables_with_principal_acl_azure(
     assert match
 
 
-def test_migrate_table_in_mount(  # pylint: disable=too-many-locals
+def test_migrate_table_in_mount(
     ws,
     sql_backend,
     inventory_schema,
@@ -748,49 +748,48 @@ def test_migrate_table_in_mount(  # pylint: disable=too-many-locals
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     tbl_path = make_random(4).lower()
-    mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{tbl_path}'
     src_external_table = make_table(
-        schema_name=make_schema(catalog_name="hive_metastore").name, external_delta=mounted_location
+        schema_name=make_schema(catalog_name="hive_metastore").name,
+        external_delta=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{tbl_path}',
     )
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name)
 
-    table_in_mount_schema = f'mounted_{env_or_skip("TEST_MOUNT_NAME")}'
     table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}"
-    src_table_in_mount = TableInfo(
-        catalog_name="hive_metastore",
-        schema_name=table_in_mount_schema,
-        table_type=TableType.EXTERNAL,
-        data_source_format=DataSourceFormat.DELTA,
-        name=src_external_table.name,
-        storage_location=table_in_mount_location,
+    table_crawler = StaticTablesCrawler(
+        sql_backend,
+        inventory_schema,
+        [
+            TableInfo(
+                catalog_name="hive_metastore",
+                schema_name=f'mounted_{env_or_skip("TEST_MOUNT_NAME")}',
+                table_type=TableType.EXTERNAL,
+                data_source_format=DataSourceFormat.DELTA,
+                name=src_external_table.name,
+                storage_location=table_in_mount_location,
+            )
+        ],
     )
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, [src_table_in_mount])
-    udf_crawler = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     rules = [
         Rule(
             "workspace",
             dst_catalog.name,
-            table_in_mount_schema,
+            f'mounted_{env_or_skip("TEST_MOUNT_NAME")}',
             dst_schema.name,
             table_in_mount_location,
             src_external_table.name,
         ),
     ]
-    group_manager = GroupManager(sql_backend, ws, inventory_schema)
-    migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler)
-    principal_grants = principal_acl(ws, inventory_schema, sql_backend)
     table_migrate = TablesMigrator(
         table_crawler,
-        grant_crawler,
+        GrantsCrawler(table_crawler, StaticUdfsCrawler(sql_backend, inventory_schema, [])),
         ws,
         sql_backend,
         StaticTableMapping(ws, sql_backend, rules=rules),
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
+        GroupManager(sql_backend, ws, inventory_schema),
+        MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler),
+        principal_acl(ws, inventory_schema, sql_backend),
     )
 
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
