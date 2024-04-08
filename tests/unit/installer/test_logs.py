@@ -12,9 +12,9 @@ from databricks.labs.ucx.installer.logs import LogsRecorder, _PartialLogRecord
 
 COMPONENT = "databricks.logs"
 WORKFLOW = "tests"
-WORKFLOW_ID = "123"
+WORKFLOW_ID = 123
 TASK_NAME = "parse_logs"
-WORKFLOW_RUN_ID = "abc"
+WORKFLOW_RUN_ID = 456
 MULTILINE_LOG_MESSAGE = (
     "GET /api/2.0/preview/scim/v2/Groups?attributes=id,displayName,meta,roles,entitlements&startIndex=1&count=100\n"
     "< 200 OK\n"
@@ -44,9 +44,9 @@ def log_path(tmp_path: Path) -> Iterator[Path]:
     with TaskLogger(
         tmp_path,
         workflow=WORKFLOW,
-        workflow_id=WORKFLOW_ID,
+        workflow_id=str(WORKFLOW_ID),
         task_name=TASK_NAME,
-        workflow_run_id=WORKFLOW_RUN_ID,
+        workflow_run_id=str(WORKFLOW_RUN_ID),
         log_level=logging.DEBUG,
     ) as task_logger:
         for log_record in PARTIAL_LOG_RECORDS:
