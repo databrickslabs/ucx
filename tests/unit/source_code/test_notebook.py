@@ -201,7 +201,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
-            code='notebook-manual-migrate',
+            code='migrate-path',
             message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
             start_line=14,
             start_col=13,
@@ -217,7 +217,7 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
-            code='notebook-auto-migrate',
+            code='migrate-path-literal',
             message="Call to 'dbutils.notebook.run' will be migrated automatically",
             start_line=2,
             start_col=0,
@@ -225,6 +225,7 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
             end_col=38,
         )
     ] == advices
+
 
 def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
     source = """

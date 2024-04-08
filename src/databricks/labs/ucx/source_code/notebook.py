@@ -55,7 +55,7 @@ class PythonLinter(ASTLinter, Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         self.parse(code)
         nodes = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        return [ self._convert_dbutils_notebook_run_to_advice(node) for node in nodes ]
+        return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]
 
     @classmethod
     def _convert_dbutils_notebook_run_to_advice(cls, node: ast.AST) -> Advisory:
@@ -63,7 +63,7 @@ class PythonLinter(ASTLinter, Linter):
         path = cls.get_dbutils_notebook_run_path_arg(node)
         if isinstance(path, ast.Constant):
             return Advisory(
-                'notebook-auto-migrate',
+                'migrate-path-literal',
                 "Call to 'dbutils.notebook.run' will be migrated automatically",
                 node.lineno,
                 node.col_offset,
@@ -71,7 +71,7 @@ class PythonLinter(ASTLinter, Linter):
                 node.end_col_offset or 0,
             )
         return Advisory(
-            'notebook-manual-migrate',
+            'migrate-path',
             "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
             node.lineno,
             node.col_offset,
@@ -110,7 +110,6 @@ class PythonCell(Cell):
             path = PythonLinter.get_dbutils_notebook_run_path_arg(node)
             if isinstance(path, ast.Constant):
                 parent.register_dependency(path.value.strip("'").strip('"'))
-
 
 
 class RCell(Cell):
