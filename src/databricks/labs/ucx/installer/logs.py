@@ -8,7 +8,6 @@ from typing import TextIO
 
 from databricks.labs.lsql.backends import SqlBackend
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -54,6 +53,7 @@ def _peak_multi_line_message(log: TextIO, pattern: re.Pattern) -> tuple[str, re.
         multi_line_message += "\n" + next_line.rstrip()
         next_line = log.readline()
         next_match = pattern.match(next_line)
+    assert next_match is not None
     return next_line, next_match, multi_line_message
 
 
@@ -124,11 +124,13 @@ class LogsRecorder:
     def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
         log_records = [
             LogRecord(
-                ts=log_creation_timestamp.replace(
-                    hour=int(partial_log_record.hour),
-                    minute=int(partial_log_record.minute),
-                    second=int(partial_log_record.second),
-                ).timestamp(),
+                ts=int(
+                    log_creation_timestamp.replace(
+                        hour=int(partial_log_record.hour),
+                        minute=int(partial_log_record.minute),
+                        second=int(partial_log_record.second),
+                    ).timestamp()
+                ),
                 job_id=self._job_id,
                 workflow_name=self._workflow,
                 task_name=task_name,
