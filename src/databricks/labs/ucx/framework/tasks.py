@@ -1,11 +1,10 @@
 import contextlib
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from functools import wraps
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -24,7 +23,6 @@ _TASKS: dict[str, "Task"] = {}
 
 @dataclass
 class Task:
-    task_id: int
     workflow: str
     name: str
     doc: str
@@ -62,64 +60,6 @@ def remove_extra_indentation(doc: str) -> str:
         else:
             stripped.append(line)
     return "\n".join(stripped)
-
-
-def task(
-    workflow,
-    *,
-    depends_on=None,
-    job_cluster="main",
-    notebook: str | None = None,
-    dashboard: str | None = None,
-    cloud: str | None = None,
-):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Perform any task-specific logic here
-            # For example, you can log when the task is started and completed
-            logger = logging.getLogger(func.__name__)
-            logger.info(f"Task '{workflow}' is starting...")
-            result = func(*args, **kwargs)
-            logger.info(f"Task '{workflow}' is completed!")
-            return result
-
-        deps = []
-        if depends_on is not None:
-            if not isinstance(depends_on, list):
-                msg = "depends_on has to be a list"
-                raise SyntaxError(msg)
-            for fn in depends_on:
-                if _TASKS[fn.__name__].workflow != workflow:
-                    # for now, we filter out the cross-task
-                    # dependencies within the same job.
-                    #
-                    # Technically, we can check it and fail
-                    # the job if the previous steps didn't
-                    # run before.
-                    continue
-                deps.append(fn.__name__)
-
-        if not func.__doc__:
-            msg = f"Task {func.__name__} must have documentation"
-            raise SyntaxError(msg)
-
-        _TASKS[func.__name__] = Task(
-            task_id=len(_TASKS),
-            workflow=workflow,
-            name=func.__name__,
-            doc=remove_extra_indentation(func.__doc__),
-            fn=func,
-            depends_on=deps,
-            job_cluster=job_cluster,
-            notebook=notebook,
-            dashboard=dashboard,
-            cloud=cloud,
-        )
-
-        return wrapper
-
-    return decorator
 
 
 class TaskLogger(contextlib.AbstractContextManager):
@@ -266,3 +206,63 @@ def trigger(*argv):
     installation = Installation(workspace_client, "ucx", install_folder=install_folder)
 
     run_task(args, config_path.parent, cfg, workspace_client, sql_backend, installation)
+
+
+class Workflow:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
+
+    def tasks(self) -> Iterable[Task]:
+        # return __task__ from every method in this class that has this attribute
+        for attr in dir(self):
+            if attr.startswith("_"):
+                continue
+            fn = getattr(self, attr)
+            if hasattr(fn, "__task__"):
+                yield fn.__task__
+
+
+def job_task(
+    fn=None,
+    *,
+    depends_on=None,
+    job_cluster="main",
+    notebook: str | None = None,
+    dashboard: str | None = None,
+    cloud: str | None = None,
+) -> Callable[[Callable], Callable]:
+    def register(func):
+        if not func.__doc__:
+            raise SyntaxError(f"{func.__name__} must have some doc comment")
+        deps = []
+        this_class = func.__qualname__.split('.')[0]
+        if depends_on is not None:
+            if not isinstance(depends_on, list):
+                msg = "depends_on has to be a list"
+                raise SyntaxError(msg)
+            for fn in depends_on:
+                other_class, task_name = fn.__qualname__.split('.')
+                if other_class != this_class:
+                    continue
+                deps.append(task_name)
+        func.__task__ = Task(
+            workflow='<unknown>',
+            name=func.__name__,
+            doc=remove_extra_indentation(func.__doc__),
+            fn=func,
+            depends_on=deps,
+            job_cluster=job_cluster,
+            notebook=notebook,
+            dashboard=dashboard,
+            cloud=cloud,
+        )
+        return func
+
+    if fn is None:
+        return register
+    register(fn)
+    return fn

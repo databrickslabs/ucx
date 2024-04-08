@@ -7,16 +7,18 @@ from databricks.sdk.service.catalog import AwsIamRoleRequest
 from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
-def test_get_uc_compatible_roles(ws, sql_backend, env_or_skip, make_random, inventory_schema):
-    profile = env_or_skip("AWS_DEFAULT_PROFILE")
+def test_get_uc_compatible_roles(ws, env_or_skip, make_random):
     installation = Installation(ws, make_random(4))
-    aws = AWSResources(profile)
-    awsrp = AWSResourcePermissions.for_cli(ws, installation, sql_backend, aws, inventory_schema)
-    compat_roles = awsrp.load_uc_compatible_roles()
+    ctx = WorkspaceContext(ws).replace(
+        aws_profile=env_or_skip("AWS_DEFAULT_PROFILE"),
+        installation=installation,
+    )
+    compat_roles = ctx.aws_resource_permissions.load_uc_compatible_roles()
     print(compat_roles)
     assert compat_roles
 

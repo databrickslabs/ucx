@@ -6,13 +6,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -28,7 +26,6 @@ from databricks.labs.ucx.hive_metastore.tables import (
     Table,
     What,
 )
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.views_sequencer import (
     ViewsMigrationSequencer,
     ViewToMigrate,
@@ -73,30 +70,8 @@ class TablesMigrator:
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
 
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
-        udfs_crawler = UdfsCrawler(sql_backend, config.inventory_database)
-        grants_crawler = GrantsCrawler(table_crawler, udfs_crawler)
-        table_mapping = TableMapping(installation, ws, sql_backend)
-        group_manager = GroupManager(sql_backend, ws, config.inventory_database)
-        principal_grants = PrincipalACL.for_cli(ws, installation, sql_backend)
-        migration_status_refresher = MigrationStatusRefresher(ws, sql_backend, config.inventory_database, table_crawler)
-        return cls(
-            table_crawler,
-            grants_crawler,
-            ws,
-            sql_backend,
-            table_mapping,
-            group_manager,
-            migration_status_refresher,
-            principal_grants,
-        )
-
     def index(self):
+        # TODO: remove this method
         return self._migration_status_refresher.index()
 
     def migrate_tables(self, what: What, acl_strategy: list[AclMigrationWhat] | None = None):
