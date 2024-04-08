@@ -577,7 +577,13 @@ def scan_tables_in_mounts_experimental(
     """
     mounts = Mounts(sql_backend, ws, cfg.inventory_database)
     TablesInMounts(
-        sql_backend, ws, cfg.inventory_database, mounts, cfg.include_mounts, cfg.exclude_paths_in_mount
+        sql_backend,
+        ws,
+        cfg.inventory_database,
+        mounts,
+        cfg.include_mounts,
+        cfg.exclude_paths_in_mount,
+        cfg.include_paths_in_mount,
     ).snapshot()
 
 
