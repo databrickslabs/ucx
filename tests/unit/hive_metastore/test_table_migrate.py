@@ -19,6 +19,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatus,
     MigrationStatusRefresher,
     TablesMigrator,
+    MigrationIndex,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
@@ -256,6 +257,15 @@ def test_migrate_view_should_produce_proper_queries(ws):
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
     }
+    migration_index = create_autospec(MigrationIndex)
+    migration_index.get.return_value = MigrationStatus(
+        src_schema="db1_src",
+        src_table="managed_dbfs",
+        dst_catalog="ucx_default",
+        dst_schema="db1_dst",
+        dst_table="managed_dbfs",
+    )
+    migration_status_refresher.index.return_value = migration_index
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
@@ -270,7 +280,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(what=What.VIEW)
 
     assert (
-        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM db1_src.managed_dbfs;"
+        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM ucx_default.db1_dst.managed_dbfs;"
         in backend.queries
     )
     assert (
@@ -727,6 +737,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_index = create_autospec(MigrationIndex)
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
@@ -743,6 +754,14 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
     }
+    migration_index.get.return_value = MigrationStatus(
+        src_schema="db1_src",
+        src_table="managed_dbfs",
+        dst_catalog="ucx_default",
+        dst_schema="db1_dst",
+        dst_table="managed_dbfs",
+    )
+    migration_status_refresher.index.return_value = migration_index
 
     table_migrate.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 

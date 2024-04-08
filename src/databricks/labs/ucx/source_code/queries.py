@@ -86,4 +86,4 @@ class FromTable(Linter, Fixer):
         statement = statements[0]
         for table in cls.get_dependencies(statement):
             src_db = table.db if table.db else use_schema
-            yield ucx_tables.Table(table.catalog, src_db, table.name, "type", "")
+            yield ucx_tables.Table("hive_metastore", src_db, table.name, "type", "")
