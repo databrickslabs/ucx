@@ -603,19 +603,6 @@ def migrate_tables_in_mounts_experimental(
     group_manager = GroupManager(sql_backend, ws, cfg.inventory_database)
     mount_crawler = Mounts(sql_backend, ws, cfg.inventory_database)
     cluster_locations = {}
-    if ws.config.is_azure:
-        locations = ExternalLocations(ws, sql_backend, cfg.inventory_database)
-        azure_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_client, graph_client)
-        resource_permissions = AzureResourcePermissions(install, ws, azurerm, locations)
-        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, cfg.inventory_database)
-        cluster_locations = AzureACL(
-            ws, sql_backend, spn_crawler, resource_permissions
-        ).get_eligible_locations_principals()
     interactive_grants = PrincipalACL(ws, sql_backend, install, table_crawler, mount_crawler, cluster_locations)
     TablesMigrator(
         table_crawler,
