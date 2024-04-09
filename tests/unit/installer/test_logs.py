@@ -40,7 +40,7 @@ PARTIAL_LOG_RECORDS = [
 
 @pytest.fixture()
 def log_path(tmp_path: Path) -> Iterator[Path]:
-    """The TaskLogger is reused so that parsing works against the currnet log format."""
+    """Test log parsing against the format used in TaskLogger"""
     logger = logging.getLogger(COMPONENT)
     with TaskLogger(
         tmp_path,
