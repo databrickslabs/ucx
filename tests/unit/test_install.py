@@ -54,7 +54,7 @@ from databricks.sdk.service.workspace import ObjectInfo
 
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
-from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig, InstallationConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import (
     WorkspaceInstallation,
@@ -66,6 +66,7 @@ from databricks.labs.ucx.installer.workflows import (
     WorkflowsDeployment,
 )
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.workspace_access.groups import ConfigureGroups
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -144,6 +145,19 @@ def ws():
     workspace_client.workspace.download = download
 
     return workspace_client
+
+
+@pytest.fixture
+def mock_installation_config(any_prompt):
+    return InstallationConfig(
+        silent=False,
+        inventory_database='ucx',
+        configure_groups=ConfigureGroups(any_prompt),
+        log_level="INFO",
+        num_threads=9,
+        is_terraform_used=True,
+        include_databases=["<ALL>"],
+    )
 
 
 def created_job(workspace_client, name):
@@ -498,7 +512,7 @@ def test_save_config(ws, mock_installation):
         }
     )
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
+    install.configure(install.prompt_for_new_installation())
 
     mock_installation.assert_file_written(
         'config.yml',
@@ -531,7 +545,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
     ws.workspace.get_status = not_found
 
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
+    install.configure(install.prompt_for_new_installation())
 
     mock_installation.assert_file_written(
         'config.yml',
@@ -574,7 +588,7 @@ def test_create_cluster_policy(ws, mock_installation):
     )
     ws.workspace.get_status = not_found
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
+    install.configure(install.prompt_for_new_installation())
     mock_installation.assert_file_written(
         'config.yml',
         {
@@ -1177,7 +1191,7 @@ def test_open_config(ws, mocker, mock_installation):
     ws.workspace.get_status = not_found
 
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
+    install.configure(install.prompt_for_new_installation())
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
@@ -1193,7 +1207,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
     )
     ws.workspace.get_status = not_found
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
+    install.configure(install.prompt_for_new_installation())
 
     mock_installation.assert_file_written(
         'config.yml',
@@ -1246,7 +1260,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     workspace_installation.run()
 
 
-def test_runs_upgrades_on_too_old_version(ws, any_prompt):
+def test_runs_upgrades_on_too_old_version(ws, any_prompt, mock_installation_config):
     existing_installation = MockInstallation(
         {
             'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
@@ -1262,13 +1276,14 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     install.run(
+        install_config=mock_installation_config,
         verify_timeout=timedelta(seconds=60),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
     )
 
 
-def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
+def test_runs_upgrades_on_more_recent_version(ws, any_prompt, mock_installation_config):
     existing_installation = MockInstallation(
         {
             'version.json': {'version': '0.3.0', 'wheel': '...', 'date': '...'},
@@ -1287,6 +1302,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     wheels = create_autospec(WheelsV2)
 
     install.run(
+        install_config=mock_installation_config,
         verify_timeout=timedelta(seconds=10),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
@@ -1310,7 +1326,7 @@ def test_fresh_install(ws, mock_installation):
     ws.workspace.get_status = not_found
 
     install = WorkspaceInstaller(prompts, mock_installation, ws, PRODUCT_INFO)
-    install.configure()
+    install.configure(install.prompt_for_new_installation())
 
     mock_installation.assert_file_written(
         'config.yml',
@@ -1391,7 +1407,7 @@ def test_get_existing_installation_global(ws, mock_installation, mocker):
     )
 
     first_install = WorkspaceInstaller(first_prompts, installation, ws, PRODUCT_INFO)
-    workspace_config = first_install.configure()
+    workspace_config = first_install.configure(first_install.prompt_for_new_installation())
     assert workspace_config.inventory_database == 'ucx_global'
 
     force_user_environ = {'UCX_FORCE_INSTALL': 'user'}
@@ -1404,7 +1420,7 @@ def test_get_existing_installation_global(ws, mock_installation, mocker):
     # test for force user install variable without prompts
     second_install = WorkspaceInstaller(second_prompts, installation, ws, PRODUCT_INFO, force_user_environ)
     with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
-        second_install.configure()
+        second_install.configure(second_install.prompt_for_new_installation())
 
     # test for force user install variable with prompts
     third_prompts = base_prompts.extend(
@@ -1414,7 +1430,7 @@ def test_get_existing_installation_global(ws, mock_installation, mocker):
         }
     )
     third_install = WorkspaceInstaller(third_prompts, installation, ws, PRODUCT_INFO, force_user_environ)
-    workspace_config = third_install.configure()
+    workspace_config = third_install.configure(third_install.prompt_for_new_installation())
     assert workspace_config.inventory_database == 'ucx_user'
 
 
@@ -1451,7 +1467,7 @@ def test_existing_installation_user(ws, mock_installation):
         is_global=False,
     )
     first_install = WorkspaceInstaller(first_prompts, installation, ws, PRODUCT_INFO)
-    workspace_config = first_install.configure()
+    workspace_config = first_install.configure(first_install.prompt_for_new_installation())
     assert workspace_config.inventory_database == 'ucx_user'
 
     # test for force global install variable without prompts
@@ -1465,7 +1481,7 @@ def test_existing_installation_user(ws, mock_installation):
     force_global_env = {'UCX_FORCE_INSTALL': 'global'}
     second_install = WorkspaceInstaller(second_prompts, installation, ws, PRODUCT_INFO, force_global_env)
     with pytest.raises(RuntimeWarning, match='UCX is already installed, but no confirmation'):
-        second_install.configure()
+        second_install.configure(second_install.prompt_for_new_installation())
 
     # test for force global install variable with prompts
     third_prompts = base_prompts.extend(
@@ -1478,7 +1494,7 @@ def test_existing_installation_user(ws, mock_installation):
 
     third_install = WorkspaceInstaller(third_prompts, installation, ws, PRODUCT_INFO, force_global_env)
     with pytest.raises(NotImplemented, match="Migration needed. Not implemented yet."):
-        third_install.configure()
+        third_install.configure(third_install.prompt_for_new_installation())
 
 
 def test_databricks_runtime_version_set(ws, mock_installation):
@@ -1511,7 +1527,7 @@ def test_check_inventory_database_exists(ws, mock_installation):
     install = WorkspaceInstaller(prompts, installation, ws, PRODUCT_INFO)
 
     with pytest.raises(AlreadyExists, match="Inventory database 'ucx_exists' already exists in another installation"):
-        install.configure()
+        install.configure(install.prompt_for_new_installation())
 
 
 def test_user_not_admin(ws, mock_installation, any_prompt):
@@ -1571,7 +1587,7 @@ def test_validate_step(ws, result_state, expected):
     assert deployed.validate_step("assessment") == expected
 
 
-def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
+def test_are_remote_local_versions_equal(ws, mock_installation, mocker, mock_installation_config):
     ws.jobs.run_now = mocker.Mock()
 
     mocker.patch("webbrowser.open")
@@ -1609,7 +1625,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
         RuntimeWarning,
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
-        install.configure()
+        install.configure(mock_installation_config)
 
     first_prompts = base_prompts.extend(
         {
@@ -1619,13 +1635,13 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     install = WorkspaceInstaller(first_prompts, installation, ws, product_info)
 
     # finishes successfully when versions match and override is provided
-    config = install.configure()
+    config = install.configure(mock_installation_config)
     assert config.inventory_database == "ucx_user"
 
     # finishes successfully when versions don't match and no override is provided/needed
     product_info.released_version.return_value = "0.4.1"
     install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
-    config = install.configure()
+    config = install.configure(mock_installation_config)
     assert config.inventory_database == "ucx_user"
 
 

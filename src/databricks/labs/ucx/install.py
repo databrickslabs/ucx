@@ -1,3 +1,4 @@
+import dataclasses
 import functools
 import logging
 import os
@@ -24,12 +25,7 @@ from databricks.labs.blueprint.wheels import (
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.errors import (
-    AlreadyExists,
-    BadRequest,
-    InvalidParameterValue,
-    NotFound,
-)
+from databricks.sdk.errors import AlreadyExists, BadRequest, InvalidParameterValue, NotFound, PermissionDenied
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
     EndpointInfoWarehouseType,
@@ -42,7 +38,8 @@ from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
-from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.config import WorkspaceConfig, InstallationConfig
+from databricks.labs.ucx.contexts.cli_command import AccountContext
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -136,6 +133,7 @@ class WorkspaceInstaller:
 
     def run(
         self,
+        install_config: InstallationConfig,
         verify_timeout=timedelta(minutes=2),
         sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
         wheel_builder_factory: Callable[[], WheelsV2] | None = None,
@@ -143,7 +141,7 @@ class WorkspaceInstaller:
     ):
         logger.info(f"Installing UCX v{self._product_info.version()}")
         if config is None:
-            config = self.configure()
+            config = self.configure(install_config)
         if not sql_backend_factory:
             sql_backend_factory = self._new_sql_backend
         if not wheel_builder_factory:
@@ -171,11 +169,33 @@ class WorkspaceInstaller:
             self._product_info,
         )
         try:
-            workspace_installation.run()
+            workspace_installation.run(install_config.silent)
         except ManyError as err:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
             raise err
+
+    def prompt_for_new_installation(self) -> InstallationConfig:
+        logger.info("Please answer a couple of questions to configure Unity Catalog migration")
+        inventory_database = self._prompts.question(
+            "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
+        )
+        log_level = self._prompts.question("Log level", default="INFO").upper()
+        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
+        configure_groups = ConfigureGroups(self._prompts)
+        configure_groups.run()
+        # Check if terraform is being used
+        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+        include_databases = self._select_databases()
+        return InstallationConfig(
+            silent=False,
+            inventory_database=inventory_database,
+            configure_groups=configure_groups,
+            log_level=log_level,
+            num_threads=num_threads,
+            is_terraform_used=is_terraform_used,
+            include_databases=include_databases,
+        )
 
     def _compare_remote_local_versions(self):
         try:
@@ -215,17 +235,17 @@ class WorkspaceInstaller:
             return True
         return False
 
-    def configure(self) -> WorkspaceConfig:
+    def configure(self, install_config: InstallationConfig) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
             if self._confirm_force_install():
-                return self._configure_new_installation()
+                return self._configure_new_installation(install_config)
             self._apply_upgrades()
             return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
-        return self._configure_new_installation()
+        return self._configure_new_installation(install_config)
 
     def _apply_upgrades(self):
         try:
@@ -235,58 +255,52 @@ class WorkspaceInstaller:
             logger.warning(f"Installed version is too old: {err}")
             return
 
-    def _configure_new_installation(self) -> WorkspaceConfig:
-        logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        HiveMetastoreLineageEnabler(self._ws).apply(self._prompts)
-        inventory_database = self._prompts.question(
-            "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
-        )
-
-        self._check_inventory_database_exists(inventory_database)
-        warehouse_id = self._configure_warehouse()
-        configure_groups = ConfigureGroups(self._prompts)
-        configure_groups.run()
-        log_level = self._prompts.question("Log level", default="INFO").upper()
-        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
+    def _configure_new_installation(self, installation_config: InstallationConfig) -> WorkspaceConfig:
+        HiveMetastoreLineageEnabler(self._ws).apply(self._prompts, installation_config.silent)
+        self._check_inventory_database_exists(installation_config.inventory_database)
+        warehouse_id = self._configure_warehouse(installation_config.silent)
 
         policy_id, instance_profile, spark_conf_dict, instance_pool_id = self._policy_installer.create(
-            inventory_database
+            installation_config.inventory_database, installation_config.silent
         )
 
         # Save configurable values for table migration cluster
-        min_workers, max_workers, spark_conf_dict = self._config_table_migration(spark_conf_dict)
-
-        # Check if terraform is being used
-        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+        min_workers, max_workers, spark_conf_dict = self._config_table_migration(
+            spark_conf_dict, installation_config.silent
+        )
 
         config = WorkspaceConfig(
-            inventory_database=inventory_database,
-            workspace_group_regex=configure_groups.workspace_group_regex,
-            workspace_group_replace=configure_groups.workspace_group_replace,
-            account_group_regex=configure_groups.account_group_regex,
-            group_match_by_external_id=configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
-            include_group_names=configure_groups.include_group_names,
-            renamed_group_prefix=configure_groups.renamed_group_prefix,
+            inventory_database=installation_config.inventory_database,
+            workspace_group_regex=installation_config.configure_groups.workspace_group_regex,
+            workspace_group_replace=installation_config.configure_groups.workspace_group_replace,
+            account_group_regex=installation_config.configure_groups.account_group_regex,
+            group_match_by_external_id=installation_config.configure_groups.group_match_by_external_id,  # type: ignore[arg-type]
+            include_group_names=installation_config.configure_groups.include_group_names,
+            renamed_group_prefix=installation_config.configure_groups.renamed_group_prefix,
             warehouse_id=warehouse_id,
-            log_level=log_level,
-            num_threads=num_threads,
+            log_level=installation_config.log_level,
+            num_threads=installation_config.num_threads,
             instance_profile=instance_profile,
             spark_conf=spark_conf_dict,
             min_workers=min_workers,
             max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
-            is_terraform_used=is_terraform_used,
-            include_databases=self._select_databases(),
+            is_terraform_used=installation_config.is_terraform_used,
+            include_databases=installation_config.include_databases,
         )
         self._installation.save(config)
         ws_file_url = self._installation.workspace_link(config.__file__)
-        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
+        if not installation_config.silent and self._prompts.confirm(
+            f"Open config file in the browser and continue installing? {ws_file_url}"
+        ):
             webbrowser.open(ws_file_url)
         return config
 
-    def _config_table_migration(self, spark_conf_dict) -> tuple[int, int, dict]:
+    def _config_table_migration(self, spark_conf_dict, silent: bool = False) -> tuple[int, int, dict]:
         # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
+        if silent:
+            return 1, 10, spark_conf_dict
         parallelism = self._prompts.question(
             "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
         )
@@ -315,7 +329,7 @@ class WorkspaceInstaller:
             return [x.strip() for x in selected_databases.split(",")]
         return None
 
-    def _configure_warehouse(self):
+    def _configure_warehouse(self, silent: bool = False) -> str:
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
@@ -324,9 +338,12 @@ class WorkspaceInstaller:
             for _ in self._ws.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
-        warehouse_id = self._prompts.choice_from_dict(
-            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
-        )
+        if silent:
+            warehouse_id = "create_new"
+        else:
+            warehouse_id = self._prompts.choice_from_dict(
+                "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
+            )
         if warehouse_id == "create_new":
             new_warehouse = self._ws.warehouses.create(
                 name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
@@ -417,7 +434,7 @@ class WorkspaceInstallation(InstallationMixin):
     def folder(self):
         return self._installation.install_folder()
 
-    def run(self):
+    def run(self, silent: bool = False):
         logger.info(f"Installing UCX v{self._product_info.version()}")
         Threads.strict(
             "installing components",
@@ -427,11 +444,11 @@ class WorkspaceInstallation(InstallationMixin):
             ],
         )
         readme_url = self._workflows_installer.create_jobs(self._prompts)
-        if self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+        if not silent and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
-        if self._prompts.confirm("Do you want to trigger assessment job ?"):
+        if not silent and self._prompts.confirm("Do you want to trigger assessment job ?"):
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
 
@@ -540,32 +557,53 @@ class WorkspaceInstallation(InstallationMixin):
             webbrowser.open(job_url)
 
 
-if __name__ == "__main__":
-    logger = get_logger(__file__)
-    logger.setLevel("INFO")
-    app = ProductInfo.from_class(WorkspaceConfig)
+def install_on_account():
+    a = AccountClient(product="ucx", product_version=__version__)
+    ctx = AccountContext(a)
+    installed_workspace_ids = []
+    installation_config = None
+    for workspace_client in ctx.account_workspaces.workspace_clients():
+        logger.info(f"Installing UCX on workspace {workspace_client.config.host}")
+        try:
+            current_user = workspace_client.current_user.me()
+            if "admins" not in current_user.groups:
+                continue
+        except (PermissionDenied, NotFound):
+            continue
+        installed_workspace_ids.append(workspace_client.get_workspace_id())
 
-    prmpts = Prompts()
-    if prmpts.confirm("Do you want to install UCX on all the workspaces in the current Databricks account?"):
-        account_client = AccountClient(product="ucx", product_version=__version__)
-        if not account_client.config.is_account_client:
-            raise SystemExit("Cannot install UCX on all workspaces from a non-account client. Exiting...")
-        for workspace in account_client.workspaces.list():
-            logger.info(f"Installing UCX on workspace {workspace.workspace_name}")
-            host = account_client.config.host.replace('accounts', workspace.deployment_name)
-            workspace_client = WorkspaceClient(host=host)
-            try:
-                current = app.current_installation(workspace_client)
-            except NotFound:
-                current = Installation.assume_global(workspace_client, app.product_name())
-            installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
-            installer.run()
-    else:
-        workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
         try:
             current = app.current_installation(workspace_client)
         except NotFound:
             current = Installation.assume_global(workspace_client, app.product_name())
-        prmpts = Prompts()
         installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
-        installer.run()
+        if installation_config is None:
+            installation_config = dataclasses.replace(installer.prompt_for_new_installation(), silent=True)
+        installer.run(installation_config)
+        if not prmpts.confirm("Do you want to install UCX on the remaining workspaces with the same config?"):
+            installation_config = None
+    ctx.account_workspaces.sync_workspace_info()
+
+
+def install_on_workspace():
+    workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
+    try:
+        current = app.current_installation(workspace_client)
+    except NotFound:
+        current = Installation.assume_global(workspace_client, app.product_name())
+    installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
+    installer.run(installer.prompt_for_new_installation())
+
+
+if __name__ == "__main__":
+    logger = get_logger(__file__)
+    logger.setLevel("INFO")
+    app = ProductInfo.from_class(WorkspaceConfig)
+    prmpts = Prompts()
+
+    env = dict(os.environ.items())
+    force_install = env.get("UCX_FORCE_INSTALL")
+    if force_install == "account":
+        install_on_account()
+    else:
+        install_on_workspace()

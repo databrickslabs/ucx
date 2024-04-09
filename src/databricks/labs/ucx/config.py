@@ -4,6 +4,8 @@ from databricks.sdk.core import Config
 
 __all__ = ["WorkspaceConfig"]
 
+from databricks.labs.ucx.workspace_access.groups import ConfigureGroups
+
 
 @dataclass
 class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
@@ -69,3 +71,23 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
         raw["renamed_group_prefix"] = groups.get("backup_group_prefix", "db-temp-")
         raw["version"] = 2
         return raw
+
+
+@dataclass
+class InstallationConfig:
+    # Installation parameters
+    silent: bool
+    inventory_database: str
+    configure_groups: ConfigureGroups
+    warehouse_id: str | None = None
+    connect: Config | None = None
+    num_threads: int | None = 10
+    database_to_catalog_mapping: dict[str, str] | None = None
+    default_catalog: str | None = "ucx_default"
+    log_level: str | None = "INFO"
+
+    # Flag to see if terraform has been used for deploying certain entities
+    is_terraform_used: bool = False
+
+    # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
+    include_databases: list[str] | None = None
