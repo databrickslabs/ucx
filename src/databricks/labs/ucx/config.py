@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from databricks.sdk.core import Config
 
-__all__ = ["WorkspaceConfig"]
+__all__ = ["WorkspaceConfig", "InstallationConfig"]
 
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups
 
