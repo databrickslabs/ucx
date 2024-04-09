@@ -1,6 +1,6 @@
-import pytest
 from pathlib import Path
 
+import pytest
 from databricks.labs.lsql.backends import StatementExecutionBackend
 
 from databricks.labs.ucx.installer import logs
