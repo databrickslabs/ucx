@@ -22,21 +22,15 @@ class NotebookMigrator:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
         notebook = self._load_notebook(object_info)
-        changed = self._apply(notebook)
-        # now discover dependencies and migrate them too
+        return self._apply(notebook)
+
+    def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
+        if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
+            raise ValueError("Not a valid Notebook")
+        notebook = self._load_notebook(object_info)
         dependencies = DependencyGraph(object_info.path, None, self._load_notebook_from_path)
         notebook.build_dependency_graph(dependencies)
-        for path in dependencies.paths:
-            # don't process twice
-            if path == object_info.path:
-                continue
-            object_info = self._load_object(path)
-            # TODO https://github.com/databrickslabs/ucx/issues/1202 load non-notebook dependency
-            notebook = self._load_notebook(object_info)
-            # TODO what to do with changed_ ?
-            # changed_ = self._apply(notebook)
-            self._apply(notebook)
-        return changed
+        return dependencies
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False

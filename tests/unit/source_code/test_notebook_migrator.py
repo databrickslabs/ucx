@@ -88,7 +88,7 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
     ws.workspace.upload.assert_any_call('path', migrated_code.encode("utf-8"))
 
 
-def test_apply_visits_dependencies():
+def test_build_dependency_graph_visits_dependencies():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
     visited: dict[str, bool] = {}
@@ -113,11 +113,11 @@ def test_apply_visits_dependencies():
     ws.workspace.list.side_effect = list_side_effect
     migrator = NotebookMigrator(ws, Languages(create_autospec(MigrationIndex)))
     object_info = ObjectInfo(path="root3.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
-    migrator.apply(object_info)
+    migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)
 
 
-def test_apply_fails_with_unfound_dependency():
+def test_build_dependency_graph_fails_with_unfound_dependency():
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
 
@@ -137,4 +137,4 @@ def test_apply_fails_with_unfound_dependency():
     migrator = NotebookMigrator(ws, Languages(create_autospec(MigrationIndex)))
     object_info = ObjectInfo(path="root1.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     with pytest.raises(ValueError):
-        migrator.apply(object_info)
+        migrator.build_dependency_graph(object_info)
