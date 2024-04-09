@@ -22,18 +22,15 @@ class ClusterPolicyInstaller:
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
 
-    def create(self, inventory_database: str, silent: bool = False) -> tuple[str, str, dict, str | None]:
+    def create(self, inventory_database: str) -> tuple[str, str, dict, str | None]:
         instance_profile = ""
         spark_conf_dict = {}
         # get instance pool id to be put into the cluster policy
         instance_pool_id = self._get_instance_pool_id()
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
-        if len(policies_with_external_hms) > 0 and (
-            silent
-            or self._prompts.confirm(
-                "We have identified one or more cluster policies set up for an external metastore"
-                "Would you like to set UCX to connect to the external metastore?"
-            )
+        if len(policies_with_external_hms) > 0 and self._prompts.confirm(
+            "We have identified one or more cluster policies set up for an external metastore"
+            "Would you like to set UCX to connect to the external metastore?"
         ):
             logger.info("Setting up an external metastore")
             cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
@@ -42,12 +39,9 @@ class ClusterPolicyInstaller:
                 instance_profile, spark_conf_dict = self._extract_external_hive_metastore_conf(cluster_policy)
         else:
             warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
-            if warehouse_config and (
-                silent
-                or self._prompts.confirm(
-                    "We have identified the workspace warehouse is set up for an external metastore"
-                    "Would you like to set UCX to connect to the external metastore?"
-                )
+            if warehouse_config and self._prompts.confirm(
+                "We have identified the workspace warehouse is set up for an external metastore"
+                "Would you like to set UCX to connect to the external metastore?"
             ):
                 logger.info("Setting up an external metastore")
                 instance_profile, spark_conf_dict = self._extract_external_hive_metastore_sql_conf(warehouse_config)

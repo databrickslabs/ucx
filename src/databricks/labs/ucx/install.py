@@ -262,7 +262,7 @@ class WorkspaceInstaller:
         warehouse_id = self._configure_warehouse(installation_config.silent)
 
         policy_id, instance_profile, spark_conf_dict, instance_pool_id = self._policy_installer.create(
-            installation_config.inventory_database, installation_config.silent
+            installation_config.inventory_database
         )
 
         # Save configurable values for table migration cluster
@@ -594,8 +594,9 @@ def install_on_account():
     ctx = AccountContext(_get_safe_account_client())
     installation_config = None
     confirmed = False
-    for workspace_client in ctx.account_workspaces.workspace_clients():
-        logger.info(f"Installing UCX on workspace {workspace_client.config.host}")
+    for workspace in ctx.account_client.workspaces.list():
+        workspace_client = ctx.account_client.get_workspace_client(workspace)
+        logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
 
         if not _is_valid_workspace(workspace_client):
             continue
