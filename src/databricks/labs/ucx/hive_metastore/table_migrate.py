@@ -158,13 +158,9 @@ class TablesMigrator:
 
     def _view_can_be_migrated(self, view: ViewToMigrate):
         # dependencies have already been computed, therefore an empty dict is good enough
-        for table in view.table_dependencies():
-            if not self._table_already_migrated(table.rule.as_uc_table_key):
-                logger.info(f"View {view.src.key} cannot be migrated because {table.src.key} is not migrated yet")
-                return False
-        for depview in view.view_dependencies():
-            if not self._table_already_migrated(depview.rule.as_uc_table_key):
-                logger.info(f"View {view.src.key} cannot be migrated because {depview.src.key} is not migrated yet")
+        for table in view.dependencies:
+            if not self.index().get(table.schema, table.name):
+                logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
 

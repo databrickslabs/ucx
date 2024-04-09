@@ -9,6 +9,7 @@ from databricks.labs.lsql.backends import MockBackend, SqlBackend
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableToMigrate
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.hive_metastore.view_migrate import ViewsMigrationSequencer
 
 SCHEMA_NAME = "schema"
@@ -36,7 +37,8 @@ def test_migrate_direct_view_returns_singleton_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
-    sequencer = ViewsMigrationSequencer(tables)
+    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
     batches = sequencer.sequence_batches()
     sequence = list(flatten(batches))
     assert len(sequence) == 1
@@ -49,7 +51,11 @@ def test_migrate_direct_views_returns_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
-    sequencer = ViewsMigrationSequencer(tables)
+    migration_index = MigrationIndex(
+        [MigrationStatus("db1", "t1", "cat1", "db1", "t1"),
+         MigrationStatus("db1", "t2", "cat1", "db1", "t2")],
+    )
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
     batches = sequencer.sequence_batches()
     sequence = list(flatten(batches))
     assert len(sequence) == 2
@@ -63,7 +69,8 @@ def test_migrate_indirect_views_returns_correct_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
-    sequencer = ViewsMigrationSequencer(tables)
+    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
     batches = sequencer.sequence_batches()
     sequence = list(flatten(batches))
     assert len(sequence) == 2
@@ -77,7 +84,8 @@ def test_migrate_deep_indirect_views_returns_correct_sequence() -> None:
     sql_backend = mock_backend(samples, "db1")
     crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
     tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
-    sequencer = ViewsMigrationSequencer(tables)
+    migration_index = MigrationIndex([MigrationStatus("db1", "t1", "cat1", "db1", "t1")])
+    sequencer = ViewsMigrationSequencer(tables, migration_index)
     batches = sequencer.sequence_batches()
     sequence = list(flatten(batches))
     assert len(sequence) == 5
@@ -98,7 +106,8 @@ def test_migrate_invalid_sql_raises_value_error() -> None:
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
         tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
-        sequencer = ViewsMigrationSequencer(tables)
+        migration_index = MigrationIndex([])
+        sequencer = ViewsMigrationSequencer(tables, migration_index)
         batches = sequencer.sequence_batches()
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
@@ -111,7 +120,8 @@ def test_migrate_invalid_sql_tables_raises_value_error() -> None:
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
         tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
-        sequencer = ViewsMigrationSequencer(tables)
+        migration_index = MigrationIndex([])
+        sequencer = ViewsMigrationSequencer(tables, migration_index)
         batches = sequencer.sequence_batches()
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
@@ -158,7 +168,6 @@ def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
 
 
 class Samples:
-
     samples: dict = {}
 
     @classmethod

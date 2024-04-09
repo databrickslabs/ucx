@@ -27,12 +27,13 @@ class MigrationStatus:
         return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
-@dataclass
+@dataclass(frozen=True)
 class TableView:
     catalog: str
     schema: str
     name: str
 
+    @property
     def key(self):
         return f"{self.catalog}.{self.schema}.{self.name}".lower()
 

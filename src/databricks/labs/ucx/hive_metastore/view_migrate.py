@@ -1,7 +1,7 @@
-from collections.abc import Callable, Collection
+from collections.abc import Collection
 from dataclasses import dataclass
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus, TableView
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -14,19 +14,20 @@ class ViewToMigrate(TableToMigrate):
         if self.src.view_text is None:
             raise RuntimeError("Should never get there! A view must have 'view_text'!")
 
+    @property
     def dependencies(self) -> list[TableView]:
         if self._table_dependencies is None:
             self._table_dependencies = self._compute_dependencies()
-        assert self._table_dependencies is not None
+        # assert self._table_dependencies is not None
         return self._table_dependencies
+
+    def _compute_dependencies(self):
+        return list(FromTable.view_dependencies(self.src.view_text, use_schema=self.src.database))
 
     @staticmethod
     def get_view_updated_text(src: str, index: MigrationIndex, schema: str):
         from_table = FromTable(index, use_schema=schema)
         return from_table.apply(src)
-
-    def _compute_dependencies(self):
-        return list(FromTable.view_dependencies(self.src.view_text, use_schema=self.src.database))
 
     def __hash__(self):
         return hash(self.src)
@@ -41,7 +42,7 @@ class ViewsMigrationSequencer:
         self._tables = tables
         self._index = index
         self._result_view_list: list[ViewToMigrate] = []
-        self._result_tables_set: set[TableToMigrate] = set()
+        self._result_tables_set: set[TableView] = set()
 
     def sequence_batches(self) -> list[list[ViewToMigrate]]:
         # sequencing is achieved using a very simple algorithm:
@@ -56,7 +57,7 @@ class ViewsMigrationSequencer:
         views = set()
         for table in self._tables:
             if table.src.view_text is not None:
-                table = ViewToMigrate(table.src, table.rule, all_tables.get)
+                table = ViewToMigrate(table.src, table.rule)
             all_tables[table.src.key] = table
             if isinstance(table, ViewToMigrate):
                 views.add(table)
@@ -65,7 +66,8 @@ class ViewsMigrationSequencer:
         while len(views) > 0:
             next_batch = self._next_batch(views)
             self._result_view_list.extend(next_batch)
-            self._result_tables_set.update(next_batch)
+            table_views = {TableView("hive_metastore", t.src.database, t.src.name) for t in next_batch}
+            self._result_tables_set.update(table_views)
             views.difference_update(next_batch)
             batches.append(list(next_batch))
         return batches
@@ -75,13 +77,20 @@ class ViewsMigrationSequencer:
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
         for view in views:
-            view_deps = view.dependencies()
+            view_deps = set(view.dependencies)
             if len(view_deps) == 0:
                 result.add(view)
             else:
                 # does the view have at least one view dependency that is not yet processed ?
-                not_processed_yet = next((t for t in view_deps if t not in self._result_tables_set), None)
-                if not_processed_yet is None and not self._index.is_migrated(view.src.database, view.src.name):
+                not_processed_yet = view_deps - self._result_tables_set
+                if not not_processed_yet:
+                    result.add(view)
+                    continue
+                if not [
+                    table_view
+                    for table_view in not_processed_yet
+                    if not self._index.is_migrated(table_view.schema, table_view.name)
+                ]:
                     result.add(view)
         # prevent infinite loop
         if len(result) == 0 and len(views) > 0:
