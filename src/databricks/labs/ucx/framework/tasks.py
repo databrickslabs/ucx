@@ -18,8 +18,6 @@ from databricks.sdk.retries import retried
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 
-# TODO: Fix circular import and use for type hinting in parse_logs
-# from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 
 _TASKS: dict[str, "Task"] = {}
 
