@@ -33,7 +33,7 @@ PARTIAL_LOG_RECORDS = [
     PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
     PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
     PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
-    PartialLogRecord("15", "12", "20", "DEBUG", COMPONENT, MULTILINE_LOG_MESSAGE),
+    PartialLogRecord("15", "12", "20", "ERROR", COMPONENT, MULTILINE_LOG_MESSAGE),
     PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
 ]
 
@@ -62,7 +62,8 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
     The time attribute are not tested as these are set differently on each test run.
     """
     expected_partial_log_records = [
-        getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS
+        getattr(partial_log_record, attribute)
+        for partial_log_record in PARTIAL_LOG_RECORDS
     ]
     with log_path.open("r") as f:
         partial_log_records = list(getattr(partial_log_record, attribute) for partial_log_record in logs.parse_logs(f))
@@ -79,31 +80,12 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
     """End-to-end test for parsing logs with LogsRecorder."""
-    expected_log_records = [getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS]
+    expected_log_records = [
+        getattr(partial_log_record, attribute)
+        for partial_log_record in PARTIAL_LOG_RECORDS
+        if logging.getLevelName(partial_log_record.level) >= logging.WARNING
+    ]
 
-    log_creation_time = log_path.stat().st_ctime
-    log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
-
-    backend = MockBackend()
-    log_processor = TaskRunWarningRecorder(
-        tmp_path,
-        WORKFLOW,
-        WORKFLOW_ID,
-        WORKFLOW_RUN_ID,
-        backend,
-        "default",
-        minimum_log_level=logging.DEBUG,
-    )
-    with log_path.open("r") as log:
-        log_records = list(
-            getattr(partial_log_record, attribute)
-            for partial_log_record in log_processor.record(TASK_NAME, log, log_creation_timestamp)
-        )
-    assert log_records == expected_log_records
-
-
-def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path):
-    """Parse a subset of the log records using the default minimum_log_level."""
     log_creation_time = log_path.stat().st_ctime
     log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
@@ -117,5 +99,8 @@ def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path):
         "default",
     )
     with log_path.open("r") as log:
-        log_records = log_processor.record(TASK_NAME, log, log_creation_timestamp)
-    assert len(log_records) == 4
+        log_records = list(
+            getattr(partial_log_record, attribute)
+            for partial_log_record in log_processor.record(TASK_NAME, log, log_creation_timestamp)
+        )
+    assert log_records == expected_log_records

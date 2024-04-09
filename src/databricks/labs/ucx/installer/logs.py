@@ -89,8 +89,6 @@ class TaskRunWarningRecorder:
         job_run_id: int,
         sql_backend: SqlBackend,
         schema: str,
-        *,
-        minimum_log_level: int = logging.WARNING,
     ):
         """
         Initializes a LogProcessor instance.
@@ -102,7 +100,6 @@ class TaskRunWarningRecorder:
             job_run_id (int): The job run id of the job to store the log records for.
             sql_backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema (str): The schema name for the logs persistence.
-            minimum_log_level (int) : The minimum log level to record, all records with a lower log level are excluded.
         """
         self._catalog = "hive_metastore"
         self._table = "logs"
@@ -112,7 +109,6 @@ class TaskRunWarningRecorder:
         self._job_run_id = job_run_id
         self._sql_backend = sql_backend
         self._schema = schema
-        self._minimum_log_level = minimum_log_level
 
         self.log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
 
@@ -146,7 +142,7 @@ class TaskRunWarningRecorder:
                 message=partial_log_record.message,
             )
             for partial_log_record in parse_logs(log)
-            if logging.getLevelName(partial_log_record.level) >= self._minimum_log_level
+            if logging.getLevelName(partial_log_record.level) >= logging.WARNING
         ]
         self._sql_backend.save_table(
             self.full_name,
