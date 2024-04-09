@@ -1,18 +1,13 @@
 import dataclasses
-import datetime
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
 
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
@@ -28,8 +23,6 @@ from databricks.labs.ucx.hive_metastore.tables import (
     Table,
     What,
 )
-from databricks.labs.ucx.hive_metastore.views_sequencer import (
-from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
