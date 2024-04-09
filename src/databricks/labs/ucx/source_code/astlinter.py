@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import logging
 
@@ -7,9 +9,13 @@ logger = logging.getLogger(__name__)
 class MatchingVisitor(ast.NodeVisitor):
 
     def __init__(self, node_type: type, match_nodes: list[tuple[str, type]]):
-        self.matched_nodes: list[ast.AST] = []
+        self._matched_nodes: list[ast.AST] = []
         self._node_type = node_type
         self._match_nodes = match_nodes
+
+    @property
+    def matched_nodes(self):
+        return self._matched_nodes
 
     # pylint: disable=invalid-name
     def visit_Call(self, node: ast.Call):
@@ -17,7 +23,7 @@ class MatchingVisitor(ast.NodeVisitor):
             return
         try:
             if self._matches(node.func, 0):
-                self.matched_nodes.append(node)
+                self._matched_nodes.append(node)
         except NotImplementedError as e:
             logger.warning(f"Missing implementation: {e.args[0]}")
 
@@ -43,16 +49,17 @@ class MatchingVisitor(ast.NodeVisitor):
         return self._matches(next_node, depth + 1)
 
 
+# disclaimer this class is NOT thread-safe
 class ASTLinter:
 
     def __init__(self):
-        self._module: ast.Module | None = None
+        self._root: ast.AST | None = None
 
     def parse(self, code: str):
-        self._module = ast.parse(code)
+        self._root = ast.parse(code)
 
     def locate(self, node_type: type, match_nodes: list[tuple[str, type]]) -> list[ast.AST]:
-        assert self._module is not None
+        assert self._root is not None
         visitor = MatchingVisitor(node_type, match_nodes)
-        visitor.visit(self._module)
+        visitor.visit(self._root)
         return visitor.matched_nodes

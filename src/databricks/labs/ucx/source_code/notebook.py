@@ -55,7 +55,7 @@ class PythonLinter(ASTLinter, Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         self.parse(code)
         nodes = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        return [ self._convert_dbutils_notebook_run_to_advice(node) for node in nodes ]
+        return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]
 
     @classmethod
     def _convert_dbutils_notebook_run_to_advice(cls, node: ast.AST) -> Advisory:
@@ -112,7 +112,6 @@ class PythonCell(Cell):
                 parent.register_dependency(path.value.strip("'").strip('"'))
 
 
-
 class RCell(Cell):
 
     @property
@@ -149,8 +148,8 @@ class SQLCell(Cell):
         try:
             statements = parse_sql(self._original_code)
             return len(statements) > 0
-        except SQLParseError:
-            sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}")
+        except SQLParseError as e:
+            sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
@@ -207,8 +206,7 @@ class CellLanguage(Enum):
         self._magic_name = args[1]
         self._comment_prefix = args[2]
         # PI stands for Processing Instruction
-        # pylint: disable=invalid-name
-        self._requires_isolated_PI = args[3]
+        self._requires_isolated_pi = args[3]
         self._new_cell = args[4]
 
     @property
@@ -225,7 +223,7 @@ class CellLanguage(Enum):
 
     @property
     def requires_isolated_pi(self) -> str:
-        return self._requires_isolated_PI
+        return self._requires_isolated_pi
 
     @classmethod
     def of_language(cls, language: Language) -> CellLanguage:
@@ -271,7 +269,7 @@ class CellLanguage(Enum):
             if cell_language is None:
                 cell_language = self
             else:
-                self._make_runnable(cell_lines, cell_language)
+                self._remove_magic_wrapper(cell_lines, cell_language)
             cell_source = '\n'.join(cell_lines)
             return cell_language.new_cell(cell_source)
 
@@ -292,23 +290,21 @@ class CellLanguage(Enum):
 
         return cells
 
-    def _make_runnable(self, lines: list[str], cell_language: CellLanguage):
+    def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage):
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
         prefix_len = len(prefix)
-        # pylint: disable=too-many-nested-blocks
         for i, line in enumerate(lines):
             if line.startswith(prefix):
                 line = line[prefix_len:]
-                if cell_language.requires_isolated_pi:
-                    if line.startswith(LANGUAGE_PREFIX):
-                        line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
+                if cell_language.requires_isolated_pi and line.startswith(LANGUAGE_PREFIX):
+                    line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
                 lines[i] = line
                 continue
             if line.startswith(self.comment_prefix):
                 line = f"{cell_language.comment_prefix} {COMMENT_PI}{line}"
                 lines[i] = line
 
-    def make_unrunnable(self, code: str, cell_language: CellLanguage) -> str:
+    def wrap_with_magic(self, code: str, cell_language: CellLanguage) -> str:
         language_pi_prefix = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
         comment_pi_prefix = f"{cell_language.comment_prefix} {COMMENT_PI}"
         comment_pi_prefix_len = len(comment_pi_prefix)
@@ -420,7 +416,7 @@ class Notebook:
         for i, cell in enumerate(self._cells):
             migrated_code = cell.migrated_code
             if cell.language is not default_language:
-                migrated_code = default_language.make_unrunnable(migrated_code, cell.language)
+                migrated_code = default_language.wrap_with_magic(migrated_code, cell.language)
             sources.append(migrated_code)
             if i < len(self._cells) - 1:
                 sources.append('')

@@ -226,6 +226,7 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
         )
     ] == advices
 
+
 def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
     source = """
 import stuff
