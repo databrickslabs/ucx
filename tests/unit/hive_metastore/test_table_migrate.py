@@ -517,11 +517,9 @@ def test_is_upgraded(ws):
     errors = {}
     rows = {
         "SHOW TBLPROPERTIES schema1.table1": [
-            {"key": "upgraded_to", "value": "fake_dest"},
+            {"value": "fake_dest"},
         ],
-        "SHOW TBLPROPERTIES schema1.table2": [
-            {"key": "another_key", "value": "fake_value"},
-        ],
+        "SHOW TBLPROPERTIES schema1.table2": [],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
