@@ -7,12 +7,6 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import DependencyGraph, Notebook
 
 
-@dataclass
-class NotebookInfo(ObjectInfo):
-    original_code: str | None = None
-    migrated_code: str | None = None
-
-
 class NotebookMigrator:
     def __init__(self, ws: WorkspaceClient, languages: Languages):
         self._ws = ws
