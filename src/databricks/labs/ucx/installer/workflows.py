@@ -42,7 +42,7 @@ from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
-from databricks.labs.ucx.framework.tasks import Task
+from databricks.labs.ucx.framework.tasks import Task, Workflow
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
@@ -488,8 +488,8 @@ class WorkflowsDeployment(InstallationMixin):
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = [t for t in self._tasks if t.workflow == step_name]
-        job_tasks = [self._job_task(task, remote_wheel) for task in tasks]
-        job_tasks.append(self._job_parse_logs_task(tasks, remote_wheel))
+        job_tasks = [self._job_task(task, remote_wheel) for task in tasks if task.name != "parse_logs"]
+        job_tasks.append(self._job_parse_logs_task(job_tasks, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -611,21 +611,13 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_parse_logs_task(self, tasks: list[Task], remote_wheel: str) -> jobs.Task:
-        task = Task(
-            task_id=len(tasks),
-            workflow=tasks[0].workflow,
-            name="parse-logs",
-            doc="Parse and store in ucx database.",
-            # fn is never executed
-            fn=lambda *_: None,  # type: ignore
-            depends_on=[task.name for task in tasks],
-        )
+    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], remote_wheel: str) -> jobs.Task:
+        task = Workflow.parse_logs.__task__
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
             # The task is made dependent on all previous tasks.
-            depends_on=[jobs.TaskDependency(task_key=task.name) for task in tasks],
+            depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
             run_if=jobs.RunIf.ALL_DONE,
         )
         return self._job_wheel_task(jobs_task, task, remote_wheel)
