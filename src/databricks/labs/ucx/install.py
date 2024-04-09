@@ -595,12 +595,14 @@ def install_on_account():
     ctx = AccountContext(_get_safe_account_client())
     installation_config = None
     confirmed = False
+    installed_workspaces = []
     for workspace in ctx.account_client.workspaces.list():
         workspace_client = ctx.account_client.get_workspace_client(workspace)
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
 
         if not _is_valid_workspace(workspace_client):
             continue
+        installed_workspaces.append(workspace)
 
         try:
             current = app.current_installation(workspace_client)
@@ -619,7 +621,7 @@ def install_on_account():
         confirmed = prmpts.confirm("Do you want to install UCX on the remaining workspaces with the same config?")
 
     # upload the json dump of workspace info in the .ucx folder
-    ctx.account_workspaces.sync_workspace_info()
+    ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
 
 def install_on_workspace():

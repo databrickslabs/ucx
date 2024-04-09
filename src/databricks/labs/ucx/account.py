@@ -49,15 +49,16 @@ class AccountWorkspaces:
             clients.append(ws)
         return clients
 
-    def sync_workspace_info(self):
+    def sync_workspace_info(self, workspaces: list[Workspace] | None = None):
         """
         Create a json dump for each Workspace in account
         For each user that has ucx installed in their workspace,
         upload the json dump of workspace info in the .ucx folder
         """
-        workspaces = []
-        for workspace in self._workspaces():
-            workspaces.append(workspace)
+        if not workspaces:
+            workspaces = []
+            for workspace in self._workspaces():
+                workspaces.append(workspace)
         for ws in self.workspace_clients():
             try:
                 for installation in Installation.existing(ws, "ucx"):
