@@ -1,6 +1,6 @@
 import datetime
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections.abc import Iterable
 
 from databricks.labs.lsql.backends import SqlBackend
@@ -111,9 +111,12 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
             if table.key in reverse_seen and self.is_migrated(src_schema, src_table):
                 target_table = reverse_seen[table.key]
                 if len(target_table.split(".")) == 3:
-                    table_migration_status.dst_catalog = target_table.split(".")[0]
-                    table_migration_status.dst_schema = target_table.split(".")[1]
-                    table_migration_status.dst_table = target_table.split(".")[2]
+                    table_migration_status = replace(
+                        table_migration_status,
+                        dst_catalog=target_table.split(".")[0],
+                        dst_schema=target_table.split(".")[1],
+                        dst_table=target_table.split(".")[2],
+                    )
             yield table_migration_status
 
     def _try_fetch(self) -> Iterable[MigrationStatus]:
