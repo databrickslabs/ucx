@@ -8,7 +8,7 @@ import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.catalog import FunctionInfo, TableInfo
+from databricks.sdk.service.catalog import FunctionInfo, TableInfo, TableType, DataSourceFormat
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -270,6 +270,20 @@ class TestRuntimeContext(RuntimeContext):
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
+
+    # For Tables in mounts, we cannot create tables in adls:/ directly, we have to workaround by injecting a mocked crawler
+    def with_static_table_crawler(self, table_crawler: StaticTablesCrawler):
+        for table in table_crawler.snapshot():
+            self._tables.append(
+                TableInfo(
+                    catalog_name=table.catalog,
+                    schema_name=table.database,
+                    name=table.name,
+                    storage_location=table.location,
+                    table_type=TableType(table.object_type),
+                    data_source_format=DataSourceFormat(table.table_format),
+                )
+            )
 
     def make_table(self, **kwargs):
         table_info = self._make_table(**kwargs)

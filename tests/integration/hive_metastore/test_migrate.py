@@ -509,7 +509,7 @@ def test_migrate_table_in_mount(
     make_table,
     env_or_skip,
     make_random,
-    make_dbfs_data_copy,
+    runtime_ctx,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -547,18 +547,12 @@ def test_migrate_table_in_mount(
             src_external_table.name,
         ),
     ]
-    table_migrate = TablesMigrator(
-        table_crawler,
-        GrantsCrawler(table_crawler, StaticUdfsCrawler(sql_backend, inventory_schema, [])),
-        ws,
-        sql_backend,
-        StaticTableMapping(ws, sql_backend, rules=rules),
-        GroupManager(sql_backend, ws, inventory_schema),
-        MigrationStatusRefresher(ws, sql_backend, inventory_schema, table_crawler),
-        principal_acl(ws, inventory_schema, sql_backend),
-    )
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_static_table_crawler(table_crawler)
 
-    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
+    runtime_ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
+
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties

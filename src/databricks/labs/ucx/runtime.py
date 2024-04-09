@@ -9,7 +9,7 @@ from databricks.labs.ucx.assessment.workflows import Assessment, DestroySchema
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Task, TaskLogger, Workflow, parse_args
 from databricks.labs.ucx.hive_metastore.workflows import (
-    MigrateTablesInMounts,
+    ScanTablesInMounts,
     TableMigration,
 )
 from databricks.labs.ucx.workspace_access.workflows import (
@@ -43,7 +43,7 @@ class Workflows:
                 TableMigration(),
                 ValidateGroupPermissions(),
                 RemoveWorkspaceLocalGroups(),
-                MigrateTablesInMounts(),
+                ScanTablesInMounts(),
                 PermissionsMigrationAPI(),
                 DestroySchema(),
             ]
@@ -85,6 +85,7 @@ class Workflows:
             ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")
             current_task = getattr(workflow, task_name)
             current_task(ctx)
+
 
 def main(*argv):
     if len(argv) == 0:
