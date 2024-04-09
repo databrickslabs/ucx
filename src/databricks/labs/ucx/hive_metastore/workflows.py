@@ -41,4 +41,6 @@ class TableMigration(Workflow):
     @job_task(job_cluster="table_migration", depends_on=[ScanTablesInMounts.scan_tables_in_mounts_experimental])
     def migrate_tables_in_mounts_experimental(self, ctx: RuntimeContext):
         """[EXPERIMENTAL] This workflow migrates `delta tables stored in mount points` to Unity Catalog using a Create Table statement."""
-        ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER])
+        ctx.tables_migrator.migrate_tables(
+            what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER]
+        )
