@@ -1,7 +1,7 @@
 import contextlib
 import logging
 import os
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -17,6 +17,7 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
+
 # TODO: Fix circular import and use for type hinting in parse_logs
 # from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 
@@ -255,26 +256,3 @@ def job_task(
         return register
     register(fn)
     return fn
-
-
-class Workflow:
-    def __init__(self, name: str):
-        self._name = name
-
-    @property
-    def name(self):
-        return self._name
-
-    def tasks(self) -> Iterable[Task]:
-        # return __task__ from every method in this class that has this attribute
-        for attr in dir(self):
-            if attr.startswith("_"):
-                continue
-            fn = getattr(self, attr)
-            if hasattr(fn, "__task__"):
-                yield fn.__task__
-
-    @job_task
-    def parse_logs(self, ctx):
-        """Parse and store the warning and error logs."""
-        ctx.parse_logs.snapshot()

@@ -42,7 +42,8 @@ from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
-from databricks.labs.ucx.framework.tasks import Task, Workflow
+from databricks.labs.ucx.framework.tasks import Task
+from databricks.labs.ucx.framework.workflow import Workflow
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
