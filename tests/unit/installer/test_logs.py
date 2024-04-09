@@ -69,6 +69,16 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
     assert partial_log_records == expected_partial_log_records
 
 
+def test_parse_logs_time(log_path: Path) -> None:
+    """Verify the time of the log record lays within the short history."""
+    current_time = dt.datetime.now().time()
+    two_minutes_ago = (dt.datetime.now() - dt.timedelta(minutes=2)).time()
+
+    with log_path.open("r") as f:
+        partial_log_records = list(logs.parse_logs(f))
+    assert all(two_minutes_ago <= partial_log_record.time <= current_time for partial_log_record in partial_log_records)
+
+
 def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     """Verify if the last log message is present."""
     with log_path.open("r") as f:
