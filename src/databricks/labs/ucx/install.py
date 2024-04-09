@@ -559,6 +559,17 @@ class WorkspaceInstallation(InstallationMixin):
 
 def install_on_account():
     a = AccountClient(product="ucx", product_version=__version__)
+    if not a.config.is_account_client:
+        w = WorkspaceClient(product="ucx", product_version=__version__)
+        if w.config.is_aws:
+            host = "https://accounts.cloud.databricks.com"
+        elif w.config.is_azure:
+            host = "https://accounts.azuredatabricks.net"
+        elif w.config.is_gcp:
+            host = "https://accounts.gcp.databricks.com"
+        else:
+            raise ValueError("Unknown cloud provider")
+        a = AccountClient(host=host, product="ucx", product_version=__version__)
     ctx = AccountContext(a)
     installed_workspace_ids = []
     installation_config = None
@@ -566,9 +577,12 @@ def install_on_account():
         logger.info(f"Installing UCX on workspace {workspace_client.config.host}")
         try:
             current_user = workspace_client.current_user.me()
-            if "admins" not in current_user.groups:
+            if "admins" not in [g.display for g in current_user.groups]:
+                logger.warning(f"User {current_user.user_name} is not a workspace admin. Skipping...")
                 continue
-        except (PermissionDenied, NotFound):
+        except (PermissionDenied, NotFound) as err:
+            logger.warning(
+                f"Encounter error {err}. Skipping...")
             continue
         installed_workspace_ids.append(workspace_client.get_workspace_id())
 
