@@ -1517,6 +1517,8 @@ def test_check_inventory_database_exists(ws, mock_installation):
         {
             r".*Inventory Database stored in hive_metastore": "ucx_exists",
             r".*": "",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
         }
     )
 
