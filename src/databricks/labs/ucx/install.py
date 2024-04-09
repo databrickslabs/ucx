@@ -1,4 +1,3 @@
-import dataclasses
 import functools
 import logging
 import os
@@ -169,13 +168,13 @@ class WorkspaceInstaller:
             self._product_info,
         )
         try:
-            workspace_installation.run(install_config.silent)
+            workspace_installation.run(install_config.silent, install_config.trigger_job)
         except ManyError as err:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
             raise err
 
-    def prompt_for_new_installation(self) -> InstallationConfig:
+    def prompt_for_new_installation(self, silent: bool = False) -> InstallationConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
@@ -187,14 +186,16 @@ class WorkspaceInstaller:
         # Check if terraform is being used
         is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         include_databases = self._select_databases()
+        trigger_job = self._prompts.confirm("Do you want to trigger assessment job after installation?")
         return InstallationConfig(
-            silent=False,
+            silent=silent,
             inventory_database=inventory_database,
             configure_groups=configure_groups,
             log_level=log_level,
             num_threads=num_threads,
             is_terraform_used=is_terraform_used,
             include_databases=include_databases,
+            trigger_job=trigger_job,
         )
 
     def _compare_remote_local_versions(self):
@@ -290,10 +291,10 @@ class WorkspaceInstaller:
             include_databases=installation_config.include_databases,
         )
         self._installation.save(config)
+        if installation_config.silent:
+            return config
         ws_file_url = self._installation.workspace_link(config.__file__)
-        if not installation_config.silent and self._prompts.confirm(
-            f"Open config file in the browser and continue installing? {ws_file_url}"
-        ):
+        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
 
@@ -434,8 +435,7 @@ class WorkspaceInstallation(InstallationMixin):
     def folder(self):
         return self._installation.install_folder()
 
-    def run(self, silent: bool = False):
-        logger.info(f"Installing UCX v{self._product_info.version()}")
+    def run(self, silent: bool = False, trigger_job: bool = False):
         Threads.strict(
             "installing components",
             [
@@ -448,7 +448,7 @@ class WorkspaceInstallation(InstallationMixin):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
-        if not silent and self._prompts.confirm("Do you want to trigger assessment job ?"):
+        if trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
 
@@ -557,9 +557,11 @@ class WorkspaceInstallation(InstallationMixin):
             webbrowser.open(job_url)
 
 
-def install_on_account():
+def _get_safe_account_client() -> AccountClient:
+    """
+    Get account client with the correct host based on the cloud provider
+    """
     a = AccountClient(product="ucx", product_version=__version__)
-    # if current profile is not an account one, replace the host accordingly to create a new account client
     if not a.config.is_account_client:
         w = WorkspaceClient(product="ucx", product_version=__version__)
         if w.config.is_aws:
@@ -571,20 +573,33 @@ def install_on_account():
         else:
             raise ValueError("Unknown cloud provider")
         a = AccountClient(host=host, product="ucx", product_version=__version__)
-    ctx = AccountContext(a)
+    return a
+
+
+def _is_valid_workspace(workspace_client: WorkspaceClient):
+    try:
+        # check if user is a workspace admin
+        current_user = workspace_client.current_user.me()
+        if current_user.groups is None:
+            return False
+        if "admins" not in [g.display for g in current_user.groups]:
+            logger.warning(f"User {current_user.user_name} is not a workspace admin. Skipping...")
+            return False
+        # check if user has access to workspace
+    except (PermissionDenied, NotFound, ValueError) as err:
+        logger.warning(f"Encounter error {err}. Skipping...")
+        return False
+    return True
+
+
+def install_on_account():
+    ctx = AccountContext(_get_safe_account_client())
     installation_config = None
+    confirmed = False
     for workspace_client in ctx.account_workspaces.workspace_clients():
         logger.info(f"Installing UCX on workspace {workspace_client.config.host}")
-        try:
-            # check if user is an admin
-            current_user = workspace_client.current_user.me()
-            if "admins" not in [g.display for g in current_user.groups]:
-                logger.warning(f"User {current_user.user_name} is not a workspace admin. Skipping...")
-                continue
-            # check if user has access to workspace
-        except (PermissionDenied, NotFound) as err:
-            logger.warning(
-                f"Encounter error {err}. Skipping...")
+
+        if not _is_valid_workspace(workspace_client):
             continue
 
         try:
@@ -592,12 +607,17 @@ def install_on_account():
         except NotFound:
             current = Installation.assume_global(workspace_client, app.product_name())
         installer = WorkspaceInstaller(prmpts, current, workspace_client, app)
-        if installation_config is None:
-            installation_config = dataclasses.replace(installer.prompt_for_new_installation(), silent=True)
-        installer.run(installation_config)
+        if not confirmed or not installation_config:
+            installation_config = installer.prompt_for_new_installation(True)
+        try:
+            installer.run(installation_config)
+        except RuntimeWarning:
+            logger.info("Skipping workspace...")
         # if user confirms to install on remaining workspaces with the same config, reuse the object
-        if not prmpts.confirm("Do you want to install UCX on the remaining workspaces with the same config?"):
-            installation_config = None
+        if confirmed:
+            continue
+        confirmed = prmpts.confirm("Do you want to install UCX on the remaining workspaces with the same config?")
+
     # upload the json dump of workspace info in the .ucx folder
     ctx.account_workspaces.sync_workspace_info()
 

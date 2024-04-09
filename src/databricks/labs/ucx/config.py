@@ -79,11 +79,7 @@ class InstallationConfig:
     silent: bool
     inventory_database: str
     configure_groups: ConfigureGroups
-    warehouse_id: str | None = None
-    connect: Config | None = None
     num_threads: int | None = 10
-    database_to_catalog_mapping: dict[str, str] | None = None
-    default_catalog: str | None = "ucx_default"
     log_level: str | None = "INFO"
 
     # Flag to see if terraform has been used for deploying certain entities
@@ -91,3 +87,6 @@ class InstallationConfig:
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
+
+    # Whether to trigger assessment job after installation
+    trigger_job: bool = False
