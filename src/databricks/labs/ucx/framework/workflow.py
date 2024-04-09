@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from databricks.labs.ucx.framework.tasks import Task, job_task
 
