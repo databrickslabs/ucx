@@ -2,5 +2,5 @@
 -- widget title=Assessment warning and error messages, row=44, col=0, size_x=8, size_y=12
 SELECT *
 FROM $inventory.logs
-WHERE job_run_id = (SELECT MAX(job_run_id) FROM $inventory.logs)
+WHERE job_run_id = (SELECT MAX(job_run_id) FROM $inventory.logs WHERE workflow_name = 'assessment')
 ORDER BY timestamp ASC
