@@ -559,6 +559,7 @@ class WorkspaceInstallation(InstallationMixin):
 
 def install_on_account():
     a = AccountClient(product="ucx", product_version=__version__)
+    # if current profile is not an account one, replace the host accordingly to create a new account client
     if not a.config.is_account_client:
         w = WorkspaceClient(product="ucx", product_version=__version__)
         if w.config.is_aws:
@@ -571,20 +572,20 @@ def install_on_account():
             raise ValueError("Unknown cloud provider")
         a = AccountClient(host=host, product="ucx", product_version=__version__)
     ctx = AccountContext(a)
-    installed_workspace_ids = []
     installation_config = None
     for workspace_client in ctx.account_workspaces.workspace_clients():
         logger.info(f"Installing UCX on workspace {workspace_client.config.host}")
         try:
+            # check if user is an admin
             current_user = workspace_client.current_user.me()
             if "admins" not in [g.display for g in current_user.groups]:
                 logger.warning(f"User {current_user.user_name} is not a workspace admin. Skipping...")
                 continue
+            # check if user has access to workspace
         except (PermissionDenied, NotFound) as err:
             logger.warning(
                 f"Encounter error {err}. Skipping...")
             continue
-        installed_workspace_ids.append(workspace_client.get_workspace_id())
 
         try:
             current = app.current_installation(workspace_client)
@@ -594,8 +595,10 @@ def install_on_account():
         if installation_config is None:
             installation_config = dataclasses.replace(installer.prompt_for_new_installation(), silent=True)
         installer.run(installation_config)
+        # if user confirms to install on remaining workspaces with the same config, reuse the object
         if not prmpts.confirm("Do you want to install UCX on the remaining workspaces with the same config?"):
             installation_config = None
+    # upload the json dump of workspace info in the .ucx folder
     ctx.account_workspaces.sync_workspace_info()
 
 
