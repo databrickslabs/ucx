@@ -50,13 +50,10 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_databases: list[str] | None = None
 
     # Whether the tables in mounts crawler should crawl a specific list of mounts.
-    # If not specified, it will list all moubts.
+    # If not specified, it will list all mounts.
     include_mounts: list[str] | None = None
     exclude_paths_in_mount: list[str] | None = None
     include_paths_in_mount: list[str] | None = None
-
-    # Whether ucx is installed on all workspaces
-    installed_workspace_ids: list[str] | None = None
 
     # Whether ucx is installed on all workspaces
     installed_workspace_ids: list[str] | None = None
