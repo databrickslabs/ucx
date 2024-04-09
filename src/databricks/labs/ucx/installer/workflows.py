@@ -43,7 +43,6 @@ import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.tasks import Task
-from databricks.labs.ucx.framework.workflow import Workflow
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
@@ -490,7 +489,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         tasks = [t for t in self._tasks if t.workflow == step_name]
         job_tasks = [self._job_task(task, remote_wheel) for task in tasks if task.name != "parse_logs"]
-        job_tasks.append(self._job_parse_logs_task(job_tasks, remote_wheel))
+        job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -514,7 +513,7 @@ class WorkflowsDeployment(InstallationMixin):
             return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task, remote_wheel)
+        return self._job_wheel_task(jobs_task, task.workflow, remote_wheel)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -546,8 +545,9 @@ class WorkflowsDeployment(InstallationMixin):
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
-        if "table_migration" in task.job_cluster:
+    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
+        assert jobs_task.job_cluster_key is not None
+        if "table_migration" in jobs_task.job_cluster_key:
             # Shared mode cluster cannot use dbfs, need to use WSFS
             libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         else:
@@ -555,8 +555,8 @@ class WorkflowsDeployment(InstallationMixin):
             libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
         named_parameters = {
             "config": f"/Workspace{self._config_file}",
-            "workflow": task.workflow,
-            "task": task.name,
+            "workflow": workflow,
+            "task": jobs_task.task_key,
         }
         return replace(
             jobs_task,
@@ -612,16 +612,15 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], remote_wheel: str) -> jobs.Task:
-        task = Workflow.parse_logs.__task__
+    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheel: str) -> jobs.Task:
         jobs_task = jobs.Task(
-            task_key=task.name,
-            job_cluster_key=task.job_cluster,
+            task_key="parse_logs",
+            job_cluster_key=Task.job_cluster,
             # The task is made dependent on all previous tasks.
             depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
             run_if=jobs.RunIf.ALL_DONE,
         )
-        return self._job_wheel_task(jobs_task, task, remote_wheel)
+        return self._job_wheel_task(jobs_task, workflow, remote_wheel)
 
     def _create_debug(self, remote_wheel: str):
         readme_link = self._installation.workspace_link('README')
