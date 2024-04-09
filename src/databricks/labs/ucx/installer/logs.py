@@ -58,8 +58,8 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
     Args:
          log (TextIO): The log file IO.
     """
-    # This regex matches the log format defined in databricks.labs.ucx.installer.logs.TaskLogger
     time_format = "%H:%M:%S"
+    # This regex matches the log format defined in databricks.labs.ucx.installer.logs.TaskLogger
     log_format = r"(\d+:\d+:\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
