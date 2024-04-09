@@ -1,33 +1,24 @@
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
 @dataclass
 class ViewToMigrate(TableToMigrate):
-
-    _fetch_table: Callable[[str], TableToMigrate | None]
-    _table_dependencies: list[TableToMigrate] | None = None
-    _view_dependencies: list[TableToMigrate] | None = None
+    _table_dependencies: list[TableView] | None = None
 
     def __post_init__(self):
         if self.src.view_text is None:
             raise RuntimeError("Should never get there! A view must have 'view_text'!")
 
-    def table_dependencies(self) -> list[TableToMigrate]:
-        if self._table_dependencies is None or self._view_dependencies is None:
-            self._compute_dependencies()
+    def dependencies(self) -> list[TableView]:
+        if self._table_dependencies is None:
+            self._table_dependencies = self._compute_dependencies()
         assert self._table_dependencies is not None
         return self._table_dependencies
-
-    def view_dependencies(self) -> list[TableToMigrate]:
-        if self._table_dependencies is None or self._view_dependencies is None:
-            self._compute_dependencies()
-        assert self._view_dependencies is not None
-        return self._view_dependencies
 
     @staticmethod
     def get_view_updated_text(src: str, index: MigrationIndex, schema: str):
@@ -35,20 +26,7 @@ class ViewToMigrate(TableToMigrate):
         return from_table.apply(src)
 
     def _compute_dependencies(self):
-        table_dependencies = set()
-        view_dependencies = set()
-        for table_with_key in FromTable.view_dependencies(self.src.view_text, use_schema=self.src.database):
-            table = self._fetch_table(table_with_key.key())
-            if table is None:
-                raise ValueError(
-                    f"Unknown schema object: {table_with_key.key} in view SQL: {self.src.view_text} of table {self.src.key}"
-                )
-            if table.src.view_text is None:
-                table_dependencies.add(table)
-            else:
-                view_dependencies.add(table)
-        self._table_dependencies = list(table_dependencies)
-        self._view_dependencies = list(view_dependencies)
+        return list(FromTable.view_dependencies(self.src.view_text, use_schema=self.src.database))
 
     def __hash__(self):
         return hash(self.src)
@@ -59,8 +37,9 @@ class ViewToMigrate(TableToMigrate):
 
 class ViewsMigrationSequencer:
 
-    def __init__(self, tables: Collection[TableToMigrate]):
+    def __init__(self, tables: Collection[TableToMigrate], index: MigrationIndex):
         self._tables = tables
+        self._index = index
         self._result_view_list: list[ViewToMigrate] = []
         self._result_tables_set: set[TableToMigrate] = set()
 
@@ -96,13 +75,13 @@ class ViewsMigrationSequencer:
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
         for view in views:
-            view_deps = view.view_dependencies()
+            view_deps = view.dependencies()
             if len(view_deps) == 0:
                 result.add(view)
             else:
                 # does the view have at least one view dependency that is not yet processed ?
                 not_processed_yet = next((t for t in view_deps if t not in self._result_tables_set), None)
-                if not_processed_yet is None:
+                if not_processed_yet is None and not self._index.is_migrated(view.src.database, view.src.name):
                     result.add(view)
         # prevent infinite loop
         if len(result) == 0 and len(views) > 0:

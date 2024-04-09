@@ -22,11 +22,11 @@ _SPARK_CONF = {
     "spark.master": "local[*]",
     "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
     "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
-    ".azurebfs.oauth2.ClientCredsTokenProvider",
+                                                                                 ".azurebfs.oauth2.ClientCredsTokenProvider",
     "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
     "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
     "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
-    ".microsoftonline.com/directory_12345/oauth2/token",
+                                                                                    ".microsoftonline.com/directory_12345/oauth2/token",
 }
 
 
@@ -67,12 +67,12 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog, make
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_tables_with_cache_should_not_create_table(
-    ws,
-    sql_backend,
-    runtime_ctx,
-    make_random,
-    make_catalog,
-    make_schema,
+        ws,
+        sql_backend,
+        runtime_ctx,
+        make_random,
+        make_catalog,
+        make_schema,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -125,14 +125,14 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table(
-    ws,
-    sql_backend,
-    runtime_ctx,
-    make_catalog,
-    make_schema,
-    env_or_skip,
-    make_random,
-    make_dbfs_data_copy,
+        ws,
+        sql_backend,
+        runtime_ctx,
+        make_catalog,
+        make_schema,
+        env_or_skip,
+        make_random,
+        make_dbfs_data_copy,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -202,6 +202,53 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, make_schema
     runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert "SYNC command failed to migrate" in caplog.text
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    src_schema = make_schema(catalog_name="hive_metastore")
+    src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    view1_sql = f"SELECT * FROM {src_managed_table.full_name}"
+    src_view1 = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name
+                                       , ctas=view1_sql, view=True)
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
+
+    rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_managed_table.name,
+            src_managed_table.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_view1.name,
+            src_view1.name,
+        ),
+    ]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    runtime_ctx.tables_migrator.migrate_tables(what=What.VIEW)
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 2
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
+    assert view1_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_managed_table.name}"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -469,10 +516,10 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_c
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables_with_principal_acl_azure(
-    ws,
-    make_user,
-    prepared_principal_acl,
-    make_cluster_permissions,
+        ws,
+        make_user,
+        prepared_principal_acl,
+        make_cluster_permissions,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
