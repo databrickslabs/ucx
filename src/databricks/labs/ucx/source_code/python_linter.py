@@ -21,6 +21,7 @@ class MatchingVisitor(ast.NodeVisitor):
     def matched_nodes(self):
         return self._matched_nodes
 
+    # visit_Call follows NodeVisitor requirements, which clash with python naming conventions
     # pylint: disable=invalid-name
     def visit_Call(self, node: ast.Call):
         if self._node_type is not ast.Call:
@@ -83,7 +84,7 @@ class PythonLinter(Linter):
         path = cls.get_dbutils_notebook_run_path_arg(node)
         if isinstance(path, ast.Constant):
             return Advisory(
-                'notebook-auto-migrate',
+                'dbutils-notebook-run-literal',
                 "Call to 'dbutils.notebook.run' will be migrated automatically",
                 node.lineno,
                 node.col_offset,
@@ -91,7 +92,7 @@ class PythonLinter(Linter):
                 node.end_col_offset or 0,
             )
         return Advisory(
-            'notebook-manual-migrate',
+            'dbutils-notebook-run-dynamic',
             "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
             node.lineno,
             node.col_offset,
