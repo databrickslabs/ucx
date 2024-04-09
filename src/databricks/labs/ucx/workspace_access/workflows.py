@@ -3,7 +3,7 @@ import logging
 from databricks.labs.ucx.assessment.workflows import Assessment
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import job_task
-from databricks.labs.ucx.framework.workflow import Workflow
+from databricks.labs.ucx.framework.workflows import Workflow
 
 logger = logging.getLogger(__name__)
 

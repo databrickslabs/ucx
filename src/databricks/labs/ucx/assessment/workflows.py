@@ -1,6 +1,6 @@
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import job_task
-from databricks.labs.ucx.framework.workflow import Workflow
+from databricks.labs.ucx.framework.workflows import Workflow
 
 
 class Assessment(Workflow):
