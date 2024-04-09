@@ -365,9 +365,7 @@ class WorkspaceInstaller:
                     raise AlreadyExists(
                         f"Inventory database '{inventory_database}' already exists in another installation"
                     )
-            except NotFound:
-                continue
-            except SerdeError:
+            except (PermissionDenied, NotFound, SerdeError):
                 continue
 
 
