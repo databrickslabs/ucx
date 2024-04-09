@@ -17,6 +17,8 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
+# TODO: Fix circular import and use for type hinting in parse_logs
+# from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 
 _TASKS: dict[str, "Task"] = {}
 
@@ -108,7 +110,7 @@ class TaskLogger(contextlib.AbstractContextManager):
     def _init_debug_logfile(self):
         log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
         log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
-        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="M", interval=10)
+        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="S", interval=10)
         self._file_handler.setFormatter(log_formatter)
         self._file_handler.setLevel(logging.DEBUG)
 
@@ -213,24 +215,6 @@ def trigger(*argv):
     run_task(args, config_path.parent, cfg, workspace_client, sql_backend, installation)
 
 
-class Workflow:
-    def __init__(self, name: str):
-        self._name = name
-
-    @property
-    def name(self):
-        return self._name
-
-    def tasks(self) -> Iterable[Task]:
-        # return __task__ from every method in this class that has this attribute
-        for attr in dir(self):
-            if attr.startswith("_"):
-                continue
-            fn = getattr(self, attr)
-            if hasattr(fn, "__task__"):
-                yield fn.__task__
-
-
 def job_task(
     fn=None,
     *,
@@ -271,3 +255,26 @@ def job_task(
         return register
     register(fn)
     return fn
+
+
+class Workflow:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
+
+    def tasks(self) -> Iterable[Task]:
+        # return __task__ from every method in this class that has this attribute
+        for attr in dir(self):
+            if attr.startswith("_"):
+                continue
+            fn = getattr(self, attr)
+            if hasattr(fn, "__task__"):
+                yield fn.__task__
+
+    @job_task
+    def parse_logs(self, ctx):
+        """Parse and store the warning and error logs."""
+        ctx.parse_logs.snapshot()
