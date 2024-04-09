@@ -27,9 +27,7 @@ class LogRecord:
 class PartialLogRecord:
     """The information found within a log file record."""
 
-    hour: str
-    minute: str
-    second: str
+    time: dt.time
     level: str
     component: str
     message: str
@@ -61,19 +59,21 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
          log (TextIO): The log file IO.
     """
     # This regex matches the log format defined in databricks.labs.ucx.installer.logs.TaskLogger
-    log_format = r"(\d+):(\d+):(\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
+    time_format = "%H:%M:%S"
+    log_format = r"(\d+:\d+:\d+)\s(\w+)\s\[(.+)\]\s\{\w+\}\s(.+)"
     pattern = re.compile(log_format)
 
     line = log.readline()
     match = pattern.match(line)
     while len(line) > 0:
         assert match is not None
-        *groups, message = match.groups()
+        time, *groups, message = match.groups()
 
         next_line, next_match, multi_line_message = peak_multi_line_message(log, pattern)
 
+        time = dt.datetime.strptime(time, time_format).time()
         # Mypy can't determine length of regex expressions
-        partial_log_record = PartialLogRecord(*groups, message + multi_line_message)  # type: ignore
+        partial_log_record = PartialLogRecord(time, *groups, message + multi_line_message)  # type: ignore
 
         yield partial_log_record
 
@@ -128,9 +128,9 @@ class TaskRunWarningRecorder:
             LogRecord(
                 timestamp=int(
                     log_creation_timestamp.replace(
-                        hour=int(partial_log_record.hour),
-                        minute=int(partial_log_record.minute),
-                        second=int(partial_log_record.second),
+                        hour=partial_log_record.time.hour,
+                        minute=partial_log_record.time.minute,
+                        second=partial_log_record.time.second,
                     ).timestamp()
                 ),
                 job_id=self._job_id,

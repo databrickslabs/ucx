@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -28,12 +29,12 @@ MULTILINE_LOG_MESSAGE = (
     "<     }"
 )
 PARTIAL_LOG_RECORDS = [
-    PartialLogRecord("15", "07", "10", "ERROR", COMPONENT, "Message."),
-    PartialLogRecord("15", "07", "12", "INFO", COMPONENT, "Other message."),
-    PartialLogRecord("15", "07", "15", "WARNING", COMPONENT, "Warning message."),
-    PartialLogRecord("15", "08", "23", "CRITICAL", COMPONENT, "Watch out!"),
-    PartialLogRecord("15", "12", "20", "ERROR", COMPONENT, MULTILINE_LOG_MESSAGE),
-    PartialLogRecord("15", "12", "21", "WARNING", COMPONENT, "Last message"),
+    PartialLogRecord(dt.time(15, 7, 10), "ERROR", COMPONENT, "Message."),
+    PartialLogRecord(dt.time(15, 7, 12), "INFO", COMPONENT, "Other message."),
+    PartialLogRecord(dt.time(15, 7, 15), "WARNING", COMPONENT, "Warning message."),
+    PartialLogRecord(dt.time(15, 8, 23), "CRITICAL", COMPONENT, "Watch out!"),
+    PartialLogRecord(dt.time(15, 12, 20), "ERROR", COMPONENT, MULTILINE_LOG_MESSAGE),
+    PartialLogRecord(dt.time(15, 12, 21), "WARNING", COMPONENT, "Last message"),
 ]
 
 
