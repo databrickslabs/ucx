@@ -1,4 +1,5 @@
 import datetime
+import datetime as dt
 import logging
 import re
 from collections.abc import Iterator
@@ -116,7 +117,7 @@ class TaskRunWarningRecorder:
     def full_name(self) -> str:
         return f"{self._catalog}.{self._schema}.{self._table}"
 
-    def record(self, task_name: str, log: TextIO, log_creation_timestamp: datetime.datetime) -> list[LogRecord]:
+    def record_task(self, task_name: str, log: TextIO, log_creation_timestamp: dt.datetime) -> list[LogRecord]:
         """Record the logs of a given task.
 
         Args:
@@ -144,10 +145,26 @@ class TaskRunWarningRecorder:
             for partial_log_record in parse_logs(log)
             if logging.getLevelName(partial_log_record.level) >= logging.WARNING
         ]
-        self._sql_backend.save_table(
-            self.full_name,
-            log_records,
-            LogRecord,
-            mode="append",
-        )
+        return log_records
+
+    def snapshot(self) -> list[LogRecord]:
+        """Parse the logs for all tasks."""
+        log_files = self.log_path.glob("*.log")
+
+        log_records = []
+        for log_file in log_files:
+            task_name = log_file.stem.rstrip(".log")
+            logger.debug(f"Parsing logs for {task_name} in file {log_file}")
+
+            log_creation_timestamp = dt.datetime.utcfromtimestamp(log_file.stat().st_ctime)
+            with log_file.open("r") as log:
+                log_records += self.record_task(task_name, log, log_creation_timestamp)
+
+            self._sql_backend.save_table(
+                self.full_name,
+                log_records,
+                LogRecord,
+                mode="append",
+            )
+
         return log_records
