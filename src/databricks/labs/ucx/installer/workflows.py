@@ -624,6 +624,7 @@ class WorkflowsDeployment(InstallationMixin):
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
+            # The task is made dependent on all previous tasks.
             depends_on=[jobs.TaskDependency(task_key=task.name) for task in tasks],
             run_if=jobs.RunIf.ALL_DONE,
         )
