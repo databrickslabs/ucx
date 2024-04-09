@@ -415,6 +415,7 @@ class PrincipalACL:
         tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
         cluster_locations: dict[str, dict],
+        default_table_owner: str | None = None,
     ):
         self._backend = backend
         self._ws = ws
@@ -422,6 +423,10 @@ class PrincipalACL:
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
+        self._default_table_owner = default_table_owner
+
+    def get_default_table_owner(self):
+        return self._default_table_owner
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()

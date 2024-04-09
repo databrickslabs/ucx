@@ -248,6 +248,7 @@ class GlobalContext(abc.ABC):
             self.tables_crawler,
             self.mounts_crawler,
             eligible,
+            self.config.default_table_owner,
         )
 
     @cached_property

@@ -30,6 +30,7 @@ class What(Enum):
 class AclMigrationWhat(Enum):
     LEGACY_TACL = auto()
     PRINCIPAL = auto()
+    DEFAULT_TABLE_OWNER = auto()
 
 
 @dataclass

@@ -547,11 +547,13 @@ def test_migrate_table_in_mount(
             src_external_table.name,
         ),
     ]
+
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_azure_resource_permission()
     runtime_ctx.with_static_table_crawler(table_crawler)
-
-    runtime_ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
+    runtime_ctx.tables_migrator.migrate_tables(
+        what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER]
+    )
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1

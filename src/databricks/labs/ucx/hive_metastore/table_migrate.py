@@ -142,7 +142,14 @@ class TablesMigrator:
             grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
         if AclMigrationWhat.PRINCIPAL in acl_strategy:
             grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
+        if AclMigrationWhat.DEFAULT_TABLE_OWNER in acl_strategy:
+            if self._principal_grants.get_default_table_owner():
+                grants.append(self._default_table_owner(table))
+
         return grants
+
+    def _default_table_owner(self, table):
+        return Grant(self._principal_grants.get_default_table_owner(), "OWN", table.catalog, table.database, table.name)
 
     def _migrate_table(
         self,
@@ -157,7 +164,7 @@ class TablesMigrator:
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.TABLE_IN_MOUNT:
-            return self._migrate_table_in_mount(src_table.src, src_table.rule)
+            return self._migrate_table_in_mount(src_table.src, src_table.rule, grants)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
@@ -209,7 +216,7 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_table_in_mount(self, src_table: Table, rule: Rule):
+    def _migrate_table_in_mount(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         fields = []
         for key, value, _ in self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;"):
@@ -221,7 +228,7 @@ class TablesMigrator:
         )
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_table_in_mount_alter_from(rule.as_uc_table_key))
-        return True
+        return self._migrate_acl(src_table, rule, grants)
 
     def _migrate_view_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
