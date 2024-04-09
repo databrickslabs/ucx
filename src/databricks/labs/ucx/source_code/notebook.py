@@ -31,6 +31,7 @@ class Cell(ABC):
 
     def __init__(self, source: str):
         self._original_code = source
+        self._migrated_code = source
 
     @property
     def original_code(self):
@@ -38,8 +39,11 @@ class Cell(ABC):
 
     @property
     def migrated_code(self):
-        # this property is for reading the migrated code, not for generating it
-        return self._original_code  # for now since we're not doing any migration yet
+        return self._migrated_code  # for now since we're not doing any migration yet
+
+    @migrated_code.setter
+    def migrated_code(self, value: str):
+        self._migrated_code = value
 
     @property
     @abstractmethod
@@ -192,6 +196,10 @@ class RunCell(Cell):
                 parent.register_dependency(path.strip('"'))
                 return
         raise ValueError("Missing notebook path in %run command")
+
+
+    def migrate_notebook_path(self):
+        pass
 
 
 class CellLanguage(Enum):
