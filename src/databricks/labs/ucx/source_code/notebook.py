@@ -4,15 +4,14 @@ import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.astlinter import ASTLinter
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
+from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
 logger = logging.getLogger(__name__)
@@ -59,42 +58,6 @@ class Cell(ABC):
         raise NotImplementedError()
 
 
-class PythonLinter(ASTLinter, Linter):
-    def lint(self, code: str) -> Iterable[Advice]:
-        self.parse(code)
-        nodes = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]
-
-    @classmethod
-    def _convert_dbutils_notebook_run_to_advice(cls, node: ast.AST) -> Advisory:
-        assert isinstance(node, ast.Call)
-        path = cls.get_dbutils_notebook_run_path_arg(node)
-        if isinstance(path, ast.Constant):
-            return Advisory(
-                'migrate-path-literal',
-                "Call to 'dbutils.notebook.run' will be migrated automatically",
-                node.lineno,
-                node.col_offset,
-                node.end_lineno or 0,
-                node.end_col_offset or 0,
-            )
-        return Advisory(
-            'migrate-path',
-            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            node.lineno,
-            node.col_offset,
-            node.end_lineno or 0,
-            node.end_col_offset or 0,
-        )
-
-    @staticmethod
-    def get_dbutils_notebook_run_path_arg(node: ast.Call):
-        if len(node.args) > 0:
-            return node.args[0]
-        arg = next(kw for kw in node.keywords if kw.arg == "path")
-        return arg.value if arg is not None else None
-
-
 class PythonCell(Cell):
 
     @property
@@ -110,8 +73,7 @@ class PythonCell(Cell):
 
     def build_dependency_graph(self, parent: DependencyGraph):
         # TODO https://github.com/databrickslabs/ucx/issues/1202
-        linter = ASTLinter()
-        linter.parse(self._original_code)
+        linter = ASTLinter.parse(self._original_code)
         nodes = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for node in nodes:
             assert isinstance(node, ast.Call)
@@ -156,8 +118,8 @@ class SQLCell(Cell):
         try:
             statements = parse_sql(self._original_code)
             return len(statements) > 0
-        except SQLParseError:
-            sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}")
+        except SQLParseError as e:
+            sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
@@ -217,8 +179,7 @@ class CellLanguage(Enum):
         self._magic_name = args[1]
         self._comment_prefix = args[2]
         # PI stands for Processing Instruction
-        # pylint: disable=invalid-name
-        self._requires_isolated_PI = args[3]
+        self._requires_isolated_pi = args[3]
         self._new_cell = args[4]
 
     @property
@@ -235,7 +196,7 @@ class CellLanguage(Enum):
 
     @property
     def requires_isolated_pi(self) -> str:
-        return self._requires_isolated_PI
+        return self._requires_isolated_pi
 
     @classmethod
     def of_language(cls, language: Language) -> CellLanguage:
@@ -281,7 +242,7 @@ class CellLanguage(Enum):
             if cell_language is None:
                 cell_language = self
             else:
-                self._make_runnable(cell_lines, cell_language)
+                self._remove_magic_wrapper(cell_lines, cell_language)
             cell_source = '\n'.join(cell_lines)
             return cell_language.new_cell(cell_source)
 
@@ -302,23 +263,21 @@ class CellLanguage(Enum):
 
         return cells
 
-    def _make_runnable(self, lines: list[str], cell_language: CellLanguage):
+    def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage):
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
         prefix_len = len(prefix)
-        # pylint: disable=too-many-nested-blocks
         for i, line in enumerate(lines):
             if line.startswith(prefix):
                 line = line[prefix_len:]
-                if cell_language.requires_isolated_pi:
-                    if line.startswith(LANGUAGE_PREFIX):
-                        line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
+                if cell_language.requires_isolated_pi and line.startswith(LANGUAGE_PREFIX):
+                    line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
                 lines[i] = line
                 continue
             if line.startswith(self.comment_prefix):
                 line = f"{cell_language.comment_prefix} {COMMENT_PI}{line}"
                 lines[i] = line
 
-    def make_unrunnable(self, code: str, cell_language: CellLanguage) -> str:
+    def wrap_with_magic(self, code: str, cell_language: CellLanguage) -> str:
         language_pi_prefix = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
         comment_pi_prefix = f"{cell_language.comment_prefix} {COMMENT_PI}"
         comment_pi_prefix_len = len(comment_pi_prefix)
@@ -443,7 +402,7 @@ class Notebook:
         for i, cell in enumerate(self._cells):
             migrated_code = cell.migrated_code
             if cell.language is not default_language:
-                migrated_code = default_language.make_unrunnable(migrated_code, cell.language)
+                migrated_code = default_language.wrap_with_magic(migrated_code, cell.language)
             sources.append(migrated_code)
             if i < len(self._cells) - 1:
                 sources.append('')

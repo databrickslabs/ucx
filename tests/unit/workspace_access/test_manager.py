@@ -197,46 +197,6 @@ def test_unregistered_support():
     permission_manager.apply_group_permissions(migration_state=MigrationState([]))
 
 
-def test_factory(mock_ws):
-    mock_ws.groups.list.return_value = []
-    sql_backend = MockBackend()
-    permission_manager = PermissionManager.factory(mock_ws, sql_backend, "test")
-    appliers = permission_manager.object_type_support()
-
-    assert sorted(
-        {
-            "sql/warehouses",
-            "registered-models",
-            "instance-pools",
-            "jobs",
-            "directories",
-            "experiments",
-            "clusters",
-            "notebooks",
-            "repos",
-            "files",
-            "authorization",
-            "pipelines",
-            "cluster-policies",
-            "dashboards",
-            "queries",
-            "alerts",
-            "secrets",
-            "entitlements",
-            "roles",
-            'serving-endpoints',
-            "feature-tables",
-            "ANY FILE",
-            "FUNCTION",
-            "ANONYMOUS FUNCTION",
-            "CATALOG",
-            "TABLE",
-            "VIEW",
-            "DATABASE",
-        }
-    ) == sorted(appliers.keys())
-
-
 def test_manager_verify():
     sql_backend = MockBackend(
         rows={

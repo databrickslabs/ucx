@@ -65,6 +65,7 @@ from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
     WorkflowsDeployment,
 )
+from databricks.labs.ucx.runtime import Workflows
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -215,6 +216,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
+        [],
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -248,6 +250,7 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
         wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
+        Workflows.all().tasks(),
     )
 
     workflows_installation.create_jobs(any_prompt)
@@ -280,6 +283,7 @@ def test_write_protected_dbfs(ws, tmp_path, mock_installation):
         wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
+        Workflows.all().tasks(),
     )
 
     workflows_installation.create_jobs(prompts)
@@ -318,6 +322,7 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
         wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
+        Workflows.all().tasks(),
     )
 
     workflows_installation.create_jobs(any_prompt)
@@ -609,6 +614,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
+        [],
     )
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
@@ -678,6 +684,7 @@ def test_remove_jobs_no_state(ws):
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
+        [],
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -709,6 +716,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
+        [],
     )
     workspace_installation = WorkspaceInstallation(
         config,
@@ -1230,6 +1238,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
+        Workflows.all().tasks(),
     )
     workspace_installation = WorkspaceInstallation(
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
@@ -1334,6 +1343,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         create_autospec(WheelsV2),
         PRODUCT_INFO,
         timedelta(seconds=1),
+        [],
     )
 
     workspace_installation = WorkspaceInstallation(
@@ -1515,6 +1525,7 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
         wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
+        Workflows.all().tasks(),
     )
 
     with pytest.raises(PermissionError) as failure:
