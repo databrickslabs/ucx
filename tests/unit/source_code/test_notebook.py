@@ -4,7 +4,8 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph, PythonLinter
+from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph
+from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
 # fmt: off

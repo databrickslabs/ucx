@@ -4,15 +4,14 @@ import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.astlinter import ASTLinter
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
+from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
 logger = logging.getLogger(__name__)
@@ -49,43 +48,6 @@ class Cell(ABC):
     @abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph):
         raise NotImplementedError()
-
-
-class PythonLinter(Linter):
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        linter = ASTLinter.parse(code)
-        nodes = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]
-
-    @classmethod
-    def _convert_dbutils_notebook_run_to_advice(cls, node: ast.AST) -> Advisory:
-        assert isinstance(node, ast.Call)
-        path = cls.get_dbutils_notebook_run_path_arg(node)
-        if isinstance(path, ast.Constant):
-            return Advisory(
-                'notebook-auto-migrate',
-                "Call to 'dbutils.notebook.run' will be migrated automatically",
-                node.lineno,
-                node.col_offset,
-                node.end_lineno or 0,
-                node.end_col_offset or 0,
-            )
-        return Advisory(
-            'notebook-manual-migrate',
-            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            node.lineno,
-            node.col_offset,
-            node.end_lineno or 0,
-            node.end_col_offset or 0,
-        )
-
-    @staticmethod
-    def get_dbutils_notebook_run_path_arg(node: ast.Call):
-        if len(node.args) > 0:
-            return node.args[0]
-        arg = next(kw for kw in node.keywords if kw.arg == "path")
-        return arg.value if arg is not None else None
 
 
 class PythonCell(Cell):
