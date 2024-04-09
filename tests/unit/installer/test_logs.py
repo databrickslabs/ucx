@@ -1,4 +1,3 @@
-import datetime
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -86,9 +85,6 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
         if logging.getLevelName(partial_log_record.level) >= logging.WARNING
     ]
 
-    log_creation_time = log_path.stat().st_ctime
-    log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
-
     backend = MockBackend()
     log_processor = TaskRunWarningRecorder(
         tmp_path,
@@ -98,9 +94,9 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
         backend,
         "default",
     )
-    with log_path.open("r") as log:
-        log_records = list(
-            getattr(partial_log_record, attribute)
-            for partial_log_record in log_processor.record(TASK_NAME, log, log_creation_timestamp)
-        )
+    log_records = [
+        getattr(log_record, attribute)
+        for log_record in log_processor.snapshot()
+    ]
+
     assert log_records == expected_log_records
