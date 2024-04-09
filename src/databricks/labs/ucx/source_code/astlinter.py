@@ -52,14 +52,15 @@ class MatchingVisitor(ast.NodeVisitor):
 # disclaimer this class is NOT thread-safe
 class ASTLinter:
 
-    def __init__(self):
-        self._root: ast.AST | None = None
+    @staticmethod
+    def parse(code: str):
+        root = ast.parse(code)
+        return ASTLinter(root)
 
-    def parse(self, code: str):
-        self._root = ast.parse(code)
+    def __init__(self, root: ast.AST):
+        self._root: ast.AST = root
 
     def locate(self, node_type: type, match_nodes: list[tuple[str, type]]) -> list[ast.AST]:
-        assert self._root is not None
         visitor = MatchingVisitor(node_type, match_nodes)
         visitor.visit(self._root)
         return visitor.matched_nodes

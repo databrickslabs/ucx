@@ -51,10 +51,11 @@ class Cell(ABC):
         raise NotImplementedError()
 
 
-class PythonLinter(ASTLinter, Linter):
+class PythonLinter(Linter):
+
     def lint(self, code: str) -> Iterable[Advice]:
-        self.parse(code)
-        nodes = self.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        linter = ASTLinter.parse(code)
+        nodes = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]
 
     @classmethod
@@ -102,8 +103,7 @@ class PythonCell(Cell):
 
     def build_dependency_graph(self, parent: DependencyGraph):
         # TODO https://github.com/databrickslabs/ucx/issues/1202
-        linter = ASTLinter()
-        linter.parse(self._original_code)
+        linter = ASTLinter.parse(self._original_code)
         nodes = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for node in nodes:
             assert isinstance(node, ast.Call)
