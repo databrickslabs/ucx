@@ -149,7 +149,7 @@ class TaskRunWarningRecorder:
 
     def snapshot(self) -> list[LogRecord]:
         """Parse the logs for all tasks."""
-        log_files = self.log_path.glob("*.log")
+        log_files = self.log_path.glob("*.log*")
 
         log_records = []
         for log_file in log_files:
