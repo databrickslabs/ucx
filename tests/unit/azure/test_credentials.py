@@ -268,21 +268,6 @@ def sp_migration(ws, installation, credential_manager):
     return ServicePrincipalMigration(installation, ws, arp, sp_crawler, credential_manager)
 
 
-def test_for_cli_not_prompts(ws, installation):
-    ws.config.is_azure = True
-    prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "No"})
-    with pytest.raises(SystemExit):
-        ServicePrincipalMigration.for_cli(ws, installation, prompts)
-
-
-def test_for_cli(ws, installation):
-    ws.config.is_azure = True
-    ws.config.auth_type = "azure-cli"
-    prompts = MockPrompts({"Have you reviewed the azure_storage_account_info.csv *": "Yes"})
-
-    assert isinstance(ServicePrincipalMigration.for_cli(ws, installation, prompts), ServicePrincipalMigration)
-
-
 @pytest.mark.parametrize(
     "secret_bytes_value, num_migrated",
     [

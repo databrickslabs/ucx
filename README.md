@@ -353,6 +353,7 @@ The table migration workflow comprises multiple workflows and tasks designed to 
 ```mermaid
 flowchart TB
     subgraph CLI
+      sync-workspace-info[sync-workspace-info] --> create_table_mapping[create-table-mapping]
       create_table_mapping[create-table-mapping] --> create_catalogs_schemas[create-catalogs-schemas]
       create_uber_principal[create-uber-principal]
       principal_prefix_access[principal-prefix-access] --> migrate_credentials[migrate-credentials]

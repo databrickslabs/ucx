@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
@@ -13,9 +12,8 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSResources, AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.config import WorkspaceConfig
 
 logger = logging.getLogger(__name__)
 
@@ -124,30 +122,6 @@ class IamRoleMigration:
         self._ws = ws
         self._resource_permissions = resource_permissions
         self._storage_credential_manager = storage_credential_manager
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation, aws: AWSResources, prompts: Prompts):
-        if not ws.config.is_aws:
-            logger.error("Workspace is not on AWS, please run this command on a Databricks on AWS workspaces.")
-            raise SystemExit()
-
-        msg = (
-            f"Have you reviewed the {AWSResourcePermissions.UC_ROLES_FILE_NAMES} "
-            "and confirm listed IAM roles to be migrated?"
-        )
-        if not prompts.confirm(msg):
-            raise SystemExit()
-
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-
-        resource_permissions = AWSResourcePermissions.for_cli(
-            ws, installation, sql_backend, aws, config.inventory_database
-        )
-
-        storage_credential_manager = CredentialManager(ws)
-
-        return cls(installation, ws, resource_permissions, storage_credential_manager)
 
     @staticmethod
     def _print_action_plan(iam_list: list[AWSRoleAction]):
