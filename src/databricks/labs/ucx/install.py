@@ -67,6 +67,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     # we need to import it like this because we expect a module instance
     from databricks.labs import ucx  # pylint: disable=import-outside-toplevel
 
+    logger.info("Creating ucx schemas...")
     deployer = SchemaDeployer(sql_backend, inventory_schema, ucx)
     deployer.deploy_schema()
     table = functools.partial(deployer.deploy_table)
