@@ -171,8 +171,13 @@ At this moment there is no global override over a user installation of UCX. As t
 ## [ADVANCED] Installing UCX on all workspaces within a Databricks account
 Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install UCX on all workspaces within a Databricks account.
 
-* `UCX_FORCE_INSTALL=account databricks labs install ucx` - will force the installation to be for user only
+* `UCX_FORCE_INSTALL=account databricks labs install ucx`
 
+After the first installation, UCX will prompt the user to confirm whether to install UCX on the remaining workspaces with the same answers. If confirmed, the remaining installations will be completed silently.
+
+This installation mode will automatically select the following options:
+* Automatically create and enable HMS lineage init script
+* Automatically create a new SQL warehouse for UCX assessment
 
 [[back to top](#databricks-labs-ucx)]
 
