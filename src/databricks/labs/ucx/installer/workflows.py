@@ -47,6 +47,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
 
+PARSE_LOGS_TASK_NAME = "parse_logs"
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -488,7 +489,7 @@ class WorkflowsDeployment(InstallationMixin):
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = [t for t in self._tasks if t.workflow == step_name]
-        job_tasks = [self._job_task(task, remote_wheel) for task in tasks if task.name != "parse_logs"]
+        job_tasks = [self._job_task(task, remote_wheel) for task in tasks if task.name != PARSE_LOGS_TASK_NAME]
         job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
@@ -614,7 +615,7 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheel: str) -> jobs.Task:
         jobs_task = jobs.Task(
-            task_key="parse_logs",
+            task_key=PARSE_LOGS_TASK_NAME,
             job_cluster_key=Task.job_cluster,
             # The task is made dependent on all previous tasks.
             depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
