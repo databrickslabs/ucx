@@ -52,7 +52,7 @@ class NotebookMigrator:
         if changed:
             self._ws.workspace.upload(notebook.path + ".bak", notebook.original_code.encode("utf-8"))
             self._ws.workspace.upload(notebook.path, notebook.to_migrated_code().encode("utf-8"))
-            # TODO mark the notebook as migrated
+            # TODO https://github.com/databrickslabs/ucx/issues/1327
         return changed
 
     def _load_notebook_from_path(self, path: str) -> Notebook:
