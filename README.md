@@ -167,6 +167,14 @@ At this moment there is no global override over a user installation of UCX. As t
 
 [[back to top](#databricks-labs-ucx)]
 
+## [ADVANCED] Installing UCX on all workspaces within a Databricks account
+Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install UCX on all workspaces within a Databricks account.
+
+* `UCX_FORCE_INSTALL=account databricks labs install ucx` - will force the installation to be for user only
+
+
+[[back to top](#databricks-labs-ucx)]
+
 ## Upgrading UCX for newer versions
 
 Verify that UCX is installed
