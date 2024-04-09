@@ -3,5 +3,6 @@
 ## Other
 - Delta Live Tables
 - Global Init Scripts
+- Warning and error logs
 
 [documentation](https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md)
