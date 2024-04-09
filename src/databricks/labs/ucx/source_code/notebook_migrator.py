@@ -1,10 +1,9 @@
-from dataclasses import dataclass
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import DependencyGraph, Notebook, CellLanguage, RunCell
+from databricks.labs.ucx.source_code.notebook import DependencyGraph, Notebook, RunCell
 
 
 class NotebookMigrator:
@@ -19,7 +18,6 @@ class NotebookMigrator:
             code = f.read().decode("utf-8")
         self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
         return True
-
 
     def apply(self, object_info: ObjectInfo) -> bool:
         notebook = self._load_notebook(object_info)
@@ -73,11 +71,8 @@ class NotebookMigrator:
         source = self._loadSource(object_info)
         return Notebook.parse(object_info.path, source, object_info.language)
 
-
     def _loadSource(self, object_info: ObjectInfo) -> str:
         if not object_info.language or not object_info.path:
             raise ValueError(f"Invalid ObjectInfo: {object_info}")
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
             return f.read().decode("utf-8")
-
-

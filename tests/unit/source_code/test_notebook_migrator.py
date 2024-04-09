@@ -40,7 +40,7 @@ def test_apply_returns_false_when_no_fixes_applied():
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = notebook_code.encode("utf-8")
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
-    languages.apply_fixes.return_value = "# original code" # cell code
+    languages.apply_fixes.return_value = "# original code"  # cell code
     migrator = NotebookMigrator(ws, languages)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     assert not migrator.apply(object_info)
@@ -68,7 +68,7 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
 
 def test_apply_visits_dependencies():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = {k: v for k,v in zip(paths, _load_sources(Notebook, *paths))}
+    sources: dict[str, str] = {k: v for k, v in zip(paths, _load_sources(Notebook, *paths))}
     visited: dict[str, bool] = {}
 
     def download_side_effect(*args, **kwargs):

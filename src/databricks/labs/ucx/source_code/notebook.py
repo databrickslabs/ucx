@@ -197,7 +197,6 @@ class RunCell(Cell):
                 return
         raise ValueError("Missing notebook path in %run command")
 
-
     def migrate_notebook_path(self):
         pass
 
