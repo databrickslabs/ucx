@@ -109,7 +109,7 @@ class TaskLogger(contextlib.AbstractContextManager):
     def _init_debug_logfile(self):
         log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
         log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
-        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="S", interval=10)
+        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="M", interval=10)
         self._file_handler.setFormatter(log_formatter)
         self._file_handler.setLevel(logging.DEBUG)
 
