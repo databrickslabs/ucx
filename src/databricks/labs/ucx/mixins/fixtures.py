@@ -47,7 +47,6 @@ from databricks.sdk.service.sql import (
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-from databricks.labs.ucx.workspace_access.manager import PermissionManager
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
@@ -160,11 +159,6 @@ def acc(product_info, debug_env) -> AccountClient:
         product=product_name,
         product_version=product_version,
     )
-
-
-@pytest.fixture
-def permission_manager(ws, sql_backend, inventory_schema) -> PermissionManager:
-    return PermissionManager.factory(ws, sql_backend, inventory_schema)
 
 
 def _permissions_mapping():

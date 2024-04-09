@@ -1,13 +1,10 @@
 import logging
 from pathlib import PurePath
 
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 logger = logging.getLogger(__name__)
@@ -18,13 +15,6 @@ class CatalogSchema:
         self._ws = ws
         self._table_mapping = table_mapping
         self._external_locations = self._ws.external_locations.list()
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        table_mapping = TableMapping(installation, ws, sql_backend)
-        return cls(ws, table_mapping)
 
     def create_all_catalogs_schemas(self, prompts: Prompts):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
