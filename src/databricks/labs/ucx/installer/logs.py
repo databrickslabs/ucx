@@ -80,7 +80,7 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
         line, match = next_line, next_match
 
 
-class LogsRecorder:
+class TaskRunWarningRecorder:
     def __init__(
         self,
         install_dir: Path | str,

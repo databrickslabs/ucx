@@ -29,7 +29,7 @@ def test_log_recorder_record_number_of_records(
     sql_backend: StatementExecutionBackend,
     inventory_schema: str,
 ) -> None:
-    log_recorder = logs.LogsRecorder(
+    log_recorder = logs.TaskRunWarningRecorder(
         log_file.parent,
         workflow="assessment",
         job_id=123,

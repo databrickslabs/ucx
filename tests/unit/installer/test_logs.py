@@ -8,7 +8,7 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import LogsRecorder, PartialLogRecord
+from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder, PartialLogRecord
 
 COMPONENT = "databricks.logs"
 WORKFLOW = "tests"
@@ -85,7 +85,7 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
     log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
     backend = MockBackend()
-    log_processor = LogsRecorder(
+    log_processor = TaskRunWarningRecorder(
         tmp_path,
         WORKFLOW,
         WORKFLOW_ID,
@@ -108,7 +108,7 @@ def test_logs_processor_warning_and_higher(tmp_path: Path, log_path: Path):
     log_creation_timestamp = datetime.datetime.utcfromtimestamp(log_creation_time)
 
     backend = MockBackend()
-    log_processor = LogsRecorder(
+    log_processor = TaskRunWarningRecorder(
         tmp_path,
         WORKFLOW,
         WORKFLOW_ID,
