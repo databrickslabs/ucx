@@ -61,8 +61,7 @@ def test_parse_logs_attributes(log_path: Path, attribute: str) -> None:
     The time attribute are not tested as these are set differently on each test run.
     """
     expected_partial_log_records = [
-        getattr(partial_log_record, attribute)
-        for partial_log_record in PARTIAL_LOG_RECORDS
+        getattr(partial_log_record, attribute) for partial_log_record in PARTIAL_LOG_RECORDS
     ]
     with log_path.open("r") as f:
         partial_log_records = list(getattr(partial_log_record, attribute) for partial_log_record in logs.parse_logs(f))
@@ -94,9 +93,6 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
         backend,
         "default",
     )
-    log_records = [
-        getattr(log_record, attribute)
-        for log_record in log_processor.snapshot()
-    ]
+    log_records = [getattr(log_record, attribute) for log_record in log_processor.snapshot()]
 
     assert log_records == expected_log_records

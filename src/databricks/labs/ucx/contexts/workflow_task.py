@@ -100,5 +100,5 @@ class RuntimeContext(GlobalContext):
             int(self.named_parameters["job_id"]),
             int(self.named_parameters["parent_run_id"]),
             self.sql_backend,
-            self.inventory_database
+            self.inventory_database,
         )
