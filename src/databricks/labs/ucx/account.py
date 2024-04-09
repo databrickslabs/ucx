@@ -4,7 +4,7 @@ from typing import ClassVar
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceConflict
+from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
@@ -59,8 +59,11 @@ class AccountWorkspaces:
         for workspace in self._workspaces():
             workspaces.append(workspace)
         for ws in self.workspace_clients():
-            for installation in Installation.existing(ws, "ucx"):
-                installation.save(workspaces, filename=self.SYNC_FILE_NAME)
+            try:
+                for installation in Installation.existing(ws, "ucx"):
+                    installation.save(workspaces, filename=self.SYNC_FILE_NAME)
+            except (PermissionDenied, NotFound, ValueError):
+                logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
     def create_account_level_groups(self, prompts: Prompts, workspace_ids: list[int] | None = None):
         acc_groups = self._get_account_groups()
