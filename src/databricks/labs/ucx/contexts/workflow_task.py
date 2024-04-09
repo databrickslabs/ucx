@@ -95,7 +95,7 @@ class RuntimeContext(GlobalContext):
     @cached_property
     def parse_logs(self):
         return TaskRunWarningRecorder(
-            self.installation.install_folder(),
+            self._config_path.parent,
             self.named_parameters["workflow"],
             int(self.named_parameters["job_id"]),
             int(self.named_parameters["parent_run_id"]),
