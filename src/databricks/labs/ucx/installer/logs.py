@@ -1,4 +1,3 @@
-import datetime
 import datetime as dt
 import logging
 import re
@@ -160,11 +159,11 @@ class TaskRunWarningRecorder:
             with log_file.open("r") as log:
                 log_records += self.record_task(task_name, log, log_creation_timestamp)
 
-            self._sql_backend.save_table(
-                self.full_name,
-                log_records,
-                LogRecord,
-                mode="append",
-            )
+        self._sql_backend.save_table(
+            self.full_name,
+            log_records,
+            LogRecord,
+            mode="append",
+        )
 
         return log_records
