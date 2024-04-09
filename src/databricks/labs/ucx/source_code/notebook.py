@@ -350,7 +350,7 @@ class DependencyGraph:
     def path(self):
         return self._path
 
-    def register_dependency(self, path: str) -> DependencyGraph:
+    def register_dependency(self, path: str) -> DependencyGraph | None:
         # already registered ?
         child_graph = self.locate_dependency(path)
         if child_graph is not None:
@@ -360,6 +360,8 @@ class DependencyGraph:
         child_graph = DependencyGraph(path, self, self._locator)
         self._dependencies[path] = child_graph
         notebook = self._locator(path)
+        if not notebook:
+            return None
         notebook.build_dependency_graph(child_graph)
         return child_graph
 
@@ -408,10 +410,12 @@ class DependencyGraph:
 class Notebook:
 
     @staticmethod
-    def parse(path: str, source: str, default_language: Language) -> Notebook | None:
+    def parse(path: str, source: str, default_language: Language) -> Notebook:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
-        return None if cells is None else Notebook(path, source, default_language, cells, source.endswith('\n'))
+        if cells is None:
+            raise ValueError(f"Could not parse Notebook: {path}")
+        return Notebook(path, source, default_language, cells, source.endswith('\n'))
 
     def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
         self._path = path

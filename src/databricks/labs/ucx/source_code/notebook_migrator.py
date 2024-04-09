@@ -1,4 +1,3 @@
-
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
@@ -16,10 +15,12 @@ class NotebookMigrator:
             return False
         with self._ws.workspace.download(object_info.path + ".bak", format=ExportFormat.SOURCE) as f:
             code = f.read().decode("utf-8")
-        self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
+            self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
         return True
 
     def apply(self, object_info: ObjectInfo) -> bool:
+        if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
+            return False
         notebook = self._load_notebook(object_info)
         changed = self._apply(notebook)
         # now discover dependencies and migrate them too
@@ -30,20 +31,23 @@ class NotebookMigrator:
             if path == object_info.path:
                 continue
             object_info = self._load_object(path)
+            # TODO https://github.com/databrickslabs/ucx/issues/1202 load non-notebook dependency
             notebook = self._load_notebook(object_info)
-            changed_ = self._apply(notebook)
             # TODO what to do with changed_ ?
+            # changed_ = self._apply(notebook)
+            self._apply(notebook)
         return changed
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False
         for cell in notebook.cells:
+            # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
                 # TODO data on what to change to ?
                 if cell.migrate_notebook_path():
                     changed = True
                 continue
-            elif not self._languages.is_supported(cell.language.language):
+            if not self._languages.is_supported(cell.language.language):
                 continue
             migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code)
             if migrated_code != cell.original_code:
@@ -55,23 +59,25 @@ class NotebookMigrator:
             # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
         return changed
 
-    def _load_notebook_from_path(self, path: str) -> Notebook | None:
+    def _load_notebook_from_path(self, path: str) -> Notebook:
         object_info = self._load_object(path)
-        if object_info is None or object_info.object_type is not ObjectType.NOTEBOOK:
-            return None
+        if object_info.object_type is not ObjectType.NOTEBOOK:
+            raise ValueError(f"Not a Notebook: {path}")
         return self._load_notebook(object_info)
 
-    def _load_object(self, path: str) -> ObjectInfo | None:
+    def _load_object(self, path: str) -> ObjectInfo:
         result = self._ws.workspace.list(path)
-        if isinstance(result, ObjectInfo):
-            return result
-        return next((oi for oi in result), None)
+        object_info = next((oi for oi in result), None)
+        if object_info is None:
+            raise ValueError(f"Could not locate object at '{path}'")
+        return object_info
 
     def _load_notebook(self, object_info: ObjectInfo) -> Notebook:
-        source = self._loadSource(object_info)
+        assert object_info is not None and object_info.path is not None and object_info.language is not None
+        source = self._load_source(object_info)
         return Notebook.parse(object_info.path, source, object_info.language)
 
-    def _loadSource(self, object_info: ObjectInfo) -> str:
+    def _load_source(self, object_info: ObjectInfo) -> str:
         if not object_info.language or not object_info.path:
             raise ValueError(f"Invalid ObjectInfo: {object_info}")
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
