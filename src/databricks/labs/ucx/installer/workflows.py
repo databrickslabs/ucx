@@ -617,7 +617,7 @@ class WorkflowsDeployment(InstallationMixin):
         jobs_task = jobs.Task(
             task_key=TASK_NAME_PARSE_LOGS,
             job_cluster_key=Task.job_cluster,
-            # The task is made dependent on all previous tasks.
+            # The task dependents on all previous tasks.
             depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
             run_if=jobs.RunIf.ALL_DONE,
         )
