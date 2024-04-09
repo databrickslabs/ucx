@@ -540,7 +540,7 @@ if __name__ == "__main__":
         if not account_client.config.is_account_client:
             raise SystemExit("Cannot install UCX on all workspaces from a non-account client. Exiting...")
         for workspace in account_client.workspaces.list():
-            logger.info(f"Processing workspace {workspace.workspace_name}")
+            logger.info(f"Installing UCX on workspace {workspace.workspace_name}")
             host = account_client.config.host.replace('accounts', workspace.deployment_name)
             workspace_client = WorkspaceClient(host=host)
             try:
