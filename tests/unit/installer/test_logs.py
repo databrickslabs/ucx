@@ -89,12 +89,6 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 @pytest.mark.parametrize("attribute", ["level", "component", "message"])
 def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
     """End-to-end test for parsing logs with LogsRecorder."""
-    expected_log_records = [
-        getattr(partial_log_record, attribute)
-        for partial_log_record in PARTIAL_LOG_RECORDS
-        if logging.getLevelName(partial_log_record.level) >= logging.WARNING
-    ]
-
     backend = MockBackend()
     log_processor = TaskRunWarningRecorder(
         tmp_path,
@@ -104,5 +98,7 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
         backend,
         "default",
     )
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as e:
         log_processor.snapshot()
+    assert "Watch out!" in e.value.args[0]
+    assert "Warning message." not in e.value.args[0]
