@@ -47,3 +47,7 @@ class TestDetectDBFS:
             if isinstance(advice, Deprecation):
                 count += 1
         assert count == expected
+
+    def test_dbfs_name(self):
+        linter = DBFSUsageLinter()
+        assert linter.name() == "dbfs-usage"

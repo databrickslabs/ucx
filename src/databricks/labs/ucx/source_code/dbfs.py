@@ -32,11 +32,8 @@ class DetectDbfsVisitor(ast.NodeVisitor):
 
     def visit_Constant(self, node):
         # Constant strings yield Advisories
-        self._check_str_constant(node)
-
-    def visit_Str(self, node):  # pylint: disable=invalid-name
-        # Literal strings yield Advisories
-        self._check_str_constant(node)
+        if isinstance(node.value, str):
+            self._check_str_constant(node)
 
     def _check_str_constant(self, node):
         if any(node.s.startswith(prefix) for prefix in self._fs_prefixes):
