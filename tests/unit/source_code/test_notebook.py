@@ -174,7 +174,6 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
         visited.append(dep.path)
         return old_load_dependency_side_effect(*args)
 
-
     loader.load_dependency.side_effect = load_dependency_side_effect
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
 from databricks.sdk import WorkspaceClient
 
+
 class Dependency:
 
     @staticmethod
@@ -53,8 +54,7 @@ class DependencyLoader:
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
-        else:
-            raise NotImplementedError(str(object_info.object_type))
+        raise NotImplementedError(str(object_info.object_type))
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
         result = self._ws.workspace.list(dependency.path)
@@ -62,11 +62,18 @@ class DependencyLoader:
         if object_info is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
         if dependency.type is not None and object_info.object_type is not dependency.type:
-            raise ValueError(f"Invalid object at '{dependency.path}', expected a {str(dependency.type)}, got a {str(object_info.object_type)}")
+            raise ValueError(
+                f"Invalid object at '{dependency.path}', expected a {str(dependency.type)}, got a {str(object_info.object_type)}"
+            )
         return object_info
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
+        # local import to avoid circular dependency
+        # pylint: disable=import-outside-toplevel
         from databricks.labs.ucx.source_code.notebook import Notebook
+
+        assert object_info.path is not None
+        assert object_info.language is not None
         source = self._load_source(object_info)
         return Notebook.parse(object_info.path, source, object_info.language)
 

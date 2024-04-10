@@ -49,7 +49,9 @@ def test_apply_returns_false_when_language_not_supported():
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = notebook_code.encode("utf-8")
     languages = create_autospec(Languages)
     languages.is_supported.return_value = False
-    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws))
+    loader = create_autospec(DependencyLoader)
+    loader.load_dependency.return_value = Notebook.parse('path', notebook_code, Language.R)
+    migrator = NotebookMigrator(ws, languages, loader)
     object_info = ObjectInfo(path='path', language=Language.R, object_type=ObjectType.NOTEBOOK)
     result = migrator.apply(object_info)
     assert not result
@@ -64,7 +66,9 @@ def test_apply_returns_false_when_no_fixes_applied():
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
     languages.apply_fixes.return_value = "# original code"  # cell code
-    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws))
+    loader = create_autospec(DependencyLoader)
+    loader.load_dependency.return_value = Notebook.parse('path', notebook_code, Language.R)
+    migrator = NotebookMigrator(ws, languages, loader)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     assert not migrator.apply(object_info)
 
@@ -82,7 +86,9 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
     languages.apply_fixes.return_value = migrated_cell_code
-    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws))
+    loader = create_autospec(DependencyLoader)
+    loader.load_dependency.return_value = Notebook.parse('path', original_code, Language.R)
+    migrator = NotebookMigrator(ws, languages, loader)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     assert migrator.apply(object_info)
     ws.workspace.upload.assert_any_call('path.bak', original_code.encode("utf-8"))
