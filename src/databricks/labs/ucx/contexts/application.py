@@ -252,11 +252,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def principal_acl(self):
         eligible = {}
-        if self.is_azure:
-            eligible = self.azure_acl.get_eligible_locations_principals()
-        if self.is_aws:
-            eligible = self.aws_acl.get_eligible_locations_principals()
-        if self.is_gcp:
+        if not (self.is_aws or self.is_azure):
             raise NotImplementedError("Not implemented for GCP.")
         return PrincipalACL(
             self.workspace_client,

@@ -361,7 +361,6 @@ class AwsACL:
             if cluster.aws_attributes is None:
                 continue
             if cluster.aws_attributes.instance_profile_arn is not None:
-                # role_name = AWSInstanceProfile(cluster.aws_attributes.instance_profile_arn).role_name
                 role_name = cluster.aws_attributes.instance_profile_arn
                 assert role_name is not None
                 cluster_instance_profiles[cluster.cluster_id] = role_name
