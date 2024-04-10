@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import logging
 from collections.abc import Iterable
-from typing import TypeVar, Generic, Type
+from typing import TypeVar, Generic
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
 
@@ -83,7 +83,7 @@ class ASTLinter(Generic[T]):
     def __init__(self, root: ast.AST):
         self._root: ast.AST = root
 
-    def locate(self, node_type: Type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
+    def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
         visitor.visit(self._root)
         return visitor.matched_nodes
@@ -125,20 +125,18 @@ class PythonLinter(Linter):
         arg = next(kw for kw in node.keywords if kw.arg == "path")
         return arg.value if arg is not None else None
 
-
     @staticmethod
     def list_dbutils_notebook_run_calls(linter: ASTLinter) -> list[ast.Call]:
         return linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
 
-
     @staticmethod
     def list_import_sources(linter: ASTLinter) -> list[str]:
         nodes = linter.locate(ast.Import, [])
-        files = [ alias.name for node in nodes for alias in node.names ]
+        files = [alias.name for node in nodes for alias in node.names]
         nodes = linter.locate(ast.ImportFrom, [])
-        files.extend( node.module for node in nodes )
+        files.extend(node.module for node in nodes)
         nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
-        files.extend( node.args[0].value for node in nodes )
+        files.extend(node.args[0].value for node in nodes)
         nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
-        files.extend( node.args[0].value for node in nodes )
+        files.extend(node.args[0].value for node in nodes)
         return files

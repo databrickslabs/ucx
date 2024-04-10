@@ -3,7 +3,7 @@ from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinte
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
     linter = ASTLinter.parse('')
-    assert [] == PythonLinter.list_dbutils_notebook_run_calls(linter)
+    assert not PythonLinter.list_dbutils_notebook_run_calls(linter)
 
 
 def test_linter_returns_list_of_dbutils_notebook_run_calls():
@@ -12,8 +12,9 @@ dbutils.notebook.run("stuff")
 for i in z:
     ww =   dbutils.notebook.run("toto")  
 """
-    linter = ASTLinter.parse('')
-    assert [] == PythonLinter.list_dbutils_notebook_run_calls(linter)
+    linter = ASTLinter.parse(code)
+    calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
+    assert {"toto", "stuff"} == {str(call.args[0].value) for call in calls}
 
 
 def test_linter_returns_empty_list_of_imports():
