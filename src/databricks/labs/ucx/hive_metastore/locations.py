@@ -279,6 +279,7 @@ class TablesInMounts(CrawlerBase[Table]):
         self._include_mounts = include_mounts
         self._ws = ws
         self._include_paths_in_mount = include_paths_in_mount
+        self._seen_tables: dict[str, str] = {}
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
         if exclude_paths_in_mount:
@@ -293,6 +294,7 @@ class TablesInMounts(CrawlerBase[Table]):
         cached_results = []
         try:
             cached_results = list(fetcher())
+            self._init_seen_tables(cached_results)
         except NotFound:
             pass
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
@@ -301,6 +303,12 @@ class TablesInMounts(CrawlerBase[Table]):
             loaded_records = loaded_records + cached_results
         self._append_records(loaded_records)
         return loaded_records
+
+    def _init_seen_tables(self, loaded_records: Iterable[Table]):
+        for rec in loaded_records:
+            if not rec.location:
+                continue
+            self._seen_tables[rec.location] = rec.key
 
     def _append_records(self, items: Sequence[Table]):
         logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
@@ -329,13 +337,24 @@ class TablesInMounts(CrawlerBase[Table]):
 
             for path, entry in table_paths.items():
                 guess_table = os.path.basename(path)
+                table_location = path.replace(f"dbfs:{mount.name}/", mount.source)
+                if table_location in self._seen_tables:
+                    logger.info(
+                        f"Path {table_location} is identified as a table in mount, but is present in current workspace as a registered table {self._seen_tables[table_location]}"
+                    )
+                    continue
+                if path in self._seen_tables:
+                    logger.info(
+                        f"Path {table_location} is identified as a table in mount, but is present in current workspace as a registered table {self._seen_tables[path]}"
+                    )
+                    continue
                 table = Table(
                     catalog="hive_metastore",
                     database=f"{self.TABLE_IN_MOUNT_DB}{mount.name.replace('/mnt/', '').replace('/', '_')}",
                     name=guess_table,
                     object_type="EXTERNAL",
                     table_format=entry.format,
-                    location=path.replace(f"dbfs:{mount.name}/", mount.source),
+                    location=table_location,
                     is_partitioned=entry.is_partitioned,
                 )
                 all_tables.append(table)
