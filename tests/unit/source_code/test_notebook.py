@@ -1,10 +1,11 @@
-from collections.abc import Callable
+from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk.service.workspace import Language
+from databricks.sdk.service.workspace import Language, ObjectType
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph
+from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
@@ -106,27 +107,29 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
         assert cell.is_runnable()
 
 
-def notebook_locator(
-    paths: list[str], sources: list[str], languages: list[Language]
-) -> Callable[[str], Notebook | None]:
-    def locator(path: str) -> Notebook | None:
-        local_path = path[2:] if path.startswith('./') else path
+def mock_dependency_loader(paths: list[str], sources: list[str], languages: list[Language]) -> DependencyLoader:
+    def load_dependency_side_effect(*args):
+        dependency = args[0]
+        local_path = dependency.path[2:] if dependency.path.startswith('./') else dependency.path
         index = paths.index(local_path)
         if index < 0:
-            raise ValueError(f"Can't locate notebook {path}")
+            raise ValueError(f"Can't locate: {dependency.path}")
         return Notebook.parse(paths[index], sources[index], languages[index])
 
-    return locator
+    loader = create_autospec(DependencyLoader)
+    loader.load_dependency.side_effect = load_dependency_side_effect
+    return loader
 
 
 def test_notebook_builds_leaf_dependency_graph():
     paths = ["leaf1.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
-    locator = notebook_locator(paths, sources, languages)
-    notebook = locator(paths[0])
-    graph = DependencyGraph(paths[0], None, locator)
-    notebook.build_dependency_graph(graph)
+    loader = mock_dependency_loader(paths, sources, languages)
+    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    graph = DependencyGraph(dependency, None, loader)
+    container = loader.load_dependency(dependency)
+    container.build_dependency_graph(graph)
     assert graph.paths == {"leaf1.py.txt"}
 
 
@@ -134,10 +137,11 @@ def test_notebook_builds_depth1_dependency_graph():
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
-    locator = notebook_locator(paths, sources, languages)
-    notebook = locator(paths[0])
-    graph = DependencyGraph(paths[0], None, locator)
-    notebook.build_dependency_graph(graph)
+    loader = mock_dependency_loader(paths, sources, languages)
+    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    graph = DependencyGraph(dependency, None, loader)
+    container = loader.load_dependency(dependency)
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
 
@@ -146,10 +150,11 @@ def test_notebook_builds_depth2_dependency_graph():
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
-    locator = notebook_locator(paths, sources, languages)
-    notebook = locator(paths[0])
-    graph = DependencyGraph(paths[0], None, locator)
-    notebook.build_dependency_graph(graph)
+    loader = mock_dependency_loader(paths, sources, languages)
+    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    graph = DependencyGraph(dependency, None, loader)
+    container = loader.load_dependency(dependency)
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
 
@@ -158,16 +163,20 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
-    locator = notebook_locator(paths, sources, languages)
-    notebook = locator(paths[0])
+    loader = mock_dependency_loader(paths, sources, languages)
+    old_load_dependency_side_effect = loader.load_dependency.side_effect
+    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    graph = DependencyGraph(dependency, None, loader)
     visited: list[str] = []
 
-    def registering_locator(path: str):
-        visited.append(path)
-        return locator(path)
+    def load_dependency_side_effect(*args):
+        dep = args[0]
+        visited.append(dep.path)
+        return old_load_dependency_side_effect(*args)
 
-    graph = DependencyGraph(paths[0], None, registering_locator)
-    notebook.build_dependency_graph(graph)
+    loader.load_dependency.side_effect = load_dependency_side_effect
+    container = loader.load_dependency(dependency)
+    container.build_dependency_graph(graph)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
 
@@ -176,10 +185,11 @@ def test_notebook_builds_cyclical_dependency_graph():
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
-    locator = notebook_locator(paths, sources, languages)
-    notebook = locator(paths[0])
-    graph = DependencyGraph(paths[0], None, locator)
-    notebook.build_dependency_graph(graph)
+    loader = mock_dependency_loader(paths, sources, languages)
+    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    graph = DependencyGraph(dependency, None, loader)
+    container = loader.load_dependency(dependency)
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
 
@@ -188,10 +198,11 @@ def test_notebook_builds_python_dependency_graph():
     paths = ["root4.py.txt", "leaf3.py.txt"]
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
-    locator = notebook_locator(paths, sources, languages)
-    notebook = locator(paths[0])
-    graph = DependencyGraph(paths[0], None, locator)
-    notebook.build_dependency_graph(graph)
+    loader = mock_dependency_loader(paths, sources, languages)
+    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    graph = DependencyGraph(dependency, None, loader)
+    container = loader.load_dependency(dependency)
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
 
