@@ -1,7 +1,7 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.dbfsvisitor import DBFSFinderLinter
+from databricks.labs.ucx.source_code.dbfs import DBFSFinderLinter
 
 
 class TestDetectFSVisitor:
