@@ -172,5 +172,4 @@ class TaskRunWarningRecorder:
         if len(error_log_records) > 0:
             error_log_messages = "\n".join([str(log_record) for log_record in error_log_records])
             raise RuntimeError(f"Found error log records:\n{error_log_messages}")
-        else:
-            return log_records
+        return log_records
