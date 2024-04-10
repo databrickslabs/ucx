@@ -71,6 +71,10 @@ class Workflows:
             raise KeyError(msg)
         print(f"UCX v{__version__}")
         workflow = self._workflows[workflow_name]
+        if task_name == "parse_logs":
+            if workflow == "099-destroy-schema":
+                return  # Can't store logs after schema is destroyed
+            return ctx.task_run_warning_recorder.snapshot()
         # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
         workflow_run_id = named_parameters.get("parent_run_id", "unknown_run_id")
         job_id = named_parameters.get("job_id", "unknown_job_id")

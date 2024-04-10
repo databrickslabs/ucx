@@ -217,8 +217,3 @@ class DestroySchema(Workflow):
         """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
         the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
         ctx.sql_backend.execute(f"DROP DATABASE {ctx.inventory_database} CASCADE")
-
-    @job_task
-    def parse_logs(self, ctx: RuntimeContext):
-        """Parse and store the warning log messages."""
-        # Can't store logs after schema is destroyed
