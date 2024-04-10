@@ -195,6 +195,25 @@ class DeployedWorkflows:
                 return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
         return False
 
+    def relay_logs(self, workflow: str | None = None):
+        latest_run = None
+        if not workflow:
+            runs = []
+            for step in self._install_state.jobs:
+                try:
+                    _, latest_run = self._latest_job_run(step)
+                    runs.append((step, latest_run))
+                except InvalidParameterValue:
+                    continue
+            if not runs:
+                logger.warning("No jobs to relay logs for")
+                return
+            runs = sorted(runs, key=lambda x: x[1].start_time, reverse=True)
+            workflow, latest_run = runs[0]
+        if not latest_run:
+            _, latest_run = self._latest_job_run(workflow)
+        self._relay_logs(workflow, latest_run.run_id)
+
     def _relay_logs(self, workflow, run_id):
         for log in self._fetch_logs(workflow, run_id):
             task_logger = logging.getLogger(log.component)
