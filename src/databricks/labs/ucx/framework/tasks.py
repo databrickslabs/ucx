@@ -18,7 +18,6 @@ from databricks.sdk.retries import retried
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.config import WorkspaceConfig
 
-
 _TASKS: dict[str, "Task"] = {}
 
 
