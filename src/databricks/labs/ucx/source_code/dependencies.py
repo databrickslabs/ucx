@@ -69,7 +69,7 @@ class DependencyLoader:
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid circular dependency
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel, cyclic-import
         from databricks.labs.ucx.source_code.notebook import Notebook
 
         assert object_info.path is not None
