@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import TextIO
 
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.errors import InternalError
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
+from databricks.sdk.errors import InternalError
 
 logger = logging.getLogger(__name__)
 
