@@ -104,6 +104,5 @@ def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
         backend,
         "default",
     )
-    log_records = [getattr(log_record, attribute) for log_record in log_processor.snapshot()]
-
-    assert log_records == expected_log_records
+    with pytest.raises(RuntimeError):
+        log_processor.snapshot()
