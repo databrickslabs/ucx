@@ -45,7 +45,7 @@ class DBFSUsageLinter(Linter):
         """
         Returns the name of the linter, for reporting etc
         """
-        return 'fs-finder-linter'
+        return 'dbfs-usage'
 
     def lint(self, code: str) -> Iterable[Advice]:
         """
