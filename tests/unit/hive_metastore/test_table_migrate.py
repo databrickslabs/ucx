@@ -4,12 +4,10 @@ from itertools import cycle
 from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
-from databricks.labs.blueprint.installation import Installation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
-from databricks.labs.ucx.hive_metastore import Mounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
@@ -871,11 +869,7 @@ def test_table_in_mount_mapping():
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
     group_manager = GroupManager(backend, client, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-
-    principal_grants = PrincipalACL(
-        client, backend, create_autospec(Installation), table_crawler, create_autospec(Mounts), {}, "GROUP_TEST"
-    )
-
+    principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -885,6 +879,7 @@ def test_table_in_mount_mapping():
         group_manager,
         migration_status_refresher,
         principal_grants,
+        "GROUP_TEST",
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER])
     assert (

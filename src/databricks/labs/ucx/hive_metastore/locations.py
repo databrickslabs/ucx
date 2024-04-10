@@ -337,7 +337,7 @@ class TablesInMounts(CrawlerBase[Table]):
 
             for path, entry in table_paths.items():
                 guess_table = os.path.basename(path)
-                table_location = path.replace(f"dbfs:{mount.name}/", mount.source)
+                table_location = self._get_table_location(mount, path)
                 if table_location in self._seen_tables:
                     logger.info(
                         f"Path {table_location} is identified as a table in mount, but is present in current workspace as a registered table {self._seen_tables[table_location]}"
@@ -358,7 +358,19 @@ class TablesInMounts(CrawlerBase[Table]):
                     is_partitioned=entry.is_partitioned,
                 )
                 all_tables.append(table)
+        logger.info(f"Found a total of {len(all_tables)} tables in mount points")
         return all_tables
+
+    def _get_table_location(self, mount: Mount, path: str):
+        """
+        There can be different cases for mounts:
+            - Mount(name='/mnt/things/a', source='abfss://things@labsazurethings.dfs.core.windows.net/a')
+            - Mount(name='/mnt/mount' source='abfss://container@dsss.net/')
+            Both must return the complete source with a forward slash in the end
+        """
+        if mount.source.endswith("/"):
+            return path.replace(f"dbfs:{mount.name}/", mount.source)
+        return path.replace(f"dbfs:{mount.name}", mount.source)
 
     def _find_delta_log_folders(self, root_dir: str, delta_log_folders=None) -> dict:
         if delta_log_folders is None:
@@ -390,7 +402,8 @@ class TablesInMounts(CrawlerBase[Table]):
     def _assess_path(
         self, file_info: FileInfo, delta_log_folders: dict[str, Table], root_path: str
     ) -> TableInMount | None:
-        if file_info.name == "_delta_log/":
+        # Depends of execution runtime, with SDK, dbutils.fs.list returns _delta_log, a cluster will return _delta_log/
+        if file_info.name in {"_delta_log/", "_delta_log"}:
             logger.debug(f"Found delta table {root_path}")
             if not delta_log_folders.get(root_path):
                 return TableInMount(format="DELTA", is_partitioned=False)

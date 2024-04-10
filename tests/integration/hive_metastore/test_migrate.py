@@ -14,6 +14,7 @@ from databricks.sdk.service.catalog import (
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
 
@@ -506,15 +507,23 @@ def test_migrate_table_in_mount(
     inventory_schema,
     make_catalog,
     make_schema,
-    make_table,
     env_or_skip,
     make_random,
     runtime_ctx,
+    make_acc_group,
 ):
+    owner_group = make_acc_group()
+    config = WorkspaceConfig(
+        warehouse_id=env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+        inventory_database=inventory_schema,
+        connect=ws.config,
+        default_table_owner=owner_group.display_name,
+    )
+    runtime_ctx = runtime_ctx.replace(config=config)
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
     tbl_path = make_random(4).lower()
-    src_external_table = make_table(
+    src_external_table = runtime_ctx.make_table(
         schema_name=make_schema(catalog_name="hive_metastore").name,
         external_delta=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{tbl_path}',
     )
@@ -537,18 +546,19 @@ def test_migrate_table_in_mount(
             )
         ],
     )
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            f'mounted_{env_or_skip("TEST_MOUNT_NAME")}',
-            dst_schema.name,
-            table_in_mount_location,
-            src_external_table.name,
-        ),
-    ]
 
-    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_table_mapping_rules(
+        [
+            Rule(
+                "workspace",
+                dst_catalog.name,
+                f'mounted_{env_or_skip("TEST_MOUNT_NAME")}',
+                dst_schema.name,
+                table_in_mount_location,
+                src_external_table.name,
+            ),
+        ]
+    )
     runtime_ctx.with_dummy_azure_resource_permission()
     runtime_ctx.with_static_table_crawler(table_crawler)
     runtime_ctx.tables_migrator.migrate_tables(
@@ -557,5 +567,6 @@ def test_migrate_table_in_mount(
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
-    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}").properties
-    assert target_table_properties["upgraded_from"] == table_in_mount_location
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}")
+    assert target_table_properties.properties["upgraded_from"] == table_in_mount_location
+    assert target_table_properties.owner == owner_group.display_name
