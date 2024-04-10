@@ -16,7 +16,7 @@ from databricks.labs.blueprint.wheels import (
     find_project_root,
 )
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
     InvalidParameterValue,
@@ -41,7 +41,7 @@ from databricks.sdk.service.jobs import (
     RunResultState,
     RunState,
 )
-
+from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -61,6 +61,7 @@ from databricks.labs.ucx.install import (
     WorkspaceInstallation,
     WorkspaceInstaller,
     extract_major_minor,
+    AccountInstaller,
 )
 from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
@@ -1649,3 +1650,23 @@ def test_extract_major_minor_versions():
 
     version_string3 = "should not match"
     assert extract_major_minor(version_string3) is None
+
+
+def test_account_installer(ws):
+    acc = create_autospec(AccountClient)
+    acc.workspaces.list.return_value = [Workspace(workspace_id=123), Workspace(workspace_id=456)]
+    acc.get_workspace_client.return_value = ws
+
+    account_installer = AccountInstaller(acc)
+    account_installer.prompts = MockPrompts(
+        {
+            r"UCX has detected the following workspaces*": "Yes",
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "0",
+            r"Do you want to install UCX on the remaining*": "Yes",
+            r".*": "",
+        }
+    )
+    account_installer.install_on_account(ProductInfo.for_testing(WorkspaceConfig))
+    # should have 4 uploaded call, 2 for config.yml, 2 for workspace.json
+    assert ws.workspace.upload.call_count == 4

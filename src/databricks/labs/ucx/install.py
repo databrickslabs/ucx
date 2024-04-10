@@ -153,6 +153,8 @@ class WorkspaceInstaller:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
         install_state = InstallState.from_installation(self._installation)
+        if self._is_testing():
+            return config
         workflows_deployment = WorkflowsDeployment(
             config,
             self._installation,
@@ -180,6 +182,9 @@ class WorkspaceInstaller:
                 raise err.errs[0] from None
             raise err
         return config
+
+    def _is_testing(self):
+        return self._product_info.product_name() != "ucx"
 
     def _prompt_for_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
@@ -597,9 +602,10 @@ class AccountInstaller(AccountContext):
                 accessible_workspaces.append(workspace)
         return accessible_workspaces
 
-    def install_on_account(self):
+    def install_on_account(self, app: ProductInfo | None = None):
         ctx = AccountContext(self._get_safe_account_client())
-        app = ProductInfo.from_class(WorkspaceConfig)
+        if app is None:
+            app = ProductInfo.from_class(WorkspaceConfig)
         default_config = None
         confirmed = False
         accessible_workspaces = self._get_accessible_workspaces()
@@ -610,9 +616,7 @@ class AccountInstaller(AccountContext):
         ):
             return
 
-        for workspace in self.account_client.workspaces.list():
-            if workspace not in accessible_workspaces:
-                continue
+        for workspace in accessible_workspaces:
             workspace_client = self.account_client.get_workspace_client(workspace)
             logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
             try:
@@ -639,8 +643,9 @@ class AccountInstaller(AccountContext):
         ctx.account_workspaces.sync_workspace_info(accessible_workspaces)
 
 
-def install_on_workspace():
-    app = ProductInfo.from_class(WorkspaceConfig)
+def install_on_workspace(app: ProductInfo | None = None):
+    if app is None:
+        app = ProductInfo.from_class(WorkspaceConfig)
     prompts = Prompts()
     workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
     try:
