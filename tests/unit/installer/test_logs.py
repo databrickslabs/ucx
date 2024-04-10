@@ -86,9 +86,8 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
 
 
-@pytest.mark.parametrize("attribute", ["level", "component", "message"])
-def test_logs_processor_all(tmp_path: Path, log_path: Path, attribute: str):
-    """End-to-end test for parsing logs with LogsRecorder."""
+def test_logs_processor_snapshot_error(tmp_path: Path, log_path: Path):
+    """Test the error raised by the snapshot"""
     backend = MockBackend()
     log_processor = TaskRunWarningRecorder(
         tmp_path,
