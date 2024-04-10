@@ -1,7 +1,7 @@
 import ast
 from collections.abc import Iterable
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory
+from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
 
 
 class DetectDbfsVisitor(ast.NodeVisitor):
@@ -15,11 +15,30 @@ class DetectDbfsVisitor(ast.NodeVisitor):
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
 
     def visit_Call(self, node):  # pylint: disable=invalid-name
-        # Call logic will yield Deprecations after inspecting call parameters
+        for arg in node.args:
+            if isinstance(arg, (ast.Str, ast.Constant)) and isinstance(arg.s, str):
+                if any(arg.s.startswith(prefix) for prefix in self._fs_prefixes):
+                    self._advices.append(
+                        Deprecation(
+                            code='fs-finder',
+                            message=f"Deprecated file system path in call to: {arg.s}",
+                            start_line=arg.lineno,
+                            start_col=arg.col_offset,
+                            end_line=arg.lineno,
+                            end_col=arg.col_offset + len(arg.s),
+                        )
+                    )
         self.generic_visit(node)
+
+    def visit_Constant(self, node):
+        # Constant strings yield Advisories
+        self._check_str_constant(node)
 
     def visit_Str(self, node):  # pylint: disable=invalid-name
         # Literal strings yield Advisories
+        self._check_str_constant(node)
+
+    def _check_str_constant(self, node):
         if any(node.s.startswith(prefix) for prefix in self._fs_prefixes):
             self._advices.append(
                 Advisory(
@@ -41,7 +60,8 @@ class DBFSUsageLinter(Linter):
     def __init__(self):
         pass
 
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         """
         Returns the name of the linter, for reporting etc
         """
