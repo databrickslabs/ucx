@@ -30,11 +30,19 @@ class Cell(ABC):
 
     def __init__(self, source: str):
         self._original_code = source
+        self._migrated_code = source
+
+    @property
+    def original_code(self):
+        return self._original_code
 
     @property
     def migrated_code(self):
-        # this property is for reading the migrated code, not for generating it
-        return self._original_code  # for now since we're not doing any migration yet
+        return self._migrated_code  # for now since we're not doing any migration yet
+
+    @migrated_code.setter
+    def migrated_code(self, value: str):
+        self._migrated_code = value
 
     @property
     @abstractmethod
@@ -150,6 +158,9 @@ class RunCell(Cell):
                 parent.register_dependency(path.strip('"'))
                 return
         raise ValueError("Missing notebook path in %run command")
+
+    def migrate_notebook_path(self):
+        pass
 
 
 class CellLanguage(Enum):
@@ -298,7 +309,7 @@ class DependencyGraph:
     def path(self):
         return self._path
 
-    def register_dependency(self, path: str) -> DependencyGraph:
+    def register_dependency(self, path: str) -> DependencyGraph | None:
         # already registered ?
         child_graph = self.locate_dependency(path)
         if child_graph is not None:
@@ -308,6 +319,8 @@ class DependencyGraph:
         child_graph = DependencyGraph(path, self, self._locator)
         self._dependencies[path] = child_graph
         notebook = self._locator(path)
+        if not notebook:
+            return None
         notebook.build_dependency_graph(child_graph)
         return child_graph
 
@@ -356,20 +369,31 @@ class DependencyGraph:
 class Notebook:
 
     @staticmethod
-    def parse(path: str, source: str, default_language: Language) -> Notebook | None:
+    def parse(path: str, source: str, default_language: Language) -> Notebook:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
-        return None if cells is None else Notebook(path, default_language, cells, source.endswith('\n'))
+        if cells is None:
+            raise ValueError(f"Could not parse Notebook: {path}")
+        return Notebook(path, source, default_language, cells, source.endswith('\n'))
 
-    def __init__(self, path: str, language: Language, cells: list[Cell], ends_with_lf):
+    def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
         self._path = path
+        self._source = source
         self._language = language
         self._cells = cells
         self._ends_with_lf = ends_with_lf
 
     @property
+    def path(self) -> str:
+        return self._path
+
+    @property
     def cells(self) -> list[Cell]:
         return self._cells
+
+    @property
+    def original_code(self) -> str:
+        return self._source
 
     def to_migrated_code(self):
         default_language = CellLanguage.of_language(self._language)
