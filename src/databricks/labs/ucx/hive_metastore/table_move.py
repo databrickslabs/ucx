@@ -1,8 +1,7 @@
 from functools import partial
 
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
@@ -12,7 +11,6 @@ from databricks.sdk.service.catalog import (
     TableType,
 )
 
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.table_migrate import logger
 
@@ -23,13 +21,6 @@ class TableMove:
         self._fetch = backend.fetch
         self._execute = backend.execute
         self._ws = ws
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx'):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        return cls(ws, sql_backend)
 
     def move(
         self,

@@ -6,12 +6,11 @@ from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
-from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
 
 from databricks.labs.ucx.account import WorkspaceInfo
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -61,20 +60,13 @@ class TableToMigrate:
 
 
 class TableMapping:
+    FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
     def __init__(self, installation: Installation, ws: WorkspaceClient, sql_backend: SqlBackend):
-        self._filename = 'mapping.csv'
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
-
-    @classmethod
-    def current(cls, ws: WorkspaceClient, product='ucx'):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        return cls(installation, ws, sql_backend)
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
         tables_snapshot = tables.snapshot()
@@ -88,11 +80,11 @@ class TableMapping:
         workspace_name = workspace_info.current()
         default_catalog_name = re.sub(r"\W+", "_", workspace_name)
         current_tables = self.current_tables(tables, workspace_name, default_catalog_name)
-        return self._installation.save(list(current_tables), filename=self._filename)
+        return self._installation.save(list(current_tables), filename=self.FILENAME)
 
     def load(self) -> list[Rule]:
         try:
-            return self._installation.load(list[Rule], filename=self._filename)
+            return self._installation.load(list[Rule], filename=self.FILENAME)
         except NotFound:
             msg = "Please run: databricks labs ucx table-mapping"
             raise ValueError(msg) from None

@@ -6,9 +6,8 @@ import sys
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
+import pytest
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
-
-import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState, RawState
 from databricks.labs.blueprint.parallel import Threads
@@ -36,6 +35,7 @@ from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
     WorkflowsDeployment,
 )
+from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access import redash
 from databricks.labs.ucx.workspace_access.generic import (
     GenericPermissionsSupport,
@@ -96,6 +96,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             [
                 functools.partial(ws.clusters.ensure_cluster_is_running, default_cluster_id),
                 functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
+                functools.partial(ws.clusters.ensure_cluster_is_running, table_migration_cluster_id),
             ],
         )
 
@@ -115,6 +116,9 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
         installation.save(workspace_config)
 
+        # TODO: inject the smallest number of tasks possible for a workflow, to speed up installation in tests
+        tasks = Workflows.all().tasks()
+
         # TODO: see if we want to move building wheel as a context manager for yield factory,
         # so that we can shave off couple of seconds and build wheel only once per session
         # instead of every test
@@ -126,6 +130,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             product_info.wheels(ws),
             product_info,
             timedelta(minutes=3),
+            tasks,
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,
@@ -268,7 +273,7 @@ def test_new_job_cluster_with_policy_assessment(
     assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job(
     ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
 ):

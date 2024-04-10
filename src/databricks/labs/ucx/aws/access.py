@@ -49,24 +49,6 @@ class AWSResourcePermissions:
         self._kms_key = kms_key
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
 
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation, backend, aws, schema, kms_key=None):
-        config = installation.load(WorkspaceConfig)
-        caller_identity = aws.validate_connection()
-        locations = ExternalLocations(ws, backend, config.inventory_database)
-        if not caller_identity:
-            raise ResourceWarning("AWS CLI is not configured properly.")
-        return cls(
-            installation,
-            ws,
-            backend,
-            aws,
-            locations,
-            schema,
-            caller_identity.get("Account"),
-            kms_key,
-        )
-
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         # Get the missing paths
         # Identify the S3 prefixes

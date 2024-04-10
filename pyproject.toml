@@ -87,7 +87,7 @@ coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=htm
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
 fmt         = ["black .",
                "ruff check . --fix",
-               "mypy .",
+               "mypy --disable-error-code 'annotation-unchecked' .",
                "pylint --output-format=colorized -j 0 src tests"]
 verify      = ["black --check .",
                "ruff .",

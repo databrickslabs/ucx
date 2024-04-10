@@ -4,14 +4,12 @@ from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceAlreadyExists
 from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.assessment.crawlers import logger
 from databricks.labs.ucx.azure.resources import (
-    AzureAPIClient,
     AzureResource,
     AzureResources,
     PrincipalSecret,
@@ -32,6 +30,8 @@ class StoragePermissionMapping:
 
 
 class AzureResourcePermissions:
+    FILENAME = 'azure_storage_account_info.csv'
+
     def __init__(
         self,
         installation: Installation,
@@ -39,7 +39,6 @@ class AzureResourcePermissions:
         azurerm: AzureResources,
         external_locations: ExternalLocations,
     ):
-        self._filename = 'azure_storage_account_info.csv'
         self._installation = installation
         self._locations = external_locations
         self._azurerm = azurerm
@@ -49,20 +48,6 @@ class AzureResourcePermissions:
             "Storage Blob Data Owner": Privilege.WRITE_FILES,
             "Storage Blob Data Reader": Privilege.READ_FILES,
         }
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, product='ucx', include_subscriptions=None):
-        installation = Installation.current(ws, product)
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        azure_mgmt_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_mgmt_client, graph_client, include_subscriptions)
-        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-        return cls(installation, ws, azurerm, locations)
 
     def _map_storage(self, storage: AzureResource) -> list[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.storage_account}")
@@ -103,7 +88,7 @@ class AzureResourcePermissions:
         if len(storage_account_infos) == 0:
             logger.error("No storage account found in current tenant with spn permission")
             return None
-        return self._installation.save(storage_account_infos, filename=self._filename)
+        return self._installation.save(storage_account_infos, filename=self.FILENAME)
 
     def _update_cluster_policy_definition(
         self,
@@ -221,7 +206,7 @@ class AzureResourcePermissions:
         self._ws.secrets.put_secret(inventory_database, "uber_principal_secret", string_value=uber_principal.secret)
 
     def load(self):
-        return self._installation.load(list[StoragePermissionMapping], filename=self._filename)
+        return self._installation.load(list[StoragePermissionMapping], filename=self.FILENAME)
 
     def _get_storage_accounts(self) -> list[str]:
         external_locations = self._locations.snapshot()

@@ -462,29 +462,3 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
 
     ws.external_locations.create.assert_not_called()
     assert "External locations below are not created in UC." in caplog.text
-
-
-def test_for_cli(ws):
-    mock_installation = MockInstallation(
-        {
-            "config.yml": {
-                'version': 2,
-                'inventory_database': 'test',
-                'connect': {
-                    'host': 'test',
-                    'token': 'test',
-                },
-            },
-            "azure_storage_account_info.csv": [
-                {
-                    'prefix': 'dummy',
-                    'client_id': 'dummy',
-                    'principal': 'dummy',
-                    'privilege': 'WRITE_FILES',
-                    'type': 'Application',
-                    'directory_id': 'dummy',
-                },
-            ],
-        }
-    )
-    assert isinstance(ExternalLocationsMigration.for_cli(ws, mock_installation), ExternalLocationsMigration)

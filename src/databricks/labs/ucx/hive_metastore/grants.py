@@ -6,7 +6,7 @@ from functools import partial
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
-from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
@@ -22,8 +22,6 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -349,13 +347,6 @@ class AwsACL:
         self._ws = ws
         self._installation = installation
 
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-
-        return cls(ws, sql_backend, installation)
-
     def _get_cluster_to_instance_profile_mapping(self) -> dict[str, str]:
         # this function gives a mapping between an interactive cluster and the instance profile used by it
         # either directly or through a cluster policy.
@@ -442,27 +433,12 @@ class AzureACL:
         ws: WorkspaceClient,
         backend: SqlBackend,
         spn_crawler: AzureServicePrincipalCrawler,
-        resource_permissions: AzureResourcePermissions,
+        installation: Installation,
     ):
         self._backend = backend
         self._ws = ws
         self._spn_crawler = spn_crawler
-        self._resource_permissions = resource_permissions
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-        azure_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_client, graph_client)
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
-        spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-        return cls(ws, sql_backend, spn_crawler, resource_permissions)
+        self._installation = installation
 
     def get_eligible_locations_principals(self) -> dict[str, dict]:
         cluster_locations = {}
@@ -482,7 +458,10 @@ class AzureACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._resource_permissions.load()
+        permission_mappings = self._installation.load(
+            list[StoragePermissionMapping],
+            filename=AzureResourcePermissions.FILENAME,
+        )
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (
@@ -537,37 +516,6 @@ class PrincipalACL:
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation, sql_backend: SqlBackend):
-        config = installation.load(WorkspaceConfig)
-
-        tables_crawler = TablesCrawler(sql_backend, config.inventory_database)
-        mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
-        if ws.config.is_azure:
-            azure_acl = AzureACL.for_cli(ws, installation)
-            return cls(
-                ws,
-                sql_backend,
-                installation,
-                tables_crawler,
-                mount_crawler,
-                azure_acl.get_eligible_locations_principals(),
-            )
-        if ws.config.is_aws:
-            aws_acl = AwsACL.for_cli(ws, installation)
-            return cls(
-                ws,
-                sql_backend,
-                installation,
-                tables_crawler,
-                mount_crawler,
-                aws_acl.get_eligible_locations_principals(),
-            )
-        if ws.config.is_gcp:
-            logger.error("UCX is not supported for GCP yet. Please run it on azure or aws")
-            return None
-        return None
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
