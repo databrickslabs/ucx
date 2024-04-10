@@ -214,6 +214,10 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
     src_view1 = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name, schema_name=src_schema.name, ctas=view1_sql, view=True
     )
+    view2_sql = f"SELECT * FROM {src_view1.full_name}"
+    src_view2 = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name, schema_name=src_schema.name, ctas=view2_sql, view=True
+    )
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
@@ -236,6 +240,14 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
             src_view1.name,
             src_view1.name,
         ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_view2.name,
+            src_view2.name,
+        ),
     ]
 
     runtime_ctx.with_table_mapping_rules(rules)
@@ -243,13 +255,15 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
     runtime_ctx.tables_migrator.migrate_tables(what=What.VIEW)
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
-    assert len(target_tables) == 2
+    assert len(target_tables) == 3
 
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
     assert target_table_properties["upgraded_from"] == src_managed_table.full_name
     assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
     view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
     assert view1_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_managed_table.name}"
+    view2_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view2.name}").view_definition
+    assert view2_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_view1.name}"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

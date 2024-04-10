@@ -596,11 +596,24 @@ def test_table_migration_job(
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=schema.name)
-    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
     src_external_table = make_table(schema_name=schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
+    src_view1_text = f"SELECT * FROM {src_managed_table.full_name}"
+    src_view1 = make_table(
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        ctas=src_view1_text,
+        view=True,
+    )
+    src_view2_text = f"SELECT * FROM {src_view1.full_name}"
+    src_view2 = make_table(
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        ctas=src_view2_text,
+        view=True,
+    )
     dst_catalog = make_catalog()
     make_schema(catalog_name=dst_catalog.name, name=schema.name)
 
@@ -636,6 +649,22 @@ def test_table_migration_job(
                 src_external_table.name,
                 src_external_table.name,
             ),
+            Rule(
+                "workspace",
+                dst_catalog.name,
+                schema.name,
+                schema.name,
+                src_view1.name,
+                src_view1.name,
+            ),
+            Rule(
+                "workspace",
+                dst_catalog.name,
+                schema.name,
+                schema.name,
+                src_view2.name,
+                src_view2.name,
+            ),
         ],
         filename='mapping.csv',
     )
@@ -649,6 +678,8 @@ def test_table_migration_job(
         [
             Table("hive_metastore", schema.name, src_managed_table.name, "MANAGED", "DELTA", location="dbfs:/test"),
             Table("hive_metastore", schema.name, src_external_table.name, "EXTERNAL", "CSV"),
+            Table("hive_metastore", schema.name, src_view1.name, "VIEW", "", view_text=src_view1_text),
+            Table("hive_metastore", schema.name, src_view2.name, "VIEW", "", view_text=src_view2_text),
         ],
         Table,
     )
@@ -698,13 +729,14 @@ def test_table_migration_job(
     try:
         assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
         assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_external_table.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_view1.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_view2.name}").name
     except NotFound:
-        assert (
-            False
-        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{schema.name}"
+        assert False, f"Table or view not found in {dst_catalog.name}.{schema.name}"
     # assert the cluster is configured correctly
-    job_id = installation.load(RawState).resources["jobs"]["migrate-tables"]
-    for job_cluster in ws.jobs.get(job_id).settings.job_clusters:
+    for job_cluster in ws.jobs.get(
+        installation.load(RawState).resources["jobs"]["migrate-tables"]
+    ).settings.job_clusters:
         assert job_cluster.new_cluster.autoscale.min_workers == 2
         assert job_cluster.new_cluster.autoscale.max_workers == 20
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"

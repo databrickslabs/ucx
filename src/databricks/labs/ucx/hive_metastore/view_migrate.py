@@ -83,7 +83,7 @@ class ViewsMigrationSequencer:
             else:
                 # does the view have at least one view dependency that is not yet processed ?
                 not_processed_yet = view_deps - self._result_tables_set
-                if not not_processed_yet:
+                if len(not_processed_yet) == 0:
                     result.add(view)
                     continue
                 if not [
