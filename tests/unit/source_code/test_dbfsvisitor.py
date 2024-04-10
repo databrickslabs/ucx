@@ -1,7 +1,7 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.dbfs import DBFSFinderLinter
+from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter
 
 
 class TestDetectFSVisitor:
@@ -15,7 +15,7 @@ class TestDetectFSVisitor:
         ],
     )
     def test_detects_fs_paths(self, code, expected):
-        finder = DBFSFinderLinter()
+        finder = DBFSUsageLinter()
         advices = finder.lint(code)
         count = 0
         for advice in advices:

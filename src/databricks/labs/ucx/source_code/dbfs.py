@@ -37,7 +37,7 @@ class DetectDbfsVisitor(ast.NodeVisitor):
         yield from self._advices
 
 
-class DBFSFinderLinter(Linter):
+class DBFSUsageLinter(Linter):
     def __init__(self):
         pass
 

@@ -4,7 +4,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
 from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter
 from databricks.labs.ucx.source_code.pyspark import SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.dbfs import DBFSFinderLinter
+from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter
 
 
 class Languages:
@@ -12,7 +12,7 @@ class Languages:
         self._index = index
         from_table = FromTable(index)
         self._linters = {
-            Language.PYTHON: SequentialLinter([SparkSql(from_table, index), DBFSFinderLinter()]),
+            Language.PYTHON: SequentialLinter([SparkSql(from_table, index), DBFSUsageLinter()]),
             Language.SQL: SequentialLinter([from_table]),
         }
         self._fixers: dict[Language, list[Fixer]] = {
