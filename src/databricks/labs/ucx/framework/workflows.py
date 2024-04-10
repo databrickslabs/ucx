@@ -24,4 +24,4 @@ class Workflow:
     @job_task
     def parse_logs(self, ctx: RuntimeContext):
         """Parse and store the warning log messages."""
-        ctx.parse_logs.snapshot()
+        ctx.task_run_warning_recorder.snapshot()
