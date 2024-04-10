@@ -79,7 +79,8 @@ class PythonCell(Cell):
             assert isinstance(node, ast.Call)
             path = PythonLinter.get_dbutils_notebook_run_path_arg(node)
             if isinstance(path, ast.Constant):
-                parent.register_dependency(path.value.strip("'").strip('"'))
+                dependency = Dependency(ObjectType.NOTEBOOK, path.value.strip("'").strip('"'))
+                parent.register_dependency(dependency)
 
 
 class RCell(Cell):

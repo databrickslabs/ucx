@@ -164,14 +164,16 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     sources: list[str] = _load_sources(Notebook, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
+    old_load_dependency_side_effect = loader.load_dependency.side_effect
     dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     visited: list[str] = []
 
     def load_dependency_side_effect(*args):
-        # visited.append(path)
-        # return locator(path)
-        pass
+        dep = args[0]
+        visited.append(dep.path)
+        return old_load_dependency_side_effect(*args)
+
 
     loader.load_dependency.side_effect = load_dependency_side_effect
     container = loader.load_dependency(dependency)
