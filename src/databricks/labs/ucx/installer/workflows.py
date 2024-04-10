@@ -619,7 +619,6 @@ class WorkflowsDeployment(InstallationMixin):
             job_cluster_key=Task.job_cluster,
             # The task dependents on all previous tasks.
             depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
-            run_if=jobs.RunIf.ALL_DONE,
         )
         return self._job_wheel_task(jobs_task, workflow, remote_wheel)
 
