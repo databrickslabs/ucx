@@ -167,9 +167,7 @@ class TaskRunWarningRecorder:
         )
 
         error_log_records = [
-            log_record
-            for log_record in log_records
-            if logging.getLevelName(log_record.level) >= logging.ERROR
+            log_record for log_record in log_records if logging.getLevelName(log_record.level) >= logging.ERROR
         ]
         if len(error_log_records) > 0:
             error_log_messages = "\n".join([str(log_record) for log_record in error_log_records])

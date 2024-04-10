@@ -90,9 +90,7 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
 def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute: str):
     """Verify the rows created by the snapshot"""
     excpected_log_records = [
-        log_record
-        for log_record in PARTIAL_LOG_RECORDS
-        if logging.getLevelName(log_record.level) >= logging.WARNING
+        log_record for log_record in PARTIAL_LOG_RECORDS if logging.getLevelName(log_record.level) >= logging.WARNING
     ]
     backend = MockBackend()
     log_processor = TaskRunWarningRecorder(
@@ -103,7 +101,7 @@ def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute:
         backend,
         "default",
     )
-    with pytest.raises(RuntimeError) as e:
+    with pytest.raises(RuntimeError):
         log_processor.snapshot()
     rows = backend.rows_written_for(log_processor.full_name, "append")
     assert all(
