@@ -11,6 +11,7 @@ class Dependency:
 
     @staticmethod
     def from_object_info(object_info: ObjectInfo):
+        assert object_info.object_type is not None
         assert object_info.path is not None
         return Dependency(object_info.object_type, object_info.path)
 
