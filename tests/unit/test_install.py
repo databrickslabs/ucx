@@ -16,7 +16,7 @@ from databricks.labs.blueprint.wheels import (
     find_project_root,
 )
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
     InvalidParameterValue,
@@ -60,14 +60,13 @@ from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import (
     WorkspaceInstallation,
     WorkspaceInstaller,
-    extract_major_minor, AccountInstaller,
+    extract_major_minor,
 )
 from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
     WorkflowsDeployment,
 )
 from databricks.labs.ucx.runtime import Workflows
-from databricks.labs.ucx.workspace_access.groups import ConfigureGroups
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -1615,7 +1614,9 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
         RuntimeWarning,
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
-        install.configure(default_config=WorkspaceConfig(inventory_database='ucx'),)
+        install.configure(
+            default_config=WorkspaceConfig(inventory_database='ucx'),
+        )
 
     first_prompts = base_prompts.extend(
         {
@@ -1625,13 +1626,17 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     install = WorkspaceInstaller(first_prompts, installation, ws, product_info)
 
     # finishes successfully when versions match and override is provided
-    config = install.configure(default_config=WorkspaceConfig(inventory_database='ucx'),)
+    config = install.configure(
+        default_config=WorkspaceConfig(inventory_database='ucx'),
+    )
     assert config.inventory_database == "ucx_user"
 
     # finishes successfully when versions don't match and no override is provided/needed
     product_info.released_version.return_value = "0.4.1"
     install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
-    config = install.configure(default_config=WorkspaceConfig(inventory_database='ucx'),)
+    config = install.configure(
+        default_config=WorkspaceConfig(inventory_database='ucx'),
+    )
     assert config.inventory_database == "ucx_user"
 
 

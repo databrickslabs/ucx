@@ -112,13 +112,13 @@ def extract_major_minor(version_string):
 
 class WorkspaceInstaller:
     def __init__(
-            self,
-            prompts: Prompts,
-            installation: Installation,
-            ws: WorkspaceClient,
-            product_info: ProductInfo,
-            environ: dict[str, str] | None = None,
-            tasks: list[Task] | None = None,
+        self,
+        prompts: Prompts,
+        installation: Installation,
+        ws: WorkspaceClient,
+        product_info: ProductInfo,
+        environ: dict[str, str] | None = None,
+        tasks: list[Task] | None = None,
     ):
         if not environ:
             environ = dict(os.environ.items())
@@ -135,12 +135,12 @@ class WorkspaceInstaller:
         self._tasks = tasks if tasks else Workflows.all().tasks()
 
     def run(
-            self,
-            default_config: WorkspaceConfig,
-            verify_timeout=timedelta(minutes=2),
-            sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
-            wheel_builder_factory: Callable[[], WheelsV2] | None = None,
-            config: WorkspaceConfig | None = None,
+        self,
+        default_config: WorkspaceConfig,
+        verify_timeout=timedelta(minutes=2),
+        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
+        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
+        config: WorkspaceConfig | None = None,
     ):
         logger.info(f"Installing UCX v{self._product_info.version()}")
         if config is None:
@@ -274,18 +274,18 @@ class WorkspaceInstaller:
         )
 
         # Save configurable values for table migration cluster
-        min_workers, max_workers, spark_conf_dict = self._config_table_migration(
-            spark_conf_dict
-        )
+        min_workers, max_workers, spark_conf_dict = self._config_table_migration(spark_conf_dict)
 
-        config = dataclasses.replace(default_config,
-                                     warehouse_id=warehouse_id,
-                                     instance_profile=instance_profile,
-                                     spark_conf=spark_conf_dict,
-                                     min_workers=min_workers,
-                                     max_workers=max_workers,
-                                     policy_id=policy_id,
-                                     instance_pool_id=instance_pool_id)
+        config = dataclasses.replace(
+            default_config,
+            warehouse_id=warehouse_id,
+            instance_profile=instance_profile,
+            spark_conf=spark_conf_dict,
+            min_workers=min_workers,
+            max_workers=max_workers,
+            policy_id=policy_id,
+            instance_pool_id=instance_pool_id,
+        )
         self._installation.save(config)
         if self._is_account_install:
             return config
@@ -367,15 +367,15 @@ class WorkspaceInstaller:
 
 class WorkspaceInstallation(InstallationMixin):
     def __init__(
-            self,
-            config: WorkspaceConfig,
-            installation: Installation,
-            install_state: InstallState,
-            sql_backend: SqlBackend,
-            ws: WorkspaceClient,
-            workflows_installer: WorkflowsDeployment,
-            prompts: Prompts,
-            product_info: ProductInfo,
+        self,
+        config: WorkspaceConfig,
+        installation: Installation,
+        install_state: InstallState,
+        sql_backend: SqlBackend,
+        ws: WorkspaceClient,
+        workflows_installer: WorkflowsDeployment,
+        prompts: Prompts,
+        product_info: ProductInfo,
     ):
         self._config = config
         self._installation = installation
@@ -477,8 +477,8 @@ class WorkspaceInstallation(InstallationMixin):
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
-                "Do you want to uninstall ucx from the workspace too, this would "
-                "remove ucx project folder, dashboards, queries and jobs"
+            "Do you want to uninstall ucx from the workspace too, this would "
+            "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
@@ -498,7 +498,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _remove_database(self):
         if self._prompts and not self._prompts.confirm(
-                f"Do you want to delete the inventory database {self._config.inventory_database} too?"
+            f"Do you want to delete the inventory database {self._config.inventory_database} too?"
         ):
             return
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
@@ -571,7 +571,9 @@ class AccountInstaller(AccountContext):
             if current_user.groups is None:
                 return False
             if "admins" not in [g.display for g in current_user.groups]:
-                logger.warning(f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping...")
+                logger.warning(
+                    f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
+                )
                 return False
             # check if user has access to workspace
         except (PermissionDenied, NotFound, ValueError) as err:
@@ -596,8 +598,9 @@ class AccountInstaller(AccountContext):
         confirmed = False
         accessible_workspaces = self._get_accessible_workspaces()
         msg = "\n".join([f"{w.deployment_name}" for w in accessible_workspaces])
-        if not self.prompts.confirm(f"UCX has detected the following workspaces available to install. \n{msg}\n"
-                                    f"Do you want to continue?"):
+        if not self.prompts.confirm(
+            f"UCX has detected the following workspaces available to install. \n{msg}\n" f"Do you want to continue?"
+        ):
             return
 
         for workspace in self.account_client.workspaces.list():
@@ -621,27 +624,32 @@ class AccountInstaller(AccountContext):
             if confirmed:
                 continue
             confirmed = self.prompts.confirm(
-                "Do you want to install UCX on the remaining workspaces with the same config?")
+                "Do you want to install UCX on the remaining workspaces with the same config?"
+            )
 
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(accessible_workspaces)
 
 
+def install_on_workspace():
+    app = ProductInfo.from_class(WorkspaceConfig)
+    prompts = Prompts()
+    workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
+    try:
+        current = app.current_installation(workspace_client)
+    except NotFound:
+        current = Installation.assume_global(workspace_client, app.product_name())
+    installer = WorkspaceInstaller(prompts, current, workspace_client, app)
+    installer.run(installer.prompt_for_new_installation())
+
+
 if __name__ == "__main__":
     logger = get_logger(__file__)
-    app = ProductInfo.from_class(WorkspaceConfig)
 
     env = dict(os.environ.items())
     force_install = env.get("UCX_FORCE_INSTALL")
-    prompts = Prompts()
     if force_install == "account":
         account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
         account_installer.install_on_account()
     else:
-        workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-        try:
-            current = app.current_installation(workspace_client)
-        except NotFound:
-            current = Installation.assume_global(workspace_client, app.product_name())
-        installer = WorkspaceInstaller(prompts, current, workspace_client, app)
-        installer.run(installer.prompt_for_new_installation())
+        install_on_workspace()
