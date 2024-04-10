@@ -181,7 +181,7 @@ class WorkspaceInstaller:
             raise err
         return config
 
-    def prompt_for_new_installation(self) -> WorkspaceConfig:
+    def _prompt_for_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         inventory_database = self._prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
@@ -269,7 +269,7 @@ class WorkspaceInstaller:
 
     def _configure_new_installation(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
         if default_config is None:
-            default_config = self.prompt_for_new_installation()
+            default_config = self._prompt_for_new_installation()
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
         warehouse_id = self._configure_warehouse()

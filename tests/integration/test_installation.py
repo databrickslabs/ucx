@@ -104,8 +104,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             installation = Installation(ws, product_info.product_name())
         install_state = InstallState.from_installation(installation)
         installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
-        install_config = installer.prompt_for_new_installation()
-        workspace_config = installer.configure(install_config)
+        workspace_config = installer.configure()
         installation = product_info.current_installation(ws)
         overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id, "table_migration": table_migration_cluster_id}
         workspace_config.override_clusters = overrides
