@@ -831,11 +831,14 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         assert (
             False
         ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{schema.name}"
-    # assert the cluster is configured correctly
+    # assert the cluster is configured correctly on the migrate tables tasks
     install_state = installation.load(RawState)
     job_id = install_state.resources["jobs"]["migrate-tables"]
-    for task in ws.jobs.get(job_id).settings.tasks:
-        assert task.existing_cluster_id == env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+    assert all(
+        task.existing_cluster_id == env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+        for task in ws.jobs.get(job_id).settings.tasks
+        if task.task_key != "parse_logs"
+    )
 
 
 def test_compare_remote_local_install_versions(ws, new_installation):
