@@ -86,6 +86,32 @@ def test_parse_logs_last_message_is_present(log_path: Path) -> None:
     assert log_records[-1].message == PARTIAL_LOG_RECORDS[-1].message
 
 
+@pytest.mark.parametrize("attribute", ["level", "component", "message"])
+def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute: str):
+    """Verify the rows created by the snapshot"""
+    excpected_log_records = [
+        log_record
+        for log_record in PARTIAL_LOG_RECORDS
+        if logging.getLevelName(log_record.level) >= logging.WARNING
+    ]
+    backend = MockBackend()
+    log_processor = TaskRunWarningRecorder(
+        tmp_path,
+        WORKFLOW,
+        WORKFLOW_ID,
+        WORKFLOW_RUN_ID,
+        backend,
+        "default",
+    )
+    with pytest.raises(RuntimeError) as e:
+        log_processor.snapshot()
+    rows = backend.rows_written_for(log_processor.full_name, "append")
+    assert all(
+        getattr(row, attribute) == getattr(log_record, attribute)
+        for row, log_record in zip(rows, excpected_log_records)
+    )
+
+
 def test_logs_processor_snapshot_error(tmp_path: Path, log_path: Path):
     """Test the error raised by the snapshot"""
     backend = MockBackend()
