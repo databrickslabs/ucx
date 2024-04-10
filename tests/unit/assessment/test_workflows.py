@@ -81,6 +81,6 @@ def test_incompatible_submit_runs(run_workflow):
     assert "SELECT * FROM ucx.submit_runs" in ctx.sql_backend.queries
 
 
-def test_runtime_destroy_schema(run_workflow):
+def test_failing_task_raises_value_error(run_workflow):
     with pytest.raises(ValueError):
         run_workflow(Failing.failing_task)
