@@ -2,5 +2,7 @@
 -- widget title=Warning messages, row=44, col=0, size_x=8, size_y=12
 SELECT *
 FROM $inventory.logs
-WHERE job_run_id = (SELECT MAX(job_run_id) FROM $inventory.logs WHERE workflow_name = 'assessment')
+WHERE job_run_id = (
+    SELECT job_run_id FROM $inventory.logs WHERE timestamp = (SELECT MAX(timestamp) FROM $inventory.logs)
+)
 ORDER BY timestamp ASC
