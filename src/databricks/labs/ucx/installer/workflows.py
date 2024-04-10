@@ -211,12 +211,17 @@ class DeployedWorkflows:
             runs = sorted(runs, key=lambda x: x[1].start_time, reverse=True)
             workflow, latest_run = runs[0]
         if not latest_run:
+            assert workflow is not None
             _, latest_run = self._latest_job_run(workflow)
         self._relay_logs(workflow, latest_run.run_id)
 
     def _relay_logs(self, workflow, run_id):
+        is_debug = logger.isEnabledFor(logging.DEBUG)
         for log in self._fetch_logs(workflow, run_id):
             task_logger = logging.getLogger(log.component)
+            log_level = logging.getLevelName(log.level)
+            if not is_debug and log_level == logging.DEBUG:
+                continue
             task_logger.log(logging.getLevelName(log.level), log.message)
 
     def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
