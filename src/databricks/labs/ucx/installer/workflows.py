@@ -1,9 +1,12 @@
 import logging
+import os.path
 import re
 import sys
 import webbrowser
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import datetime, timedelta
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +46,7 @@ import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.tasks import Task
+from databricks.labs.ucx.installer.logs import PartialLogRecord, parse_logs
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
@@ -115,6 +119,9 @@ class DeployedWorkflows:
             try:
                 self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
             except OperationFailed as err:
+                logger.info('---------- REMOTE LOGS --------------')
+                self._relay_logs(step, job_initial_run.run_id)
+                logger.info('---------- END REMOTE LOGS ----------')
                 job_run = self._ws.jobs.get_run(job_initial_run.run_id)
                 raise self._infer_error_from_job_run(job_run) from err
             return
@@ -182,6 +189,26 @@ class DeployedWorkflows:
                 return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
         return False
 
+    def _relay_logs(self, workflow, run_id):
+        for log in self._fetch_logs(workflow, run_id):
+            task_logger = logging.getLogger(log.component)
+            # we're relaying almost raw log events, so we need to call the logger directly
+            raw_log_event = task_logger._log  # pylint: disable=protected-access
+            raw_log_event(logging.getLevelName(log.level), log.message, ())
+
+    def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
+        log_path = f'{self._install_state.install_folder()}/logs/{workflow}/run-{run_id}'
+        for object_info in self._ws.workspace.list(log_path):
+            if not object_info.path:
+                continue
+            if '.log' not in object_info.path:
+                continue
+            task_name = os.path.basename(object_info.path).split('.')[0]
+            with self._ws.workspace.download(object_info.path) as raw_file:
+                text_io = StringIO(raw_file.read().decode())
+            for record in parse_logs(text_io):
+                yield replace(record, component=f'{record.component}:{task_name}')
+
     @staticmethod
     def _readable_timedelta(epoch):
         when = datetime.utcfromtimestamp(epoch)
@@ -200,13 +227,7 @@ class DeployedWorkflows:
         return "less than 1 second ago"
 
     def _repair_workflow(self, workflow):
-        job_id = self._install_state.jobs.get(workflow)
-        if not job_id:
-            raise InvalidParameterValue("job does not exists hence skipping repair")
-        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
-        if not job_runs:
-            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
-        latest_job_run = job_runs[0]
+        job_id, latest_job_run = self._latest_job_run(workflow)
         retry_on_attribute_error = retried(on=[AttributeError], timeout=self._verify_timeout)
         retried_check = retry_on_attribute_error(self._get_result_state)
         state_value = retried_check(job_id)
@@ -215,6 +236,16 @@ class DeployedWorkflows:
             raise InvalidParameterValue("job is not in FAILED state hence skipping repair")
         run_id = latest_job_run.run_id
         return job_id, run_id
+
+    def _latest_job_run(self, workflow: str):
+        job_id = self._install_state.jobs.get(workflow)
+        if not job_id:
+            raise InvalidParameterValue("job does not exists hence skipping repair")
+        job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
+        if not job_runs:
+            raise InvalidParameterValue("job is not initialized yet. Can't trigger repair run now")
+        latest_job_run = job_runs[0]
+        return job_id, latest_job_run
 
     def _get_result_state(self, job_id):
         job_runs = list(self._ws.jobs.list_runs(job_id=job_id, limit=1))
@@ -307,7 +338,7 @@ class DeployedWorkflows:
 
 
 class WorkflowsDeployment(InstallationMixin):
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         config: WorkspaceConfig,
         installation: Installation,
@@ -317,6 +348,7 @@ class WorkflowsDeployment(InstallationMixin):
         product_info: ProductInfo,
         verify_timeout: timedelta,
         tasks: list[Task],
+        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -327,6 +359,7 @@ class WorkflowsDeployment(InstallationMixin):
         self._verify_timeout = verify_timeout
         self._tasks = tasks
         self._this_file = Path(__file__)
+        self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
     def create_jobs(self, prompts):
@@ -364,6 +397,9 @@ class WorkflowsDeployment(InstallationMixin):
     def _config_file(self):
         return f"{self._installation.install_folder()}/config.yml"
 
+    def _is_testing(self):
+        return self._product_info.product_name() != "ucx"
+
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
         markdown = [
@@ -378,19 +414,16 @@ class WorkflowsDeployment(InstallationMixin):
                 continue
             job_id = self._install_state.jobs[step_name]
             dashboard_link = ""
-            dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
-            for dash in dashboards_per_step:
-                if len(dashboard_link) == 0:
-                    dashboard_link += "Go to the one of the following dashboards after running the job:\n"
-                first, second = dash.replace("_", " ").title().split()
-                dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
-                dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
+            if not self._skip_dashboards:
+                dashboard_link = self._create_dashboard_links(step_name, dashboard_link)
             job_link = f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             markdown.append("---\n\n")
             markdown.append(f"## {job_link}\n\n")
             markdown.append(f"{dashboard_link}")
             markdown.append("\nThe workflow consists of the following separate tasks:\n\n")
             for task in self._tasks:
+                if self._is_testing() and task.is_testing():
+                    continue
                 if task.workflow != step_name:
                     continue
                 doc = self._config.replace_inventory_variable(task.doc)
@@ -403,9 +436,21 @@ class WorkflowsDeployment(InstallationMixin):
         readme_url = self._installation.workspace_link('README')
         return readme_url
 
+    def _create_dashboard_links(self, step_name, dashboard_link):
+        dashboards_per_step = [d for d in self._install_state.dashboards.keys() if d.startswith(step_name)]
+        for dash in dashboards_per_step:
+            if len(dashboard_link) == 0:
+                dashboard_link += "Go to the one of the following dashboards after running the job:\n"
+            first, second = dash.replace("_", " ").title().split()
+            dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
+            dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
+        return dashboard_link
+
     def _step_list(self) -> list[str]:
         step_list = []
         for task in self._tasks:
+            if self._is_testing() and task.is_testing():
+                continue
             if task.workflow not in step_list:
                 step_list.append(task.workflow)
         return step_list
@@ -487,15 +532,22 @@ class WorkflowsDeployment(InstallationMixin):
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
-        tasks = [t for t in self._tasks if t.workflow == step_name]
-        job_tasks = [self._job_task(task, remote_wheel) for task in tasks]
+        job_tasks = []
+        job_clusters: set[str] = set()
+        for task in self._tasks:
+            if task.workflow != step_name:
+                continue
+            if self._skip_dashboards and task.dashboard:
+                continue
+            job_clusters.add(task.job_cluster)
+            job_tasks.append(self._job_task(task, remote_wheel))
         job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
             "tags": {"version": f"v{version}"},
-            "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
+            "job_clusters": self._job_clusters(job_clusters),
             "email_notifications": email_notifications,
             "tasks": job_tasks,
         }

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TextIO
 
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk.errors import InternalError
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ class TaskRunWarningRecorder:
         """Parse and store the logs for all tasks.
 
         Raises:
-            RuntimeError: When error or above log records are found, after storing the logs.
+            InternalError: When error or above log records are found, after storing the logs.
         """
         log_files = self._log_path.glob("*.log*")
 
@@ -170,10 +171,15 @@ class TaskRunWarningRecorder:
             mode="append",
         )
 
-        error_log_records = [
-            log_record for log_record in log_records if logging.getLevelName(log_record.level) >= logging.ERROR
-        ]
-        if len(error_log_records) > 0:
-            error_log_messages = "\n".join([str(log_record) for log_record in error_log_records])
-            raise RuntimeError(f"Found error log records:\n{error_log_messages}")
+        error_messages = []
+        for log_record in log_records:
+            if logging.getLevelName(log_record.level) < logging.ERROR:
+                continue
+            message = log_record.message
+            # Ignore the prompt to troubleshoot, which is the error
+            if 'databricks workspace export /' in message:
+                continue
+            error_messages.append(message)
+        if len(error_messages) > 0:
+            raise InternalError("\n".join(error_messages))
         return log_records

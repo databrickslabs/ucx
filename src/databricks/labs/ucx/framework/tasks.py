@@ -33,6 +33,9 @@ class Task:
     dashboard: str | None = None
     cloud: str | None = None
 
+    def is_testing(self):
+        return self.workflow in {"failing"}
+
     def dependencies(self):
         if not self.depends_on:
             return []
