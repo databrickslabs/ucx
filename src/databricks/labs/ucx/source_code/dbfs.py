@@ -20,7 +20,7 @@ class DetectDbfsVisitor(ast.NodeVisitor):
                 if any(arg.s.startswith(prefix) for prefix in self._fs_prefixes):
                     self._advices.append(
                         Deprecation(
-                            code='fs-finder',
+                            code='dbfs-usage',
                             message=f"Deprecated file system path in call to: {arg.s}",
                             start_line=arg.lineno,
                             start_col=arg.col_offset,
@@ -42,7 +42,7 @@ class DetectDbfsVisitor(ast.NodeVisitor):
         if any(node.s.startswith(prefix) for prefix in self._fs_prefixes):
             self._advices.append(
                 Advisory(
-                    code='fs-finder',
+                    code='dbfs-usage',
                     message=f"Possible deprecated file system path: {node.s}",
                     start_line=node.lineno,
                     start_col=node.col_offset,
