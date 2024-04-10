@@ -3,10 +3,14 @@ from collections.abc import Callable
 import pytest
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.notebook import Notebook, DependencyGraph
+from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
 # fmt: off
+# the following samples are real samples from https://github.com/databricks-industry-solutions
+# please keep them untouched, we want our unit tests to run against genuinely representative data
 PYTHON_NOTEBOOK_SAMPLE = (
     "00_var_context.py.txt",
     Language.PYTHON,
@@ -82,7 +86,6 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     assert actual_purified == expected_purified
 
 
-@pytest.mark.skip("for now")
 @pytest.mark.parametrize(
     "source",
     [
@@ -179,3 +182,70 @@ def test_notebook_builds_cyclical_dependency_graph():
     notebook.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
+
+
+def test_notebook_builds_python_dependency_graph():
+    paths = ["root4.py.txt", "leaf3.py.txt"]
+    sources: list[str] = _load_sources(Notebook, *paths)
+    languages = [Language.PYTHON] * len(paths)
+    locator = notebook_locator(paths, sources, languages)
+    notebook = locator(paths[0])
+    graph = DependencyGraph(paths[0], None, locator)
+    notebook.build_dependency_graph(graph)
+    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
+    assert actual == set(paths)
+
+
+def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
+    sources: list[str] = _load_sources(Notebook, "run_notebooks.py.txt")
+    linter = PythonLinter()
+    advices = list(linter.lint(sources[0]))
+    assert [
+        Advisory(
+            code='dbutils-notebook-run-dynamic',
+            message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
+            start_line=14,
+            start_col=13,
+            end_line=14,
+            end_col=50,
+        )
+    ] == advices
+
+
+def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
+    sources: list[str] = _load_sources(Notebook, "root4.py.txt")
+    linter = PythonLinter()
+    advices = list(linter.lint(sources[0]))
+    assert [
+        Advisory(
+            code='dbutils-notebook-run-literal',
+            message="Call to 'dbutils.notebook.run' will be migrated automatically",
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=38,
+        )
+    ] == advices
+
+
+def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
+    source = """
+import stuff
+do_something_with_stuff(stuff)
+stuff2 = dbutils.notebook.run("where is notebook 1?")
+stuff3 = dbutils.notebook.run("where is notebook 2?")
+"""
+    linter = PythonLinter()
+    advices = list(linter.lint(source))
+    assert len(advices) == 2
+
+
+def test_does_not_detect_partial_call_to_dbutils_notebook_run_in_python_code_():
+    source = """
+import stuff
+do_something_with_stuff(stuff)
+stuff2 = notebook.run("where is notebook 1?")
+"""
+    linter = PythonLinter()
+    advices = list(linter.lint(source))
+    assert len(advices) == 0
