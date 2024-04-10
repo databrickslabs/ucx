@@ -71,7 +71,7 @@ class Workflows:
         print(f"UCX v{__version__}")
         workflow = self._workflows[workflow_name]
         if task_name == "parse_logs":
-            if workflow != "099-destroy-schema":  # Can't store logs after schema is destroyed
+            if workflow != "099-destroy-schema":  # Cannot store logs after schema is destroyed
                 ctx.task_run_warning_recorder.snapshot()
         else:
             # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
