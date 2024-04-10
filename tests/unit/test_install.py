@@ -16,7 +16,7 @@ from databricks.labs.blueprint.wheels import (
     find_project_root,
 )
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
     InvalidParameterValue,
@@ -41,6 +41,7 @@ from databricks.sdk.service.jobs import (
     RunResultState,
     RunState,
 )
+
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -54,12 +55,12 @@ from databricks.sdk.service.workspace import ObjectInfo
 
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
-from databricks.labs.ucx.config import WorkspaceConfig, InstallationConfig
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.install import (
     WorkspaceInstallation,
     WorkspaceInstaller,
-    extract_major_minor,
+    extract_major_minor, AccountInstaller,
 )
 from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
@@ -145,19 +146,6 @@ def ws():
     workspace_client.workspace.download = download
 
     return workspace_client
-
-
-@pytest.fixture
-def mock_installation_config(any_prompt):
-    return InstallationConfig(
-        silent=False,
-        inventory_database='ucx',
-        configure_groups=ConfigureGroups(any_prompt),
-        log_level="INFO",
-        num_threads=9,
-        is_terraform_used=True,
-        include_databases=["<ALL>"],
-    )
 
 
 def created_job(workspace_client, name):
@@ -1260,7 +1248,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     workspace_installation.run()
 
 
-def test_runs_upgrades_on_too_old_version(ws, any_prompt, mock_installation_config):
+def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     existing_installation = MockInstallation(
         {
             'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
@@ -1276,14 +1264,14 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt, mock_installation_conf
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     install.run(
-        install_config=mock_installation_config,
+        default_config=WorkspaceConfig(inventory_database='ucx'),
         verify_timeout=timedelta(seconds=60),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
     )
 
 
-def test_runs_upgrades_on_more_recent_version(ws, any_prompt, mock_installation_config):
+def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     existing_installation = MockInstallation(
         {
             'version.json': {'version': '0.3.0', 'wheel': '...', 'date': '...'},
@@ -1302,7 +1290,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt, mock_installation_
     wheels = create_autospec(WheelsV2)
 
     install.run(
-        install_config=mock_installation_config,
+        default_config=WorkspaceConfig(inventory_database='ucx'),
         verify_timeout=timedelta(seconds=10),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
@@ -1589,7 +1577,7 @@ def test_validate_step(ws, result_state, expected):
     assert deployed.validate_step("assessment") == expected
 
 
-def test_are_remote_local_versions_equal(ws, mock_installation, mocker, mock_installation_config):
+def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     ws.jobs.run_now = mocker.Mock()
 
     mocker.patch("webbrowser.open")
@@ -1627,7 +1615,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker, mock_ins
         RuntimeWarning,
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
-        install.configure(mock_installation_config)
+        install.configure(default_config=WorkspaceConfig(inventory_database='ucx'),)
 
     first_prompts = base_prompts.extend(
         {
@@ -1637,13 +1625,13 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker, mock_ins
     install = WorkspaceInstaller(first_prompts, installation, ws, product_info)
 
     # finishes successfully when versions match and override is provided
-    config = install.configure(mock_installation_config)
+    config = install.configure(default_config=WorkspaceConfig(inventory_database='ucx'),)
     assert config.inventory_database == "ucx_user"
 
     # finishes successfully when versions don't match and no override is provided/needed
     product_info.released_version.return_value = "0.4.1"
     install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
-    config = install.configure(mock_installation_config)
+    config = install.configure(default_config=WorkspaceConfig(inventory_database='ucx'),)
     assert config.inventory_database == "ucx_user"
 
 

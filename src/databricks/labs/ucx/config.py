@@ -2,9 +2,7 @@ from dataclasses import dataclass
 
 from databricks.sdk.core import Config
 
-__all__ = ["WorkspaceConfig", "InstallationConfig"]
-
-from databricks.labs.ucx.workspace_access.groups import ConfigureGroups
+__all__ = ["WorkspaceConfig"]
 
 
 @dataclass
@@ -55,6 +53,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     exclude_paths_in_mount: list[str] | None = None
     include_paths_in_mount: list[str] | None = None
 
+    # Whether to trigger assessment job after installation
+    trigger_job: bool = False
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 
@@ -68,22 +69,3 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
         raw["renamed_group_prefix"] = groups.get("backup_group_prefix", "db-temp-")
         raw["version"] = 2
         return raw
-
-
-@dataclass
-class InstallationConfig:
-    # Installation parameters
-    silent: bool
-    inventory_database: str
-    configure_groups: ConfigureGroups
-    num_threads: int | None = 10
-    log_level: str | None = "INFO"
-
-    # Flag to see if terraform has been used for deploying certain entities
-    is_terraform_used: bool = False
-
-    # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
-    include_databases: list[str] | None = None
-
-    # Whether to trigger assessment job after installation
-    trigger_job: bool = False
