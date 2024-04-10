@@ -110,7 +110,7 @@ class TaskRunWarningRecorder:
         self._sql_backend = sql_backend
         self._schema = schema
 
-        self.log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
+        self._log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
 
     @property
     def full_name(self) -> str:
@@ -148,7 +148,7 @@ class TaskRunWarningRecorder:
 
     def snapshot(self) -> list[LogRecord]:
         """Parse the logs for all tasks."""
-        log_files = self.log_path.glob("*.log*")
+        log_files = self._log_path.glob("*.log*")
 
         log_records = []
         for log_file in log_files:
