@@ -119,6 +119,7 @@ class WorkspaceInstaller:
         product_info: ProductInfo,
         environ: dict[str, str] | None = None,
         tasks: list[Task] | None = None,
+        installed_workspace_ids: list[int] | None = None,
     ):
         if not environ:
             environ = dict(os.environ.items())
@@ -133,15 +134,16 @@ class WorkspaceInstaller:
         self._force_install = environ.get("UCX_FORCE_INSTALL")
         self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
+        self._installed_workspace_ids = installed_workspace_ids
 
     def run(
         self,
-        default_config: WorkspaceConfig,
+        default_config: WorkspaceConfig | None = None,
         verify_timeout=timedelta(minutes=2),
         sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
         wheel_builder_factory: Callable[[], WheelsV2] | None = None,
         config: WorkspaceConfig | None = None,
-    ):
+    ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self._product_info.version()}")
         if config is None:
             config = self.configure(default_config)
@@ -177,6 +179,7 @@ class WorkspaceInstaller:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
             raise err
+        return config
 
     def prompt_for_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
@@ -244,7 +247,7 @@ class WorkspaceInstaller:
             return True
         return False
 
-    def configure(self, default_config: WorkspaceConfig) -> WorkspaceConfig:
+    def configure(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
         try:
             config = self._installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
@@ -264,7 +267,9 @@ class WorkspaceInstaller:
             logger.warning(f"Installed version is too old: {err}")
             return
 
-    def _configure_new_installation(self, default_config: WorkspaceConfig) -> WorkspaceConfig:
+    def _configure_new_installation(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
+        if default_config is None:
+            default_config = self.prompt_for_new_installation()
         HiveMetastoreLineageEnabler(self._ws).apply(self._prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
         warehouse_id = self._configure_warehouse()
@@ -285,6 +290,7 @@ class WorkspaceInstaller:
             max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
+            installed_workspace_ids=self._installed_workspace_ids,
         )
         self._installation.save(config)
         if self._is_account_install:
@@ -598,6 +604,7 @@ class AccountInstaller(AccountContext):
         confirmed = False
         accessible_workspaces = self._get_accessible_workspaces()
         msg = "\n".join([f"{w.deployment_name}" for w in accessible_workspaces])
+        installed_workspace_ids = [w.workspace_id for w in accessible_workspaces if w.workspace_id is not None]
         if not self.prompts.confirm(
             f"UCX has detected the following workspaces available to install. \n{msg}\n" f"Do you want to continue?"
         ):
@@ -608,19 +615,20 @@ class AccountInstaller(AccountContext):
                 continue
             workspace_client = self.account_client.get_workspace_client(workspace)
             logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
-
             try:
                 current = app.current_installation(workspace_client)
             except NotFound:
                 current = Installation.assume_global(workspace_client, app.product_name())
-            installer = WorkspaceInstaller(self.prompts, current, workspace_client, app)
-            if not confirmed or not default_config:
-                default_config = installer.prompt_for_new_installation()
+            installer = WorkspaceInstaller(
+                self.prompts, current, workspace_client, app, installed_workspace_ids=installed_workspace_ids
+            )
+            if not confirmed:
+                default_config = None
             try:
-                installer.run(default_config)
+                default_config = installer.run(default_config)
             except RuntimeWarning:
                 logger.info("Skipping workspace...")
-            # if user confirms to install on remaining workspaces with the same config, reuse the object
+            # if user confirms to install on remaining workspaces with the same config, don't prompt again
             if confirmed:
                 continue
             confirmed = self.prompts.confirm(
@@ -640,7 +648,7 @@ def install_on_workspace():
     except NotFound:
         current = Installation.assume_global(workspace_client, app.product_name())
     installer = WorkspaceInstaller(prompts, current, workspace_client, app)
-    installer.run(installer.prompt_for_new_installation())
+    installer.run()
 
 
 if __name__ == "__main__":

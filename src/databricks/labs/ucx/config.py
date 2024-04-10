@@ -56,6 +56,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Whether to trigger assessment job after installation
     trigger_job: bool = False
 
+    # List of workspace ids ucx is installed on, only applied to account-level installation
+    installed_workspace_ids: list[int] | None = None
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

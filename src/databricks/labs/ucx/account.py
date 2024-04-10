@@ -38,13 +38,15 @@ class AccountWorkspaces:
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         return self._ac.get_workspace_client(workspace)
 
-    def workspace_clients(self) -> list[WorkspaceClient]:
+    def workspace_clients(self, workspaces: list[Workspace] | None = None) -> list[WorkspaceClient]:
         """
         Return a list of WorkspaceClient for each configured workspace in the account
         :return: list[WorkspaceClient]
         """
         clients = []
-        for workspace in self._workspaces():
+        if workspaces is None:
+            workspaces = self._workspaces()
+        for workspace in workspaces:
             ws = self.client_for(workspace)
             clients.append(ws)
         return clients
@@ -55,11 +57,8 @@ class AccountWorkspaces:
         For each user that has ucx installed in their workspace,
         upload the json dump of workspace info in the .ucx folder
         """
-        if not workspaces:
-            workspaces = []
-            for workspace in self._workspaces():
-                workspaces.append(workspace)
-        for ws in self.workspace_clients():
+
+        for ws in self.workspace_clients(workspaces):
             try:
                 for installation in Installation.existing(ws, "ucx"):
                     installation.save(workspaces, filename=self.SYNC_FILE_NAME)
