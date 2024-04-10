@@ -1,10 +1,11 @@
 import collections
 import logging
-from functools import partial
+import warnings
+from functools import partial, cached_property
 
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
-from databricks.labs.blueprint.installation import Installation
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.catalog import FunctionInfo, TableInfo
@@ -15,6 +16,9 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
+from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
 from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
@@ -173,6 +177,8 @@ class StaticGrantsCrawler(GrantsCrawler):
 
 class StaticTableMapping(TableMapping):
     def __init__(self, workspace_client: WorkspaceClient, sb: SqlBackend, rules: list[Rule]):
+        # TODO: remove this class, it creates difficulties when used together with Permission mapping
+        warnings.warn("switch to using runtime_ctx fixture", DeprecationWarning)
         installation = Installation(workspace_client, 'ucx')
         super().__init__(installation, workspace_client, sb)
         self._rules = rules
@@ -194,9 +200,167 @@ class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
 
 
 class StaticMountCrawler(Mounts):
-    def __init__(self, mounts: list[Mount], *args):
-        super().__init__(*args)
+    def __init__(
+        self,
+        mounts: list[Mount],
+        sb: SqlBackend,
+        workspace_client: WorkspaceClient,
+        inventory_database: str,
+    ):
+        super().__init__(sb, workspace_client, inventory_database)
         self._mounts = mounts
 
     def snapshot(self) -> list[Mount]:
         return self._mounts
+
+
+class TestRuntimeContext(RuntimeContext):
+    def __init__(self, make_table_fixture, make_schema_fixture, make_udf_fixture, env_or_skip_fixture):
+        super().__init__()
+        self._make_table = make_table_fixture
+        self._make_schema = make_schema_fixture
+        self._make_udf = make_udf_fixture
+        self._env_or_skip = env_or_skip_fixture
+        self._tables = []
+        self._schemas = []
+        self._udfs = []
+        self._grants = []
+        # TODO: add methods to pre-populate the following:
+        self._spn_infos = []
+
+    def with_dummy_azure_resource_permission(self):
+        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
+        self.with_azure_storage_permissions(
+            [
+                StoragePermissionMapping(
+                    # TODO: replace with env variable
+                    prefix='abfss://things@labsazurethings.dfs.core.windows.net',
+                    client_id='dummy_application_id',
+                    principal='principal_1',
+                    privilege='WRITE_FILES',
+                    type='Application',
+                    directory_id='directory_id_ss1',
+                )
+            ]
+        )
+
+    def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
+        self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
+
+    def with_table_mapping_rule(
+        self,
+        catalog_name: str,
+        src_schema: str,
+        dst_schema: str,
+        src_table: str,
+        dst_table: str,
+    ):
+        self.with_table_mapping_rules(
+            [
+                Rule(
+                    workspace_name="workspace",
+                    catalog_name=catalog_name,
+                    src_schema=src_schema,
+                    dst_schema=dst_schema,
+                    src_table=src_table,
+                    dst_table=dst_table,
+                )
+            ]
+        )
+
+    def with_table_mapping_rules(self, rules):
+        self.installation.save(rules, filename=TableMapping.FILENAME)
+
+    def make_table(self, **kwargs):
+        table_info = self._make_table(**kwargs)
+        self._tables.append(table_info)
+        return table_info
+
+    def make_udf(self, **kwargs):
+        udf_info = self._make_udf(**kwargs)
+        self._udfs.append(udf_info)
+        return udf_info
+
+    def make_grant(  # pylint: disable=too-many-arguments
+        self,
+        principal: str,
+        action_type: str,
+        catalog: str | None = None,
+        database: str | None = None,
+        table: str | None = None,
+        view: str | None = None,
+        udf: str | None = None,
+        any_file: bool = False,
+        anonymous_function: bool = False,
+    ):
+        grant = Grant(
+            principal=principal,
+            action_type=action_type,
+            catalog=catalog,
+            database=database,
+            table=table,
+            view=view,
+            udf=udf,
+            any_file=any_file,
+            anonymous_function=anonymous_function,
+        )
+        for query in grant.hive_grant_sql():
+            self.sql_backend.execute(query)
+        self._grants.append(grant)
+        return grant
+
+    @cached_property
+    def config(self) -> WorkspaceConfig:
+        return WorkspaceConfig(
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+            inventory_database=self.inventory_database,
+            connect=self.workspace_client.config,
+        )
+
+    @cached_property
+    def installation(self):
+        # TODO: we may need to do a real installation instead of a mock
+        return MockInstallation()
+
+    @cached_property
+    def inventory_database(self) -> str:
+        return self._make_schema(catalog_name="hive_metastore").name
+
+    @cached_property
+    def tables_crawler(self):
+        return StaticTablesCrawler(self.sql_backend, self.inventory_database, self._tables)
+
+    @cached_property
+    def udfs_crawler(self):
+        return StaticUdfsCrawler(self.sql_backend, self.inventory_database, self._udfs)
+
+    @cached_property
+    def grants_crawler(self):
+        return StaticGrantsCrawler(self.tables_crawler, self.udfs_crawler, self._grants)
+
+    @cached_property
+    def azure_service_principal_crawler(self):
+        return StaticServicePrincipalCrawler(
+            self._spn_infos,
+            self.workspace_client,
+            self.sql_backend,
+            self.inventory_database,
+        )
+
+    @cached_property
+    def mounts_crawler(self):
+        # TODO: replace with env variable and make AWS and Azure versions
+        real_location = 'abfss://things@labsazurethings.dfs.core.windows.net/a'
+        mount = Mount(f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', real_location)
+        return StaticMountCrawler(
+            [mount],
+            self.sql_backend,
+            self.workspace_client,
+            self.inventory_database,
+        )
+
+
+@pytest.fixture
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, env_or_skip):
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, env_or_skip)
+    return ctx.replace(workspace_client=ws, sql_backend=sql_backend)

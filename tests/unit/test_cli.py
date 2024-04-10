@@ -1,6 +1,5 @@
 import io
 import json
-import subprocess
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -41,6 +40,7 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
 )
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
 
 @pytest.fixture
@@ -200,11 +200,12 @@ def test_no_step_in_repair_run(ws):
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found
     prompts = MockPrompts({'.*': 'yes'})
-    assert revert_migrated_tables(ws, prompts, schema=None, table=None) is None
+    assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
     assert 'No migrated tables were found.' in caplog.messages
 
 
@@ -266,31 +267,17 @@ def test_alias(ws):
     ws.tables.list.assert_called_once()
 
 
-def test_save_storage_and_principal_azure_no_azure_cli(ws, caplog):
-    ws.config.auth_type = "azure_clis"
+def test_save_storage_and_principal_azure_no_azure_cli(ws):
     ws.config.is_azure = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts, "")
-
-    assert 'In order to obtain AAD token, Please run azure cli to authenticate.' in caplog.messages
-
-
-def test_save_storage_and_principal_azure_no_subscription_id(ws, caplog):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts)
-
-    assert "Please enter subscription id to scan storage accounts in." in caplog.messages
+    ctx = WorkspaceContext(ws)
+    with pytest.raises(ValueError):
+        principal_prefix_access(ws, ctx=ctx)
 
 
 def test_save_storage_and_principal_azure(ws, caplog):
-    ws.config.auth_type = "azure-cli"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
     azure_resource_permissions = create_autospec(AzureResourcePermissions)
-    principal_prefix_access(ws, prompts, subscription_id="test", azure_resource_permissions=azure_resource_permissions)
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_resource_permissions=azure_resource_permissions)
+    principal_prefix_access(ws, ctx=ctx)
     azure_resource_permissions.save_spn_permissions.assert_called_once()
 
 
@@ -299,113 +286,53 @@ def test_validate_groups_membership(ws):
     ws.groups.list.assert_called()
 
 
-def test_save_storage_and_principal_aws_no_profile(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts)
-    assert any({"AWS Profile is not specified." in message for message in caplog.messages})
-
-
-def test_save_storage_and_principal_aws_no_connection(ws, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
-    pop = create_autospec(subprocess.Popen)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    pop.communicate.return_value = (bytes("message", "utf-8"), bytes("error", "utf-8"))
-    pop.returncode = 127
-    mocker.patch("subprocess.Popen.__init__", return_value=None)
-    mocker.patch("subprocess.Popen.__enter__", return_value=pop)
-    mocker.patch("subprocess.Popen.__exit__", return_value=None)
-    prompts = MockPrompts({})
-
-    with pytest.raises(ResourceWarning, match="AWS CLI is not configured properly."):
-        principal_prefix_access(ws, prompts, aws_profile="profile")
-
-
-def test_save_storage_and_principal_aws_no_cli(ws, mocker, caplog):
-    mocker.patch("shutil.which", return_value=None)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts, aws_profile="profile")
-    assert any({"Couldn't find AWS" in message for message in caplog.messages})
-
-
-def test_save_storage_and_principal_aws(ws, mocker, caplog):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
+def test_save_storage_and_principal_aws(ws):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts, aws_profile="profile", aws_resource_permissions=aws_resource_permissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    principal_prefix_access(ws, ctx=ctx)
     aws_resource_permissions.save_instance_profile_permissions.assert_called_once()
 
 
-def test_save_storage_and_principal_gcp(ws, caplog):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
-    ws.config.is_gcp = True
-    prompts = MockPrompts({})
-    principal_prefix_access(ws, prompts)
-    assert "This cmd is only supported for azure and aws workspaces" in caplog.messages
+def test_save_storage_and_principal_gcp(ws):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+    with pytest.raises(ValueError):
+        principal_prefix_access(ws, ctx=ctx)
 
 
 def test_migrate_credentials_azure(ws):
-    ws.config.is_azure = True
     ws.workspace.upload.return_value = "test"
     prompts = MockPrompts({'.*': 'yes'})
-    migrate_credentials(ws, prompts)
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
 
 
 def test_migrate_credentials_aws(ws, mocker):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ws.config.is_gcp = False
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
-    migrate_credentials(ws, prompts, aws_profile="profile", aws_resources=aws_resources)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
+    migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
     aws_resources.update_uc_trust_role.assert_called_once()
 
 
-def test_migrate_credentials_aws_no_profile(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value="/path/aws")
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    prompts = MockPrompts({})
-    migrate_credentials(ws, prompts)
-    assert (
-        "AWS Profile is not specified. Use the environment variable [AWS_DEFAULT_PROFILE] or use the "
-        "'--aws-profile=[profile-name]' parameter." in caplog.messages
-    )
-
-
 def test_create_master_principal_not_azure(ws):
     ws.config.is_azure = False
+    ws.config.is_aws = False
     prompts = MockPrompts({})
-    create_uber_principal(ws, prompts, subscription_id="")
-    ws.workspace.get_status.assert_not_called()
-
-
-def test_create_master_principal_no_azure_cli(ws):
-    ws.config.auth_type = "azure_clis"
-    ws.config.is_azure = True
-    prompts = MockPrompts({})
-    create_uber_principal(ws, prompts, subscription_id="")
-    ws.workspace.get_status.assert_not_called()
+    ctx = WorkspaceContext(ws)
+    with pytest.raises(ValueError):
+        create_uber_principal(ws, prompts, ctx=ctx)
 
 
 def test_create_master_principal_no_subscription(ws):
     ws.config.auth_type = "azure-cli"
     ws.config.is_azure = True
     prompts = MockPrompts({})
-    create_uber_principal(ws, prompts, subscription_id="")
-    ws.workspace.get_status.assert_not_called()
+    ctx = WorkspaceContext(ws)
+    with pytest.raises(ValueError):
+        create_uber_principal(ws, prompts, ctx=ctx, subscription_id="")
 
 
 def test_create_uber_principal(ws):
@@ -417,38 +344,21 @@ def test_create_uber_principal(ws):
 
 
 def test_migrate_locations_azure(ws):
-    ws.config.is_azure = True
-    ws.config.is_aws = False
-    ws.config.is_gcp = False
-    migrate_locations(ws)
+    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
 
-def test_migrate_locations_aws(ws, caplog, mocker):
-    mocker.patch("shutil.which", return_value=True)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ws.config.is_gcp = False
-    migrate_locations(ws, aws_profile="profile")
+def test_migrate_locations_aws(ws, caplog):
+    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
 
-def test_missing_aws_cli(ws, caplog, mocker):
-    # Test to verify the CLI is called. Fail it intentionally to test the error message.
-    mocker.patch("shutil.which", return_value=None)
-    ws.config.is_azure = False
-    ws.config.is_aws = True
-    ws.config.is_gcp = False
-    migrate_locations(ws, aws_profile="profile")
-    assert "Couldn't find AWS CLI in path. Please install the CLI from https://aws.amazon.com/cli/" in caplog.messages
-
-
-def test_migrate_locations_gcp(ws, caplog):
-    ws.config.is_azure = False
-    ws.config.is_aws = False
-    ws.config.is_gcp = True
-    migrate_locations(ws)
-    assert "migrate_locations is not yet supported in GCP" in caplog.messages
+def test_migrate_locations_gcp(ws):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=False)
+    with pytest.raises(ValueError):
+        migrate_locations(ws, ctx=ctx)
 
 
 def test_create_catalogs_schemas(ws):

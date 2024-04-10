@@ -44,6 +44,7 @@ from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, Mount
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationStatus
@@ -51,9 +52,11 @@ from databricks.labs.ucx.hive_metastore.table_size import TableSize
 from databricks.labs.ucx.hive_metastore.tables import Table, TableError
 from databricks.labs.ucx.hive_metastore.udfs import Udf
 from databricks.labs.ucx.installer.hms_lineage import HiveMetastoreLineageEnabler
+from databricks.labs.ucx.installer.logs import LogRecord
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -93,6 +96,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "policies", PolicyInfo),
             functools.partial(table, "migration_status", MigrationStatus),
             functools.partial(table, "udfs", Udf),
+            functools.partial(table, "logs", LogRecord),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
@@ -117,6 +121,7 @@ class WorkspaceInstaller:
         ws: WorkspaceClient,
         product_info: ProductInfo,
         environ: dict[str, str] | None = None,
+        tasks: list[Task] | None = None,
     ):
         if not environ:
             environ = dict(os.environ.items())
@@ -129,6 +134,7 @@ class WorkspaceInstaller:
         self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
         self._product_info = product_info
         self._force_install = environ.get("UCX_FORCE_INSTALL")
+        self._tasks = tasks if tasks else Workflows.all().tasks()
 
     def run(
         self,
@@ -144,8 +150,15 @@ class WorkspaceInstaller:
             wheel_builder_factory = self._new_wheel_builder
         wheels = wheel_builder_factory()
         install_state = InstallState.from_installation(self._installation)
-        workflows_installer = WorkflowsDeployment(
-            config, self._installation, install_state, self._ws, wheels, self._product_info, verify_timeout
+        workflows_deployment = WorkflowsDeployment(
+            config,
+            self._installation,
+            install_state,
+            self._ws,
+            wheels,
+            self._product_info,
+            verify_timeout,
+            self._tasks,
         )
         workspace_installation = WorkspaceInstallation(
             config,
@@ -153,7 +166,7 @@ class WorkspaceInstaller:
             install_state,
             sql_backend_factory(config),
             self._ws,
-            workflows_installer,
+            workflows_deployment,
             self._prompts,
             self._product_info,
         )
@@ -364,6 +377,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
+        # TODO: remove this method, it's no longer needed
         product_info = ProductInfo.from_class(WorkspaceConfig)
         installation = product_info.current_installation(ws)
         install_state = InstallState.from_installation(installation)
@@ -372,6 +386,7 @@ class WorkspaceInstallation(InstallationMixin):
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
+        tasks = Workflows.all().tasks()
         workflows_installer = WorkflowsDeployment(
             config,
             installation,
@@ -380,6 +395,7 @@ class WorkspaceInstallation(InstallationMixin):
             wheels,
             product_info,
             timeout,
+            tasks,
         )
 
         return cls(
@@ -418,9 +434,6 @@ class WorkspaceInstallation(InstallationMixin):
         if self._prompts.confirm("Do you want to trigger assessment job ?"):
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
-
-    def config_file_link(self):
-        return self._installation.workspace_link('config.yml')
 
     def _create_database(self):
         try:

@@ -2,7 +2,6 @@ import logging
 import re
 import sys
 import webbrowser
-from collections.abc import Collection
 from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -43,9 +42,8 @@ from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.configure import ConfigureClusterOverrides
-from databricks.labs.ucx.framework.tasks import _TASKS, Task
+from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.mixins import InstallationMixin
-from databricks.labs.ucx.runtime import main
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +93,7 @@ dbutils.library.restartPython()
 from databricks.labs.ucx.runtime import main
 
 main(f'--config=/Workspace{config_file}',
+     f'--workflow=' + dbutils.widgets.get('workflow'),
      f'--task=' + dbutils.widgets.get('task'),
      f'--job_id=' + dbutils.widgets.get('job_id'),
      f'--run_id=' + dbutils.widgets.get('run_id'),
@@ -317,7 +316,7 @@ class WorkflowsDeployment(InstallationMixin):
         wheels: WheelsV2,
         product_info: ProductInfo,
         verify_timeout: timedelta,
-        tasks: list[Task] | None = None,
+        tasks: list[Task],
     ):
         self._config = config
         self._installation = installation
@@ -326,44 +325,35 @@ class WorkflowsDeployment(InstallationMixin):
         self._wheels = wheels
         self._product_info = product_info
         self._verify_timeout = verify_timeout
-        self._tasks = self._sort_tasks(tasks if tasks else _TASKS.values())
+        self._tasks = tasks
         self._this_file = Path(__file__)
         super().__init__(config, installation, ws)
 
-    @staticmethod
-    def _sort_tasks(tasks: Collection[Task]) -> list[Task]:
-        return sorted(tasks, key=lambda x: x.task_id)
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient):
-        product_info = ProductInfo.from_class(WorkspaceConfig)
-        installation = product_info.current_installation(ws)
-        install_state = InstallState.from_installation(installation)
-        timeout = timedelta(minutes=2)
-
-        return DeployedWorkflows(ws, install_state, timeout)
-
     def create_jobs(self, prompts):
-        logger.debug(f"Creating jobs from tasks in {main.__name__}")
         remote_wheel = self._upload_wheel(prompts)
-        desired_steps = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
+        desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
             wheel_runner = self._upload_wheel_runner(remote_wheel)
-        for step_name in desired_steps:
-            settings = self._job_settings(step_name, remote_wheel)
+        for workflow_name in desired_workflows:
+            settings = self._job_settings(workflow_name, remote_wheel)
             if self._config.override_clusters:
-                settings = self._apply_cluster_overrides(settings, self._config.override_clusters, wheel_runner)
-            self._deploy_workflow(step_name, settings)
+                settings = self._apply_cluster_overrides(
+                    workflow_name,
+                    settings,
+                    self._config.override_clusters,
+                    wheel_runner,
+                )
+            self._deploy_workflow(workflow_name, settings)
 
-        for step_name, job_id in self._install_state.jobs.items():
-            if step_name not in desired_steps:
+        for workflow_name, job_id in self._install_state.jobs.items():
+            if workflow_name not in desired_workflows:
                 try:
                     logger.info(f"Removing job_id={job_id}, as it is no longer needed")
                     self._ws.jobs.delete(job_id)
                 except InvalidParameterValue:
-                    logger.warning(f"step={step_name} does not exist anymore for some reason")
+                    logger.warning(f"step={workflow_name} does not exist anymore for some reason")
                     continue
 
         self._install_state.save()
@@ -469,7 +459,12 @@ class WorkflowsDeployment(InstallationMixin):
         return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
     @staticmethod
-    def _apply_cluster_overrides(settings: dict[str, Any], overrides: dict[str, str], wheel_runner: str) -> dict:
+    def _apply_cluster_overrides(
+        workflow_name: str,
+        settings: dict[str, Any],
+        overrides: dict[str, str],
+        wheel_runner: str,
+    ) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
@@ -480,8 +475,8 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
-                params = {"task": job_task.task_key} | EXTRA_TASK_PARAMS
-                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=params)
+                widget_values = {"task": job_task.task_key, 'workflow': workflow_name} | EXTRA_TASK_PARAMS
+                job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=widget_values)
         return settings
 
     def _job_settings(self, step_name: str, remote_wheel: str):
@@ -493,6 +488,8 @@ class WorkflowsDeployment(InstallationMixin):
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         tasks = [t for t in self._tasks if t.workflow == step_name]
+        job_tasks = [self._job_task(task, remote_wheel) for task in tasks]
+        job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
@@ -500,7 +497,7 @@ class WorkflowsDeployment(InstallationMixin):
             "tags": {"version": f"v{version}"},
             "job_clusters": self._job_clusters({t.job_cluster for t in tasks}),
             "email_notifications": email_notifications,
-            "tasks": [self._job_task(task, remote_wheel) for task in tasks],
+            "tasks": job_tasks,
         }
 
     def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
@@ -516,7 +513,7 @@ class WorkflowsDeployment(InstallationMixin):
             return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task, remote_wheel)
+        return self._job_wheel_task(jobs_task, task.workflow, remote_wheel)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -548,21 +545,25 @@ class WorkflowsDeployment(InstallationMixin):
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, task: Task, remote_wheel: str) -> jobs.Task:
-        if "table_migration" in task.job_cluster:
+    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
+        if jobs_task.job_cluster_key is not None and "table_migration" in jobs_task.job_cluster_key:
             # Shared mode cluster cannot use dbfs, need to use WSFS
             libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         else:
-            # TODO: check when we can install wheels from WSFS properly
-            # None UC cluster cannot use WSFS, need to use dbfs
+            # TODO: https://github.com/databrickslabs/ucx/issues/1098
             libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
+        named_parameters = {
+            "config": f"/Workspace{self._config_file}",
+            "workflow": workflow,
+            "task": jobs_task.task_key,
+        }
         return replace(
             jobs_task,
             libraries=libraries,
             python_wheel_task=jobs.PythonWheelTask(
                 package_name="databricks_labs_ucx",
                 entry_point="runtime",  # [project.entry-points.databricks] in pyproject.toml
-                named_parameters={"task": task.name, "config": f"/Workspace{self._config_file}"} | EXTRA_TASK_PARAMS,
+                named_parameters=named_parameters | EXTRA_TASK_PARAMS,
             ),
         )
 
@@ -609,6 +610,16 @@ class WorkflowsDeployment(InstallationMixin):
                 )
             )
         return clusters
+
+    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheel: str) -> jobs.Task:
+        jobs_task = jobs.Task(
+            task_key="parse_logs",
+            job_cluster_key=Task.job_cluster,
+            # The task dependents on all previous tasks.
+            depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
+            run_if=jobs.RunIf.ALL_DONE,
+        )
+        return self._job_wheel_task(jobs_task, workflow, remote_wheel)
 
     def _create_debug(self, remote_wheel: str):
         readme_link = self._installation.workspace_link('README')

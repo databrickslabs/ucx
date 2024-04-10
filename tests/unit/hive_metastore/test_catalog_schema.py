@@ -89,21 +89,3 @@ def test_no_catalog_storage():
     catalog_schema = prepare_test(ws)
     catalog_schema.create_all_catalogs_schemas(mock_prompts)
     ws.catalogs.create.assert_called_once_with("catalog2", comment="Created by UCX")
-
-
-def test_for_cli():
-    ws = create_autospec(WorkspaceClient)
-    installation = MockInstallation(
-        {
-            "config.yml": {
-                'version': 2,
-                'inventory_database': 'test',
-                'connect': {
-                    'host': 'test',
-                    'token': 'test',
-                },
-            }
-        }
-    )
-    catalog_schema = CatalogSchema.for_cli(ws, installation)
-    assert isinstance(catalog_schema, CatalogSchema)

@@ -2,7 +2,6 @@ import logging
 from pathlib import PurePath
 import dataclasses
 
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import StatementExecutionBackend, SqlBackend
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -13,7 +12,6 @@ from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, AzureACL, Gr
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
 logger = logging.getLogger(__name__)
@@ -26,35 +24,6 @@ class CatalogSchema:
         self._external_locations = self._ws.external_locations.list()
         self._principal_grants = principal_grants
         self._backend = sql_backend
-
-    @classmethod
-    def for_cli(cls, ws: WorkspaceClient, installation: Installation):
-        config = installation.load(WorkspaceConfig)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        table_mapping = TableMapping(installation, ws, sql_backend)
-        table_crawler = TablesCrawler(sql_backend, config.inventory_database)
-        mount_crawler = Mounts(sql_backend, ws, config.inventory_database)
-        sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
-        cluster_locations = {}
-        if ws.config.is_azure:
-            locations = ExternalLocations(ws, sql_backend, config.inventory_database)
-            azure_client = AzureAPIClient(
-                ws.config.arm_environment.resource_manager_endpoint,
-                ws.config.arm_environment.service_management_endpoint,
-            )
-            graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-            azurerm = AzureResources(azure_client, graph_client)
-            resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
-            spn_crawler = AzureServicePrincipalCrawler(ws, sql_backend, config.inventory_database)
-            cluster_locations = AzureACL(
-                ws, sql_backend, spn_crawler, resource_permissions
-            ).get_eligible_locations_principals()
-        if ws.config.is_aws:
-            pass
-        principal_grants = PrincipalACL(ws, sql_backend, installation, table_crawler, mount_crawler, cluster_locations)
-
-
-        return cls(ws, table_mapping, principal_grants, sql_backend)
 
     def create_all_catalogs_schemas(self, prompts: Prompts):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
