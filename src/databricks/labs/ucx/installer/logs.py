@@ -147,7 +147,11 @@ class TaskRunWarningRecorder:
         return log_records
 
     def snapshot(self) -> list[LogRecord]:
-        """Parse the logs for all tasks."""
+        """Parse and store the logs for all tasks.
+
+        Raises:
+            RuntimeError: When error or above log records are found, after storing the logs.
+        """
         log_files = self._log_path.glob("*.log*")
 
         log_records = []
