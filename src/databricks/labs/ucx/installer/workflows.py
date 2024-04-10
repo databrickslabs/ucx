@@ -547,8 +547,7 @@ class WorkflowsDeployment(InstallationMixin):
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
-        assert jobs_task.job_cluster_key is not None
-        if "table_migration" in jobs_task.job_cluster_key:
+        if jobs_task.job_cluster_key is not None and "table_migration" in jobs_task.job_cluster_key:
             # Shared mode cluster cannot use dbfs, need to use WSFS
             libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         else:
