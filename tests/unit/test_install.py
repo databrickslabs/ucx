@@ -1364,7 +1364,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     ws.jobs.delete.assert_called_with("123")
 
 
-def test_get_existing_installation_global(ws, mock_installation, mocker):
+def test_get_existing_installation_global(ws, mock_installation):
     base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
