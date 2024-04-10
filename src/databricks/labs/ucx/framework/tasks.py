@@ -1,7 +1,7 @@
 import contextlib
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -207,6 +207,24 @@ def trigger(*argv):
     installation = Installation(workspace_client, "ucx", install_folder=install_folder)
 
     run_task(args, config_path.parent, cfg, workspace_client, sql_backend, installation)
+
+
+class Workflow:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
+
+    def tasks(self) -> Iterable[Task]:
+        # return __task__ from every method in this class that has this attribute
+        for attr in dir(self):
+            if attr.startswith("_"):
+                continue
+            fn = getattr(self, attr)
+            if hasattr(fn, "__task__"):
+                yield fn.__task__
 
 
 def job_task(
