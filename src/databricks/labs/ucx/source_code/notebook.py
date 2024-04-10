@@ -4,13 +4,13 @@ import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable
 from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language
+from databricks.sdk.service.workspace import Language, ObjectType
 
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
@@ -155,7 +155,7 @@ class RunCell(Cell):
             start = line.index(command)
             if start >= 0:
                 path = line[start + len(command) :].strip()
-                parent.register_dependency(path.strip('"'))
+                parent.register_dependency(Dependency(ObjectType.NOTEBOOK, path.strip('"')))
                 return
         raise ValueError("Missing notebook path in %run command")
 
@@ -297,76 +297,7 @@ class CellLanguage(Enum):
         return "\n".join(lines)
 
 
-class DependencyGraph:
-
-    def __init__(self, path: str, parent: DependencyGraph | None, locator: Callable[[str], Notebook]):
-        self._path = path
-        self._parent = parent
-        self._locator = locator
-        self._dependencies: dict[str, DependencyGraph] = {}
-
-    @property
-    def path(self):
-        return self._path
-
-    def register_dependency(self, path: str) -> DependencyGraph | None:
-        # already registered ?
-        child_graph = self.locate_dependency(path)
-        if child_graph is not None:
-            self._dependencies[path] = child_graph
-            return child_graph
-        # nay, create the child graph and populate it
-        child_graph = DependencyGraph(path, self, self._locator)
-        self._dependencies[path] = child_graph
-        notebook = self._locator(path)
-        if not notebook:
-            return None
-        notebook.build_dependency_graph(child_graph)
-        return child_graph
-
-    def locate_dependency(self, path: str) -> DependencyGraph | None:
-        # need a list since unlike JS, Python won't let you assign closure variables
-        found: list[DependencyGraph] = []
-        path = path[2:] if path.startswith('./') else path
-
-        def check_registered_dependency(graph):
-            graph_path = graph.path[2:] if graph.path.startswith('./') else graph.path
-            if graph_path == path:
-                found.append(graph)
-                return True
-            return False
-
-        self.root.visit(check_registered_dependency)
-        return found[0] if len(found) > 0 else None
-
-    @property
-    def root(self):
-        return self if self._parent is None else self._parent.root
-
-    @property
-    def paths(self) -> set[str]:
-        paths: set[str] = set()
-
-        def add_to_paths(graph: DependencyGraph) -> bool:
-            if graph.path in paths:
-                return True
-            paths.add(graph.path)
-            return False
-
-        self.visit(add_to_paths)
-        return paths
-
-    # when visit_node returns True it interrupts the visit
-    def visit(self, visit_node: Callable[[DependencyGraph], bool | None]) -> bool | None:
-        if visit_node(self):
-            return True
-        for dependency in self._dependencies.values():
-            if dependency.visit(visit_node):
-                return True
-        return False
-
-
-class Notebook:
+class Notebook(SourceContainer):
 
     @staticmethod
     def parse(path: str, source: str, default_language: Language) -> Notebook:
@@ -382,6 +313,10 @@ class Notebook:
         self._language = language
         self._cells = cells
         self._ends_with_lf = ends_with_lf
+
+    @property
+    def object_type(self) -> ObjectType:
+        return ObjectType.NOTEBOOK
 
     @property
     def path(self) -> str:

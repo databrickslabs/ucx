@@ -2,7 +2,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import DependencyGraph, Notebook, RunCell
+from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, DependencyLoader
 
 
 class NotebookMigrator:
@@ -21,23 +22,25 @@ class NotebookMigrator:
     def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        notebook = self._load_notebook(object_info)
+        notebook = self._load_notebook_from_object_info(object_info)
         return self._apply(notebook)
 
-    def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
+    def build_dependency_graph(self, object_info: ObjectInfo, loader: DependencyLoader) -> DependencyGraph:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             raise ValueError("Not a valid Notebook")
-        notebook = self._load_notebook(object_info)
-        dependencies = DependencyGraph(object_info.path, None, self._load_notebook_from_path)
-        notebook.build_dependency_graph(dependencies)
-        return dependencies
+        dependency = Dependency.from_object_info(object_info)
+        graph = DependencyGraph(dependency, None, loader)
+        container = loader.load_dependency(dependency)
+        if container is not None:
+            container.build_dependency_graph(graph)
+        return graph
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
-                # TODO data on what to change to ?
+                # TODO migration data ?
                 if cell.migrate_notebook_path():
                     changed = True
                 continue
@@ -57,7 +60,7 @@ class NotebookMigrator:
         object_info = self._load_object(path)
         if object_info.object_type is not ObjectType.NOTEBOOK:
             raise ValueError(f"Not a Notebook: {path}")
-        return self._load_notebook(object_info)
+        return self._load_notebook_from_object_info(object_info)
 
     def _load_object(self, path: str) -> ObjectInfo:
         result = self._ws.workspace.list(path)
@@ -66,7 +69,7 @@ class NotebookMigrator:
             raise ValueError(f"Could not locate object at '{path}'")
         return object_info
 
-    def _load_notebook(self, object_info: ObjectInfo) -> Notebook:
+    def _load_notebook_from_object_info(self, object_info: ObjectInfo) -> Notebook:
         assert object_info is not None and object_info.path is not None and object_info.language is not None
         source = self._load_source(object_info)
         return Notebook.parse(object_info.path, source, object_info.language)

@@ -6,6 +6,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
+from databricks.labs.ucx.source_code.dependencies import DependencyLoader
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
@@ -113,7 +114,7 @@ def test_build_dependency_graph_visits_dependencies():
     ws.workspace.list.side_effect = list_side_effect
     migrator = NotebookMigrator(ws, Languages(create_autospec(MigrationIndex)))
     object_info = ObjectInfo(path="root3.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
-    migrator.build_dependency_graph(object_info)
+    migrator.build_dependency_graph(object_info, DependencyLoader(ws))
     assert len(visited) == len(paths)
 
 
@@ -137,4 +138,4 @@ def test_build_dependency_graph_fails_with_unfound_dependency():
     migrator = NotebookMigrator(ws, Languages(create_autospec(MigrationIndex)))
     object_info = ObjectInfo(path="root1.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     with pytest.raises(ValueError):
-        migrator.build_dependency_graph(object_info)
+        migrator.build_dependency_graph(object_info, DependencyLoader(ws))
