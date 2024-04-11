@@ -570,7 +570,7 @@ class WorkflowsDeployment(InstallationMixin):
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         job_tasks = []
-        job_clusters: set[str] = {'main'}
+        job_clusters: set[str] = {Task.job_cluster}
         for task in self._tasks:
             if task.workflow != step_name:
                 continue
