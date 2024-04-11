@@ -63,7 +63,7 @@ def ws():
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
         "/Users/foo/.ucx/mapping.csv": "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\ntest,test,test,test,test,test",
-        "/Users/foo/.ucx/logs/run-123-1/foo.log-123": """18:59:17 INFO [databricks.labs.ucx] {MainThread} UCX v0.21.1+4120240410204248 After job finishes, see debug logs at /Workspace/Users/serge.smertin@databricks.com/.ucx/logs/assessment/run-328023550674439/assess_clusters.log
+        "/Users/foo/.ucx/logs/run-123-1/foo.log-123": """18:59:17 INFO [databricks.labs.ucx] {MainThread} Something is logged
 18:59:17 DEBUG [databricks.labs.ucx.framework.crawlers] {MainThread} [hive_metastore.ucx_serge.clusters] fetching clusters inventory
 18:59:17 DEBUG [databricks.labs.lsql.backends] {MainThread} [spark][fetch] SELECT * FROM ucx_serge.clusters
 """,
@@ -422,4 +422,4 @@ def test_relay_logs(ws, caplog):
         [ObjectInfo(path='/Users/foo/.ucx/logs/run-123-1/foo.log-123')],
     ]
     logs(ws)
-    assert '[spark][fetch] SELECT * FROM ucx_serge.clusters' in caplog.messages
+    assert 'Something is logged' in caplog.messages
