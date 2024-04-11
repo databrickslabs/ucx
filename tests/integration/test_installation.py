@@ -83,6 +83,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
+                r"Choose a cluster policy": "0",
                 r".*Inventory Database.*": inventory_schema_name,
                 r".*Backup prefix*": renamed_group_prefix,
                 r".*": "",
