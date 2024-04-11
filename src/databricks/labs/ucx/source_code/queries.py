@@ -98,3 +98,21 @@ class FromTable(Linter, Fixer):
                 logger.error(f"Could not determine schema for table {table.name}")
                 continue
             yield TableView("hive_metastore", src_db, table.name)
+
+    @staticmethod
+    def view_columns(code: str):
+        # This method is used to get the columns for a view
+        # It is based on the "show create table" output for a view
+        try:
+            statements = sqlglot.parse(code)
+            if len(statements) != 1 or statements[0] is None:
+                raise ValueError(f"Could not analyze view SQL: {code}")
+        except ParseError as e:
+            raise ValueError(f"Could not analyze view SQL: {code}") from e
+        statement = statements[0]
+        if not statement.this.expressions:
+            return None
+        columns = []
+        for expression in statement.this.expressions:
+            columns.append(expression.name.lower())
+        return columns

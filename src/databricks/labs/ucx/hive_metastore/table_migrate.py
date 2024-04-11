@@ -27,6 +27,7 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
+from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,13 @@ class TablesMigrator:
         new_view_text = ViewToMigrate.get_view_updated_text(
             src_table.view_text, self._migration_status_refresher.index(), src_table.database
         )
-        return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} AS {new_view_text};"
+        # Getting columns definition from the show create table output
+        create_statement = self._backend.fetch(f"SHOW CREATE TABLE {src_table.safe_sql_key}")
+        columns = FromTable.view_columns(next(create_statement)[0])
+        columns_text = f" ({', '.join(columns)})" if columns else ""
+        return (
+            f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)}{columns_text} AS {new_view_text};"
+        )
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
         if grants is None:

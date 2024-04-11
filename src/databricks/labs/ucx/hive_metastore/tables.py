@@ -74,6 +74,10 @@ class Table:
     def key(self) -> str:
         return f"{self.catalog}.{self.database}.{self.name}".lower()
 
+    @property
+    def safe_sql_key(self) -> str:
+        return escape_sql_identifier(self.key)
+
     def __hash__(self):
         return hash(self.key)
 
