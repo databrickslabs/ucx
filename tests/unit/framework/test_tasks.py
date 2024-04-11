@@ -8,8 +8,8 @@ from databricks.labs.ucx.framework.tasks import (
     Task,
     parse_args,
     remove_extra_indentation,
-    TaskLogger,
 )
+from databricks.labs.ucx.installer.logs import TaskLogger
 
 
 def test_replace_pydoc():

@@ -7,9 +7,8 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk.errors import InternalError
 
-from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder, PartialLogRecord
+from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder, PartialLogRecord, TaskLogger
 
 COMPONENT = "databricks.logs"
 WORKFLOW = "tests"
