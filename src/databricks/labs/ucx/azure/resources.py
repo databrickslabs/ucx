@@ -94,6 +94,20 @@ class AzureRoleAssignment:
     role_name: str
 
 
+@dataclass
+class AccessConnector:
+    id: str
+    name: str
+    type: str
+    location: str
+    # TODO: Add identity with reference to dataclass
+    # identity {"principalId": ..., "tenantId": ..., "type": ...}
+    # The raw API call contains the following fields as well:
+    # tags
+    # properties
+    # systemData
+
+
 class AzureAPIClient:
     def __init__(self, host_endpoint: str, service_endpoint: str):
         self.api_client = ApiClient(
