@@ -6,16 +6,15 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
-from databricks.labs.ucx.source_code.dependencies import DependencyLoader
+from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.source_migrator import SourceCodeMigrator
 from tests.unit import _load_sources
 
 
 def test_build_dependency_graph_visits_notebook_notebook_dependencies():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
     # can't remove **kwargs because it receives format=xxx
@@ -44,7 +43,7 @@ def test_build_dependency_graph_visits_notebook_notebook_dependencies():
 
 def test_build_dependency_graph_visits_notebook_file_dependencies():
     paths = ["root8.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
     # can't remove **kwargs because it receives format=xxx
@@ -81,7 +80,7 @@ def test_build_dependency_graph_visits_notebook_file_dependencies():
 
 def test_build_dependency_graph_fails_with_unfound_dependency():
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
 
     # can't remove **kwargs because it receives format=xxx
     # pylint: disable=unused-argument
@@ -104,7 +103,7 @@ def test_build_dependency_graph_fails_with_unfound_dependency():
 
 def test_build_dependency_graph_visits_file_dependencies():
     paths = ["root5.py.txt", "leaf4.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
     # can't remove **kwargs because it receives format=xxx
@@ -137,7 +136,7 @@ def test_build_dependency_graph_visits_file_dependencies():
 
 def test_build_dependency_graph_visits_recursive_file_dependencies():
     paths = ["root6.py.txt", "root5.py.txt", "leaf4.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
     # can't remove **kwargs because it receives format=xxx
@@ -170,7 +169,7 @@ def test_build_dependency_graph_visits_recursive_file_dependencies():
 
 def test_build_dependency_graph_safely_visits_non_file_dependencies():
     paths = ["root7.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
     # can't remove **kwargs because it receives format=xxx
@@ -207,7 +206,7 @@ def test_build_dependency_graph_safely_visits_non_file_dependencies():
 
 def test_build_dependency_graph_throws_with_invalid_dependencies():
     paths = ["root7.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
     # can't remove **kwargs because it receives format=xxx
