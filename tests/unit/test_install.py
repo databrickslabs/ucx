@@ -1264,7 +1264,6 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     sql_backend = MockBackend()
     wheels = create_autospec(WheelsV2)
     install.run(
-        default_config=WorkspaceConfig(inventory_database='ucx'),
         verify_timeout=timedelta(seconds=60),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
@@ -1290,7 +1289,6 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     wheels = create_autospec(WheelsV2)
 
     install.run(
-        default_config=WorkspaceConfig(inventory_database='ucx'),
         verify_timeout=timedelta(seconds=10),
         sql_backend_factory=lambda _: sql_backend,
         wheel_builder_factory=lambda: wheels,
@@ -1616,8 +1614,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         install.configure(
-            default_config=WorkspaceConfig(inventory_database='ucx'),
-        )
+            )
 
     first_prompts = base_prompts.extend(
         {
@@ -1627,17 +1624,13 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
     install = WorkspaceInstaller(first_prompts, installation, ws, product_info)
 
     # finishes successfully when versions match and override is provided
-    config = install.configure(
-        default_config=WorkspaceConfig(inventory_database='ucx'),
-    )
+    config = install.configure()
     assert config.inventory_database == "ucx_user"
 
     # finishes successfully when versions don't match and no override is provided/needed
     product_info.released_version.return_value = "0.4.1"
     install = WorkspaceInstaller(base_prompts, installation, ws, product_info)
-    config = install.configure(
-        default_config=WorkspaceConfig(inventory_database='ucx'),
-    )
+    config = install.configure()
     assert config.inventory_database == "ucx_user"
 
 
