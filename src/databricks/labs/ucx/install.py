@@ -176,7 +176,7 @@ class WorkspaceInstaller:
             self._product_info,
         )
         try:
-            workspace_installation.run(config.trigger_job)
+            workspace_installation.run()
         except ManyError as err:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
@@ -442,7 +442,7 @@ class WorkspaceInstallation(InstallationMixin):
     def folder(self):
         return self._installation.install_folder()
 
-    def run(self, trigger_job: bool = False):
+    def run(self):
         Threads.strict(
             "installing components",
             [
@@ -455,7 +455,7 @@ class WorkspaceInstallation(InstallationMixin):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
-        if trigger_job:
+        if self.config.trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
 
@@ -611,10 +611,10 @@ class AccountInstaller(AccountContext):
         default_config = None
         confirmed = False
         accessible_workspaces = self._get_accessible_workspaces()
-        msg = "\n".join([f"{w.deployment_name}" for w in accessible_workspaces])
+        msg = "\n".join([w.deployment_name for w in accessible_workspaces])
         installed_workspace_ids = [w.workspace_id for w in accessible_workspaces if w.workspace_id is not None]
         if not self.prompts.confirm(
-            f"UCX has detected the following workspaces available to install. \n{msg}\n" f"Do you want to continue?"
+            f"UCX has detected the following workspaces available to install. \n{msg}\nDo you want to continue?"
         ):
             return
 

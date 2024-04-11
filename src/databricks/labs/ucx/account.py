@@ -38,11 +38,13 @@ class AccountWorkspaces:
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         return self._ac.get_workspace_client(workspace)
 
-    def workspace_clients(self, workspaces: list[Workspace]) -> list[WorkspaceClient]:
+    def workspace_clients(self, workspaces: list[Workspace] | None) -> list[WorkspaceClient]:
         """
         Return a list of WorkspaceClient for each configured workspace in the account
         :return: list[WorkspaceClient]
         """
+        if workspaces is None:
+            workspaces = self._workspaces()
         clients = []
         for workspace in workspaces:
             ws = self.client_for(workspace)
