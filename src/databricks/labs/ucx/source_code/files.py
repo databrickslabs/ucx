@@ -37,6 +37,7 @@ class SourceFile(SourceContainer):
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         import_names = PythonLinter.list_import_sources(linter)
         for import_name in import_names:
+            # we don't know yet if it's a file or a library
             graph.register_dependency(Dependency(None, import_name))
 
 
