@@ -88,7 +88,7 @@ _FOLDERS = {
     Policy: 'assessment/policies',
     TableToMigrate: 'hive_metastore/tables',
     EndpointConfPair: 'assessment/warehouses',
-    Notebook: 'source_code/notebooks',
+    Notebook: 'source_code/samples',
 }
 
 
