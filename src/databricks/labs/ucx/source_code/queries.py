@@ -1,15 +1,19 @@
 from collections.abc import Iterable
 
+import logging
 import sqlglot
-from sqlglot.expressions import Table
-
-from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
+from sqlglot import ParseError
+from sqlglot.expressions import Table, Expression
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
 from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter
+
+logger = logging.getLogger(__name__)
 
 
 class FromTable(Linter, Fixer):
-    def __init__(self, index: MigrationIndex):
+    def __init__(self, index: MigrationIndex, *, use_schema: str | None = None):
         self._index = index
+        self._use_schema = use_schema
 
     def name(self) -> str:
         return 'table-migrate'
@@ -22,7 +26,11 @@ class FromTable(Linter, Fixer):
                 catalog = self._catalog(table)
                 if catalog != 'hive_metastore':
                     continue
-                dst = self._index.get(table.db, table.name)
+                src_db = table.db if table.db else self._use_schema
+                if not src_db:
+                    logger.error(f"Could not determine schema for table {table.name}")
+                    continue
+                dst = self._index.get(src_db, table.name)
                 if not dst:
                     continue
                 yield Deprecation(
@@ -43,14 +51,15 @@ class FromTable(Linter, Fixer):
 
     def apply(self, code: str) -> str:
         new_statements = []
-        for statement in sqlglot.parse(code):
+        for statement in self._get_statements(code):
             if not statement:
                 continue
-            for old_table in statement.find_all(Table):
-                catalog = self._catalog(old_table)
-                if catalog != 'hive_metastore':
+            for old_table in self._dependent_tables(statement):
+                src_db = old_table.db if old_table.db else self._use_schema
+                if not src_db:
+                    logger.error(f"Could not determine schema for table {old_table.name}")
                     continue
-                dst = self._index.get(old_table.db, old_table.name)
+                dst = self._index.get(src_db, old_table.name)
                 if not dst:
                     continue
                 new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
@@ -58,3 +67,34 @@ class FromTable(Linter, Fixer):
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)
         return '; '.join(new_statements)
+
+    @staticmethod
+    def _get_statements(code: str):
+        return sqlglot.parse(code)
+
+    @classmethod
+    def _dependent_tables(cls, statement: Expression):
+        dependencies = []
+        for old_table in statement.find_all(Table):
+            catalog = cls._catalog(old_table)
+            if catalog != 'hive_metastore':
+                continue
+            dependencies.append(old_table)
+        return dependencies
+
+    @classmethod
+    # This method is used to get the dependencies for a query as a list of tables
+    def view_dependencies(cls, code: str, *, use_schema: str | None = None):
+        try:
+            statements = sqlglot.parse(code)
+            if len(statements) != 1 or statements[0] is None:
+                raise ValueError(f"Could not analyze view SQL: {code}")
+        except ParseError as e:
+            raise ValueError(f"Could not analyze view SQL: {code}") from e
+        statement = statements[0]
+        for table in cls._dependent_tables(statement):
+            src_db = table.db if table.db else use_schema
+            if not src_db:
+                logger.error(f"Could not determine schema for table {table.name}")
+                continue
+            yield TableView("hive_metastore", src_db, table.name)

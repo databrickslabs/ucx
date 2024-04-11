@@ -12,10 +12,10 @@ from urllib.parse import parse_qsl
 from databricks.labs.blueprint.logger import install_logger
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationIndex,
+from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatus,
 )
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Advisory,
