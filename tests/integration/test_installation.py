@@ -20,6 +20,7 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
+from databricks.sdk.service.catalog import TableInfo
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
@@ -595,20 +596,21 @@ def test_table_migration_job(
         env_or_skip("TEST_NIGHTLY")
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    src_managed_table = make_table(schema_name=schema.name)
+    tables: dict[str, TableInfo] = {}
+    tables["src_managed_table"] = make_table(schema_name=schema.name)
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=schema.name, external_csv=new_mounted_location)
+    tables["src_external_table"] = make_table(schema_name=schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
-    src_view1_text = f"SELECT * FROM {src_managed_table.full_name}"
-    src_view1 = make_table(
+    src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
+    tables["src_view1"] = make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view1_text,
         view=True,
     )
-    src_view2_text = f"SELECT * FROM {src_view1.full_name}"
-    src_view2 = make_table(
+    src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
+    tables["src_view2"] = make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view2_text,
@@ -638,32 +640,32 @@ def test_table_migration_job(
                 dst_catalog.name,
                 schema.name,
                 schema.name,
-                src_managed_table.name,
-                src_managed_table.name,
+                tables["src_managed_table"].name,
+                tables["src_managed_table"].name,
             ),
             Rule(
                 "ws_name",
                 dst_catalog.name,
                 schema.name,
                 schema.name,
-                src_external_table.name,
-                src_external_table.name,
+                tables["src_external_table"].name,
+                tables["src_external_table"].name,
             ),
             Rule(
                 "workspace",
                 dst_catalog.name,
                 schema.name,
                 schema.name,
-                src_view1.name,
-                src_view1.name,
+                tables["src_view1"].name,
+                tables["src_view1"].name,
             ),
             Rule(
                 "workspace",
                 dst_catalog.name,
                 schema.name,
                 schema.name,
-                src_view2.name,
-                src_view2.name,
+                tables["src_view2"].name,
+                tables["src_view2"].name,
             ),
         ],
         filename='mapping.csv',
@@ -676,10 +678,17 @@ def test_table_migration_job(
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.tables",
         [
-            Table("hive_metastore", schema.name, src_managed_table.name, "MANAGED", "DELTA", location="dbfs:/test"),
-            Table("hive_metastore", schema.name, src_external_table.name, "EXTERNAL", "CSV"),
-            Table("hive_metastore", schema.name, src_view1.name, "VIEW", "", view_text=src_view1_text),
-            Table("hive_metastore", schema.name, src_view2.name, "VIEW", "", view_text=src_view2_text),
+            Table(
+                "hive_metastore",
+                schema.name,
+                tables["src_managed_table"].name,
+                "MANAGED",
+                "DELTA",
+                location="dbfs:/test",
+            ),
+            Table("hive_metastore", schema.name, tables["src_external_table"].name, "EXTERNAL", "CSV"),
+            Table("hive_metastore", schema.name, tables["src_view1"].name, "VIEW", "", view_text=src_view1_text),
+            Table("hive_metastore", schema.name, tables["src_view2"].name, "VIEW", "", view_text=src_view2_text),
         ],
         Table,
     )
@@ -727,10 +736,10 @@ def test_table_migration_job(
     assert deployed_workflow.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_external_table.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_view1.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_view2.name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_managed_table'].name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_external_table'].name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_view1'].name}").name
+        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_view2'].name}").name
     except NotFound:
         assert False, f"Table or view not found in {dst_catalog.name}.{schema.name}"
     # assert the cluster is configured correctly
