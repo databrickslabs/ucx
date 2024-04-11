@@ -176,7 +176,7 @@ class WorkspaceInstaller:
             self._product_info,
         )
         try:
-            workspace_installation.run(self._is_account_install, config.trigger_job)
+            workspace_installation.run(config.trigger_job)
         except ManyError as err:
             if len(err.errs) == 1:
                 raise err.errs[0] from None
@@ -396,6 +396,8 @@ class WorkspaceInstallation(InstallationMixin):
         self._workflows_installer = workflows_installer
         self._prompts = prompts
         self._product_info = product_info
+        environ = dict(os.environ.items())
+        self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
         super().__init__(config, installation, ws)
 
     @classmethod
@@ -440,7 +442,7 @@ class WorkspaceInstallation(InstallationMixin):
     def folder(self):
         return self._installation.install_folder()
 
-    def run(self, silent: bool = False, trigger_job: bool = False):
+    def run(self, trigger_job: bool = False):
         Threads.strict(
             "installing components",
             [
@@ -449,7 +451,7 @@ class WorkspaceInstallation(InstallationMixin):
             ],
         )
         readme_url = self._workflows_installer.create_jobs(self._prompts)
-        if not silent and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+        if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
 
