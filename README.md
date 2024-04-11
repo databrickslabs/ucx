@@ -35,6 +35,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
     * [Other considerations](#other-considerations)
 * [Utility commands](#utility-commands)
+  * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
   * [`repair-run` command](#repair-run-command)
   * [`workflows` command](#workflows-command)
@@ -444,6 +445,20 @@ See more details in [Table migration commands](#table-migration-commands)
 [[back to top](#databricks-labs-ucx)]
 
 # Utility commands
+
+## `logs` command
+
+```text
+$ databricks labs ucx logs [--workflow WORKFLOW_NAME] [--debug]
+```
+
+This command displays the logs of the last run of the specified workflow. If no workflow is specified, it displays 
+the logs of the workflow that was run the last. This command is useful for developers and administrators who want to 
+check the logs of the last run of a workflow and ensure that it was executed as expected. It can also be used for 
+debugging purposes when a workflow is not behaving as expected. By default, only `INFO`, `WARNING`, and `ERROR` logs
+are displayed. To display `DEBUG` logs, use the `--debug` flag.
+
+[[back to top](#databricks-labs-ucx)] 
 
 ## `ensure-assessment-run` command
 
