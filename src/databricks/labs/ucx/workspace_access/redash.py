@@ -156,7 +156,7 @@ class RedashPermissionsSupport(AclSupport):
                 f"acl to be applied={acl}\n"
                 f"acl found in the object={remote_permission}\n"
             )
-            raise ValueError(msg)
+            raise NotFound(msg)
         return False
 
     def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
@@ -178,7 +178,7 @@ class RedashPermissionsSupport(AclSupport):
         set_retried_check = set_retry_on_value_error(self._safe_set_permissions)
         set_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[InternalError, ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[InternalError, NotFound], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, acl)
 

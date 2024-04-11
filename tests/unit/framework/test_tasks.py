@@ -6,9 +6,9 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.tasks import (
     Task,
-    TaskLogger,
     parse_args,
     remove_extra_indentation,
+    TaskLogger,
 )
 
 
@@ -43,6 +43,7 @@ def test_task_cloud():
 
 
 def test_task_logger(tmp_path):
+    # TODO: move this to test_logs.py
     app_logger = logging.getLogger("databricks.labs.ucx.foo")
     databricks_logger = logging.getLogger("databricks.sdk.core")
     with TaskLogger(tmp_path, "assessment", "123", "crawl-tables", "234") as task_logger:
@@ -50,9 +51,9 @@ def test_task_logger(tmp_path):
         databricks_logger.debug("something from sdk")
     contents = _log_contents(tmp_path)
     assert len(contents) == 2
-    assert "log file is" in contents["logs/assessment/run-234/crawl-tables.log"]
-    assert "something from sdk" in contents["logs/assessment/run-234/crawl-tables.log"]
-    assert "[run #234](/#job/123/run/234)" in contents["logs/assessment/run-234/README.md"]
+    assert "log file is" in contents["logs/assessment/run-234-0/crawl-tables.log"]
+    assert "something from sdk" in contents["logs/assessment/run-234-0/crawl-tables.log"]
+    assert "[run #234](/#job/123/run/234)" in contents["logs/assessment/run-234-0/README.md"]
 
 
 def test_task_failure(tmp_path):
@@ -62,11 +63,11 @@ def test_task_failure(tmp_path):
     contents = _log_contents(tmp_path)
     assert len(contents) == 2
     # CLI debug info present
-    assert "databricks workspace export" in contents["logs/assessment/run-234/crawl-tables.log"]
+    assert "databricks workspace export" in contents["logs/assessment/run-234-0/crawl-tables.log"]
     # log file name present
-    assert "logs/assessment/run-234/crawl-tables.log" in contents["logs/assessment/run-234/crawl-tables.log"]
+    assert "logs/assessment/run-234-0/crawl-tables.log" in contents["logs/assessment/run-234-0/crawl-tables.log"]
     # traceback present
-    assert 'raise ValueError("some value not found")' in contents["logs/assessment/run-234/crawl-tables.log"]
+    assert 'raise ValueError("some value not found")' in contents["logs/assessment/run-234-0/crawl-tables.log"]
 
 
 def _log_contents(tmp_path):

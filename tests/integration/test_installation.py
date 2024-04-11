@@ -10,14 +10,13 @@ from datetime import timedelta
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState, RawState
-from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.parallel import Threads, ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
-    Unknown,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
@@ -65,7 +64,9 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         environ: dict[str, str] | None = None,
         extend_prompts: dict[str, str] | None = None,
         inventory_schema_name: str | None = None,
+        skip_dashboards: bool = True,
     ):
+        logger.debug("Creating new installation...")
         if not product_info:
             product_info = ProductInfo.for_testing(WorkspaceConfig)
         if not environ:
@@ -88,6 +89,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             | (extend_prompts or {})
         )
 
+        logger.debug("Waiting for clusters to start...")
         default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
         tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
         table_migration_cluster_id = env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
@@ -99,6 +101,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
                 functools.partial(ws.clusters.ensure_cluster_is_running, table_migration_cluster_id),
             ],
         )
+        logger.debug("Waiting for clusters to start...")
 
         if not installation:
             installation = Installation(ws, product_info.product_name())
@@ -116,7 +119,6 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
         installation.save(workspace_config)
 
-        # TODO: inject the smallest number of tasks possible for a workflow, to speed up installation in tests
         tasks = Workflows.all().tasks()
 
         # TODO: see if we want to move building wheel as a context manager for yield factory,
@@ -131,6 +133,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             product_info,
             timedelta(minutes=3),
             tasks,
+            skip_dashboards=skip_dashboards,
         )
         workspace_installation = WorkspaceInstallation(
             workspace_config,
@@ -141,6 +144,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             workflows_installation,
             prompts,
             product_info,
+            skip_dashboards=skip_dashboards,
         )
         workspace_installation.run()
         cleanup.append(workspace_installation)
@@ -216,19 +220,22 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
     assert object_permissions[migrated_group.name_in_account] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
 def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, new_installation):
     workspace_installation, deployed_workflow = new_installation()
 
-    sql_backend.execute(f"DROP SCHEMA {workspace_installation.config.inventory_database} CASCADE")
+    with pytest.raises(ManyError) as failure:
+        deployed_workflow.run_workflow("failing")
 
-    with pytest.raises(NotFound) as failure:
-        deployed_workflow.run_workflow("099-destroy-schema")
-
-    assert "cannot be found" in str(failure.value)
+    assert "This is a test error message." in str(failure.value)
+    assert "This task is supposed to fail." in str(failure.value)
 
     workflow_run_logs = list(ws.workspace.list(f"{workspace_installation.folder}/logs"))
     assert len(workflow_run_logs) == 1
+
+    inventory_database = workspace_installation.config.inventory_database
+    (records,) = next(sql_backend.fetch(f"SELECT COUNT(*) AS cnt FROM {inventory_database}.logs"))
+    assert records == 3
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
@@ -286,7 +293,10 @@ def test_running_real_assessment_job(
         group_name=ws_group_a.display_name,
     )
 
-    _, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
+    _, deployed_workflow = new_installation(
+        lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]),
+        skip_dashboards=False,
+    )
     deployed_workflow.run_workflow("assessment")
 
     generic_permissions = GenericPermissionsSupport(ws, [])
@@ -383,7 +393,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    with pytest.raises(Unknown):
+    with pytest.raises(ManyError):
         deployed_workflow.run_workflow("validate-groups-permissions")
 
 
@@ -407,25 +417,15 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
-def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
-    install, deployed_workflow = new_installation()
+def test_repair_run_workflow_job(new_installation, mocker):
     mocker.patch("webbrowser.open")
-    sql_backend.execute(f"DROP SCHEMA {install.config.inventory_database} CASCADE")
-    with pytest.raises(NotFound):
-        deployed_workflow.run_workflow("099-destroy-schema")
+    _, deployed_workflows = new_installation()
+    with pytest.raises(ManyError):
+        deployed_workflows.run_workflow("failing")
 
-    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.config.inventory_database}")
+    deployed_workflows.repair_run("failing")
 
-    deployed_workflow.repair_run("099-destroy-schema")
-
-    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
-    state = InstallState.from_installation(installation)
-    workflow_job_id = state.jobs["099-destroy-schema"]
-    run_status = None
-    while run_status is None:
-        job_runs = list(ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
-        run_status = job_runs[0].state.result_state
-    assert run_status.value == "SUCCESS"
+    assert deployed_workflows.validate_step("failing")
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

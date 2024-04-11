@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk.errors import InternalError
 
 from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
@@ -101,7 +102,7 @@ def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute:
         backend,
         "default",
     )
-    with pytest.raises(RuntimeError):
+    with pytest.raises(InternalError):
         log_processor.snapshot()
     rows = backend.rows_written_for(log_processor.full_name, "append")
     assert all(
@@ -121,7 +122,7 @@ def test_logs_processor_snapshot_error(tmp_path: Path, log_path: Path):
         backend,
         "default",
     )
-    with pytest.raises(RuntimeError) as e:
+    with pytest.raises(InternalError) as e:
         log_processor.snapshot()
     assert "Watch out!" in e.value.args[0]
     assert "Warning message." not in e.value.args[0]

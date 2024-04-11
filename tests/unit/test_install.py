@@ -971,7 +971,7 @@ def test_repair_run_no_job_id(ws, mock_installation, caplog):
 
     with caplog.at_level('WARNING'):
         deployed.repair_run("assessment")
-        assert 'skipping assessment: job does not exists hence skipping repair' in caplog.messages
+        assert 'Skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
 def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
@@ -984,7 +984,7 @@ def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
 
     with caplog.at_level('WARNING'):
         deployed.repair_run("assessment")
-        assert "skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
+        assert "Skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
 def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
@@ -996,7 +996,7 @@ def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
 
     with caplog.at_level('WARNING'):
         deployed.repair_run("assessment")
-        assert "skipping assessment: Workflow does not exists" in caplog.messages
+        assert "Skipping assessment: Workflow does not exists" in caplog.messages
 
 
 def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):

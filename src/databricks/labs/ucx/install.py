@@ -387,7 +387,7 @@ class WorkspaceInstaller:
 
 
 class WorkspaceInstallation(InstallationMixin):
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         config: WorkspaceConfig,
         installation: Installation,
@@ -397,6 +397,7 @@ class WorkspaceInstallation(InstallationMixin):
         workflows_installer: WorkflowsDeployment,
         prompts: Prompts,
         product_info: ProductInfo,
+        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -408,6 +409,7 @@ class WorkspaceInstallation(InstallationMixin):
         self._product_info = product_info
         environ = dict(os.environ.items())
         self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
+        self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
     @classmethod
@@ -453,13 +455,11 @@ class WorkspaceInstallation(InstallationMixin):
         return self._installation.install_folder()
 
     def run(self):
-        Threads.strict(
-            "installing components",
-            [
-                self._create_dashboards,
-                self._create_database,
-            ],
-        )
+        logger.info(f"Installing UCX v{self._product_info.version()}")
+        install_tasks = [self._create_database]
+        if not self._skip_dashboards:
+            install_tasks.append(self._create_dashboards)
+        Threads.strict("installing components", install_tasks)
         readme_url = self._workflows_installer.create_jobs(self._prompts)
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
