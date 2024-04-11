@@ -28,7 +28,7 @@ def common():
 
     w.cluster_policies.list.return_value = [policy]
     w.clusters.select_spark_version = lambda **_: "14.2.x-scala2.12"
-    w.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    w.clusters.select_node_type = lambda **_: "Standard_F4s"
     w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     prompts = MockPrompts(
         {
