@@ -3,6 +3,7 @@ from unittest.mock import create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo, ObjectType
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.dependencies import DependencyLoader
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook

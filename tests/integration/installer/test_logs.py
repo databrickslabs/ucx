@@ -21,7 +21,7 @@ LOG = f"""
 
 @pytest.fixture
 def log_file(tmp_path: Path) -> Path:
-    log_file_path = tmp_path / "logs" / WORKFLOW / f"run-{JOB_RUN_ID}" / "crawl_grants.log"
+    log_file_path = tmp_path / "logs" / WORKFLOW / f"run-{JOB_RUN_ID}-0" / "crawl_grants.log"
     log_file_path.parent.mkdir(parents=True, exist_ok=True)
     with log_file_path.open("w") as f:
         f.write(LOG)
