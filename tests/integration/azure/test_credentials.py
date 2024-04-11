@@ -56,16 +56,21 @@ def extract_test_info(ws, env_or_skip, make_random):
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend):
+def azure_resources(ws):
+    azure_mgmt_client = AzureAPIClient(
+        ws.config.arm_environment.resource_manager_endpoint,
+        ws.config.arm_environment.service_management_endpoint,
+    )
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    azure_resources = AzureResources(azure_mgmt_client, graph_client)
+    return azure_resources
+
+
+@pytest.fixture
+def run_migration(ws, sql_backend, azure_resources):
     def inner(
         test_info: MigrationTestInfo, credentials: set[str], read_only=False
     ) -> list[StorageCredentialValidationResult]:
-        azure_mgmt_client = AzureAPIClient(
-            ws.config.arm_environment.resource_manager_endpoint,
-            ws.config.arm_environment.service_management_endpoint,
-        )
-        graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_mgmt_client, graph_client)
         locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
 
         installation = MockInstallation(
@@ -82,7 +87,7 @@ def run_migration(ws, sql_backend):
                 ]
             }
         )
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+        resource_permissions = AzureResourcePermissions(installation, ws, azure_resources, locations)
 
         sp_infos = [
             AzureServicePrincipalInfo(
