@@ -360,9 +360,7 @@ class TestRuntimeContext(RuntimeContext):
 
     @cached_property
     def mounts_crawler(self):
-        # TODO: replace with env variable and make AWS and Azure versions
-        real_location = 'abfss://things@labsazurethings.dfs.core.windows.net/a'
-        mount = Mount(f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', real_location)
+        mount = Mount(f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', self._env_or_skip("MOUNT_PATH"))
         return StaticMountCrawler(
             [mount],
             self.sql_backend,
