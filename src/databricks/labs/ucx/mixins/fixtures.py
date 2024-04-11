@@ -697,7 +697,7 @@ def make_cluster(ws, make_random):
                 kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
             kwargs["custom_tags"] = {"ResourceClass": "SingleNode"}
         if "instance_pool_id" not in kwargs:
-            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
+            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
 
         return ws.clusters.create(
             cluster_name=cluster_name,
@@ -738,7 +738,7 @@ def make_instance_pool(ws, make_random):
         if instance_pool_name is None:
             instance_pool_name = f"sdk-{make_random(4)}"
         if node_type_id is None:
-            node_type_id = ws.clusters.select_node_type(local_disk=True)
+            node_type_id = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         return ws.instance_pools.create(instance_pool_name, node_type_id, **kwargs)
 
     yield from factory("instance pool", create, lambda item: ws.instance_pools.delete(item.instance_pool_id))
@@ -761,7 +761,7 @@ def make_job(ws, make_random, make_notebook):
                         description=make_random(4),
                         new_cluster=compute.ClusterSpec(
                             num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                             spark_version=ws.clusters.select_spark_version(latest=True),
                             spark_conf=task_spark_conf,
                         ),
@@ -776,7 +776,7 @@ def make_job(ws, make_random, make_notebook):
                         description=make_random(4),
                         new_cluster=compute.ClusterSpec(
                             num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                             spark_version=ws.clusters.select_spark_version(latest=True),
                         ),
                         notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
@@ -817,7 +817,7 @@ def make_pipeline(ws, make_random, make_notebook):
         if "clusters" not in kwargs:
             kwargs["clusters"] = [
                 pipelines.PipelineCluster(
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                     label="default",
                     num_workers=1,
                     custom_tags={

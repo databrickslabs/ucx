@@ -19,9 +19,6 @@ class ClusterPolicyInstaller:
         self._installation = installation
         self._prompts = prompts
 
-    def _is_testing(self):
-        return self._installation.product() != "ucx"
-
     @staticmethod
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
@@ -93,10 +90,7 @@ class ClusterPolicyInstaller:
 
     def _definition(self, conf: dict, instance_profile: str | None, instance_pool_id: str | None) -> str:
         latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
-        if self._is_testing():
-            node_type_id = self._ws.clusters.select_node_type(local_disk=True)
-        else:
-            node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
+        node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         policy_definition = {
             "spark_version": self._policy_config(latest_lts_dbr),
             "node_type_id": self._policy_config(node_type_id),
