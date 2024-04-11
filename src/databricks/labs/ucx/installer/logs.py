@@ -198,7 +198,7 @@ class TaskRunWarningRecorder:
 
 class TaskLogger(contextlib.AbstractContextManager):
     # files are available in the workspace only once their handlers are closed,
-    # so we rotate files log every 10 minutes.
+    # so we rotate files log every minute to make them available for download.
     #
     # See https://docs.python.org/3/library/logging.handlers.html#logging.handlers.TimedRotatingFileHandler
     # See https://docs.python.org/3/howto/logging-cookbook.html
