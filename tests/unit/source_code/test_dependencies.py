@@ -76,11 +76,11 @@ def test_build_dependency_graph_visits_file_dependencies():
         filename = args[0]
         if filename.startswith('./'):
             filename = filename[2:]
+        visited[filename] = True
         if filename.find(".py") < 0:
             filename = filename + ".py"
         if filename.find(".txt") < 0:
             filename = filename + ".txt"
-        visited[filename] = True
         result = create_autospec(BinaryIO)
         result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
         return result
@@ -94,5 +94,72 @@ def test_build_dependency_graph_visits_file_dependencies():
     ws.workspace.list.side_effect = list_side_effect
     migrator = SourceCodeMigrator(ws, Languages(create_autospec(MigrationIndex)), DependencyLoader(ws))
     object_info = ObjectInfo(path="root5.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
+    migrator.build_dependency_graph(object_info)
+    assert len(visited) == len(paths)
+
+
+def test_build_dependency_graph_visits_recursive_file_dependencies():
+    paths = ["root6.py.txt", "root5.py.txt", "leaf4.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    visited: dict[str, bool] = {}
+
+    # can't remove **kwargs because it receives format=xxx
+    # pylint: disable=unused-argument
+    def download_side_effect(*args, **kwargs):
+        filename = args[0]
+        if filename.startswith('./'):
+            filename = filename[2:]
+        visited[filename] = True
+        if filename.find(".py") < 0:
+            filename = filename + ".py"
+        if filename.find(".txt") < 0:
+            filename = filename + ".txt"
+        result = create_autospec(BinaryIO)
+        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
+        return result
+
+    def list_side_effect(*args):
+        path = args[0]
+        return [ObjectInfo(path=path, language=Language.PYTHON, object_type=ObjectType.FILE)]
+
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.list.side_effect = list_side_effect
+    migrator = SourceCodeMigrator(ws, Languages(create_autospec(MigrationIndex)), DependencyLoader(ws))
+    object_info = ObjectInfo(path="root6.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
+    migrator.build_dependency_graph(object_info)
+    assert len(visited) == len(paths)
+
+
+def test_build_dependency_graph_safely_visits_non_file_dependencies():
+    paths = ["root7.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
+    visited: dict[str, bool] = {}
+
+    # can't remove **kwargs because it receives format=xxx
+    # pylint: disable=unused-argument
+    def download_side_effect(*args, **kwargs):
+        filename = args[0]
+        if filename.startswith('./'):
+            filename = filename[2:]
+        visited[filename] = True
+        if filename.find(".py") < 0:
+            filename = filename + ".py"
+        if filename.find(".txt") < 0:
+            filename = filename + ".txt"
+        result = create_autospec(BinaryIO)
+        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
+        return result
+
+    def list_side_effect(*args):
+        path = args[0]
+        info = ObjectInfo(path=path, object_type=ObjectType.LIBRARY) if path=="some_library" else ObjectInfo(path=path, language=Language.PYTHON, object_type=ObjectType.FILE)
+        return [info]
+
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.list.side_effect = list_side_effect
+    migrator = SourceCodeMigrator(ws, Languages(create_autospec(MigrationIndex)), DependencyLoader(ws))
+    object_info = ObjectInfo(path="root7.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)

@@ -57,6 +57,8 @@ class DependencyLoader:
             return self._load_notebook(object_info)
         if object_info.object_type is ObjectType.FILE:
             return self._load_file(object_info)
+        if object_info.object_type in [ ObjectType.LIBRARY, ObjectType.DIRECTORY, ObjectType.DASHBOARD, ObjectType.REPO ]:
+            return None
         raise NotImplementedError(str(object_info.object_type))
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
