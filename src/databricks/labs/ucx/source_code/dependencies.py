@@ -54,6 +54,8 @@ class DependencyLoader:
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
+        if object_info.object_type is ObjectType.FILE:
+            return self._load_file(object_info)
         raise NotImplementedError(str(object_info.object_type))
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
@@ -68,7 +70,7 @@ class DependencyLoader:
         return object_info
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
-        # local import to avoid circular dependency
+        # local import to avoid cyclic dependency
         # pylint: disable=import-outside-toplevel, cyclic-import
         from databricks.labs.ucx.source_code.notebook import Notebook
 
@@ -76,6 +78,16 @@ class DependencyLoader:
         assert object_info.language is not None
         source = self._load_source(object_info)
         return Notebook.parse(object_info.path, source, object_info.language)
+
+    def _load_file(self, object_info: ObjectInfo) -> SourceContainer:
+        # local import to avoid cyclic dependency
+        # pylint: disable=import-outside-toplevel, cyclic-import
+        from databricks.labs.ucx.source_code.files import WorkspaceFile
+
+        assert object_info.path is not None
+        assert object_info.language is not None
+        source = self._load_source(object_info)
+        return WorkspaceFile(object_info.path, source, object_info.language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
         if not object_info.language or not object_info.path:
