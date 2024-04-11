@@ -6,9 +6,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
 from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
-from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer
+from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.source_migrator import SourceCodeMigrator
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources
 
 
@@ -235,3 +236,32 @@ def test_build_dependency_graph_throws_with_invalid_dependencies():
     object_info = ObjectInfo(path="root7.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     with pytest.raises(ValueError):
         migrator.build_dependency_graph(object_info)
+
+
+def test_build_dependency_graph_ignores_builtin_dependencies():
+    source = """
+import os
+from path import Path    
+"""
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
+    ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
+    migrator = SourceCodeMigrator(ws, Languages(create_autospec(MigrationIndex)), DependencyLoader(ws))
+    object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
+    migrator.build_dependency_graph(object_info)
+
+
+def test_build_dependency_graph_ignores_discovered_dependencies():
+    source = """
+import bcrypt
+from cmdstanpy import Thing    
+"""
+    datas = _load_sources(SourceContainer, "sample-runtime-packages-output.txt")
+    whitelist = Whitelist.parse(datas[0])
+    resolver = DependencyResolver(whitelist)
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
+    ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
+    migrator = SourceCodeMigrator(ws, Languages(create_autospec(MigrationIndex)), DependencyLoader(ws), resolver)
+    object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
+    migrator.build_dependency_graph(object_info)
