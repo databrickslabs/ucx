@@ -6,7 +6,7 @@ from sqlglot.expressions import Table
 from databricks.labs.ucx.source_code.base import Advice, Deprecation, Linter
 
 
-class DbfsFromTable(Linter):
+class FromDbfsFolder(Linter):
     def __init__(self):
         self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
 
