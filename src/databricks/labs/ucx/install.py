@@ -119,7 +119,6 @@ class WorkspaceInstaller:
         product_info: ProductInfo,
         environ: dict[str, str] | None = None,
         tasks: list[Task] | None = None,
-        installed_workspace_ids: list[int] | None = None,
     ):
         if not environ:
             environ = dict(os.environ.items())
@@ -134,7 +133,6 @@ class WorkspaceInstaller:
         self._force_install = environ.get("UCX_FORCE_INSTALL")
         self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
-        self._installed_workspace_ids = installed_workspace_ids
 
     def run(
         self,
@@ -264,6 +262,17 @@ class WorkspaceInstaller:
             logger.debug(f"Cannot find previous installation: {err}")
         return self._configure_new_installation(default_config)
 
+    def replace_config(self, **changes: Any):
+        """
+        Persist the list of workspaces where UCX is successfully installed in the config
+        """
+        try:
+            config = self._installation.load(WorkspaceConfig)
+            new_config = dataclasses.replace(config, **changes)
+            self._installation.save(new_config)
+        except (PermissionDenied, NotFound, ValueError):
+            logger.warning(f"Failed to replace config for {self._ws.config.host}")
+
     def _apply_upgrades(self):
         try:
             upgrades = Upgrades(self._product_info, self._installation)
@@ -295,7 +304,6 @@ class WorkspaceInstaller:
             max_workers=max_workers,
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
-            installed_workspace_ids=self._installed_workspace_ids,
         )
         self._installation.save(config)
         if self._is_account_install:
@@ -604,6 +612,15 @@ class AccountInstaller(AccountContext):
                 accessible_workspaces.append(workspace)
         return accessible_workspaces
 
+    def _get_installer(self, app: ProductInfo, workspace: Workspace) -> WorkspaceInstaller:
+        workspace_client = self.account_client.get_workspace_client(workspace)
+        logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
+        try:
+            current = app.current_installation(workspace_client)
+        except NotFound:
+            current = Installation.assume_global(workspace_client, app.product_name())
+        return WorkspaceInstaller(self.prompts, current, workspace_client, app)
+
     def install_on_account(self, app: ProductInfo | None = None):
         ctx = AccountContext(self._get_safe_account_client())
         if app is None:
@@ -612,22 +629,15 @@ class AccountInstaller(AccountContext):
         confirmed = False
         accessible_workspaces = self._get_accessible_workspaces()
         msg = "\n".join([w.deployment_name for w in accessible_workspaces])
-        installed_workspace_ids = [w.workspace_id for w in accessible_workspaces if w.workspace_id is not None]
+        installed_workspaces = []
         if not self.prompts.confirm(
             f"UCX has detected the following workspaces available to install. \n{msg}\nDo you want to continue?"
         ):
             return
 
         for workspace in accessible_workspaces:
-            workspace_client = self.account_client.get_workspace_client(workspace)
             logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
-            try:
-                current = app.current_installation(workspace_client)
-            except NotFound:
-                current = Installation.assume_global(workspace_client, app.product_name())
-            installer = WorkspaceInstaller(
-                self.prompts, current, workspace_client, app, installed_workspace_ids=installed_workspace_ids
-            )
+            installer = self._get_installer(app, workspace)
             if not confirmed:
                 default_config = None
             try:
@@ -635,14 +645,20 @@ class AccountInstaller(AccountContext):
             except RuntimeWarning:
                 logger.info("Skipping workspace...")
             # if user confirms to install on remaining workspaces with the same config, don't prompt again
+            installed_workspaces.append(workspace)
             if confirmed:
                 continue
             confirmed = self.prompts.confirm(
                 "Do you want to install UCX on the remaining workspaces with the same config?"
             )
 
+        installed_workspace_ids = [w.workspace_id for w in installed_workspaces if w.workspace_id is not None]
+        for workspace in installed_workspaces:
+            installer = self._get_installer(app, workspace)
+            installer.replace_config(installed_workspace_ids=installed_workspace_ids)
+
         # upload the json dump of workspace info in the .ucx folder
-        ctx.account_workspaces.sync_workspace_info(accessible_workspaces)
+        ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
 
 def install_on_workspace(app: ProductInfo | None = None):

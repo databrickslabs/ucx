@@ -1646,7 +1646,8 @@ def test_extract_major_minor_versions():
 
 def test_account_installer(ws):
     acc = create_autospec(AccountClient)
-    acc.workspaces.list.return_value = [Workspace(workspace_id=123), Workspace(workspace_id=456)]
+    acc.workspaces.list.return_value = [Workspace(workspace_id=123, deployment_name="test"),
+                                        Workspace(workspace_id=456, deployment_name="test2")]
     acc.get_workspace_client.return_value = ws
 
     account_installer = AccountInstaller(acc)
