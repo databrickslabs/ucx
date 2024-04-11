@@ -9,7 +9,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse
 
-from databricks.labs.ucx.config import WorkspaceConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +33,8 @@ class ClusterPolicyInstaller:
         instance_pool_id = self._get_instance_pool_id()
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-                "We have identified one or more cluster policies set up for an external metastore"
-                "Would you like to set UCX to connect to the external metastore?"
+            "We have identified one or more cluster policies set up for an external metastore"
+            "Would you like to set UCX to connect to the external metastore?"
         ):
             logger.info("Setting up an external metastore")
             cluster_policies = {conf.name: conf.definition for conf in policies_with_external_hms}
@@ -45,8 +44,8 @@ class ClusterPolicyInstaller:
         else:
             warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
             if warehouse_config and self._prompts.confirm(
-                    "We have identified the workspace warehouse is set up for an external metastore"
-                    "Would you like to set UCX to connect to the external metastore?"
+                "We have identified the workspace warehouse is set up for an external metastore"
+                "Would you like to set UCX to connect to the external metastore?"
             ):
                 logger.info("Setting up an external metastore")
                 instance_profile, spark_conf_dict = self._extract_external_hive_metastore_sql_conf(warehouse_config)
@@ -138,10 +137,10 @@ class ClusterPolicyInstaller:
             logger.info(f"Instance Profile is Set to {instance_profile}")
         for key in cluster_policy.keys():
             if (
-                    key.startswith("spark_conf.spark.sql.hive.metastore")
-                    or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
-                    or key.startswith("spark_conf.spark.databricks.hive.metastore")
-                    or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
+                key.startswith("spark_conf.spark.sql.hive.metastore")
+                or key.startswith("spark_conf.spark.hadoop.javax.jdo.option")
+                or key.startswith("spark_conf.spark.databricks.hive.metastore")
+                or key.startswith("spark_conf.spark.hadoop.hive.metastore.glue")
             ):
                 spark_conf_dict[key[11:]] = cluster_policy[key]["value"]
         return instance_profile, spark_conf_dict
@@ -173,10 +172,10 @@ class ClusterPolicyInstaller:
             if conf.value is None:
                 continue
             if (
-                    conf.key.startswith("spark.sql.hive.metastore")
-                    or conf.key.startswith("spark.hadoop.javax.jdo.option")
-                    or conf.key.startswith("spark.databricks.hive.metastore")
-                    or conf.key.startswith("spark.hadoop.hive.metastore.glue")
+                conf.key.startswith("spark.sql.hive.metastore")
+                or conf.key.startswith("spark.hadoop.javax.jdo.option")
+                or conf.key.startswith("spark.databricks.hive.metastore")
+                or conf.key.startswith("spark.hadoop.hive.metastore.glue")
             ):
                 spark_conf_dict[conf.key] = conf.value
         return instance_profile, spark_conf_dict
