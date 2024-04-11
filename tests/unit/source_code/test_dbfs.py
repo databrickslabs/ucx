@@ -14,6 +14,7 @@ class TestDetectDBFS:
             ('# "/dbfs/mnt"', 0),
             ('SOME_CONSTANT = "/dbfs/mnt"', 1),
             ('SOME_CONSTANT = "/dbfs/mnt"; load_data(SOME_CONSTANT)', 1),
+            ('SOME_CONSTANT = 42; load_data(SOME_CONSTANT)', 0),
         ],
     )
     def test_detects_dbfs_str_const_paths(self, code, expected):
