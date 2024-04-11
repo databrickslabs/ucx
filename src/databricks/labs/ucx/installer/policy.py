@@ -91,7 +91,7 @@ class ClusterPolicyInstaller:
         latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
         policy_definition = {
             "spark_version": self._policy_config(latest_lts_dbr),
-            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
+            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)),
         }
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
