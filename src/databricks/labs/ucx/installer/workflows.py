@@ -195,10 +195,32 @@ class DeployedWorkflows:
                 return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
         return False
 
+    def relay_logs(self, workflow: str | None = None):
+        latest_run = None
+        if not workflow:
+            runs = []
+            for step in self._install_state.jobs:
+                try:
+                    _, latest_run = self._latest_job_run(step)
+                    runs.append((step, latest_run))
+                except InvalidParameterValue:
+                    continue
+            if not runs:
+                logger.warning("No jobs to relay logs for")
+                return
+            runs = sorted(runs, key=lambda x: x[1].start_time, reverse=True)
+            workflow, latest_run = runs[0]
+        if not latest_run:
+            assert workflow is not None
+            _, latest_run = self._latest_job_run(workflow)
+        self._relay_logs(workflow, latest_run.run_id)
+
     def _relay_logs(self, workflow, run_id):
-        for log in self._fetch_logs(workflow, run_id):
-            task_logger = logging.getLogger(log.component)
-            task_logger.log(logging.getLevelName(log.level), log.message)
+        for record in self._fetch_logs(workflow, run_id):
+            task_logger = logging.getLogger(record.component)
+            task_logger.setLevel(logger.getEffectiveLevel())
+            log_level = logging.getLevelName(record.level)
+            task_logger.log(log_level, record.message)
 
     def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
         log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
@@ -548,7 +570,7 @@ class WorkflowsDeployment(InstallationMixin):
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
         job_tasks = []
-        job_clusters: set[str] = {'main'}
+        job_clusters: set[str] = {Task.job_cluster}
         for task in self._tasks:
             if task.workflow != step_name:
                 continue

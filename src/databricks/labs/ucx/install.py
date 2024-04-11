@@ -279,9 +279,8 @@ class WorkspaceInstaller:
         try:
             upgrades = Upgrades(self._product_info, self._installation)
             upgrades.apply(self._ws)
-        except NotFound as err:
+        except (InvalidParameterValue, NotFound) as err:
             logger.warning(f"Installed version is too old: {err}")
-            return
 
     def _configure_new_installation(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
         if default_config is None:
