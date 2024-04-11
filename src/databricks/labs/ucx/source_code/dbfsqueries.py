@@ -21,7 +21,7 @@ class FromDbfsFolder(Linter):
                 # Check table names for deprecated DBFS table names
                 yield from self._check_table_name(table)
 
-    def _check_table_name(self, table: Table) -> Iterable[Advice]:
+    def _check_dbfs_folder(self, table: Table) -> Iterable[Advice]:
         """
         Check if the table is a DBFS table or reference in some way
         and yield a deprecation message if it is
