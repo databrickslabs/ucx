@@ -29,7 +29,7 @@ class FromDbfsFolder(Linter):
         if any(table.name.startswith(prefix) for prefix in self._dbfs_prefixes):
             yield Deprecation(
                 code='dbfs-query',
-                message=f"The use of table {table.db}.{table.name} as a source is deprecated",
+                message=f"The use of DBFS is deprecated: {table.name}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
