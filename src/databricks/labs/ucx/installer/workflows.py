@@ -216,13 +216,11 @@ class DeployedWorkflows:
         self._relay_logs(workflow, latest_run.run_id)
 
     def _relay_logs(self, workflow, run_id):
-        is_debug = logger.isEnabledFor(logging.DEBUG)
-        for log in self._fetch_logs(workflow, run_id):
-            task_logger = logging.getLogger(log.component)
-            log_level = logging.getLevelName(log.level)
-            if not is_debug and log_level == logging.DEBUG:
-                continue
-            task_logger.log(logging.getLevelName(log.level), log.message)
+        for record in self._fetch_logs(workflow, run_id):
+            task_logger = logging.getLogger(record.component)
+            task_logger.setLevel(logger.getEffectiveLevel())
+            log_level = logging.getLevelName(record.level)
+            task_logger.log(log_level, record.message)
 
     def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
         log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
