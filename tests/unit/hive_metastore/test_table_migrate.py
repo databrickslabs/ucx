@@ -16,9 +16,12 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableToMigrate,
 )
 from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationStatus,
-    MigrationStatusRefresher,
     TablesMigrator,
+)
+from databricks.labs.ucx.hive_metastore.migration_status import (
+    MigrationStatusRefresher,
+    MigrationIndex,
+    MigrationStatus,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
@@ -256,6 +259,15 @@ def test_migrate_view_should_produce_proper_queries(ws):
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
     }
+    migration_index = create_autospec(MigrationIndex)
+    migration_index.get.return_value = MigrationStatus(
+        src_schema="db1_src",
+        src_table="managed_dbfs",
+        dst_catalog="ucx_default",
+        dst_schema="db1_dst",
+        dst_table="managed_dbfs",
+    )
+    migration_status_refresher.index.return_value = migration_index
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
@@ -270,7 +282,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(what=What.VIEW)
 
     assert (
-        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM db1_src.managed_dbfs;"
+        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM ucx_default.db1_dst.managed_dbfs;"
         in backend.queries
     )
     assert (
@@ -505,11 +517,9 @@ def test_is_upgraded(ws):
     errors = {}
     rows = {
         "SHOW TBLPROPERTIES schema1.table1": [
-            {"key": "upgraded_to", "value": "fake_dest"},
+            {"value": "fake_dest"},
         ],
-        "SHOW TBLPROPERTIES schema1.table2": [
-            {"key": "another_key", "value": "fake_value"},
-        ],
+        "SHOW TBLPROPERTIES schema1.table2": [],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
@@ -727,6 +737,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
+
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,
@@ -743,6 +754,16 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
     }
+    migration_index = create_autospec(MigrationIndex)
+    migration_index.get.return_value = MigrationStatus(
+        src_schema="db1_src",
+        src_table="managed_dbfs",
+        dst_catalog="ucx_default",
+        dst_schema="db1_dst",
+        dst_table="managed_dbfs",
+    )
+    migration_index.is_migrated.return_value = True
+    migration_status_refresher.index.return_value = migration_index
 
     table_migrate.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
@@ -789,7 +810,6 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
-    table_migrate.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     assert "GRANT ALL PRIVILEGES ON TABLE ucx_default.db1_dst.managed_dbfs TO `spn1`" in backend.queries
 
@@ -824,7 +844,20 @@ def test_migrate_views_should_be_properly_sequenced(ws):
         ),
     ]
     group_manager = GroupManager(backend, ws, "inventory_database")
-    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    migration_status_refresher = create_autospec(MigrationStatusRefresher)
+    migration_status_refresher.get_seen_tables.return_value = {
+        "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
+    }
+    migration_index = create_autospec(MigrationIndex)
+    migration_index.get.return_value = MigrationStatus(
+        src_schema="db1_src",
+        src_table="t1_src",
+        dst_catalog="catalog",
+        dst_schema="db1_dst",
+        dst_table="t1_dst",
+    )
+    migration_index.is_migrated.side_effect = lambda _, b: b in {"t1_src", "t2_src"}
+    migration_status_refresher.index.return_value = migration_index
     principal_grants = create_autospec(PrincipalACL)
     table_migrate = TablesMigrator(
         table_crawler,

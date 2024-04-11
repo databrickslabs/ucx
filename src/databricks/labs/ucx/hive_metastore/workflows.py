@@ -26,6 +26,16 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
+    @job_task(
+        job_cluster="table_migration",
+        depends_on=[Assessment.crawl_tables, migrate_external_tables_sync, migrate_dbfs_root_delta_tables],
+    )
+    def migrate_views(self, ctx: RuntimeContext):
+        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
+        It is dependent on the migration of the tables.
+        """
+        ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
 
 class MigrateTablesInMounts(Workflow):
     def __init__(self):
