@@ -26,7 +26,7 @@ def test_non_dbfs_trigger_nothing(query):
         ("SELECT * FROM json.`/a/b/c` WHERE foo > 6", "/a/b/c"),
         ("DELETE FROM json.`/...` WHERE foo = 'bar'", "/..."),
         (
-            "MERGE INTO delta.'/dbfs/...' t USING source ON t.key = source.key WHEN MATCHED THEN DELETE",
+            "MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED THEN DELETE",
             "/dbfs/...",
         ),
     ],
