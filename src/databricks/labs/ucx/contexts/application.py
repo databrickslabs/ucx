@@ -105,7 +105,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def is_gcp(self) -> bool:
-        return self.connect_config.is_gcp
+        return not self.is_aws and not self.is_azure
 
     @cached_property
     def inventory_database(self) -> str:
@@ -250,21 +250,25 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def principal_acl(self):
-        eligible = {}
+    def principal_locations(self):
+        eligible_locations = {}
         if self.is_azure:
-            eligible = self.azure_acl.get_eligible_locations_principals()
+            eligible_locations = self.azure_acl.get_eligible_locations_principals()
         if self.is_aws:
-            eligible = self.aws_acl.get_eligible_locations_principals()
+            eligible_locations = self.aws_acl.get_eligible_locations_principals()
         if self.is_gcp:
             raise NotImplementedError("Not implemented for GCP.")
+        return eligible_locations
+
+    @cached_property
+    def principal_acl(self):
         return PrincipalACL(
             self.workspace_client,
             self.sql_backend,
             self.installation,
             self.tables_crawler,
             self.mounts_crawler,
-            eligible,
+            self.principal_locations,
         )
 
     @cached_property

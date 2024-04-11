@@ -7,7 +7,6 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 import pytest
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState, RawState
 from databricks.labs.blueprint.parallel import Threads
@@ -690,11 +689,6 @@ def test_table_migration_job(
         ],
         filename='azure_storage_account_info.csv',
     )
-    installation.save(
-        [AWSRoleAction('arn:aws:iam::12345:instance-profile/role1', 's3', 'WRITE_FILES', 's3://storage5/*')],
-        filename='aws_instance_profile_info.csv',
-    )
-
     deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert deployed_workflow.validate_step("migrate-tables")
@@ -815,10 +809,6 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
             )
         ],
         filename='azure_storage_account_info.csv',
-    )
-    installation.save(
-        [AWSRoleAction('arn:aws:iam::12345:instance-profile/role1', 's3', 'WRITE_FILES', 's3://storage5/*')],
-        filename='aws_instance_profile_info.csv',
     )
     deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful

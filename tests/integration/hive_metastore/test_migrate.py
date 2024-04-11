@@ -459,10 +459,8 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_c
         ),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
-    runtime_ctx.with_dummy_aws_resource_permission()
     return (
-        runtime_ctx.tables_migrator,
+        runtime_ctx,
         f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
         cluster.cluster_id,
     )
@@ -477,7 +475,9 @@ def test_migrate_managed_tables_with_principal_acl_azure(
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    table_migrate, table_full_name, cluster_id = prepared_principal_acl
+    ctx, table_full_name, cluster_id = prepared_principal_acl
+    ctx.with_dummy_azure_resource_permission()
+    table_migrate = ctx.tables_migrator
     user = make_user()
     make_cluster_permissions(
         object_id=cluster_id,
@@ -505,7 +505,9 @@ def test_migrate_managed_tables_with_principal_acl_aws(
 ):
     if not ws.config.is_aws:
         pytest.skip("temporary: only works in azure test env")
-    table_migrate, table_full_name, cluster_id = prepared_principal_acl
+    ctx, table_full_name, cluster_id = prepared_principal_acl
+    ctx.with_dummy_aws_resource_permission()
+    table_migrate = ctx.tables_migrator
     user = make_user()
     make_cluster_permissions(
         object_id=cluster_id,
