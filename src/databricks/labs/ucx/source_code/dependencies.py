@@ -15,7 +15,7 @@ class Dependency:
         assert object_info.path is not None
         return Dependency(object_info.object_type, object_info.path)
 
-    def __init__(self, object_type: ObjectType, path: str):
+    def __init__(self, object_type: ObjectType | None, path: str):
         self._type = object_type
         self._path = path
 
