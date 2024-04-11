@@ -1,12 +1,13 @@
 import csv
+import sys
 from collections.abc import Iterable
 
 
 class Whitelist:
     @classmethod
     def parse(cls, data: str):
-        fixed_widths = [68, 9]
-        default_width = 18
+        fixed_widths = [68, 9] # name and ML-only
+        default_width = 18 # versions
         def parse_line(line: str) -> list[str]:
             cells: list[str] = []
             for i in range(0, 1000):
@@ -24,7 +25,10 @@ class Whitelist:
         return Whitelist(names)
 
     def __init__(self, names: Iterable[str]):
-        self._names = set(names)
+        self._names = set(names).union(sys.stdlib_module_names)
+
+    def __contains__(self, name: str):
+        return name in self._names
 
     def has(self, name: str):
-        return name in self._names
+        return name in self
