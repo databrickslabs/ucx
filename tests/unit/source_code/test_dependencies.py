@@ -153,7 +153,11 @@ def test_build_dependency_graph_safely_visits_non_file_dependencies():
 
     def list_side_effect(*args):
         path = args[0]
-        info = ObjectInfo(path=path, object_type=ObjectType.LIBRARY) if path=="some_library" else ObjectInfo(path=path, language=Language.PYTHON, object_type=ObjectType.FILE)
+        info = (
+            ObjectInfo(path=path, object_type=ObjectType.LIBRARY)
+            if path == "some_library"
+            else ObjectInfo(path=path, language=Language.PYTHON, object_type=ObjectType.FILE)
+        )
         return [info]
 
     ws = create_autospec(WorkspaceClient)
