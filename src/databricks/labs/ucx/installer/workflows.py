@@ -185,9 +185,9 @@ class DeployedWorkflows:
                 return True
         for run in current_runs:
             if (
-                    run.run_id
-                    and run.state
-                    and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
+                run.run_id
+                and run.state
+                and run.state.life_cycle_state in (RunLifeCycleState.RUNNING, RunLifeCycleState.PENDING)
             ):
                 logger.info("Identified a run in progress waiting for run completion")
                 self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=run.run_id)
@@ -376,16 +376,16 @@ class DeployedWorkflows:
 
 class WorkflowsDeployment(InstallationMixin):
     def __init__(  # pylint: disable=too-many-arguments
-            self,
-            config: WorkspaceConfig,
-            installation: Installation,
-            install_state: InstallState,
-            ws: WorkspaceClient,
-            wheels: WheelsV2,
-            product_info: ProductInfo,
-            verify_timeout: timedelta,
-            tasks: list[Task],
-            skip_dashboards=False,
+        self,
+        config: WorkspaceConfig,
+        installation: Installation,
+        install_state: InstallState,
+        ws: WorkspaceClient,
+        wheels: WheelsV2,
+        product_info: ProductInfo,
+        verify_timeout: timedelta,
+        tasks: list[Task],
+        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -542,10 +542,10 @@ class WorkflowsDeployment(InstallationMixin):
 
     @staticmethod
     def _apply_cluster_overrides(
-            workflow_name: str,
-            settings: dict[str, Any],
-            overrides: dict[str, str],
-            wheel_runner: str,
+        workflow_name: str,
+        settings: dict[str, Any],
+        overrides: dict[str, str],
+        wheel_runner: str,
     ) -> dict:
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
@@ -627,10 +627,10 @@ class WorkflowsDeployment(InstallationMixin):
                 notebook_path=remote_notebook,
                 # ES-872211: currently, we cannot read WSFS files from Scala context
                 base_parameters={
-                                    "task": task.name,
-                                    "config": f"/Workspace{self._config_file}",
-                                }
-                                | EXTRA_TASK_PARAMS,
+                    "task": task.name,
+                    "config": f"/Workspace{self._config_file}",
+                }
+                | EXTRA_TASK_PARAMS,
             ),
         )
 
@@ -658,7 +658,6 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _job_clusters(self, names: set[str]):
         clusters = []
-        node_type = self._ws.clusters.select_node_type(min_memory_gb=16)
         if "main" in names:
             clusters.append(
                 jobs.JobCluster(
@@ -681,7 +680,6 @@ class WorkflowsDeployment(InstallationMixin):
                         spark_conf=self._job_cluster_spark_conf("tacl"),
                         num_workers=1,  # ShowPermissionsCommand needs a worker
                         policy_id=self._config.policy_id,
-                        node_type_id=node_type
                     ),
                 )
             )
@@ -694,7 +692,6 @@ class WorkflowsDeployment(InstallationMixin):
                         data_security_mode=compute.DataSecurityMode.USER_ISOLATION,
                         spark_conf=self._job_cluster_spark_conf("table_migration"),
                         policy_id=self._config.policy_id,
-                        node_type_id=node_type,
                         autoscale=compute.AutoScale(
                             max_workers=self._config.max_workers,
                             min_workers=self._config.min_workers,
