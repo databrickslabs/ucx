@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.lsql.backends import SqlBackend
 
-from databricks.labs.ucx.assessment.workflows import Assessment, DestroySchema
+from databricks.labs.ucx.assessment.workflows import Assessment, Failing
 
 
 def test_assess_azure_service_principals(run_workflow):
@@ -81,6 +81,6 @@ def test_incompatible_submit_runs(run_workflow):
     assert "SELECT * FROM ucx.submit_runs" in ctx.sql_backend.queries
 
 
-def test_runtime_destroy_schema(run_workflow):
-    ctx = run_workflow(DestroySchema.destroy_schema)
-    assert "DROP DATABASE ucx CASCADE" in ctx.sql_backend.queries
+def test_failing_task_raises_value_error(run_workflow):
+    with pytest.raises(ValueError):
+        run_workflow(Failing.failing_task)

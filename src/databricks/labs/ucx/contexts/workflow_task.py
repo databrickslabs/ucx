@@ -14,6 +14,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.hive_metastore import TablesInMounts
 from databricks.labs.ucx.hive_metastore.table_size import TableSizeCrawler
+from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder
 
 
 class RuntimeContext(GlobalContext):
@@ -89,4 +90,16 @@ class RuntimeContext(GlobalContext):
             self.mounts_crawler,
             self.config.include_mounts,
             self.config.exclude_paths_in_mount,
+        )
+
+    @cached_property
+    def task_run_warning_recorder(self):
+        return TaskRunWarningRecorder(
+            self._config_path.parent,
+            self.named_parameters["workflow"],
+            int(self.named_parameters["job_id"]),
+            int(self.named_parameters["parent_run_id"]),
+            self.sql_backend,
+            self.inventory_database,
+            int(self.named_parameters.get("attempt", "0")),
         )

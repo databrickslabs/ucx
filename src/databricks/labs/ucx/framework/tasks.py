@@ -10,7 +10,7 @@ from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.logger import install_logger
-from databricks.labs.lsql.backends import RuntimeBackend, SqlBackend
+from databricks.labs.lsql.backends import SqlBackend, RuntimeBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config
 from databricks.sdk.retries import retried
@@ -32,6 +32,9 @@ class Task:
     notebook: str | None = None
     dashboard: str | None = None
     cloud: str | None = None
+
+    def is_testing(self):
+        return self.workflow in {"failing"}
 
     def dependencies(self):
         if not self.depends_on:
@@ -70,7 +73,14 @@ class TaskLogger(contextlib.AbstractContextManager):
     # See https://docs.python.org/3/howto/logging-cookbook.html
 
     def __init__(
-        self, install_dir: Path, workflow: str, workflow_id: str, task_name: str, workflow_run_id: str, log_level="INFO"
+        self,
+        install_dir: Path,
+        workflow: str,
+        workflow_id: str,
+        task_name: str,
+        workflow_run_id: str,
+        log_level="INFO",
+        attempt: str = "0",
     ):
         self._log_level = log_level
         self._workflow = workflow
@@ -78,9 +88,13 @@ class TaskLogger(contextlib.AbstractContextManager):
         self._workflow_run_id = workflow_run_id
         self._databricks_logger = logging.getLogger("databricks")
         self._app_logger = logging.getLogger("databricks.labs.ucx")
-        self._log_path = install_dir / "logs" / self._workflow / f"run-{self._workflow_run_id}"
+        self._log_path = self.log_path(install_dir, workflow, workflow_run_id, attempt)
         self.log_file = self._log_path / f"{task_name}.log"
         self._app_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {self.log_file}")
+
+    @classmethod
+    def log_path(cls, install_dir: Path, workflow: str, workflow_run_id: str | int, attempt: str | int) -> Path:
+        return install_dir / "logs" / workflow / f"run-{workflow_run_id}-{attempt}"
 
     def __repr__(self):
         return self.log_file.as_posix()
@@ -108,7 +122,7 @@ class TaskLogger(contextlib.AbstractContextManager):
     def _init_debug_logfile(self):
         log_format = "%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s"
         log_formatter = logging.Formatter(fmt=log_format, datefmt="%H:%M:%S")
-        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="M", interval=10)
+        self._file_handler = TimedRotatingFileHandler(self.log_file.as_posix(), when="M", interval=1)
         self._file_handler.setFormatter(log_formatter)
         self._file_handler.setLevel(logging.DEBUG)
 
@@ -170,6 +184,7 @@ def run_task(
     sql_backend: RuntimeBackend,
     installation: Installation,
 ):
+    # TODO: remove this function
     task_name = args.get("task", "not specified")
     if task_name not in _TASKS:
         msg = f'task "{task_name}" not found. Valid tasks are: {", ".join(_TASKS.keys())}'
