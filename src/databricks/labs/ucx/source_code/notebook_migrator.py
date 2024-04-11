@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.dependencies import (
 )
 
 
-class SourceCodeMigrator:
+class NotebookMigrator:
     def __init__(
         self,
         ws: WorkspaceClient,

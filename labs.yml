@@ -18,6 +18,11 @@ commands:
       {{range .}}{{.step}}\t{{.state}}\t{{.started}}
       {{end}}
 
+  - name: logs
+    description: Show logs from the latest job run
+    flags:
+      - name: workflow
+        description: Name of the workflow to show logs for - assessment, table-migration, etc
 
   - name: installations
     description: Show installations by different users on the same workspace
