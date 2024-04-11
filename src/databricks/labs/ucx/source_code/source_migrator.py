@@ -6,15 +6,15 @@ from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, DependencyLoader
 
 
-class NotebookMigrator:
+class SourceCodeMigrator:
     def __init__(self, ws: WorkspaceClient, languages: Languages, loader: DependencyLoader):
         self._ws = ws
         self._languages = languages
         self._loader = loader
 
     def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
-        if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
-            raise ValueError("Not a valid Notebook")
+        if not object_info.path or not object_info.language:
+            raise ValueError(f"Not a valid source of code: {object_info.path}")
         dependency = Dependency.from_object_info(object_info)
         graph = DependencyGraph(dependency, None, self._loader)
         container = self._loader.load_dependency(dependency)
