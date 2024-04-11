@@ -14,12 +14,12 @@ class FromDbfsFolder(Linter):
         return 'dbfs-query'
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code):
+        for statement in sqlglot.parse(code, dialect='spark'):
             if not statement:
                 continue
             for table in statement.find_all(Table):
                 # Check table names for deprecated DBFS table names
-                yield from self._check_table_name(table)
+                yield from self._check_dbfs_folder(table)
 
     def _check_dbfs_folder(self, table: Table) -> Iterable[Advice]:
         """
