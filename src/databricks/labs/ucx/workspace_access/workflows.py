@@ -11,11 +11,14 @@ class GroupMigration(Workflow):
     def __init__(self):
         super().__init__('migrate-groups')
 
-    @job_task(depends_on=[Assessment.crawl_groups])
+    @job_task(job_cluster="table_migration")
+    def verify_metastore_attached(self, ctx: RuntimeContext):
+        """Verifies if a metastore is attached to this workspace. If not, the workflow will fail."""
+        ctx.verify_has_metastore.verify_metastore()
+
+    @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
         """Renames workspace local groups by adding `ucx-renamed-` prefix."""
-        if ctx.verify_has_metastore.verify_metastore():
-            logger.info("Metastore exists in the workspace")
         ctx.group_manager.rename_groups()
 
     @job_task(depends_on=[rename_workspace_local_groups])
@@ -41,7 +44,7 @@ class GroupMigration(Workflow):
             return
         ctx.permission_manager.apply_group_permissions(migration_state)
 
-    @job_task(job_cluster="tacl")
+    @job_task(depends_on=[apply_permissions_to_account_groups], job_cluster="tacl")
     def validate_groups_permissions(self, ctx: RuntimeContext):
         """Validate that all the crawled permissions are applied correctly to the destination groups."""
         ctx.permission_manager.verify_group_permissions()
@@ -51,7 +54,12 @@ class PermissionsMigrationAPI(Workflow):
     def __init__(self):
         super().__init__('migrate-groups-experimental')
 
-    @job_task(depends_on=[Assessment.crawl_groups])
+    @job_task(job_cluster="table_migration")
+    def verify_metastore_attached(self, ctx: RuntimeContext):
+        """Verifies if a metastore is attached to this workspace. If not, the workflow will fail."""
+        ctx.verify_has_metastore.verify_metastore()
+
+    @job_task(depends_on=[Assessment.crawl_groups, verify_metastore_attached])
     def rename_workspace_local_groups(self, ctx: RuntimeContext):
         """[EXPERIMENTAL] Renames workspace local groups by adding `ucx-renamed-` prefix."""
         ctx.group_manager.rename_groups()

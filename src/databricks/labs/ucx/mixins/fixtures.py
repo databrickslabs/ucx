@@ -976,10 +976,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         table_type: TableType | None = None
         data_source_format = None
         storage_location = None
+        view_text = None
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         ddl = f'CREATE {"VIEW" if view else "TABLE"} {full_name}'
         if view:
             table_type = TableType.VIEW
+            view_text = ctas
         if ctas is not None:
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
@@ -1019,6 +1021,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             properties=tbl_properties,
             storage_location=storage_location,
             table_type=table_type,
+            view_definition=view_text,
             data_source_format=data_source_format,
         )
         logger.info(

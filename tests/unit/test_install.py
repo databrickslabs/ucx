@@ -16,7 +16,7 @@ from databricks.labs.blueprint.wheels import (
     find_project_root,
 )
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     AlreadyExists,
     InvalidParameterValue,
@@ -41,6 +41,7 @@ from databricks.sdk.service.jobs import (
     RunResultState,
     RunState,
 )
+from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
     Dashboard,
     DataSource,
@@ -60,6 +61,7 @@ from databricks.labs.ucx.install import (
     WorkspaceInstallation,
     WorkspaceInstaller,
     extract_major_minor,
+    AccountInstaller,
 )
 from databricks.labs.ucx.installer.workflows import (
     DeployedWorkflows,
@@ -969,7 +971,7 @@ def test_repair_run_no_job_id(ws, mock_installation, caplog):
 
     with caplog.at_level('WARNING'):
         deployed.repair_run("assessment")
-        assert 'skipping assessment: job does not exists hence skipping repair' in caplog.messages
+        assert 'Skipping assessment: job does not exists hence skipping repair' in caplog.messages
 
 
 def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
@@ -982,7 +984,7 @@ def test_repair_run_no_job_run(ws, mock_installation_with_jobs, caplog):
 
     with caplog.at_level('WARNING'):
         deployed.repair_run("assessment")
-        assert "skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
+        assert "Skipping assessment: job is not initialized yet. Can't trigger repair run now" in caplog.messages
 
 
 def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
@@ -994,7 +996,7 @@ def test_repair_run_exception(ws, mock_installation_with_jobs, caplog):
 
     with caplog.at_level('WARNING'):
         deployed.repair_run("assessment")
-        assert "skipping assessment: Workflow does not exists" in caplog.messages
+        assert "Skipping assessment: Workflow does not exists" in caplog.messages
 
 
 def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
@@ -1361,7 +1363,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     ws.jobs.delete.assert_called_with("123")
 
 
-def test_get_existing_installation_global(ws, mock_installation, mocker):
+def test_get_existing_installation_global(ws, mock_installation):
     base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1501,6 +1503,8 @@ def test_check_inventory_database_exists(ws, mock_installation):
         {
             r".*Inventory Database stored in hive_metastore": "ucx_exists",
             r".*": "",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*workspace group names.*": "g1, g2, g99",
         }
     )
 
@@ -1638,3 +1642,26 @@ def test_extract_major_minor_versions():
 
     version_string3 = "should not match"
     assert extract_major_minor(version_string3) is None
+
+
+def test_account_installer(ws):
+    acc = create_autospec(AccountClient)
+    acc.workspaces.list.return_value = [
+        Workspace(workspace_id=123, deployment_name="test"),
+        Workspace(workspace_id=456, deployment_name="test2"),
+    ]
+    acc.get_workspace_client.return_value = ws
+
+    account_installer = AccountInstaller(acc)
+    account_installer.prompts = MockPrompts(
+        {
+            r"UCX has detected the following workspaces*": "Yes",
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "0",
+            r"Do you want to install UCX on the remaining*": "Yes",
+            r".*": "",
+        }
+    )
+    account_installer.install_on_account(ProductInfo.for_testing(WorkspaceConfig))
+    # should have 4 uploaded call, 2 for config.yml, 2 for workspace.json
+    assert ws.workspace.upload.call_count == 4
