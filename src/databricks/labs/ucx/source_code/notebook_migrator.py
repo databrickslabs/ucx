@@ -6,7 +6,7 @@ from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, DependencyLoader
 
 
-class SourceCodeMigrator:
+class NotebookMigrator:
     def __init__(self, ws: WorkspaceClient, languages: Languages, loader: DependencyLoader):
         self._ws = ws
         self._languages = languages
