@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import cached_property
 
 from databricks.sdk.core import (
     ApiClient,
@@ -162,6 +163,37 @@ class AzureAPIClient:
 
     def token(self):
         return self._token_source.token()
+
+
+class AccessConnectorClient:
+
+    def __init__(self, azure_mgmt: AzureAPIClient) -> None:
+        self._api_version = "2023-05-01"
+        self._azure_mgmt = azure_mgmt
+
+    def list(self, subscription_id: str) -> list[AccessConnector]:
+        """List all access connector within subscription
+        
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP    
+        """
+        _ = subscription_id
+        return []
+
+    def create(self, connector_name: str, resource_group_name: str, subscription_id: str):
+        """Create access connector.
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/create-or-update?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
+        _ = connector_name, resource_group_name, subscription_id
+
+    def delete(self, connector_name: str, resource_group_name: str, subscription_id: str):
+        """Delete an access connector.
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
 
 
 class AzureResources:
@@ -388,3 +420,7 @@ class AzureResources:
                 return None
             return principal.client_id
         return None
+
+    @cached_property
+    def access_connector_handler(self) -> AccessConnectorClient:
+        return AccessConnectorClient(self._mgmt)
