@@ -45,6 +45,7 @@ class TablesMigrator:
         group_manager: GroupManager,
         migration_status_refresher: 'MigrationStatusRefresher',
         principal_grants: PrincipalACL,
+        mount_grants: PrincipalACL,
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -67,6 +68,7 @@ class TablesMigrator:
         all_grants_to_migrate = None if acl_strategy is None else self._gc.snapshot()
         all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
         all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
+        all_spn_mount_grants = None if acl_strategy is None else self._principal_grants.get_spn_mount_grants()
         self._init_seen_tables()
         if what == What.VIEW:
             return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)

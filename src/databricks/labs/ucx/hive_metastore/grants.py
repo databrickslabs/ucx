@@ -614,3 +614,15 @@ class PrincipalACL:
             if acl.service_principal_name is not None:
                 principal_list.append(acl.service_principal_name)
         return principal_list
+
+    def get_spn_mount_grants(self) -> list[Grant]:
+        grants = []
+
+
+        # get mounts and spn mapping
+
+        # get mounts and table mapping
+
+        # get user, table and cluster mapping
+
+        return None
