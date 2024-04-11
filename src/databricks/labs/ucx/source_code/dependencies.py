@@ -62,9 +62,9 @@ class DependencyLoader:
         raise NotImplementedError(str(object_info.object_type))
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
-        result = self._ws.workspace.list(dependency.path)
-        object_info = next((oi for oi in result), None)
-        if object_info is None:
+        object_info = self._ws.workspace.get_status(dependency.path)
+        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
+        if object_info is None or object_info.object_type is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
         if dependency.type is not None and object_info.object_type is not dependency.type:
             raise ValueError(
