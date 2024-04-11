@@ -205,7 +205,8 @@ class TablesMigrator:
         )
         # Getting columns definition from the show create table output
         create_statement = self._backend.fetch(f"SHOW CREATE TABLE {src_table.safe_sql_key}")
-        columns = FromTable.view_columns(next(create_statement)[0])
+        create_str = next(iter(create_statement))["createtab_stmt"]
+        columns = FromTable.view_columns(create_str)
         columns_text = f" ({', '.join(columns)})" if columns else ""
         return (
             f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)}{columns_text} AS {new_view_text};"

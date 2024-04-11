@@ -945,11 +945,16 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
         )
         return schema_info
 
-    yield from factory(
-        "schema",
-        create,
-        lambda schema_info: sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE"),
-    )
+    def remove(schema_info: SchemaInfo):
+        try:
+            sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE")
+        except RuntimeError as e:
+            if "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
+            else:
+                raise e
+
+    yield from factory("schema", create, remove)
 
 
 @pytest.fixture

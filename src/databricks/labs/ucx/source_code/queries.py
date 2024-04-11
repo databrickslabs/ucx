@@ -110,7 +110,7 @@ class FromTable(Linter, Fixer):
         except ParseError as e:
             raise ValueError(f"Could not analyze view SQL: {code}") from e
         statement = statements[0]
-        if not statement.this.expressions:
+        if not statement.this.expressions or len(statement.this.expressions) == 0:
             return None
         columns = []
         for expression in statement.this.expressions:
