@@ -65,7 +65,7 @@ def test_build_dependency_graph_fails_with_unfound_dependency():
         migrator.build_dependency_graph(object_info)
 
 
-def test_build_dependency_graph_visits_local_dependencies():
+def test_build_dependency_graph_visits_file_dependencies():
     paths = ["root5.py.txt", "leaf4.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(Notebook, *paths)))
     visited: dict[str, bool] = {}
