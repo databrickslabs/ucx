@@ -16,8 +16,8 @@ from databricks.labs.ucx.azure.credentials import (
     StorageCredentialManager,
     StorageCredentialValidationResult,
 )
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from tests.integration.azure.conftest import azure_resources
 from tests.integration.conftest import StaticServicePrincipalCrawler
 
 
@@ -53,17 +53,6 @@ def extract_test_info(ws, env_or_skip, make_random):
     client_secret = base64.b64decode(secret_response.value).decode("utf-8")
 
     return MigrationTestInfo(credential_name, application_id, directory_id, secret_scope, secret_key, client_secret)
-
-
-@pytest.fixture
-def azure_resources(ws):
-    azure_mgmt_client = AzureAPIClient(
-        ws.config.arm_environment.resource_manager_endpoint,
-        ws.config.arm_environment.service_management_endpoint,
-    )
-    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-    azure_resources = AzureResources(azure_mgmt_client, graph_client)
-    return azure_resources
 
 
 @pytest.fixture
