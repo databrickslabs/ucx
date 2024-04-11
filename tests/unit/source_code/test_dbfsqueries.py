@@ -21,7 +21,7 @@ def test_non_dbfs_trigger_nothing(query):
 @pytest.mark.parametrize(
     "query, table",
     [
-        ("SELECT * FROM parquet.'dbfs:/...' LIMIT 10", "parquet.dbfs:/..."),
+        ("SELECT * FROM parquet.`dbfs:/...` LIMIT 10", "parquet.dbfs:/..."),
         ("SELECT * FROM delta.'/mnt/...' WHERE foo > 6", "delta./mnt/..."),
         ("SELECT * FROM json.'/a/b/c' WHERE foo > 6", "json./a/b/c"),
         ("DELETE FROM json.'/...' WHERE foo = 'bar'", "json./..."),
