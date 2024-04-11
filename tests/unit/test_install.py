@@ -1613,8 +1613,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
         RuntimeWarning,
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
-        install.configure(
-            )
+        install.configure()
 
     first_prompts = base_prompts.extend(
         {
