@@ -59,6 +59,7 @@ class Workflows:
         install_dir = config_path.parent
         task_name = named_parameters.get("task", "not specified")
         workflow_name = named_parameters.get("workflow", "not specified")
+        attempt = named_parameters.get("attempt", "0")
         if workflow_name not in self._workflows:
             msg = f'workflow "{workflow_name}" not found. Valid workflows are: {", ".join(self._workflows.keys())}'
             raise KeyError(msg)
@@ -76,6 +77,7 @@ class Workflows:
             task_name=task_name,
             workflow_run_id=workflow_run_id,
             log_level=ctx.config.log_level,
+            attempt=attempt,
         ) as task_logger:
             ucx_logger = logging.getLogger("databricks.labs.ucx")
             ucx_logger.info(f"UCX v{__version__} After job finishes, see debug logs at {task_logger}")

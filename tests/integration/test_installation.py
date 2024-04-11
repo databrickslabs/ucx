@@ -17,7 +17,6 @@ from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
-    Unknown,
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
@@ -394,7 +393,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         request_object_type="cluster-policies", request_object_id=cluster_policy.policy_id, access_control_list=[]
     )
 
-    with pytest.raises(Unknown):
+    with pytest.raises(ManyError):
         deployed_workflow.run_workflow("validate-groups-permissions")
 
 
@@ -418,25 +417,15 @@ def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
-def test_repair_run_workflow_job(ws, mocker, new_installation, sql_backend):
-    install, deployed_workflow = new_installation()
+def test_repair_run_workflow_job(new_installation, mocker):
     mocker.patch("webbrowser.open")
-    sql_backend.execute(f"DROP SCHEMA {install.config.inventory_database} CASCADE")
-    with pytest.raises(NotFound):
-        deployed_workflow.run_workflow("099-destroy-schema")
+    _, deployed_workflows = new_installation()
+    with pytest.raises(ManyError):
+        deployed_workflows.run_workflow("failing")
 
-    sql_backend.execute(f"CREATE SCHEMA IF NOT EXISTS {install.config.inventory_database}")
+    deployed_workflows.repair_run("failing")
 
-    deployed_workflow.repair_run("099-destroy-schema")
-
-    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
-    state = InstallState.from_installation(installation)
-    workflow_job_id = state.jobs["099-destroy-schema"]
-    run_status = None
-    while run_status is None:
-        job_runs = list(ws.jobs.list_runs(job_id=workflow_job_id, limit=1))
-        run_status = job_runs[0].state.result_state
-    assert run_status.value == "SUCCESS"
+    assert deployed_workflows.validate_step("failing")
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

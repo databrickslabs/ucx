@@ -9,6 +9,8 @@ from typing import TextIO
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import InternalError
 
+from databricks.labs.ucx.framework.tasks import TaskLogger
+
 logger = logging.getLogger(__name__)
 
 
@@ -90,6 +92,7 @@ class TaskRunWarningRecorder:
         job_run_id: int,
         sql_backend: SqlBackend,
         schema: str,
+        attempt: int = 0,
     ):
         """
         Initializes a LogProcessor instance.
@@ -111,7 +114,7 @@ class TaskRunWarningRecorder:
         self._sql_backend = sql_backend
         self._schema = schema
 
-        self._log_path = Path(install_dir) / "logs" / self._workflow / f"run-{self._job_run_id}"
+        self._log_path = TaskLogger.log_path(Path(str(install_dir)), workflow, job_run_id, attempt)
 
     @property
     def full_name(self) -> str:

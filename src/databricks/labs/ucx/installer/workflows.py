@@ -41,6 +41,7 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
+from databricks.sdk.service.workspace import ObjectType
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
+    "attempt": "{{job.repair_count}}",
     "parent_run_id": "{{parent_run_id}}",
 }
 DEBUG_NOTEBOOK = """# Databricks notebook source
@@ -101,6 +103,7 @@ main(f'--config=/Workspace{config_file}',
      f'--task=' + dbutils.widgets.get('task'),
      f'--job_id=' + dbutils.widgets.get('job_id'),
      f'--run_id=' + dbutils.widgets.get('run_id'),
+     f'--attempt=' + dbutils.widgets.get('attempt'),
      f'--parent_run_id=' + dbutils.widgets.get('parent_run_id'))
 """
 
@@ -112,6 +115,9 @@ class DeployedWorkflows:
         self._verify_timeout = verify_timeout
 
     def run_workflow(self, step: str):
+        # this dunder variable is hiding this method from tracebacks, making it cleaner
+        # for the user to see the actual error without too much noise.
+        __tracebackhide__ = True  # pylint: disable=unused-variable
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"starting {step} job: {self._ws.config.host}#job/{job_id}")
         job_initial_run = self._ws.jobs.run_now(job_id)
@@ -133,11 +139,11 @@ class DeployedWorkflows:
             run_details = self._ws.jobs.get_run(run_id=run_id, include_history=True)
             latest_repair_run_id = run_details.repair_history[-1].id
             job_url = f"{self._ws.config.host}#job/{job_id}/run/{run_id}"
-            logger.debug(f"Repair Running {workflow} job: {job_url}")
+            logger.debug(f"Repairing {workflow} job: {job_url}")
             self._ws.jobs.repair_run(run_id=run_id, rerun_all_failed_tasks=True, latest_repair_id=latest_repair_run_id)
             webbrowser.open(job_url)
         except InvalidParameterValue as e:
-            logger.warning(f"skipping {workflow}: {e}")
+            logger.warning(f"Skipping {workflow}: {e}")
         except TimeoutError:
             logger.warning(f"Skipping the {workflow} due to time out. Please try after sometime")
 
@@ -192,13 +198,22 @@ class DeployedWorkflows:
     def _relay_logs(self, workflow, run_id):
         for log in self._fetch_logs(workflow, run_id):
             task_logger = logging.getLogger(log.component)
-            # we're relaying almost raw log events, so we need to call the logger directly
-            raw_log_event = task_logger._log  # pylint: disable=protected-access
-            raw_log_event(logging.getLevelName(log.level), log.message, ())
+            task_logger.log(logging.getLevelName(log.level), log.message)
 
     def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
-        log_path = f'{self._install_state.install_folder()}/logs/{workflow}/run-{run_id}'
-        for object_info in self._ws.workspace.list(log_path):
+        log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
+        run_folders = []
+        for run_folder in self._ws.workspace.list(log_path):
+            if not run_folder.path or run_folder.object_type != ObjectType.DIRECTORY:
+                continue
+            if f'run-{run_id}-' not in run_folder.path:
+                continue
+            run_folders.append(run_folder.path)
+        if not run_folders:
+            return
+        # sort folders based on the last repair attempt
+        last_attempt = sorted(run_folders, key=lambda _: int(_.split('-')[-1]), reverse=True)[0]
+        for object_info in self._ws.workspace.list(last_attempt):
             if not object_info.path:
                 continue
             if '.log' not in object_info.path:
@@ -647,6 +662,7 @@ class WorkflowsDeployment(InstallationMixin):
                 )
             )
         if "table_migration" in names:
+            # TODO: rename to "user-isolation", so that we can use it in group migration workflows
             clusters.append(
                 jobs.JobCluster(
                     job_cluster_key="table_migration",

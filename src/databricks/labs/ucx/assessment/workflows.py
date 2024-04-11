@@ -217,8 +217,12 @@ class Failing(Workflow):
         super().__init__('failing')
 
     @job_task
-    def failing_task(self, _: RuntimeContext):
+    def failing_task(self, ctx: RuntimeContext):
         """This task always fails. It is used to test the failure handling of the framework."""
+        attempt = ctx.named_parameters.get("attempt", "0")
+        if int(attempt) > 0:
+            logger.info("This task is no longer failing.")
+            return
         logger.warning("This is a test warning message.")
         logger.error("This is a test error message.")
         raise ValueError("This task is supposed to fail.")
