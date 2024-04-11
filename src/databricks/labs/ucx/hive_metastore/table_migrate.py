@@ -226,7 +226,7 @@ class TablesMigrator:
             return False
 
         table_migrate_sql = src_table.sql_migrate_external_hiveserde_in_place(
-            rule, self._backend, hiveserde_in_place_migrate
+            rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_in_place_migrate
         )
         if not table_migrate_sql:
             logger.warning(

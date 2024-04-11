@@ -15,7 +15,6 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore.mapping import Rule
 
 logger = logging.getLogger(__name__)
 
@@ -175,9 +174,10 @@ class Table:
         )
 
     def sql_migrate_external_hiveserde_in_place(
-        self, rule: Rule, backend: SqlBackend, hiveserde_in_place_migrate: str
+        self, catalog_name, dst_schema, dst_table, backend: SqlBackend, hiveserde_in_place_migrate: str
     ) -> str | None:
-        # extract hive serde info
+        # extract hive serde info, ideally this should be done by table crawler.
+        # But doing here to avoid breaking change to the `tables` table in the inventory schema.
         describe = {}
         for key, values, _ in backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(self.key)}"):
             describe[key] = values
@@ -194,7 +194,7 @@ class Table:
                 hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
             )
         ):
-            return self._ddl_show_create_table(backend, rule)
+            return self._ddl_show_create_table(backend, catalog_name, dst_schema, dst_table)
 
         # "TEXTFILE" hiveserde needs extra handling on preparing the DDL
         # TODO: add support for "TEXTFILE" hiveserde
@@ -229,7 +229,7 @@ class Table:
             and output_format == "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
         )
 
-    def _ddl_show_create_table(self, backend: SqlBackend, rule: Rule) -> str:
+    def _ddl_show_create_table(self, backend: SqlBackend, catalog_name, dst_schema, dst_table) -> str:
         # get raw DDL from "SHOW CREATE TABLE..."
         createtab_stmt = next(backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(self.key)}"))["createtab_stmt"]
         # parse the DDL and replace the old table name with the new UC table name
@@ -238,7 +238,7 @@ class Table:
             if not statement:
                 continue
             for old_table in statement.find_all(SQLTable):
-                new_table = SQLTable(catalog=rule.catalog_name, db=rule.dst_schema, this=rule.dst_table)
+                new_table = SQLTable(catalog=catalog_name, db=dst_schema, this=dst_table)
                 old_table.replace(new_table)
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)
