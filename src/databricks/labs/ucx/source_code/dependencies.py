@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from collections.abc import Callable
 
-from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
+from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
 
 
@@ -88,12 +88,12 @@ class DependencyLoader:
         from databricks.labs.ucx.source_code.files import WorkspaceFile
 
         assert object_info.path is not None
-        assert object_info.language is not None
+        language = Language.PYTHON if object_info.language is None else object_info.language
         source = self._load_source(object_info)
-        return WorkspaceFile(object_info.path, source, object_info.language)
+        return WorkspaceFile(object_info.path, source, language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
-        if not object_info.language or not object_info.path:
+        if not object_info.path:
             raise ValueError(f"Invalid ObjectInfo: {object_info}")
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
             return f.read().decode("utf-8")

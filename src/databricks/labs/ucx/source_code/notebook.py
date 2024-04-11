@@ -38,7 +38,7 @@ class Cell(ABC):
 
     @property
     def migrated_code(self):
-        return self._migrated_code  # for now since we're not doing any migration yet
+        return self._migrated_code
 
     @migrated_code.setter
     def migrated_code(self, value: str):
@@ -72,15 +72,18 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        # TODO https://github.com/databrickslabs/ucx/issues/1202
         linter = ASTLinter.parse(self._original_code)
-        nodes = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        for node in nodes:
-            assert isinstance(node, ast.Call)
-            path = PythonLinter.get_dbutils_notebook_run_path_arg(node)
+        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        for call in calls:
+            assert isinstance(call, ast.Call)
+            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
                 dependency = Dependency(ObjectType.NOTEBOOK, path.value.strip("'").strip('"'))
                 parent.register_dependency(dependency)
+        names = PythonLinter.list_import_sources(linter)
+        for name in names:
+            dependency = Dependency(None, name)
+            parent.register_dependency(dependency)
 
 
 class RCell(Cell):

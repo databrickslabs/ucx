@@ -13,8 +13,10 @@ class SourceCodeMigrator:
         self._loader = loader
 
     def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
-        if not object_info.path or not object_info.language:
+        if not object_info.path or not object_info.object_type:
             raise ValueError(f"Not a valid source of code: {object_info.path}")
+        if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
+            raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
         dependency = Dependency.from_object_info(object_info)
         graph = DependencyGraph(dependency, None, self._loader)
         container = self._loader.load_dependency(dependency)
