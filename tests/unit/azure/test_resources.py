@@ -267,7 +267,7 @@ def test_managed_identity_not_found():
 
 @pytest.fixture
 def access_connector_client() -> AccessConnectorClient:
-    return AccessConnectorClient(azure_api_client())
+    return AccessConnectorClient(azure_api_client)
 
 
 def test_access_connector_handler_list_access_connectors(
@@ -277,10 +277,11 @@ def test_access_connector_handler_list_access_connectors(
     assert len(list(access_connectors)) > 0
 
 
-def test_access_connector_handler_get(
-    access_connector_client: AccessConnectorClient,
-) -> None:
-    access_connector = access_connector_client.get("test", "rg-test", "test-access-connector")
+def test_azure_resources_get_access_connector() -> None:
+    """Should return the properties of the mocked response."""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connector = azure_resource.get_access_connector("test", "rg-test", "test-access-connector")
     assert access_connector.name == "test-access-connector"
     assert access_connector.tags["application"] == "databricks"
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"

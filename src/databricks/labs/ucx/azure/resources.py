@@ -194,26 +194,6 @@ class AccessConnectorClient:
         self._api_version = "2023-05-01"
         self._mgmt = azure_mgmt
 
-    def get(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
-        """Get an access connector.
-
-        Docs:
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/get?view=rest-databricks-2023-05-01&tabs=HTTP
-        """
-        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
-        response = self._mgmt.get(url, self._api_version)
-        access_connector = AccessConnector(
-            id=response["id"],
-            name=response["name"],
-            location=response["location"],
-            type=response["type"],
-            identity=response.get("identity", {}),
-            tags=response.get("tags", {}),
-            properties=response.get("properties", {}),
-            system_data=response.get("systemData", {}),
-        )
-        return access_connector
-
     def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
         """List all resources of a type within subscription"""
         query = {"api-version": "2020-06-01", "$filter": f"resourceType eq '{resource_type}'"}
@@ -514,3 +494,23 @@ class AzureResources:
     def access_connectors(self) -> AccessConnectorClient:
         # TODO: remove this and move all the methods to the AzureResources class
         return AccessConnectorClient(self._mgmt)
+
+    def get_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
+        """Get an access connector.
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/get?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
+        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
+        response = self._mgmt.get(url, "2023-05-01")
+        access_connector = AccessConnector(
+            id=response["id"],
+            name=response["name"],
+            location=response["location"],
+            type=response["type"],
+            identity=response.get("identity", {}),
+            tags=response.get("tags", {}),
+            properties=response.get("properties", {}),
+            system_data=response.get("systemData", {}),
+        )
+        return access_connector
