@@ -419,15 +419,16 @@ class AzureResources:
         """
         url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         response = self._mgmt.get(url, api_version="2023-05-01")
+        raw = RawResource(response)
         access_connector = AccessConnector(
-            id=response["id"],
-            name=response["name"],
-            location=response["location"],
-            type=response["type"],
-            identity=response.get("identity", {}),
-            tags=response.get("tags", {}),
-            properties=response.get("properties", {}),
-            system_data=response.get("systemData", {}),
+            id=str(raw.id),
+            name=raw.get("name", ""),
+            location=raw.get("location", ""),
+            type=raw.get("type", ""),
+            identity=raw.get("identity", {}),
+            tags=raw.get("tags", {}),
+            properties=raw.get("properties", {}),
+            system_data=raw.get("systemData", {}),
         )
         return access_connector
 
