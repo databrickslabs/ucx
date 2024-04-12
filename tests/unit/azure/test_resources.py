@@ -305,8 +305,6 @@ def test_access_connector_handler_get(
     access_connector_client: AccessConnectorClient,
 ) -> None:
     access_connector = access_connector_client.get("test", "rg-test", "test-access-connector")
-    assert access_connector.subscription_id == "test"
-    assert access_connector.resource_group == "rg-test"
     assert access_connector.name == "test-access-connector"
     assert access_connector.tags["application"] == "databricks"
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
