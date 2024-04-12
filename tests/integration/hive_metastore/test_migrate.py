@@ -269,6 +269,8 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_revert_migrated_table(sql_backend, runtime_ctx, make_schema, make_catalog):
+    if not runtime_ctx.workspace_client.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     src_schema1 = make_schema(catalog_name="hive_metastore")
     src_schema2 = make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema1.name)
@@ -380,6 +382,8 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_schema, make_catalog):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
@@ -500,6 +504,8 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
 @pytest.fixture
 def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_catalog, make_schema, make_cluster):
+    if not runtime_ctx.workspace_client.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{runtime_ctx.inventory_database}'
     make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
