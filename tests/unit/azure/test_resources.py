@@ -265,15 +265,11 @@ def test_managed_identity_not_found():
     )
 
 
-@pytest.fixture
-def access_connector_client() -> AccessConnectorClient:
-    return AccessConnectorClient(azure_api_client)
-
-
-def test_access_connector_handler_list_access_connectors(
-    access_connector_client: AccessConnectorClient,
-) -> None:
-    access_connectors = access_connector_client.list("test")
+def test_azure_resources_list_access_connectors() -> None:
+    """Non-zero access connectors are mocked"""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connectors = azure_resource.list_access_connectors("test")
     assert len(list(access_connectors)) > 0
 
 
