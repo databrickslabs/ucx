@@ -121,18 +121,11 @@ class AccessConnector:
     id: str
     name: str
     location: str
+    type: str = "Microsoft.Databricks/accessConnectors"
+    identity: dict[str, str] = field(default=dict)
     tags: dict[str, str] = field(default_factory=dict)
-    # TODO: Add identity with reference to dataclass
-    # identity {"principalId": ..., "tenantId": ..., "type": ...}
-    # The raw API call contains the following fields as well:
-    # properties
-    # systemData
-
-    _type = "Microsoft.Databricks/accessConnectors"
-
-    @property
-    def type(self) -> str:
-        return self._type
+    properties: dict[str, str] = field(default_factory=dict)
+    system_data: dict[str, str] = field(default_factory=dict)
 
 
 class AzureAPIClient:
@@ -213,7 +206,11 @@ class AccessConnectorClient:
             id=response["id"],
             name=response["name"],
             location=response["location"],
+            type=response["type"],
+            identity=response.get("identity", {}),
             tags=response.get("tags", {}),
+            properties=response.get("properties", {}),
+            system_data=response.get("systemData", {}),
         )
         return access_connector
 
@@ -249,7 +246,11 @@ class AccessConnectorClient:
                 id=str(raw.id),
                 name=raw.get("name", ""),
                 location=raw.get("location", ""),
+                type=raw.get("type", ""),
+                identity=raw.get("identity", {}),
                 tags=raw.get("tags", {}),
+                properties=raw.get("properties", {}),
+                system_data=raw.get("systemData", {}),
             )
 
     def create_or_update(
