@@ -1,16 +1,26 @@
+import os
+
 import pytest
 from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AccessConnectorClient, AzureResources
+from databricks.labs.ucx.azure.resources import AzureAPIClient, AccessConnector, AccessConnectorClient
 
 
+SUBSCRIPTION_ID = "test"
+RESOURCE_GROUP = "rg-test"
+ACCESS_CONNECTOR_NAME = "test-access-connector"
+ACCESS_CONNECTOR_ID = (
+    f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
+    f"/providers/Microsoft.Databricks/accessConnectors/{ACCESS_CONNECTOR_NAME}"
+)
+LOCATION = "westeurope"
 TEST_ACCESS_CONNECTOR_RESPONSE = {"value": [{
-    "id": "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector",
-    "name": "test-access-connector",
+    "id": ACCESS_CONNECTOR_ID,
+    "name": ACCESS_CONNECTOR_NAME,
     "type": "Microsoft.Databricks/accessConnectors",
-    "location": "westeurope",
+    "location": LOCATION,
     "identity": {
         "principalId": "test",
         "tenantId": "test",
@@ -32,6 +42,7 @@ TEST_ACCESS_CONNECTOR_RESPONSE = {"value": [{
 }]}
 
 
+
 @pytest.fixture
 def azure_management_api_client(ws: WorkspaceClient) -> AzureAPIClient:
     azure_mgmt_client = AzureAPIClient(
@@ -43,9 +54,28 @@ def azure_management_api_client(ws: WorkspaceClient) -> AzureAPIClient:
 
 
 @pytest.fixture
+def access_connector() -> AccessConnector:
+    access_connector_client = AccessConnector(
+        id=ACCESS_CONNECTOR_ID,
+        name=ACCESS_CONNECTOR_NAME,
+        type="Microsoft.Databricks/accessConnectors",
+        location=LOCATION,
+    )
+    return access_connector_client
+
+
+@pytest.fixture
 def access_connector_client(azure_management_api_client: AzureAPIClient) -> AccessConnectorClient:
     access_connector_client = AccessConnectorClient(azure_management_api_client)
     return access_connector_client
+
+
+def test_access_connector_parse_subscription_id(access_connector: AccessConnector) -> None:
+    assert access_connector.subscription_id == SUBSCRIPTION_ID
+
+
+def test_access_connector_parse_resource_group(access_connector: AccessConnector) -> None:
+    assert access_connector.resource_group == RESOURCE_GROUP
 
 
 def test_access_connector_handler_list_access_connectors(

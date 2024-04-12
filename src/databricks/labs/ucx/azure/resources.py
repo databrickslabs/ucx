@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
@@ -107,6 +108,27 @@ class AccessConnector:
     # tags
     # properties
     # systemData
+
+    _pattern_id = re.compile(
+        r"^/subscriptions/([\w-]+)/resourceGroups/([\w-]+)"
+        r"/providers/Microsoft\.Databricks/accessConnectors/([\w-]+)$"
+    )
+
+    def _parse_id(self) -> tuple[str, str]:
+        match = self._pattern_id.match(self.id)
+        assert match is not None
+        subscription_id, resource_group, _ = match.groups()
+        return subscription_id, resource_group
+
+    @property
+    def subscription_id(self) -> str:
+        subscription_id, _ = self._parse_id()
+        return subscription_id
+
+    @property
+    def resource_group(self) -> str:
+        _, resource_group = self._parse_id()
+        return resource_group
 
 
 class AzureAPIClient:
