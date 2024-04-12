@@ -204,19 +204,6 @@ class AccessConnectorClient:
         self._api_version = "2023-05-01"
         self._mgmt = azure_mgmt
 
-    def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
-        """List all resources of a type within subscription"""
-        query = {'api-version': "2020-06-01", '$filter': f"resourceType eq '{resource_type}'"}
-        while True:
-            res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
-            for resource in res["value"]:
-                yield RawResource(resource)
-            next_link = res.get("nextLink", None)
-            if not next_link:
-                break
-            parsed_link = urllib.parse.urlparse(next_link)
-            query = dict(urllib.parse.parse_qsl(parsed_link.query))
-
     def get(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
         """Get an access connector.
 
@@ -233,7 +220,20 @@ class AccessConnectorClient:
         )
         return access_connector
 
-    def list(self, subscription_id: str) -> list[AccessConnector]:
+    def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
+        """List all resources of a type within subscription"""
+        query = {"api-version": "2020-06-01", "$filter": f"resourceType eq '{resource_type}'"}
+        while True:
+            res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
+            for resource in res["value"]:
+                yield RawResource(resource)
+            next_link = res.get("nextLink", None)
+            if not next_link:
+                break
+            parsed_link = urllib.parse.urlparse(next_link)
+            query = dict(urllib.parse.parse_qsl(parsed_link.query))
+
+    def list(self, subscription_id: str) -> Iterable[AccessConnector]:
         """List all access connector within subscription
         
         Docs:
