@@ -3,7 +3,8 @@ import datetime as dt
 from databricks.labs.ucx.azure.resources import AzureResource
 
 
-def test_access_connector_client_create_get_list_delete(az_cli_ctx, env_or_skip, make_random):
+def test_azure_resource_access_connector_list_create_get_delete(az_cli_ctx, env_or_skip, make_random):
+    """Test listing, creating, getting and deleting access connectors."""
     subscription_id = az_cli_ctx.azure_subscription_id
     resource_group_name = env_or_skip("TEST_RESOURCE_GROUP")
     access_connector_name = f"test-{make_random()}"
