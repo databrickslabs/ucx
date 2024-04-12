@@ -1,7 +1,7 @@
 import re
 import urllib.parse
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
 
@@ -122,7 +122,7 @@ class AccessConnector:
     id: str
     name: str
     location: str
-    tags: dict[str, str]
+    tags: dict[str, str] = field(default_factory=dict)
     # TODO: Add identity with reference to dataclass
     # identity {"principalId": ..., "tenantId": ..., "type": ...}
     # The raw API call contains the following fields as well:
