@@ -223,8 +223,8 @@ class TestRuntimeContext(RuntimeContext):
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
         self._env_or_skip = env_or_skip_fixture
-        self._tables = []
-        self._schemas = []
+        self._tables: list[TableInfo] = []
+        self._schemas: list[SchemaInfo] = []
         self._udfs = []
         self._grants = []
         # TODO: add methods to pre-populate the following:
@@ -289,6 +289,11 @@ class TestRuntimeContext(RuntimeContext):
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
 
+    def make_schema(self, **kwargs):
+        schema_info = self._make_schema(**kwargs)
+        self._schemas.append(schema_info)
+        return schema_info
+
     def make_table(self, **kwargs):
         table_info = self._make_table(**kwargs)
         self._tables.append(table_info)
@@ -348,8 +353,27 @@ class TestRuntimeContext(RuntimeContext):
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
+    def created_databases(self):
+        created_databases: set[str] = set()
+        for schema_info in self._schemas:
+            if schema_info.catalog_name != "hive_metastore":
+                continue
+            created_databases.add(schema_info.name)
+        for table_info in self._tables:
+            if table_info.catalog_name != "hive_metastore":
+                continue
+            created_databases.add(table_info.schema_name)
+        for grant in self._grants:
+            if grant.catalog != "hive_metastore":
+                continue
+            if grant.database:
+                created_databases.add(grant.database)
+        return list(created_databases)
+
+    @cached_property
     def tables_crawler(self):
-        return StaticTablesCrawler(self.sql_backend, self.inventory_database, self._tables)
+        # and override the config
+        return TablesCrawler(self.sql_backend, self.inventory_database, self.created_databases)
 
     @cached_property
     def udfs_crawler(self):
