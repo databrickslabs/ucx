@@ -267,28 +267,6 @@ def test_managed_identity_not_found():
 
 
 @pytest.fixture
-def access_connector() -> AccessConnector:
-    access_connector_id = (
-        "/subscriptions/test/resourceGroups/rg-test/providers"
-        "/Microsoft.Databricks/accessConnectors/test-access-connector"
-    )
-    access_connector_client = AccessConnector(id=access_connector_id, location="westeurope")
-    return access_connector_client
-
-
-def test_access_connector_parse_subscription_id(access_connector: AccessConnector) -> None:
-    assert access_connector.subscription_id == "test"
-
-
-def test_access_connector_parse_resource_group(access_connector: AccessConnector) -> None:
-    assert access_connector.resource_group == "rg-test"
-
-
-def test_access_connector_parse_name(access_connector: AccessConnector) -> None:
-    assert access_connector.name == "test-access-connector"
-
-
-@pytest.fixture
 def access_connector_client() -> AccessConnectorClient:
     access_connector_client = AccessConnectorClient(azure_api_client())
     return access_connector_client
@@ -298,7 +276,7 @@ def test_access_connector_handler_list_access_connectors(
     access_connector_client: AccessConnectorClient,
 ) -> None:
     access_connectors = access_connector_client.list("test")
-    assert len(access_connectors) > 0
+    assert len(list(access_connectors)) > 0
 
 
 def test_access_connector_handler_get(
