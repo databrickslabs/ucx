@@ -249,12 +249,12 @@ from path import Path
     migrator.build_dependency_graph(object_info)
 
 
-def test_build_dependency_graph_ignores_discovered_dependencies(empty_index):
+def test_build_dependency_graph_ignores_known_dependencies(empty_index):
     source = """
-import bcrypt
-from cmdstanpy import Thing    
+import databricks
+from databricks.sdk.service.compute import Thing    
 """
-    datas = _load_sources(SourceContainer, "sample-runtime-packages-output.txt")
+    datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
     resolver = DependencyResolver(whitelist)
     ws = create_autospec(WorkspaceClient)

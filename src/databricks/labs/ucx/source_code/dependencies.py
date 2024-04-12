@@ -109,7 +109,8 @@ class DependencyResolver:
         if dependency.type == ObjectType.NOTEBOOK:
             return dependency
         compatibility = self._whitelist.compatibility(dependency.path)
-        if compatibility is None:
+        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        if compatibility is not None:
             return None
         return dependency
 
