@@ -177,10 +177,12 @@ class AzureAPIClient:
             return self.api_client.do("POST", path, query, headers, body)
         return self.api_client.do("POST", path, query, headers)
 
-    def delete(self, path: str):
+    def delete(self, path: str, api_version: str | None = None):
         # this method is added only to be used in int test to delete the application once tests pass
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
+        if api_version is not None:
+            query = {"api-version": api_version}
         return self.api_client.do("DELETE", path, query, headers)
 
     def token(self):
