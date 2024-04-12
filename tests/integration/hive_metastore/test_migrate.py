@@ -13,7 +13,6 @@ from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, W
 
 from ..conftest import (
     StaticTableMapping,
-    StaticTablesCrawler,
 )
 
 logger = logging.getLogger(__name__)
@@ -350,22 +349,20 @@ def test_revert_migrated_table(sql_backend, runtime_ctx, make_schema, make_catal
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_schema, make_table, make_catalog):
-    src_schema1 = make_schema(catalog_name="hive_metastore")
-    src_schema2 = make_schema(catalog_name="hive_metastore")
-    table_to_migrate = make_table(schema_name=src_schema1.name)
-    table_databricks_dataset = make_table(
+def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catalog):
+    src_schema1 = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_schema2 = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    table_to_migrate = runtime_ctx.make_table(schema_name=src_schema1.name)
+    table_databricks_dataset = runtime_ctx.make_table(
         schema_name=src_schema1.name, external_csv="dbfs:/databricks-datasets/adult/adult.data"
     )
-    table_to_skip = make_table(schema_name=src_schema1.name)
-    table_in_skipped_database = make_table(schema_name=src_schema2.name)
-    all_tables = [table_to_migrate, table_to_skip, table_in_skipped_database]
+    table_to_skip = runtime_ctx.make_table(schema_name=src_schema1.name)
+    table_in_skipped_database = runtime_ctx.make_table(schema_name=src_schema2.name)
 
     dst_catalog = make_catalog()
-    dst_schema1 = make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
-    dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
+    dst_schema1 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema1.name)
+    dst_schema2 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
 
-    table_crawler = StaticTablesCrawler(sql_backend, inventory_schema, all_tables)
     rules = [
         Rule(
             "workspace",
@@ -400,10 +397,11 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
             table_in_skipped_database.name,
         ),
     ]
-    table_mapping = StaticTableMapping(ws, sql_backend, rules=rules)
+    runtime_ctx.with_table_mapping_rules(rules)
+    table_mapping = runtime_ctx.table_mapping
     table_mapping.skip_table(src_schema1.name, table_to_skip.name)
     table_mapping.skip_schema(src_schema2.name)
-    assert len(table_mapping.get_tables_to_migrate(table_crawler)) == 1
+    assert len(table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler)) == 1
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

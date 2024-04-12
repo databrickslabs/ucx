@@ -8,7 +8,8 @@ import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.catalog import FunctionInfo, TableInfo
+from databricks.sdk.service.catalog import FunctionInfo, TableInfo, SchemaInfo
+from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -30,7 +31,7 @@ from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, GroupManager
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
@@ -217,14 +218,18 @@ class StaticMountCrawler(Mounts):
 
 
 class TestRuntimeContext(RuntimeContext):
-    def __init__(self, make_table_fixture, make_schema_fixture, make_udf_fixture, env_or_skip_fixture):
+    def __init__(
+        self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
+    ):
         super().__init__()
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
+        self._make_group = make_group_fixture
         self._env_or_skip = env_or_skip_fixture
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
+        self._groups: list[Group] = []
         self._udfs = []
         self._grants = []
         # TODO: add methods to pre-populate the following:
@@ -293,6 +298,11 @@ class TestRuntimeContext(RuntimeContext):
         schema_info = self._make_schema(**kwargs)
         self._schemas.append(schema_info)
         return schema_info
+
+    def make_group(self, **kwargs):
+        group_info = self._make_group(**kwargs)
+        self._groups.append(group_info)
+        return group_info
 
     def make_table(self, **kwargs):
         table_info = self._make_table(**kwargs)
@@ -371,6 +381,14 @@ class TestRuntimeContext(RuntimeContext):
         return list(created_databases)
 
     @cached_property
+    def created_groups(self):
+        # TODO: save to workspace config
+        created_groups = []
+        for group in self._groups:
+            created_groups.append(group.display_name)
+        return created_groups
+
+    @cached_property
     def tables_crawler(self):
         # and override the config
         return TablesCrawler(self.sql_backend, self.inventory_database, self.created_databases)
@@ -381,7 +399,7 @@ class TestRuntimeContext(RuntimeContext):
 
     @cached_property
     def grants_crawler(self):
-        return StaticGrantsCrawler(self.tables_crawler, self.udfs_crawler, self._grants)
+        return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.created_databases)
 
     @cached_property
     def azure_service_principal_crawler(self):
@@ -404,8 +422,22 @@ class TestRuntimeContext(RuntimeContext):
             self.inventory_database,
         )
 
+    @cached_property
+    def group_manager(self):
+        return GroupManager(
+            self.sql_backend,
+            self.workspace_client,
+            self.inventory_database,
+            self.created_groups,
+            self.config.renamed_group_prefix,
+            workspace_group_regex=self.config.workspace_group_regex,
+            workspace_group_replace=self.config.workspace_group_replace,
+            account_group_regex=self.config.account_group_regex,
+            external_id_match=self.config.group_match_by_external_id,
+        )
+
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, env_or_skip):
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf, env_or_skip)
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)

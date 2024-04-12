@@ -7,13 +7,12 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 
-from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 
 logger = logging.getLogger(__name__)
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
-def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):  # pylint: disable=too-many-locals
+def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     group_a = make_group()
     group_b = make_group()
     schema_a = runtime_ctx.make_schema()
@@ -57,20 +56,18 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):  # pylin
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_all_grants_for_udfs_in_databases(sql_backend, inventory_schema, make_schema, make_udf, make_group):
+def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
     group = make_group()
-    schema = make_schema()
-    udf_a = make_udf(schema_name=schema.name)
-    udf_b = make_udf(schema_name=schema.name)
+    schema = runtime_ctx.make_schema()
+    udf_a = runtime_ctx.make_udf(schema_name=schema.name)
+    udf_b = runtime_ctx.make_udf(schema_name=schema.name)
 
     sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
     sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
     sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.display_name}`")
     sql_backend.execute(f"GRANT ALL PRIVILEGES ON FUNCTION {udf_b.full_name} TO `{group.display_name}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [udf_a, udf_b])
-    grants = GrantsCrawler(tables, udfs)
+    grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
 
     actual_grants = defaultdict(set)
     for grant in grants.snapshot():
