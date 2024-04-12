@@ -1,7 +1,9 @@
 import re
+import urllib.parse
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Any
 
 from databricks.sdk.core import (
     ApiClient,
@@ -55,19 +57,36 @@ class AzureResource:
     def container(self):
         return self._pairs.get("containers")
 
+    @property
+    def access_connector(self):
+        return self._pairs.get("accessConnectors")
+
     def __eq__(self, other):
         if not isinstance(other, AzureResource):
             return NotImplemented
         return self._resource_id == other._resource_id
 
     def __repr__(self):
-        properties = ["subscription_id", "resource_group", "storage_account", "container"]
+        properties = ["subscription_id", "resource_group", "storage_account", "container", "access_connector"]
         pairs = [f"{_}={getattr(self, _)}" for _ in properties]
         return f'AzureResource<{", ".join(pairs)}>'
 
     def __str__(self):
         return self._resource_id
 
+class RawResource:
+    def __init__(self, raw_resource: dict[str, Any]):
+        if 'id' not in raw_resource:
+            raise ValueError("Raw resource must contain an 'id' field")
+        self._id = AzureResource(raw_resource["id"])
+        self._raw_resource = raw_resource
+
+    @property
+    def id(self) -> AzureResource:
+        return self._id
+
+    def get(self, key: str, default: Any) -> Any:
+        return self._raw_resource.get(key, default)
 
 @dataclass
 class Principal:
@@ -162,11 +181,12 @@ class AzureAPIClient:
 
         return _credentials
 
-    def get(self, path: str, api_version: str | None = None):
+    def get(self, path: str, api_version: str | None = None, query: dict[str, Any] | None = None):
         headers = {"Accept": "application/json"}
-        query = {}
-        if api_version is not None:
-            query = {"api-version": api_version}
+        if not query:
+            query = {}
+        if api_version:
+            query["api-version"] = api_version
         return self.api_client.do("GET", path, query, headers)
 
     def put(self, path: str, api_version: str | None = None, body: dict | None = None):
@@ -197,11 +217,29 @@ class AzureAPIClient:
         return self._token_source.token()
 
 
+
+
 class AccessConnectorClient:
 
+    # TODO: move all of these methods to the AzureResources class!
     def __init__(self, azure_mgmt: AzureAPIClient) -> None:
         self._api_version = "2023-05-01"
-        self._azure_mgmt = azure_mgmt
+        self._mgmt = azure_mgmt
+
+    def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
+        """List all resources of a type within subscription"""
+        resources = []
+        query = {'api-version': "2020-06-01", '$filter': f"resourceType eq '{resource_type}'"}
+        while True:
+            res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
+            for resource in res["value"]:
+                yield RawResource(resource)
+            next_link = res.get("nextLink", None)
+            if not next_link:
+                break
+            parsed_link = urllib.parse.urlparse(next_link)
+            query = dict(urllib.parse.parse_qsl(parsed_link.query))
+        return resources
 
     def list(self, subscription_id: str) -> list[AccessConnector]:
         """List all access connector within subscription
@@ -209,24 +247,20 @@ class AccessConnectorClient:
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
 
+        TODO: rename method to list_access_connectors
+
         TODO:
             To filter for resource_groups use. Note: failed when testing manually.
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        # Add api_version in path instead of as argument to `self._azure_mgmt.get` to match possible `reponse.nextLink`
-        url = f"/subscriptions/{subscription_id}/providers/Microsoft.Databricks/accessConnectors?api-version={self._api_version}"
-        access_connectors = []
-        while len(url) > 0:
-            response = self._azure_mgmt.get(url)
-            for access_connector_raw in response["value"]:
-                access_connector = AccessConnector(
-                    id=access_connector_raw["id"],
-                    location=access_connector_raw["location"],
-                    tags=access_connector_raw.get("tags", {}),
-                )
-                access_connectors.append(access_connector)
-            url = response.get("nextLink", "").removeprefix(self._azure_mgmt.api_client._cfg.host)
-        return access_connectors
+
+        for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
+            # TODO: map all properties
+            yield AccessConnector(
+                id=raw.id,
+                location=raw.get("location", ""),
+                tags=raw.get("tags", {}),
+            )
 
     def create_or_update(self, access_connector: AccessConnector):
         """Create access connector.
@@ -241,7 +275,7 @@ class AccessConnectorClient:
                 "type": "SystemAssigned"
             }
         }
-        self._azure_mgmt.put(access_connector.id, self._api_version, body)
+        self._mgmt.put(access_connector.id, self._api_version, body)
 
     def delete(self, access_connector: AccessConnector):
         """Delete an access connector.
@@ -249,7 +283,7 @@ class AccessConnectorClient:
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        self._azure_mgmt.delete(access_connector.id)
+        self._mgmt.delete(access_connector.id)
 
 
 class AzureResources:
@@ -478,5 +512,6 @@ class AzureResources:
         return None
 
     @cached_property
-    def access_connector_handler(self) -> AccessConnectorClient:
+    def access_connectors(self) -> AccessConnectorClient:
+        # TODO: remove this and move all the methods to the AzureResources class
         return AccessConnectorClient(self._mgmt)
