@@ -180,7 +180,16 @@ class AccessConnectorClient:
         url = f"/subscriptions/{subscription_id}/providers/Microsoft.Databricks/accessConnectors"
         response = self._azure_mgmt.get(url, self._api_version)
 
-        return []
+        access_connectors = []
+        for access_connector_raw in response["value"]:
+            access_connector = AccessConnector(
+                id=access_connector_raw["id"],
+                name=access_connector_raw["name"],
+                type=access_connector_raw["type"],
+                location=access_connector_raw["location"],
+            )
+            access_connectors.append(access_connector)
+        return access_connectors
 
     def create(self, connector_name: str, resource_group_name: str, subscription_id: str):
         """Create access connector.
