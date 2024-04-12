@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import ast
 import logging
 from collections.abc import Iterable
@@ -69,6 +70,89 @@ class MatchingVisitor(ast.NodeVisitor):
         return self._matches(next_node, depth + 1)
 
 
+class SysPath(abc.ABC):
+
+    def __init__(self, path: str):
+        self._path = path
+
+    @property
+    def path(self):
+        return self._path
+
+
+# path directly added to sys.path
+class AbsolutePath(SysPath):
+    pass
+
+
+# path added to sys.path using os.path.abspath
+class RelativePath(SysPath):
+    pass
+
+
+class SysPathVisitor(ast.NodeVisitor):
+
+    def __init__(self):
+        self._aliases: dict[str, str] = {}
+        self._appended_paths: list[SysPath] = []
+
+    @property
+    def appended_paths(self):
+        return self._appended_paths
+
+    # visit_Import follows NodeVisitor requirements, which clash with python naming conventions
+    # pylint: disable=invalid-name
+    def visit_Import(self, node: ast.Import):
+        for alias in node.names:
+            if alias.name in {"sys", "os"}:
+                self._aliases[alias.name] = alias.asname or alias.name
+
+    # visit_ImportFrom follows NodeVisitor requirements, which clash with python naming conventions
+    # pylint: disable=invalid-name
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        interesting_aliases = [("sys", "path"), ("os", "path"), ("os.path", "abspath")]
+        interesting_alias = next((t for t in interesting_aliases if t[0] == node.module), None)
+        if interesting_alias is None:
+            return
+        for alias in node.names:
+            if alias.name == interesting_alias[1]:
+                self._aliases[f"{node.module}.{interesting_alias[1]}"] = alias.asname or alias.name
+                break
+
+    # visit_Call follows NodeVisitor requirements, which clash with python naming conventions
+    # pylint: disable=invalid-name
+    def visit_Call(self, node: ast.Call):
+        # check for 'sys.path.append'
+        if not self._match_aliases(node.func, ["sys", "path", "append"]):
+            return
+        appended = node.args[0]
+        if isinstance(appended, ast.Constant):
+            self._appended_paths.append(AbsolutePath(appended.value))
+        elif isinstance(appended, ast.Call):
+            self._append_relative_path(appended)
+
+    def _match_aliases(self, node: ast.AST, names: list[str]):
+        if isinstance(node, ast.Attribute):
+            if node.attr != names[-1]:
+                return False
+            if len(names) == 1:
+                return True
+            return self._match_aliases(node.value, names[0 : len(names) - 1])
+        if isinstance(node, ast.Name):
+            full_name = ".".join(names)
+            alias = self._aliases.get(full_name, full_name)
+            return node.id == alias
+        return False
+
+    def _append_relative_path(self, node: ast.Call):
+        # check for 'os.path.abspath'
+        if not self._match_aliases(node.func, ["os", "path", "abspath"]):
+            return
+        appended = node.args[0]
+        if isinstance(appended, ast.Constant):
+            self._appended_paths.append(RelativePath(appended.value))
+
+
 T = TypeVar("T", bound=ast.AST)
 
 
@@ -87,6 +171,11 @@ class ASTLinter(Generic[T]):
         visitor = MatchingVisitor(node_type, match_nodes)
         visitor.visit(self._root)
         return visitor.matched_nodes
+
+    def collect_appended_sys_paths(self):
+        visitor = SysPathVisitor()
+        visitor.visit(self._root)
+        return visitor.appended_paths
 
 
 class PythonLinter(Linter):
@@ -140,3 +229,7 @@ class PythonLinter(Linter):
         nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
         files.extend(node.args[0].value for node in nodes)
         return files
+
+    @staticmethod
+    def list_appended_sys_paths(linter: ASTLinter) -> list[SysPath]:
+        return linter.collect_appended_sys_paths()
