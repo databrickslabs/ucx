@@ -1,0 +1,35 @@
+%YAML 1.2
+---
+identifier:
+  name: databricks-sdk
+  version: ^0.24.0 # since version is specified, this entry only applies to versions matching the version number
+top_level: databricks
+packages:
+  - name: databricks.sdk.service.dashboards
+    compatibility: full
+    failures:
+      - some failure 1
+      - some failure 2
+  - name: databricks.sdk.service.compute
+    compatibility: full
+    failures:
+      - some failure 1
+      - some long failure message
+        that spans across multiple
+        lines...
+---
+identifier:
+  name: databricks-sdk
+  # since version is omitted, this entry applies to all versions for which there is no versioned entry
+top_level: databricks
+packages:
+  - name: databricks.sdk.service.dashboards
+    compatibility: full
+    failures:
+      - some failure 1
+      - <some><html>failure 2</html></some>
+  - name: databricks.sdk.service.compute
+    compatibility: none
+    failures:
+      - some failure 1
+      - some failure 2

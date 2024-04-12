@@ -6,6 +6,8 @@ from collections.abc import Callable
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
 
+from databricks.labs.ucx.source_code.whitelist import Whitelist
+
 
 class Dependency:
 
@@ -99,12 +101,33 @@ class DependencyLoader:
             return f.read().decode("utf-8")
 
 
+class DependencyResolver:
+    def __init__(self, whitelist: Whitelist | None = None):
+        self._whitelist = Whitelist() if whitelist is None else whitelist
+
+    def resolve(self, dependency: Dependency) -> Dependency | None:
+        if dependency.type == ObjectType.NOTEBOOK:
+            return dependency
+        compatibility = self._whitelist.compatibility(dependency.path)
+        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        if compatibility is not None:
+            return None
+        return dependency
+
+
 class DependencyGraph:
 
-    def __init__(self, dependency: Dependency, parent: DependencyGraph | None, loader: DependencyLoader):
+    def __init__(
+        self,
+        dependency: Dependency,
+        parent: DependencyGraph | None,
+        loader: DependencyLoader,
+        resolver: DependencyResolver | None = None,
+    ):
         self._dependency = dependency
         self._parent = parent
         self._loader = loader
+        self._resolver = resolver or DependencyResolver()
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
@@ -116,15 +139,18 @@ class DependencyGraph:
         return self._dependency.path
 
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
+        resolved = self._resolver.resolve(dependency)
+        if resolved is None:
+            return None
         # already registered ?
-        child_graph = self.locate_dependency(dependency)
+        child_graph = self.locate_dependency(resolved)
         if child_graph is not None:
-            self._dependencies[dependency] = child_graph
+            self._dependencies[resolved] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(dependency, self, self._loader)
-        self._dependencies[dependency] = child_graph
-        container = self._loader.load_dependency(dependency)
+        child_graph = DependencyGraph(resolved, self, self._loader, self._resolver)
+        self._dependencies[resolved] = child_graph
+        container = self._loader.load_dependency(resolved)
         if not container:
             return None
         container.build_dependency_graph(child_graph)
