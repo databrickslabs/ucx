@@ -221,6 +221,7 @@ class AccessConnectorClient:
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/create-or-update?view=rest-databricks-2023-05-01&tabs=HTTP
         """
+        # TODO: Manual test failed, fix!
         body = {
             "location": access_connector.location
         }
