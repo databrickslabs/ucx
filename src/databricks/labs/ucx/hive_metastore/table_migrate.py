@@ -248,10 +248,10 @@ class TablesMigrator:
             dst_table_location,
         )
         if not table_migrate_sql:
-            logger.warning(
-                f"{src_table.key} is not using hiveserde for {hiveserde_in_place_migrate}. "
-                f"It will be migrated by other in-place migration workflow tasks. "
-                f"Or it needs to be migrated using CTAS workflow if its hiveserde is not supported for in-place migration."
+            logger.info(
+                f"{src_table.key} hiveserde table cannot be in-place migrated in this {hiveserde_in_place_migrate} dedicated task. "
+                f"1. If this table uses in-place migration supported hiveserde, it will be migrated by other tasks in this in-place migration workflow. "
+                f"2. Otherwise this table will need to be migrated by the CTAS workflow."
             )
             return False
 
