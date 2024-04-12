@@ -45,4 +45,3 @@ def test_access_connector_client_create_get_list_delete(az_cli_ctx, env_or_skip,
     access_connectors = az_cli_ctx.azure_resources.list_access_connectors(subscription_id)
     access_connector_ids = [access_connector.id for access_connector in access_connectors]
     assert access_connector_id not in access_connector_ids
-
