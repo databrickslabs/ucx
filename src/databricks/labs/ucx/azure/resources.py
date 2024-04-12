@@ -177,7 +177,9 @@ class AccessConnectorClient:
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP    
         """
-        _ = subscription_id
+        url = f"/subscriptions/{subscription_id}/providers/Microsoft.Databricks/accessConnectors"
+        response = self._azure_mgmt.get(url, self._api_version)
+
         return []
 
     def create(self, connector_name: str, resource_group_name: str, subscription_id: str):
