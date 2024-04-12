@@ -1,7 +1,6 @@
 import urllib.parse
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import Any
 
 from databricks.sdk.core import (
@@ -122,7 +121,7 @@ class AccessConnector:
     name: str
     location: str
     type: str = "Microsoft.Databricks/accessConnectors"
-    identity: dict[str, str] = field(default=dict)
+    identity: dict[str, str] = field(default_factory=dict)
     tags: dict[str, str] = field(default_factory=dict)
     properties: dict[str, str] = field(default_factory=dict)
     system_data: dict[str, str] = field(default_factory=dict)
