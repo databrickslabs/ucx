@@ -132,10 +132,10 @@ class StorageCredentialManager:
 
         failures = []
         for result in validation.results:
-            if result.operation is None:
+            if result.azure_operation is None:
                 continue
             if result.result == ValidationResultResult.FAIL:
-                failures.append(f"{result.operation.value} validation failed with message: {result.message}")
+                failures.append(f"{result.azure_operation.value} validation failed with message: {result.message}")
         return StorageCredentialValidationResult.from_validation(permission_mapping, None if not failures else failures)
 
 

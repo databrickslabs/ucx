@@ -11,13 +11,14 @@ from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
-    AzureManagedIdentity,
+    AzureManagedIdentityResponse,
     AzureServicePrincipal,
     StorageCredentialInfo,
     ValidateStorageCredentialResponse,
     ValidationResult,
-    ValidationResultOperation,
+    ValidationResultAzureOperation,
     ValidationResultResult,
+    ValidationResultAwsOperation,
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
@@ -100,7 +101,9 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
     )
 
 
-def side_effect_validate_storage_credential(storage_credential_name, url, read_only):  # pylint: disable=unused-argument
+def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
+    is_aws = url.startswith("s3://")
+    is_azure = url.startswith("abfss://")
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "none" in storage_credential_name:
@@ -110,19 +113,34 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
             is_dir=True,
             results=[
                 ValidationResult(
-                    operation=ValidationResultOperation.LIST, result=ValidationResultResult.FAIL, message="fail"
+                    azure_operation=ValidationResultAzureOperation.LIST if is_azure else None,
+                    aws_operation=ValidationResultAwsOperation.LIST if is_aws else None,
+                    result=ValidationResultResult.FAIL,
+                    message="fail",
                 ),
-                ValidationResult(operation=None, result=ValidationResultResult.FAIL, message="fail"),
+                ValidationResult(result=ValidationResultResult.FAIL, message="fail"),
             ],
         )
     if read_only:
         return ValidateStorageCredentialResponse(
             is_dir=True,
-            results=[ValidationResult(operation=ValidationResultOperation.READ, result=ValidationResultResult.PASS)],
+            results=[
+                ValidationResult(
+                    azure_operation=ValidationResultAzureOperation.READ if is_azure else None,
+                    aws_operation=ValidationResultAwsOperation.READ if is_aws else None,
+                    result=ValidationResultResult.PASS,
+                )
+            ],
         )
     return ValidateStorageCredentialResponse(
         is_dir=True,
-        results=[ValidationResult(operation=ValidationResultOperation.WRITE, result=ValidationResultResult.PASS)],
+        results=[
+            ValidationResult(
+                azure_operation=ValidationResultAzureOperation.WRITE if is_azure else None,
+                aws_operation=ValidationResultAwsOperation.WRITE if is_aws else None,
+                result=ValidationResultResult.PASS,
+            )
+        ],
     )
 
 
@@ -131,7 +149,7 @@ def credential_manager(ws):
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/example-role-name")),
         StorageCredentialInfo(
-            azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
+            azure_managed_identity=AzureManagedIdentityResponse("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
         StorageCredentialInfo(
             name="included_test",
@@ -240,7 +258,7 @@ def test_validate_storage_credentials_non_response(credential_manager):
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
+        "abfss://prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
     )
 
     validation = credential_manager.validate(permission_mapping)
