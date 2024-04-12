@@ -516,10 +516,10 @@ def test_empty_revert_report(ws):
 def test_is_upgraded(ws):
     errors = {}
     rows = {
-        "SHOW TBLPROPERTIES schema1.table1": [
-            {"value": "fake_dest"},
+        "SHOW TBLPROPERTIES schema1.table1": MockBackend.rows("key", "value")["upgrade_to", "fake_dest"],
+        "SHOW TBLPROPERTIES schema1.table2": MockBackend.rows("key", "value")[
+            "upgraded_to", "table table2 does not have property: upgraded_to"
         ],
-        "SHOW TBLPROPERTIES schema1.table2": [],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
@@ -551,11 +551,7 @@ def test_table_status():
 
     datetime.datetime = FakeDate
     errors = {}
-    rows = {
-        "SHOW TBLPROPERTIES schema1.table1": [
-            {"key": "upgraded_to", "value": "cat1.schema1.dest1"},
-        ],
-    }
+    rows = {"SHOW TBLPROPERTIES schema1.table1": MockBackend.rows("key", "value")["upgrade_to", "cat1.schema1.dest1"]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     table_crawler.snapshot.return_value = [
