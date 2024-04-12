@@ -1,11 +1,52 @@
+from __future__ import annotations  # for type hints
+
 import logging
 from pathlib import Path
 
-from databricks.sdk.service.workspace import Language
+from databricks.sdk.service.workspace import Language, ObjectType
 
+from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency
 from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.notebook import CellLanguage
+from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
+
 
 logger = logging.getLogger(__name__)
+
+
+class SourceFile(SourceContainer):
+
+    def __init__(self, path: str, source: str, language: Language):
+        self._path = path
+        self._original_code = source
+        # using CellLanguage so we can reuse the facilities it provides
+        self._language = CellLanguage.of_language(language)
+
+    @property
+    def object_type(self) -> ObjectType:
+        return ObjectType.FILE
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> None:
+        if self._language is not CellLanguage.PYTHON:
+            logger.warning(f"Unsupported language: {self._language.language}")
+        linter = ASTLinter.parse(self._original_code)
+        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
+        notebook_paths = {PythonLinter.get_dbutils_notebook_run_path_arg(call) for call in run_notebook_calls}
+        for path in notebook_paths:
+            graph.register_dependency(Dependency(ObjectType.NOTEBOOK, path))
+        # TODO https://github.com/databrickslabs/ucx/issues/1287
+        import_names = PythonLinter.list_import_sources(linter)
+        for import_name in import_names:
+            # we don't know yet if it's a file or a library
+            graph.register_dependency(Dependency(None, import_name))
+
+
+class WorkspaceFile(SourceFile):
+    pass
+
+
+class LocalFile(SourceFile):
+    pass
 
 
 class LocalFileMigrator:
