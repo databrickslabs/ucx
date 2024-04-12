@@ -315,10 +315,15 @@ def test_is_partitioned_flag():
     'table, destination, hiveserde_in_place_migrate, mounts, describe, ddl, expected',
     [
         (
-            Table("hive_metastore", "schema", "test_parquet", "EXTERNAL", "HIVE", location="dbfs:/mnt/test_parquet/table1"),
+            Table(
+                "hive_metastore", "schema", "test_parquet", "EXTERNAL", "HIVE", location="dbfs:/mnt/test_parquet/table1"
+            ),
             ["uc_catalog", "uc_schema", "test_parquet"],
             "PARQUET",
-            [Mount("/mnt/test_parquet", "s3://databricks/test_parquet"), Mount("/mnt/test_orc", "s3://databricks/test_orc")],
+            [
+                Mount("/mnt/test_parquet", "s3://databricks/test_parquet"),
+                Mount("/mnt/test_orc", "s3://databricks/test_orc"),
+            ],
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
                 ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
@@ -352,7 +357,10 @@ def test_is_partitioned_flag():
             Table("hive_metastore", "schema", "test_orc", "EXTERNAL", "HIVE", location="/dbfs/mnt/test_orc/table1"),
             ["uc_catalog", "uc_schema", "test_orc"],
             "ORC",
-            [Mount("/mnt/test_parquet", "s3://databricks/test_parquet"), Mount("/mnt/test_orc", "s3://databricks/test_orc")],
+            [
+                Mount("/mnt/test_parquet", "s3://databricks/test_parquet"),
+                Mount("/mnt/test_orc", "s3://databricks/test_orc"),
+            ],
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "org.apache.hadoop.hive.ql.io.orc.OrcSerde", None),
                 ("InputFormat", "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat", None),
@@ -401,7 +409,7 @@ def test_in_place_migrate_hiveserde_sql(
     dst_table_location = None
     if table.is_dbfs_mnt:
         dst_table_location = ExternalLocations.resolve_mount(table.location, mounts)
-        
+
     migrate_sql = table.sql_migrate_external_hiveserde_in_place(
         destination[0], destination[1], destination[2], sql_backend, hiveserde_in_place_migrate, dst_table_location
     )

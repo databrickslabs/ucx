@@ -46,7 +46,7 @@ class TablesMigrator:
         group_manager: GroupManager,
         migration_status_refresher: 'MigrationStatusRefresher',
         principal_grants: PrincipalACL,
-        mounts_crawler: Mounts
+        mounts_crawler: Mounts,
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -76,6 +76,7 @@ class TablesMigrator:
         all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
         all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
         self._init_seen_tables()
+        # mounts will be used to replace the mnt based table location in the DDL for hiveserde table in-place migration
         mounts = self._mounts_crawler.snapshot()
         if what == What.VIEW:
             return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
@@ -86,7 +87,7 @@ class TablesMigrator:
             all_migrated_groups,
             all_principal_grants,
             mounts,
-            hiveserde_in_place_migrate
+            hiveserde_in_place_migrate,
         )
 
     def _migrate_tables(
@@ -238,7 +239,12 @@ class TablesMigrator:
             dst_table_location = ExternalLocations.resolve_mount(src_table.location, mounts)
 
         table_migrate_sql = src_table.sql_migrate_external_hiveserde_in_place(
-            rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_in_place_migrate, dst_table_location
+            rule.catalog_name,
+            rule.dst_schema,
+            rule.dst_table,
+            self._backend,
+            hiveserde_in_place_migrate,
+            dst_table_location,
         )
         if not table_migrate_sql:
             logger.warning(
