@@ -207,7 +207,11 @@ class AccessConnectorClient:
         """List all access connector within subscription
         
         Docs:
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP    
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
+
+        TODO:
+            To filter for resource_groups use. Note: failed when testing manually.
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
         """
         url = f"/subscriptions/{subscription_id}/providers/Microsoft.Databricks/accessConnectors"
         response = self._azure_mgmt.get(url, self._api_version)
