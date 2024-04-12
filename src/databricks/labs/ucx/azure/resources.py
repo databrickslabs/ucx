@@ -249,8 +249,8 @@ class AccessConnectorClient:
         for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
             # TODO: map all properties
             yield AccessConnector(
-                id=raw.id,
-                name=raw.get("access_connector", ""),
+                id=str(raw.id),
+                name=raw.get("name", ""),
                 location=raw.get("location", ""),
                 tags=raw.get("tags", {}),
             )
