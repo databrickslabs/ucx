@@ -8,10 +8,10 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import iam, sql
+from databricks.sdk.service import iam, sql, jobs
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
-from databricks.sdk.service.workspace import ObjectInfo
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -39,6 +39,7 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
+    logs,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
@@ -62,12 +63,16 @@ def ws():
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
         "/Users/foo/.ucx/mapping.csv": "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\ntest,test,test,test,test,test",
+        "/Users/foo/.ucx/logs/run-123-1/foo.log-123": """18:59:17 INFO [databricks.labs.ucx] {MainThread} Something is logged
+18:59:17 DEBUG [databricks.labs.ucx.framework.crawlers] {MainThread} [hive_metastore.ucx_serge.clusters] fetching clusters inventory
+18:59:17 DEBUG [databricks.labs.lsql.backends] {MainThread} [spark][fetch] SELECT * FROM ucx_serge.clusters
+""",
     }
 
     def download(path: str) -> io.StringIO | io.BytesIO:
         if path not in state:
             raise NotFound(path)
-        if ".csv" in path:
+        if ".csv" in path or ".log" in path:
             return io.BytesIO(state[path].encode('utf-8'))
         return io.StringIO(state[path])
 
@@ -405,3 +410,16 @@ def test_revert_cluster_remap_empty(ws, caplog):
     ws = create_autospec(WorkspaceClient)
     revert_cluster_remap(ws, prompts)
     assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages
+
+
+def test_relay_logs(ws, caplog):
+    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123)]
+    ws.workspace.list.side_effect = [
+        [
+            ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
+            ObjectInfo(path='/Users/foo/.ucx/logs/run-123-1', object_type=ObjectType.DIRECTORY),
+        ],
+        [ObjectInfo(path='/Users/foo/.ucx/logs/run-123-1/foo.log-123')],
+    ]
+    logs(ws)
+    assert 'Something is logged' in caplog.messages

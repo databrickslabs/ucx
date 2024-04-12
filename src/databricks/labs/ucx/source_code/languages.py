@@ -1,18 +1,20 @@
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.hive_metastore.table_migrate import MigrationIndex
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter
 from databricks.labs.ucx.source_code.pyspark import SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
+from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter, FromDbfsFolder
 
 
 class Languages:
     def __init__(self, index: MigrationIndex):
         self._index = index
         from_table = FromTable(index)
+        dbfs_from_folder = FromDbfsFolder()
         self._linters = {
-            Language.PYTHON: SequentialLinter([SparkSql(from_table, index)]),
-            Language.SQL: SequentialLinter([from_table]),
+            Language.PYTHON: SequentialLinter([SparkSql(from_table, index), DBFSUsageLinter()]),
+            Language.SQL: SequentialLinter([from_table, dbfs_from_folder]),
         }
         self._fixers: dict[Language, list[Fixer]] = {
             Language.PYTHON: [SparkSql(from_table, index)],
