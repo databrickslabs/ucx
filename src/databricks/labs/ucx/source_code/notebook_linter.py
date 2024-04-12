@@ -13,8 +13,9 @@ class NotebookLinter:
     """
 
     def __init__(self, langs: Languages, notebook: Notebook):
-        self._languages = langs
-        self._notebook = notebook
+        self._languages: Languages = langs
+        self._notebook: Notebook = notebook
+        self._cell_offsets: list[int] = []
 
     @classmethod
     def from_notebook(cls, langs: Languages, notebook: Notebook) -> 'NotebookLinter':
@@ -28,18 +29,19 @@ class NotebookLinter:
         assert notebook is not None
         return cls(langs, notebook)
 
-    @classmethod
-    def from_path(cls, langs: Languages, path: str) -> 'NotebookLinter':
-        with open(path, "r", encoding="utf-8") as f:
-            source = f.read()
-        return cls.from_source(langs, source)
-
     def lint(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
             if not self._languages.is_supported(cell.language.language):
                 continue
             linter = self._languages.linter(cell.language.language)
-            yield from linter.lint(cell.original_code)
+            for advice in linter.lint(cell.original_code):
+                yield advice
+                self._cell_offsets.append(cell.original_offset)
+
+    def adjust_advices(self, advices: list[Advice]) -> Iterable[Advice]:
+        for advice, offset in zip(advices, self._cell_offsets):
+            advice = advice.replace(start_line=advice.start_line + offset, end_line=advice.end_line + offset)
+            yield advice
 
     @staticmethod
     def name() -> str:

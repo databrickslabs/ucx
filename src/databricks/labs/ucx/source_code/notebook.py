@@ -29,8 +29,17 @@ COMMENT_PI = 'COMMENT'
 class Cell(ABC):
 
     def __init__(self, source: str):
+        self._original_offset: int = 0
         self._original_code = source
         self._migrated_code = source
+
+    @property
+    def original_offset(self) -> int:
+        return self._original_offset
+
+    @original_offset.setter
+    def original_offset(self, value: int):
+        self._original_offset = value
 
     @property
     def original_code(self):
@@ -232,13 +241,16 @@ class CellLanguage(Enum):
     def extract_cells(self, source: str) -> list[Cell] | None:
         lines = source.split('\n')
         header = f"{self.comment_prefix} {NOTEBOOK_HEADER}"
+
         if not lines[0].startswith(header):
             raise ValueError("Not a Databricks notebook source!")
 
-        def make_cell(cell_lines: list[str]):
+        def make_cell(cell_lines: list[str], start: int = 0):
             # trim leading blank lines
             while len(cell_lines) > 0 and len(cell_lines[0]) == 0:
                 cell_lines.pop(0)
+                start += 1
+
             # trim trailing blank lines
             while len(cell_lines) > 0 and len(cell_lines[-1]) == 0:
                 cell_lines.pop(-1)
@@ -246,23 +258,32 @@ class CellLanguage(Enum):
             if cell_language is None:
                 cell_language = self
             else:
+                before = len(cell_lines)
                 self._remove_magic_wrapper(cell_lines, cell_language)
+                start += before - len(cell_lines)
+
             cell_source = '\n'.join(cell_lines)
-            return cell_language.new_cell(cell_source)
+            cell = cell_language.new_cell(cell_source)
+            cell.original_offset = start
+            return cell
 
         cells = []
         cell_lines: list[str] = []
         separator = f"{self.comment_prefix} {CELL_SEPARATOR}"
+
+        next_cell_pos = 1
         for i in range(1, len(lines)):
             line = lines[i].strip()
             if line.startswith(separator):
-                cell = make_cell(cell_lines)
+                cell = make_cell(cell_lines, next_cell_pos)
                 cells.append(cell)
                 cell_lines = []
+                next_cell_pos = i
             else:
                 cell_lines.append(lines[i])
+
         if len(cell_lines) > 0:
-            cell = make_cell(cell_lines)
+            cell = make_cell(cell_lines, next_cell_pos)
             cells.append(cell)
 
         return cells
