@@ -40,7 +40,6 @@ TEST_ACCESS_CONNECTOR_RESPONSE = {"value": [{
 }]}
 
 
-
 @pytest.fixture
 def azure_management_api_client(ws: WorkspaceClient) -> AzureAPIClient:
     azure_mgmt_client = AzureAPIClient(
@@ -55,7 +54,6 @@ def azure_management_api_client(ws: WorkspaceClient) -> AzureAPIClient:
 def access_connector() -> AccessConnector:
     access_connector_client = AccessConnector(
         id=ACCESS_CONNECTOR_ID,
-        type="Microsoft.Databricks/accessConnectors",
         location=LOCATION,
     )
     return access_connector_client
