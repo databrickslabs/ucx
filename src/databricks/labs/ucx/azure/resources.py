@@ -213,17 +213,19 @@ class AccessConnectorClient:
             To filter for resource_groups use. Note: failed when testing manually.
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        url = f"/subscriptions/{subscription_id}/providers/Microsoft.Databricks/accessConnectors"
-        response = self._azure_mgmt.get(url, self._api_version)
-
+        # Add api_version in path instead of as argument to `self._azure_mgmt.get` to match possible `reponse.nextLink`
+        url = f"/subscriptions/{subscription_id}/providers/Microsoft.Databricks/accessConnectors?api-version={self._api_version}"
         access_connectors = []
-        for access_connector_raw in response["value"]:
-            access_connector = AccessConnector(
-                id=access_connector_raw["id"],
-                location=access_connector_raw["location"],
-                tags=access_connector_raw.get("tags", {}),
-            )
-            access_connectors.append(access_connector)
+        while len(url) > 0:
+            response = self._azure_mgmt.get(url)
+            for access_connector_raw in response["value"]:
+                access_connector = AccessConnector(
+                    id=access_connector_raw["id"],
+                    location=access_connector_raw["location"],
+                    tags=access_connector_raw.get("tags", {}),
+                )
+                access_connectors.append(access_connector)
+            url = response.get("nextLink", "").removeprefix(self._azure_mgmt.api_client._cfg.host)
         return access_connectors
 
     def create(self, access_connector: AccessConnector):
