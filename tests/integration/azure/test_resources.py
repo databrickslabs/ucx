@@ -31,6 +31,7 @@ TEST_ACCESS_CONNECTOR_RESPONSE = {"value": [{
     }
 }]}
 
+
 @pytest.fixture
 def azure_management_api_client(ws: WorkspaceClient) -> AzureAPIClient:
     azure_mgmt_client = AzureAPIClient(
