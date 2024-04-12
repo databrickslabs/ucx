@@ -4,7 +4,7 @@ import datetime as dt
 from databricks.labs.ucx.azure.resources import AccessConnector
 
 
-def test_access_connector_client_create_delete(az_cli_ctx, env_or_skip, make_random):
+def test_access_connector_client_create_get_list_delete(az_cli_ctx, env_or_skip, make_random):
     subscription_id = az_cli_ctx.azure_subscription_id
     resource_group_name = env_or_skip("TEST_RESOURCE_GROUP")
     access_connector_name = f"test-{make_random()}"
@@ -20,7 +20,9 @@ def test_access_connector_client_create_delete(az_cli_ctx, env_or_skip, make_ran
         location="westeurope",
         tags={"RemoveAfter": str(tomorrow.date())},
     )
+
     assert access_connector not in list(az_cli_ctx.azure_resources.access_connectors.list(subscription_id))
+
     az_cli_ctx.azure_resources.access_connectors.create_or_update(
         subscription_id,
         resource_group_name,
@@ -28,7 +30,13 @@ def test_access_connector_client_create_delete(az_cli_ctx, env_or_skip, make_ran
         "westeurope",
         {"RemoveAfter": str(tomorrow.date())}
     )
-    assert access_connector in list(az_cli_ctx.azure_resources.access_connectors.list(subscription_id))
+    new_access_connector = az_cli_ctx.azure_resources.access_connectors.get(
+        subscription_id,
+        resource_group_name,
+        access_connector_name,
+    )
+    assert access_connector == new_access_connector
+
     az_cli_ctx.azure_resources.access_connectors.delete(
         subscription_id,
         resource_group_name,
