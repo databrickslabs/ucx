@@ -236,6 +236,7 @@ class AccessConnectorClient:
         """
         body = {
             "location": access_connector.location,
+            "tags": access_connector.tags,
             "identity": {
                 "type": "SystemAssigned"
             }
