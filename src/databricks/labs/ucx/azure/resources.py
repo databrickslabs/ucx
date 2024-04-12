@@ -213,13 +213,16 @@ class AccessConnectorClient:
             access_connectors.append(access_connector)
         return access_connectors
 
-    def create(self, connector_name: str, resource_group_name: str, subscription_id: str):
+    def create(self, access_connector: AccessConnector):
         """Create access connector.
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/create-or-update?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        _ = connector_name, resource_group_name, subscription_id
+        body = {
+            "location": access_connector.location
+        }
+        self._azure_mgmt.put(access_connector.id, self._api_version, body)
 
     def delete(self, connector_name: str, resource_group_name: str, subscription_id: str):
         """Delete an access connector.
