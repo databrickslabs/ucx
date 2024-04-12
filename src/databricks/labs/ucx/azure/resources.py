@@ -274,13 +274,14 @@ class AccessConnectorClient:
             body["tags"] = tags
         self._mgmt.put(url, self._api_version, body)
 
-    def delete(self, access_connector: AccessConnector) -> None:
+    def delete(self, subscription_id: str, resource_group_name: str, name: str) -> None:
         """Delete an access connector.
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        self._mgmt.delete(access_connector.id, self._api_version)
+        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
+        self._mgmt.delete(url, self._api_version)
 
 
 class AzureResources:
