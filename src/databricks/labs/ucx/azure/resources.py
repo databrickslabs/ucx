@@ -110,8 +110,7 @@ class AccessConnector:
     _type = "Microsoft.Databricks/accessConnectors"
 
     _pattern_id = re.compile(
-        r"^/subscriptions/([\w-]+)/resourceGroups/([\w-]+)"
-        r"/providers/Microsoft\.Databricks/accessConnectors/([\w-]+)$"
+        r"^/subscriptions/(.+)/resourceGroups/(.+)/providers/Microsoft\.Databricks/accessConnectors/(.+)$"
     )
 
     def _parse_id(self) -> tuple[str, str, str]:
