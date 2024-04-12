@@ -100,10 +100,10 @@ class AzureRoleAssignment:
 class AccessConnector:
     id: str
     location: str
+    tags: dict[str, str]
     # TODO: Add identity with reference to dataclass
     # identity {"principalId": ..., "tenantId": ..., "type": ...}
     # The raw API call contains the following fields as well:
-    # tags
     # properties
     # systemData
 
@@ -218,6 +218,7 @@ class AccessConnectorClient:
             access_connector = AccessConnector(
                 id=access_connector_raw["id"],
                 location=access_connector_raw["location"],
+                tags=access_connector_raw.get("tags", {}),
             )
             access_connectors.append(access_connector)
         return access_connectors

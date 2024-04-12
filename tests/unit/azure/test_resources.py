@@ -284,6 +284,10 @@ def test_access_connector_parse_resource_group(access_connector: AccessConnector
     assert access_connector.resource_group == "rg-test"
 
 
+def test_access_connector_parse_name(access_connector: AccessConnector) -> None:
+    assert access_connector.name == "test-access-connector"
+
+
 @pytest.fixture
 def access_connector_client() -> AccessConnectorClient:
     access_connector_client = AccessConnectorClient(azure_api_client())
@@ -293,4 +297,12 @@ def access_connector_client() -> AccessConnectorClient:
 def test_access_connector_handler_list_access_connectors(
     access_connector_client: AccessConnectorClient,
 ) -> None:
-    assert len(access_connector_client.list("test")) > 0
+    access_connectors = access_connector_client.list("test")
+    assert len(access_connectors) > 0
+
+    access_connector = access_connectors[0]
+    assert access_connector.subscription_id == "test"
+    assert access_connector.resource_group == "rg-test"
+    assert access_connector.name == "test-access-connector"
+    assert access_connector.tags["application"] == "databricks"
+    assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
