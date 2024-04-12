@@ -252,18 +252,27 @@ class AccessConnectorClient:
                 tags=raw.get("tags", {}),
             )
 
-    def create_or_update(self, access_connector: AccessConnector) -> None:
+    def create_or_update(
+        self,
+        subscription_id: str,
+        resource_group_name: str,
+        name: str,
+        location: str,
+        tags: dict[str, str] | None,
+    ) -> None:
         """Create access connector.
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/create-or-update?view=rest-databricks-2023-05-01&tabs=HTTP
         """
+        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         body = {
-            "location": access_connector.location,
-            "tags": access_connector.tags,
+            "location": location,
             "identity": {"type": "SystemAssigned"},
         }
-        self._mgmt.put(access_connector.id, self._api_version, body)
+        if tags is not None:
+            body["tags"] = tags
+        self._mgmt.put(url, self._api_version, body)
 
     def delete(self, access_connector: AccessConnector) -> None:
         """Delete an access connector.
