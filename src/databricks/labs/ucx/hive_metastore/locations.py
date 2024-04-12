@@ -3,7 +3,6 @@ import os
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from functools import partial
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
@@ -13,7 +12,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.dbutils import FileInfo
-from databricks.labs.ucx.framework.crawlers import CrawlerBase, Result, ResultFn
+from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -279,7 +278,6 @@ class TablesInMounts(CrawlerBase[Table]):
         self._include_mounts = include_mounts
         self._ws = ws
         self._include_paths_in_mount = include_paths_in_mount
-        self._seen_tables: dict[str, str] = {}
 
         irrelevant_patterns = {'_SUCCESS', '_committed_', '_started_'}
         if exclude_paths_in_mount:
@@ -287,32 +285,19 @@ class TablesInMounts(CrawlerBase[Table]):
         self._fiter_paths = irrelevant_patterns
 
     def snapshot(self) -> list[Table]:
-        return self._snapshot(partial(self._try_load), partial(self._crawl))
-
-    def _snapshot(self, fetcher: ResultFn, loader: ResultFn) -> list[Result]:
         logger.debug(f"[{self.full_name}] fetching {self._table} inventory")
         cached_results = []
         try:
-            cached_results = list(fetcher())
-            self._init_seen_tables(cached_results)
+            cached_results = list(self._try_load())
         except NotFound:
             pass
+        table_paths = self._get_tables_paths_from_assessment(cached_results)
         logger.debug(f"[{self.full_name}] crawling new batch for {self._table}")
-        loaded_records = list(loader())
+        loaded_records = list(self._crawl(table_paths))
         if len(cached_results) > 0:
             loaded_records = loaded_records + cached_results
-        self._append_records(loaded_records)
+        self._overwrite_records(loaded_records)
         return loaded_records
-
-    def _init_seen_tables(self, loaded_records: Iterable[Table]):
-        for rec in loaded_records:
-            if not rec.location:
-                continue
-            self._seen_tables[rec.location] = rec.key
-
-    def _append_records(self, items: Sequence[Table]):
-        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
-        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
 
     def _try_load(self) -> Iterable[Table]:
         """Tries to load table information from the database or throws TABLE_OR_VIEW_NOT_FOUND error"""
@@ -321,7 +306,19 @@ class TablesInMounts(CrawlerBase[Table]):
         ):
             yield Table(*row)
 
-    def _crawl(self):
+    def _get_tables_paths_from_assessment(self, loaded_records: Iterable[Table]) -> dict[str, str]:
+        seen = {}
+        for rec in loaded_records:
+            if not rec.location:
+                continue
+            seen[rec.location] = rec.key
+        return seen
+
+    def _overwrite_records(self, items: Sequence[Table]):
+        logger.debug(f"[{self.full_name}] found {len(items)} new records for {self._table}")
+        self._backend.save_table(self.full_name, items, Table, mode="overwrite")
+
+    def _crawl(self, table_paths_from_assessment: dict[str, str]):
         all_mounts = self._mounts_crawler.snapshot()
         all_tables = []
         for mount in all_mounts:
@@ -338,14 +335,15 @@ class TablesInMounts(CrawlerBase[Table]):
             for path, entry in table_paths.items():
                 guess_table = os.path.basename(path)
                 table_location = self._get_table_location(mount, path)
-                if table_location in self._seen_tables:
+
+                if table_location in table_paths_from_assessment:
                     logger.info(
-                        f"Path {table_location} is identified as a table in mount, but is present in current workspace as a registered table {self._seen_tables[table_location]}"
+                        f"Path {path} is identified as a table in mount, but is present in current workspace as a registered table {table_paths_from_assessment[table_location]}"
                     )
                     continue
-                if path in self._seen_tables:
+                if path in table_paths_from_assessment:
                     logger.info(
-                        f"Path {table_location} is identified as a table in mount, but is present in current workspace as a registered table {self._seen_tables[path]}"
+                        f"Path {path} is identified as a table in mount, but is present in current workspace as a registered table {table_paths_from_assessment[path]}"
                     )
                     continue
                 table = Table(

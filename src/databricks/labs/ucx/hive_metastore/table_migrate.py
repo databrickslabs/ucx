@@ -198,11 +198,8 @@ class TablesMigrator:
 
     def _migrate_table_in_mount(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
-        fields = []
-        for key, value, _ in self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;"):
-            fields.append(f"{key} {value}")
-        schema = ", ".join(fields)
-        table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, schema)
+        table_schema = self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
+        table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, table_schema)
         logger.info(
             f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
         )

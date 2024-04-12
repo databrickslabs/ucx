@@ -428,7 +428,6 @@ See more details in [Table migration commands](#table-migration-commands)
 ### Table Migration Workflow Tasks
 - `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone, along with legacy table ACL migrated if any.
 - `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command, along with legacy table ACL migrated if any.
-- `migrate_tables_in_mounts_experimental` - An experimental task that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter. You must run the `scan_tables_in_mounts_experimental` workflow before running this task, otherwise it will do nothing.
 - Following workflows/tasks are on the roadmap and being developed:
   - Migrate view
   - Migrate tables using CTAS
@@ -444,17 +443,26 @@ See more details in [Table migration commands](#table-migration-commands)
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
 
 ### [EXPERIMENTAL] Scan tables in mounts Workflow
+#### <b>Always run this workflow AFTER the assessment has finished</b>
 - This experimental workflow attemps to find all Tables inside mount points that are present on your workspace.
-- If you do not run this workflow, then `migrate_tables_in_mounts_experimental` won't do anything.
+- If you do not run this workflow, then `migrate-tables-in-mounts-experimental` won't do anything.
 - It writes all results to `hive_metastore.<inventory_database>.tables`, you can query those tables found by filtering on database values that starts with `mounted_`
 - This command is incremental, meaning that each time you run it, it will overwrite the previous tables in mounts found.
 - Current format are supported:
-  - DELTA - PARQUET - CSV - JSONS
+  - DELTA - PARQUET - CSV - JSON
   - Also detects partitioned DELTA and PARQUET
 - You can configure these workflows with the following options available on conf.yml:
   - include_mounts : A list of mount points to scans, by default the workflow scans for all mount points
   - exclude_paths_in_mount : A list of paths to exclude in all mount points
   - include_paths_in_mount : A list of paths to include in all mount points 
+
+### [EXPERIMENTAL] Migrate tables in mounts Workflow
+- An experimental workflow that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter. 
+- You must do the following in order to make this work: 
+  - run the Assessment [workflow](#assessment-workflow)
+  - run the scan tables in mounts [workflow](#EXPERIMENTAL-scan-tables-in-mounts-workflow)
+  - run the [`create-table-mapping` command](#create-table-mapping-command)
+    - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
 
 
 [[back to top](#databricks-labs-ucx)]

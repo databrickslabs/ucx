@@ -5,11 +5,8 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import (
-    DataSourceFormat,
     Privilege,
     SecurableType,
-    TableInfo,
-    TableType,
 )
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
@@ -574,6 +571,8 @@ def test_migrate_table_in_mount(
     runtime_ctx,
     make_acc_group,
 ):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     owner_group = make_acc_group()
     config = WorkspaceConfig(
         warehouse_id=env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
@@ -582,32 +581,19 @@ def test_migrate_table_in_mount(
         default_table_owner=owner_group.display_name,
     )
     runtime_ctx = runtime_ctx.replace(config=config)
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     tbl_path = make_random(4).lower()
     src_external_table = runtime_ctx.make_table(
-        schema_name=make_schema(catalog_name="hive_metastore").name,
+        schema_name=make_schema(catalog_name="hive_metastore", name=f'mounted_{env_or_skip("TEST_MOUNT_NAME")}').name,
         external_delta=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{tbl_path}',
     )
+    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}"
+    # TODO: Remove this hack below
+    # This is done because we have to create the external table in a mount point, but TablesInMounts() has to use the adls/ path
+    # Otherwise, if we keep the dbfs:/ path, the entire logic of TablesInMounts won't work
+    src_external_table.storage_location = table_in_mount_location
 
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name)
-
-    table_in_mount_location = f"abfss://things@labsazurethings.dfs.core.windows.net/a/b/{tbl_path}"
-    table_crawler = StaticTablesCrawler(
-        sql_backend,
-        inventory_schema,
-        [
-            TableInfo(
-                catalog_name="hive_metastore",
-                schema_name=f'mounted_{env_or_skip("TEST_MOUNT_NAME")}',
-                table_type=TableType.EXTERNAL,
-                data_source_format=DataSourceFormat.DELTA,
-                name=src_external_table.name,
-                storage_location=table_in_mount_location,
-            )
-        ],
-    )
 
     runtime_ctx.with_table_mapping_rules(
         [
@@ -622,7 +608,7 @@ def test_migrate_table_in_mount(
         ]
     )
     runtime_ctx.with_dummy_azure_resource_permission()
-    runtime_ctx.with_static_table_crawler(table_crawler)
+
     runtime_ctx.tables_migrator.migrate_tables(
         what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER]
     )

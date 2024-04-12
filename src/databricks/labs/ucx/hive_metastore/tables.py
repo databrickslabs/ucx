@@ -1,7 +1,7 @@
 import logging
 import re
 import typing
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial
@@ -140,7 +140,7 @@ class Table:
 
     @property
     def is_table_in_mount(self) -> bool:
-        return self.database.startswith("mounted_")
+        return self.database.startswith("mounted_") and self.is_delta
 
     @property
     def what(self) -> What:
@@ -172,8 +172,28 @@ class Table:
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
 
-    def sql_migrate_table_in_mount(self, target_table_key, schema):
-        return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} ({schema}) LOCATION '{(self.location)}';"
+    def sql_migrate_table_in_mount(self, target_table_key: str, table_schema: Iterator[typing.Any]):
+        fields = []
+        partitioned_fields = []
+        next_fileds_are_partitioned = False
+        for key, value, _ in table_schema:
+            if key == "# Partition Information":
+                continue
+            if key == "# col_name":
+                next_fileds_are_partitioned = True
+                continue
+            if next_fileds_are_partitioned:
+                partitioned_fields.append(f"{key}")
+            else:
+                fields.append(f"{key} {value}")
+
+        partitioned_str = ""
+        if partitioned_fields:
+            partitioning_columns = ", ".join(partitioned_fields)
+            partitioned_str = f"PARTITIONED BY ({partitioning_columns})"
+        schema = ", ".join(fields)
+
+        return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} ({schema}) {partitioned_str} LOCATION '{self.location}';"
 
 
 @dataclass

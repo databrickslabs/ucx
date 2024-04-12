@@ -876,7 +876,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
 
 
-def test_table_in_mount_mapping():
+def test_table_in_mount_mapping_with_table_owner():
     client = create_autospec(WorkspaceClient)
     client.tables.get.side_effect = NotFound()
     backend = MockBackend(
@@ -916,7 +916,56 @@ def test_table_in_mount_mapping():
     )
     table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER])
     assert (
-        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal) LOCATION 'abfss://bucket@msft/path/test';"
+        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal)  LOCATION 'abfss://bucket@msft/path/test';"
+        in backend.queries
+    )
+    assert 'ALTER TABLE tgt_catalog.tgt_db.test OWNER TO `GROUP_TEST`' in backend.queries
+
+
+def test_table_in_mount_mapping_with_partition_information():
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
+                ("col1", "string", None),
+                ("col2", "decimal", None),
+                ("# Partition Information", None, None),
+                ("# col_name", None, None),
+                ("col1", None, None),
+            ],
+        }
+    )
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "mounted_datalake", "test", "EXTERNAL", "DELTA", "abfss://bucket@msft/path/test"),
+            Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
+        )
+    ]
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    udf_crawler = UdfsCrawler(backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    group_manager = GroupManager(backend, client, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        client,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+        "GROUP_TEST",
+    )
+    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER])
+    assert (
+        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal) PARTITIONED BY (col1) LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
     assert 'ALTER TABLE tgt_catalog.tgt_db.test OWNER TO `GROUP_TEST`' in backend.queries

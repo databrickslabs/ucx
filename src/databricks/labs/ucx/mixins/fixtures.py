@@ -955,8 +955,8 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
-    # pylint: disable-next=too-many-arguments
-    def create(
+    # pylint: disable-next=too-many-locals
+    def create(  # pylint: disable=too-many-arguments
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
