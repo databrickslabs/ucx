@@ -99,7 +99,6 @@ class AzureRoleAssignment:
 @dataclass
 class AccessConnector:
     id: str
-    type: str
     location: str
     # TODO: Add identity with reference to dataclass
     # identity {"principalId": ..., "tenantId": ..., "type": ...}
@@ -107,6 +106,8 @@ class AccessConnector:
     # tags
     # properties
     # systemData
+
+    _type = "Microsoft.Databricks/accessConnectors"
 
     _pattern_id = re.compile(
         r"^/subscriptions/([\w-]+)/resourceGroups/([\w-]+)"
@@ -133,6 +134,10 @@ class AccessConnector:
     def name(self) -> str:
         _, _, name = self._parse_id()
         return name
+
+    @property
+    def type(self) -> str:
+        return self._type
 
 
 class AzureAPIClient:
@@ -212,7 +217,6 @@ class AccessConnectorClient:
         for access_connector_raw in response["value"]:
             access_connector = AccessConnector(
                 id=access_connector_raw["id"],
-                type=access_connector_raw["type"],
                 location=access_connector_raw["location"],
             )
             access_connectors.append(access_connector)
