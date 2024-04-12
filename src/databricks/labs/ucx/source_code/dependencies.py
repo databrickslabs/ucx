@@ -108,7 +108,8 @@ class DependencyResolver:
     def resolve(self, dependency: Dependency) -> Dependency | None:
         if dependency.type == ObjectType.NOTEBOOK:
             return dependency
-        if dependency.path in self._whitelist:
+        compatibility = self._whitelist.compatibility(dependency.path)
+        if compatibility is None:
             return None
         return dependency
 

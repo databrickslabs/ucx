@@ -11,7 +11,7 @@ packages:
       - some failure 1
       - some failure 2
   - name: databricks.sdk.service.compute
-    unity-compatibility: none
+    compatibility: full
     failures:
       - some failure 1
       - some long failure message
