@@ -241,6 +241,21 @@ class AccessConnectorClient:
             query = dict(urllib.parse.parse_qsl(parsed_link.query))
         return resources
 
+    def get(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
+        """Get an access connector.
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/get?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
+        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
+        response = self._mgmt.get(url, self._api_version)
+        access_connector = AccessConnector(
+            id=response["id"],
+            location=response["location"],
+            tags=response.get("tags", {}),
+        )
+        return access_connector
+
     def list(self, subscription_id: str) -> list[AccessConnector]:
         """List all access connector within subscription
         
