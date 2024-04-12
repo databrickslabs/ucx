@@ -26,20 +26,20 @@ def test_access_connector_client_create_get_list_delete(az_cli_ctx, env_or_skip,
     az_cli_ctx.azure_resources.access_connectors.create_or_update(
         subscription_id,
         resource_group_name,
-        access_connector_name,
-        "westeurope",
-        {"RemoveAfter": str(tomorrow.date())}
+        access_connector.name,
+        access_connector.location,
+        access_connector.tags,
     )
     new_access_connector = az_cli_ctx.azure_resources.access_connectors.get(
         subscription_id,
         resource_group_name,
-        access_connector_name,
+        access_connector.name,
     )
     assert access_connector == new_access_connector
 
     az_cli_ctx.azure_resources.access_connectors.delete(
         subscription_id,
         resource_group_name,
-        access_connector_name,
+        access_connector.name,
     )
     assert access_connector not in list(az_cli_ctx.azure_resources.access_connectors.list(subscription_id))
