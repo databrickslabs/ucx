@@ -594,6 +594,9 @@ def test_table_migration_job(
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
+    # TODO - DBFS API does not support instance profile based mounts
+    if not ws.config.is_azure:
+        pytest.skip("Temporarily does not work on AWS")
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     tables: dict[str, TableInfo] = {}
@@ -763,6 +766,9 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     make_dbfs_data_copy,
     sql_backend,
 ):
+    # TODO - DBFS API does not support instance profile based mounts
+    if not ws.config.is_azure:
+        pytest.skip("Temporarily does not work on AWS")
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=schema.name)
