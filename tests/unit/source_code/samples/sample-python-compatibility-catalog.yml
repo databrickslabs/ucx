@@ -1,0 +1,39 @@
+pip:
+  name: databricks-sdk
+  version: ^0.24.0 # since version is specified, this entry only applies to versions matching the version number
+packages:
+  - name: databricks
+    unity-compatibility: partial
+    failures:
+      - some failure message
+  - name: databricks.sdk.service.dashboards
+    unity-compatibility: full
+    failures:
+      - some failure 1
+      - some failure 2
+  - name: databricks.sdk.service.compute
+    unity-compatibility: none
+    failures:
+      - some failure 1
+      - some long failure message
+        that spans across multiple
+        lines...
+---
+pip:
+  name: databricks-sdk
+  # since version is omitted, this entry applies to all versions for which there is no versioned entry
+packages:
+  - name: databricks
+    unity-compatibility: partial
+    failures:
+      - some failure
+  - name: databricks.sdk.service.dashboards
+    unity-compatibility: full
+    failures:
+      - some failure 1
+      - <some><html>failure 2</html></some>
+  - name: databricks.sdk.service.compute
+    unity-compatibility: none
+    failures:
+      - some failure 1
+      - some failure 2
