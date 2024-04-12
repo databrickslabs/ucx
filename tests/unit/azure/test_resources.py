@@ -4,7 +4,6 @@ import pytest
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
 from databricks.labs.ucx.azure.resources import (
-    AccessConnectorClient,
     AzureAPIClient,
     AzureResource,
     AzureResources,
