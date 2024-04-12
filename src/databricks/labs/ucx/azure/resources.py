@@ -194,45 +194,6 @@ class AccessConnectorClient:
         self._api_version = "2023-05-01"
         self._mgmt = azure_mgmt
 
-    def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
-        """List all resources of a type within subscription"""
-        query = {"api-version": "2020-06-01", "$filter": f"resourceType eq '{resource_type}'"}
-        while True:
-            res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
-            for resource in res["value"]:
-                yield RawResource(resource)
-            next_link = res.get("nextLink", None)
-            if not next_link:
-                break
-            parsed_link = urllib.parse.urlparse(next_link)
-            query = dict(urllib.parse.parse_qsl(parsed_link.query))
-
-    def list(self, subscription_id: str) -> Iterable[AccessConnector]:
-        """List all access connector within subscription
-
-        Docs:
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
-
-        TODO: rename method to list_access_connectors
-
-        TODO:
-            To filter for resource_groups use. Note: failed when testing manually.
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
-        """
-
-        for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
-            # TODO: map all properties
-            yield AccessConnector(
-                id=str(raw.id),
-                name=raw.get("name", ""),
-                location=raw.get("location", ""),
-                type=raw.get("type", ""),
-                identity=raw.get("identity", {}),
-                tags=raw.get("tags", {}),
-                properties=raw.get("properties", {}),
-                system_data=raw.get("systemData", {}),
-            )
-
     def create_or_update(
         self,
         subscription_id: str,
@@ -514,3 +475,39 @@ class AzureResources:
             system_data=response.get("systemData", {}),
         )
         return access_connector
+
+    def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
+        """List all resources of a type within subscription"""
+        query = {"api-version": "2020-06-01", "$filter": f"resourceType eq '{resource_type}'"}
+        while True:
+            res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
+            for resource in res["value"]:
+                yield RawResource(resource)
+            next_link = res.get("nextLink", None)
+            if not next_link:
+                break
+            parsed_link = urllib.parse.urlparse(next_link)
+            query = dict(urllib.parse.parse_qsl(parsed_link.query))
+
+    def list_access_connectors(self, subscription_id: str) -> Iterable[AccessConnector]:
+        """List all access connector within subscription
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
+
+        TODO:
+            To filter for resource_groups use. Note: failed when testing manually.
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
+
+        for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
+            yield AccessConnector(
+                id=str(raw.id),
+                name=raw.get("name", ""),
+                location=raw.get("location", ""),
+                type=raw.get("type", ""),
+                identity=raw.get("identity", {}),
+                tags=raw.get("tags", {}),
+                properties=raw.get("properties", {}),
+                system_data=raw.get("systemData", {}),
+            )
