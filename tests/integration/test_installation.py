@@ -6,7 +6,9 @@ import sys
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-import pytest
+from functools import cached_property
+
+import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState, RawState
 from databricks.labs.blueprint.parallel import Threads, ManyError
@@ -49,9 +51,150 @@ from tests.integration.conftest import (
     StaticGrantsCrawler,
     StaticTablesCrawler,
     StaticUdfsCrawler,
+    TestRuntimeContext,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class TestInstallationContext(TestRuntimeContext):
+    @cached_property
+    def running_clusters(self):
+        logger.debug("Waiting for clusters to start...")
+        default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
+        tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+        table_migration_cluster_id = self._env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+        ensure_cluster_is_running = self.workspace_client.clusters.ensure_cluster_is_running
+        Threads.strict(
+            "ensure clusters running",
+            [
+                functools.partial(ensure_cluster_is_running, default_cluster_id),
+                functools.partial(ensure_cluster_is_running, tacl_cluster_id),
+                functools.partial(ensure_cluster_is_running, table_migration_cluster_id),
+            ],
+        )
+        logger.debug("Waiting for clusters to start...")
+        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
+
+    @cached_property
+    def installation(self):
+        return Installation(self.workspace_client, self.product_info.product_name())
+
+    @cached_property
+    def environ(self) -> dict[str, str]:
+        return os.environ
+
+    @cached_property
+    def workspace_installer(self):
+        return WorkspaceInstaller(
+            self.prompts, self.installation, self.workspace_client, self.product_info, self.environ
+        )
+
+    @cached_property
+    def config(self) -> WorkspaceConfig:
+        workspace_config = self.workspace_installer.configure()
+        default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
+        workspace_config = replace(
+            workspace_config,
+            override_clusters={
+                "main": default_cluster_id,
+                "tacl": tacl_cluster_id,
+                "table_migration": table_migration_cluster_id,
+            },
+            workspace_start_path=self.installation.install_folder(),
+        )
+        self.installation.save(workspace_config)
+        return workspace_config
+
+    @cached_property
+    def product_info(self):
+        return ProductInfo.for_testing(WorkspaceConfig)
+
+    @cached_property
+    def tasks(self):
+        return Workflows.all().tasks()
+
+    @cached_property
+    def skip_dashboards(self):
+        return True
+
+    @cached_property
+    def workflows_deployment(self):
+        return WorkflowsDeployment(
+            self.config,
+            self.installation,
+            self.install_state,
+            self.workspace_client,
+            self.product_info.wheels(self.workspace_client),
+            self.product_info,
+            timedelta(minutes=3),
+            self.tasks,
+            skip_dashboards=self.skip_dashboards,
+        )
+
+    @cached_property
+    def workspace_installation(self):
+        return WorkspaceInstallation(
+            self.config,
+            self.installation,
+            self.install_state,
+            self.sql_backend,
+            self.workspace_client,
+            self.workflows_deployment,
+            self.prompts,
+            self.product_info,
+            skip_dashboards=self.skip_dashboards,
+        )
+
+    @cached_property
+    def workspace_installation_run(self):
+        return self.workspace_installation.run()
+
+    @cached_property
+    def created_databases(self):
+        created_databases = super().created_databases()
+        new_config = replace(self.config, include_databases=created_databases)
+        self.installation.save(new_config)
+        return created_databases
+
+    @cached_property
+    def created_groups(self):
+        created_groups = super().created_groups()
+        new_config = replace(self.config, include_group_names=created_groups)
+        self.installation.save(new_config)
+        return created_groups
+
+    @cached_property
+    def extend_prompts(self):
+        return {}
+
+    @cached_property
+    def renamed_group_prefix(self):
+        return f"rename-{self.product_info.product_name()}-"
+
+    @cached_property
+    def prompts(self):
+        return MockPrompts(
+            {
+                r'Open job overview in your browser.*': 'no',
+                r'Do you want to uninstall ucx.*': 'yes',
+                r'Do you want to delete the inventory database.*': 'yes',
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r"Choose how to map the workspace groups.*": "1",
+                r".*connect to the external metastore?.*": "yes",
+                r"Choose a cluster policy": "0",
+                r".*Inventory Database.*": self.inventory_database,
+                r".*Backup prefix*": self.renamed_group_prefix,
+                r".*": "",
+            }
+            | (self.extend_prompts or {})
+        )
+
+
+@pytest.fixture
+def installation_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
+    ctx = TestInstallationContext(make_table, make_schema, make_udf, make_group, env_or_skip)
+    return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
 @pytest.fixture
