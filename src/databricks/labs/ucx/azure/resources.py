@@ -187,13 +187,6 @@ class AzureAPIClient:
         return self._token_source.token()
 
 
-class AccessConnectorClient:
-
-    # TODO: move all of these methods to the AzureResources class!
-    def __init__(self, azure_mgmt: AzureAPIClient) -> None:
-        self._api_version = "2023-05-01"
-        self._mgmt = azure_mgmt
-
 class AzureResources:
     def __init__(self, azure_mgmt: AzureAPIClient, azure_graph: AzureAPIClient, include_subscriptions=None):
         if not include_subscriptions:
@@ -418,11 +411,6 @@ class AzureResources:
                 return None
             return principal.client_id
         return None
-
-    @cached_property
-    def access_connectors(self) -> AccessConnectorClient:
-        # TODO: remove this and move all the methods to the AzureResources class
-        return AccessConnectorClient(self._mgmt)
 
     def get_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
         """Get an access connector.
