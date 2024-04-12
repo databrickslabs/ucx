@@ -39,6 +39,7 @@ def test_access_connector_client_create_delete(ws, access_connector_client: Acce
 
     assert access_connector not in access_connector_client.list(subscription_id)
     access_connector_client.create(access_connector)
+    access_connector_client.create_or_update(access_connector)
     assert access_connector in access_connector_client.list(subscription_id)
     access_connector_client.delete(access_connector)
     assert access_connector not in access_connector_client.list(subscription_id)
