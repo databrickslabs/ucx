@@ -194,16 +194,6 @@ class AccessConnectorClient:
         self._api_version = "2023-05-01"
         self._mgmt = azure_mgmt
 
-    def delete(self, subscription_id: str, resource_group_name: str, name: str) -> None:
-        """Delete an access connector.
-
-        Docs:
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
-        """
-        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
-        self._mgmt.delete(url, self._api_version)
-
-
 class AzureResources:
     def __init__(self, azure_mgmt: AzureAPIClient, azure_graph: AzureAPIClient, include_subscriptions=None):
         if not include_subscriptions:
@@ -510,3 +500,12 @@ class AzureResources:
         if tags is not None:
             body["tags"] = tags
         self._mgmt.put(url, "2023-05-01", body)
+
+    def delete_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> None:
+        """Delete an access connector.
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
+        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
+        self._mgmt.delete(url, "2023-05-01")
