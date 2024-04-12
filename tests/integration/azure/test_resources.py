@@ -1,12 +1,7 @@
 import datetime as dt
-import logging
-import os
-from functools import cached_property
 
-import pytest
 
-from databricks.labs.ucx.azure.resources import AccessConnector, AccessConnectorClient, AzureAPIClient
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.azure.resources import AccessConnector
 
 
 def test_access_connector_client_create_delete(az_cli_ctx, env_or_skip, make_random):

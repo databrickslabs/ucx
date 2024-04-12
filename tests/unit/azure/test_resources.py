@@ -4,7 +4,6 @@ import pytest
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
 from databricks.labs.ucx.azure.resources import (
-    AccessConnector,
     AccessConnectorClient,
     AzureAPIClient,
     AzureResource,
@@ -268,8 +267,7 @@ def test_managed_identity_not_found():
 
 @pytest.fixture
 def access_connector_client() -> AccessConnectorClient:
-    access_connector_client = AccessConnectorClient(azure_api_client())
-    return access_connector_client
+    return AccessConnectorClient(azure_api_client())
 
 
 def test_access_connector_handler_list_access_connectors(

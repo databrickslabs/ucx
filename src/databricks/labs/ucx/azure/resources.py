@@ -1,4 +1,3 @@
-import re
 import urllib.parse
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -195,8 +194,6 @@ class AzureAPIClient:
         return self._token_source.token()
 
 
-
-
 class AccessConnectorClient:
 
     # TODO: move all of these methods to the AzureResources class!
@@ -235,7 +232,7 @@ class AccessConnectorClient:
 
     def list(self, subscription_id: str) -> Iterable[AccessConnector]:
         """List all access connector within subscription
-        
+
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
 
@@ -264,9 +261,7 @@ class AccessConnectorClient:
         body = {
             "location": access_connector.location,
             "tags": access_connector.tags,
-            "identity": {
-                "type": "SystemAssigned"
-            }
+            "identity": {"type": "SystemAssigned"},
         }
         self._mgmt.put(access_connector.id, self._api_version, body)
 
@@ -277,6 +272,7 @@ class AccessConnectorClient:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
         """
         self._mgmt.delete(access_connector.id, self._api_version)
+
 
 class AzureResources:
     def __init__(self, azure_mgmt: AzureAPIClient, azure_graph: AzureAPIClient, include_subscriptions=None):

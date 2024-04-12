@@ -2,6 +2,7 @@ import collections
 import logging
 import warnings
 from functools import partial, cached_property
+from typing import Callable
 
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
