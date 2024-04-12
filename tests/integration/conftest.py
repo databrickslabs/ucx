@@ -8,7 +8,7 @@ import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.catalog import FunctionInfo, TableInfo, TableType, DataSourceFormat
+from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
