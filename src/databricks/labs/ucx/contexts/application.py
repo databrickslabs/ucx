@@ -239,6 +239,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def principal_acl(self):
         if not self.is_azure:
+            # test_mapping_reverts_table and test_revert_migrated_table depend on this
             raise NotImplementedError("Azure only for now")
         eligible = self.azure_acl.get_eligible_locations_principals()
         return PrincipalACL(
