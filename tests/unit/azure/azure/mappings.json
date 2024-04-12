@@ -220,6 +220,32 @@
       "displayName": "credential_system_assigned_mi",
       "id": "id_system_assigned_mi-123",
       "servicePrincipalType": "ManagedIdentity"
+    },
+    "/subscriptions/test/providers/Microsoft.Databricks/accessConnectors": {
+      "value": [{
+        "id": "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector",
+        "name": "test-access-connector",
+        "type": "Microsoft.Databricks/accessConnectors",
+        "location": "westeurope",
+        "identity": {
+            "principalId": "test",
+            "tenantId": "test",
+            "type": "SystemAssigned"
+        },
+        "tags": {
+            "application": "databricks",
+            "Owner": "cor.zuurmond@databricks.com",
+            "RemoveAfter": "2030-01-01",
+            "NoAutoRemove": "True"
+        },
+        "properties": {
+            "provisioningState": "Succeeded"
+        },
+        "systemData": {
+            "createdAt": "0001-01-01T00:00:00+00:00",
+            "lastModifiedAt": "0001-01-01T00:00:00+00:00"
+        }
+      }]
     }
   }
 ]
