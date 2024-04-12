@@ -276,8 +276,7 @@ class AccessConnectorClient:
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/delete?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        self._mgmt.delete(access_connector.id)
-
+        self._mgmt.delete(access_connector.id, self._api_version)
 
 class AzureResources:
     def __init__(self, azure_mgmt: AzureAPIClient, azure_graph: AzureAPIClient, include_subscriptions=None):
