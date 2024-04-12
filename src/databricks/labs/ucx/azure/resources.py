@@ -228,7 +228,7 @@ class AccessConnectorClient:
             url = response.get("nextLink", "").removeprefix(self._azure_mgmt.api_client._cfg.host)
         return access_connectors
 
-    def create(self, access_connector: AccessConnector):
+    def create_or_update(self, access_connector: AccessConnector):
         """Create access connector.
 
         Docs:
