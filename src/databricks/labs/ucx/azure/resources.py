@@ -74,6 +74,7 @@ class AzureResource:
     def __str__(self):
         return self._resource_id
 
+
 class RawResource:
     def __init__(self, raw_resource: dict[str, Any]):
         if 'id' not in raw_resource:
@@ -87,6 +88,7 @@ class RawResource:
 
     def get(self, key: str, default: Any) -> Any:
         return self._raw_resource.get(key, default)
+
 
 @dataclass
 class Principal:
@@ -118,6 +120,7 @@ class AzureRoleAssignment:
 @dataclass
 class AccessConnector:
     id: str
+    name: str
     location: str
     tags: dict[str, str]
     # TODO: Add identity with reference to dataclass
@@ -127,31 +130,6 @@ class AccessConnector:
     # systemData
 
     _type = "Microsoft.Databricks/accessConnectors"
-
-    _pattern_id = re.compile(
-        r"^/subscriptions/(.+)/resourceGroups/(.+)/providers/Microsoft\.Databricks/accessConnectors/(.+)$"
-    )
-
-    def _parse_id(self) -> tuple[str, str, str]:
-        match = self._pattern_id.match(self.id)
-        assert match is not None
-        subscription_id, resource_group, name = match.groups()
-        return subscription_id, resource_group, name
-
-    @property
-    def subscription_id(self) -> str:
-        subscription_id, _, _ = self._parse_id()
-        return subscription_id
-
-    @property
-    def resource_group(self) -> str:
-        _, resource_group, _ = self._parse_id()
-        return resource_group
-
-    @property
-    def name(self) -> str:
-        _, _, name = self._parse_id()
-        return name
 
     @property
     def type(self) -> str:
@@ -228,7 +206,6 @@ class AccessConnectorClient:
 
     def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
         """List all resources of a type within subscription"""
-        resources = []
         query = {'api-version': "2020-06-01", '$filter': f"resourceType eq '{resource_type}'"}
         while True:
             res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
@@ -239,7 +216,6 @@ class AccessConnectorClient:
                 break
             parsed_link = urllib.parse.urlparse(next_link)
             query = dict(urllib.parse.parse_qsl(parsed_link.query))
-        return resources
 
     def get(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
         """Get an access connector.
@@ -251,6 +227,7 @@ class AccessConnectorClient:
         response = self._mgmt.get(url, self._api_version)
         access_connector = AccessConnector(
             id=response["id"],
+            name=response["name"],
             location=response["location"],
             tags=response.get("tags", {}),
         )
@@ -273,11 +250,12 @@ class AccessConnectorClient:
             # TODO: map all properties
             yield AccessConnector(
                 id=raw.id,
+                name=raw.get("access_connector", ""),
                 location=raw.get("location", ""),
                 tags=raw.get("tags", {}),
             )
 
-    def create_or_update(self, access_connector: AccessConnector):
+    def create_or_update(self, access_connector: AccessConnector) -> None:
         """Create access connector.
 
         Docs:
@@ -292,7 +270,7 @@ class AccessConnectorClient:
         }
         self._mgmt.put(access_connector.id, self._api_version, body)
 
-    def delete(self, access_connector: AccessConnector):
+    def delete(self, access_connector: AccessConnector) -> None:
         """Delete an access connector.
 
         Docs:
