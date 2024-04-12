@@ -450,10 +450,6 @@ class AzureResources:
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
-
-        TODO:
-            To filter for resource_groups use. Note: failed when testing manually.
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
         """
         for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
             yield AccessConnector(
