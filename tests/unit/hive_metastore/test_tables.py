@@ -308,3 +308,101 @@ def test_is_partitioned_flag():
         )
         in results
     )
+
+
+@pytest.mark.parametrize(
+    'table, catalog_name, dst_schema, dst_table, hiveserde_in_place_migrate, describe, ddl, expected',
+    [
+        (
+            Table("hive_metastore", "schema", "test_parquet", "EXTERNAL", "HIVE"),
+            "uc_catalog",
+            "uc_schema",
+            "test_parquet",
+            "PARQUET",
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
+            ],
+            MockBackend.rows("createtab_stmt")[
+                (
+                    "CREATE TABLE hive_metastore.schema.test_parquet (id INT, name STRING, age INT) USING PARQUET PARTITIONED BY (age) LOCATION 's3://databricks/test_parquet' TBLPROPERTIES ('transient_lastDdlTime'='1712729041')"
+                ),
+            ],
+            "CREATE TABLE uc_catalog.uc_schema.test_parquet (id INT, name STRING, age INT) USING PARQUET PARTITIONED BY (age) LOCATION 's3://databricks/test_parquet' TBLPROPERTIES ('transient_lastDdlTime'='1712729041')",
+        ),
+        (
+            Table("hive_metastore", "schema", "test_avro", "EXTERNAL", "HIVE"),
+            "uc_catalog",
+            "uc_schema",
+            "test_avro",
+            "AVRO",
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.serde2.avro.AvroSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat", None),
+            ],
+            MockBackend.rows("createtab_stmt")[
+                (
+                    'CREATE TABLE hive_metastore.schema.test_avro (id INT, name STRING, age INT) USING AVRO LOCATION \'s3://databricks/test_avro\' TBLPROPERTIES (\'avro.schema.literal\'=\'{"namespace": "org.apache.hive", "name": "first_schema", "type": "record", "fields": [{"name":"id", "type":"int"}, {"name":"name", "type":"string"}, {"name":"age", "type":"int"}]}\', \'transient_lastDdlTime\'=\'1712728956\')'
+                ),
+            ],
+            'CREATE TABLE uc_catalog.uc_schema.test_avro (id INT, name STRING, age INT) USING AVRO LOCATION \'s3://databricks/test_avro\' TBLPROPERTIES (\'avro.schema.literal\'=\'{"namespace": "org.apache.hive", "name": "first_schema", "type": "record", "fields": [{"name":"id", "type":"int"}, {"name":"name", "type":"string"}, {"name":"age", "type":"int"}]}\', \'transient_lastDdlTime\'=\'1712728956\')',
+        ),
+        (
+            Table("hive_metastore", "schema", "test_orc", "EXTERNAL", "HIVE"),
+            "uc_catalog",
+            "uc_schema",
+            "test_orc",
+            "ORC",
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.orc.OrcSerde", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat", None),
+            ],
+            MockBackend.rows("createtab_stmt")[
+                (
+                    "CREATE TABLE hive_metastore.schema.test_orc (id INT, name STRING, age INT) USING ORC PARTITIONED BY (age) LOCATION 's3://databricks/test_orc' TBLPROPERTIES ('transient_lastDdlTime'='1712729616')"
+                ),
+            ],
+            "CREATE TABLE uc_catalog.uc_schema.test_orc (id INT, name STRING, age INT) USING ORC PARTITIONED BY (age) LOCATION 's3://databricks/test_orc' TBLPROPERTIES ('transient_lastDdlTime'='1712729616')",
+        ),
+        (
+            Table("hive_metastore", "schema", "nosupport_serde", "EXTERNAL", "HIVE"),
+            "uc_catalog",
+            "uc_schema",
+            "nosupport_serde",
+            "RCFILE",
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "LazyBinaryColumnarSerDe", None),
+                ("InputFormat", "RCFileInputFormat", None),
+                ("OutputFormat", "RCFileOutputFormat", None),
+            ],
+            None,
+            None,
+        ),
+        (
+            Table("hive_metastore", "schema", "no_serde", "EXTERNAL", "HIVE"),
+            "uc_catalog",
+            "uc_schema",
+            "no_serde",
+            "RCFILE",
+            MockBackend.rows("col_name", "data_type", "comment")[("dummy", "dummy", None),],
+            None,
+            None,
+        ),
+    ],
+)
+def test_in_place_migrate_hiveserde_sql(
+    table, catalog_name, dst_schema, dst_table, hiveserde_in_place_migrate, describe, ddl, expected
+):
+    sql_backend = MockBackend(
+        rows={
+            "DESCRIBE TABLE EXTENDED *": describe,
+            "SHOW CREATE TABLE *": ddl,
+        }
+    )
+    migrate_sql = table.sql_migrate_external_hiveserde_in_place(
+        catalog_name, dst_schema, dst_table, sql_backend, hiveserde_in_place_migrate
+    )
+    assert migrate_sql == expected

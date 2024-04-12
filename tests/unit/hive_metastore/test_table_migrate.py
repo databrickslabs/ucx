@@ -604,8 +604,8 @@ def test_revert_report(ws, capsys):
     table_migrate = get_table_migrator(backend)
     table_migrate.print_revert_report(delete_managed=True)
     captured = capsys.readouterr()
-    assert "test_schema1|1|0|1|0|1|0|0|" in captured.out.replace(" ", "")
-    assert "test_schema2|1|0|0|0|0|0|0|" in captured.out.replace(" ", "")
+    assert "test_schema1|1|0|0|1|0|1|0|0|" in captured.out.replace(" ", "")
+    assert "test_schema2|1|0|0|0|0|0|0|0|" in captured.out.replace(" ", "")
     assert "- Migrated DBFS Root Tables will be deleted" in captured.out
 
     table_migrate.print_revert_report(delete_managed=False)

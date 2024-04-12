@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class What(Enum):
     EXTERNAL_SYNC = auto()
-    EXTERNAL_NO_SYNC_HIVESERDE = auto()
+    EXTERNAL_HIVESERDE = auto()
     EXTERNAL_NO_SYNC = auto()
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
@@ -155,7 +155,7 @@ class Table:
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
         if self.kind == "TABLE" and self.table_format == "HIVE":
-            return What.EXTERNAL_NO_SYNC_HIVESERDE
+            return What.EXTERNAL_HIVESERDE
         if self.kind == "TABLE":
             return What.EXTERNAL_NO_SYNC
         if self.kind == "VIEW":
@@ -181,6 +181,9 @@ class Table:
         describe = {}
         for key, values, _ in backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(self.key)}"):
             describe[key] = values
+
+        if not {"Serde Library", "InputFormat", "OutputFormat"} <= describe.keys():
+            return None
 
         # if "PARQUET", "AVRO", "ORC" hiveserde, just reuse the DDL from "SHOW CREATE TABLE..."
         if (

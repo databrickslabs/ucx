@@ -156,7 +156,7 @@ class TablesMigrator:
             return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
-        if src_table.src.what == What.EXTERNAL_NO_SYNC_HIVESERDE:
+        if src_table.src.what == What.EXTERNAL_HIVESERDE:
             return self._migrate_external_table_hiveserde(
                 src_table.src, src_table.rule, grants, hiveserde_in_place_migrate
             )
