@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from unittest.mock import create_autospec
 
@@ -57,7 +55,6 @@ def azure_management_api_client(ws: WorkspaceClient) -> AzureAPIClient:
 def access_connector() -> AccessConnector:
     access_connector_client = AccessConnector(
         id=ACCESS_CONNECTOR_ID,
-        name=ACCESS_CONNECTOR_NAME,
         type="Microsoft.Databricks/accessConnectors",
         location=LOCATION,
     )

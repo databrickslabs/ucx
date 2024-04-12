@@ -99,7 +99,6 @@ class AzureRoleAssignment:
 @dataclass
 class AccessConnector:
     id: str
-    name: str
     type: str
     location: str
     # TODO: Add identity with reference to dataclass
@@ -114,21 +113,26 @@ class AccessConnector:
         r"/providers/Microsoft\.Databricks/accessConnectors/([\w-]+)$"
     )
 
-    def _parse_id(self) -> tuple[str, str]:
+    def _parse_id(self) -> tuple[str, str, str]:
         match = self._pattern_id.match(self.id)
         assert match is not None
-        subscription_id, resource_group, _ = match.groups()
-        return subscription_id, resource_group
+        subscription_id, resource_group, name = match.groups()
+        return subscription_id, resource_group, name
 
     @property
     def subscription_id(self) -> str:
-        subscription_id, _ = self._parse_id()
+        subscription_id, _, _ = self._parse_id()
         return subscription_id
 
     @property
     def resource_group(self) -> str:
-        _, resource_group = self._parse_id()
+        _, resource_group, _ = self._parse_id()
         return resource_group
+
+    @property
+    def name(self) -> str:
+        _, _, name = self._parse_id()
+        return name
 
 
 class AzureAPIClient:
@@ -208,7 +212,6 @@ class AccessConnectorClient:
         for access_connector_raw in response["value"]:
             access_connector = AccessConnector(
                 id=access_connector_raw["id"],
-                name=access_connector_raw["name"],
                 type=access_connector_raw["type"],
                 location=access_connector_raw["location"],
             )
