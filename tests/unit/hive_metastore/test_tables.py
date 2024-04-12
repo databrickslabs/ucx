@@ -413,4 +413,5 @@ def test_in_place_migrate_hiveserde_sql(
     migrate_sql = table.sql_migrate_external_hiveserde_in_place(
         destination[0], destination[1], destination[2], sql_backend, hiveserde_in_place_migrate, dst_table_location
     )
+    assert table.what == What.EXTERNAL_HIVESERDE
     assert migrate_sql == expected
