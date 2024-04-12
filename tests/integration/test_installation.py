@@ -83,6 +83,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
                 r".*connect to the external metastore?.*": "yes",
+                r"Choose a cluster policy": "0",
                 r".*Inventory Database.*": inventory_schema_name,
                 r".*Backup prefix*": renamed_group_prefix,
                 r".*": "",
@@ -166,6 +167,7 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
     make_table,
     make_cluster_policy,
     make_cluster_policy_permissions,
+    migrated_group,
 ):
     ws_group, acc_group = make_ucx_group()
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
@@ -599,8 +601,7 @@ def test_table_migration_job(
         pytest.skip("Temporarily does not work on AWS")
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    tables: dict[str, TableInfo] = {}
-    tables["src_managed_table"] = make_table(schema_name=schema.name)
+    tables: dict[str, TableInfo] = {"src_managed_table": make_table(schema_name=schema.name)}
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
     tables["src_external_table"] = make_table(schema_name=schema.name, external_csv=new_mounted_location)
