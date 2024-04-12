@@ -194,28 +194,6 @@ class AccessConnectorClient:
         self._api_version = "2023-05-01"
         self._mgmt = azure_mgmt
 
-    def create_or_update(
-        self,
-        subscription_id: str,
-        resource_group_name: str,
-        name: str,
-        location: str,
-        tags: dict[str, str] | None,
-    ) -> None:
-        """Create access connector.
-
-        Docs:
-            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/create-or-update?view=rest-databricks-2023-05-01&tabs=HTTP
-        """
-        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
-        body = {
-            "location": location,
-            "identity": {"type": "SystemAssigned"},
-        }
-        if tags is not None:
-            body["tags"] = tags
-        self._mgmt.put(url, self._api_version, body)
-
     def delete(self, subscription_id: str, resource_group_name: str, name: str) -> None:
         """Delete an access connector.
 
@@ -499,7 +477,6 @@ class AzureResources:
             To filter for resource_groups use. Note: failed when testing manually.
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-resource-group?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-
         for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
             yield AccessConnector(
                 id=str(raw.id),
@@ -511,3 +488,25 @@ class AzureResources:
                 properties=raw.get("properties", {}),
                 system_data=raw.get("systemData", {}),
             )
+
+    def create_or_update_access_connector(
+        self,
+        subscription_id: str,
+        resource_group_name: str,
+        name: str,
+        location: str,
+        tags: dict[str, str] | None,
+    ) -> None:
+        """Create access connector.
+
+        Docs:
+            https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/create-or-update?view=rest-databricks-2023-05-01&tabs=HTTP
+        """
+        url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
+        body = {
+            "location": location,
+            "identity": {"type": "SystemAssigned"},
+        }
+        if tags is not None:
+            body["tags"] = tags
+        self._mgmt.put(url, "2023-05-01", body)
