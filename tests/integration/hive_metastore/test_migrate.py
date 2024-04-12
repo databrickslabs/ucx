@@ -252,6 +252,7 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
 
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.tables_migrator.index()
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
     runtime_ctx.tables_migrator.migrate_tables(what=What.VIEW)
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
