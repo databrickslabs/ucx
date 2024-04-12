@@ -88,10 +88,12 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         return seen_tables
 
     def is_migrated(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(
+        results = self._backend.fetch(
             f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)} ('upgraded_to')"
         )
-        for _ in result:
+        for result in results:
+            if "does not have property" in result.value:
+                continue
             logger.info(f"{schema}.{table} is set as migrated")
             return True
         logger.info(f"{schema}.{table} is set as not migrated")
