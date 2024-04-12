@@ -2,9 +2,8 @@ from collections.abc import Iterable
 
 import logging
 import sqlglot
-from sqlglot import ParseError
 from sqlglot.expressions import Table, Expression
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class FromTable(Linter, Fixer):
 
     def apply(self, code: str) -> str:
         new_statements = []
-        for statement in self._get_statements(code):
+        for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue
             for old_table in self._dependent_tables(statement):
@@ -68,10 +67,6 @@ class FromTable(Linter, Fixer):
             new_statements.append(new_sql)
         return '; '.join(new_statements)
 
-    @staticmethod
-    def _get_statements(code: str):
-        return sqlglot.parse(code)
-
     @classmethod
     def _dependent_tables(cls, statement: Expression):
         dependencies = []
@@ -81,38 +76,3 @@ class FromTable(Linter, Fixer):
                 continue
             dependencies.append(old_table)
         return dependencies
-
-    @classmethod
-    # This method is used to get the dependencies for a query as a list of tables
-    def view_dependencies(cls, code: str, *, use_schema: str | None = None):
-        try:
-            statements = sqlglot.parse(code)
-            if len(statements) != 1 or statements[0] is None:
-                raise ValueError(f"Could not analyze view SQL: {code}")
-        except ParseError as e:
-            raise ValueError(f"Could not analyze view SQL: {code}") from e
-        statement = statements[0]
-        for table in cls._dependent_tables(statement):
-            src_db = table.db if table.db else use_schema
-            if not src_db:
-                logger.error(f"Could not determine schema for table {table.name}")
-                continue
-            yield TableView("hive_metastore", src_db, table.name)
-
-    @staticmethod
-    def view_columns(code: str):
-        # This method is used to get the columns for a view
-        # It is based on the "show create table" output for a view
-        try:
-            statements = sqlglot.parse(code)
-            if len(statements) != 1 or statements[0] is None:
-                raise ValueError(f"Could not analyze view SQL: {code}")
-        except ParseError as e:
-            raise ValueError(f"Could not analyze view SQL: {code}") from e
-        statement = statements[0]
-        if not statement.this.expressions or len(statement.this.expressions) == 0:
-            return None
-        columns = []
-        for expression in statement.this.expressions:
-            columns.append(expression.name.lower())
-        return columns

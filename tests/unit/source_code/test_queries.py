@@ -1,5 +1,3 @@
-import pytest
-
 from databricks.labs.ucx.source_code.base import Deprecation
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -53,21 +51,3 @@ def test_fully_migrated_queries_match_no_db(migration_index):
     new_query = "SELECT * FROM brand.new.stuff LEFT JOIN some.certain.issues USING (x) WHERE state > 1 LIMIT 10"
 
     assert ftf.apply(old_query) == new_query
-
-
-@pytest.mark.parametrize(
-    "src,columns",
-    [
-        (
-            "CREATE OR REPLACE VIEW abc.ghi (   first,   last) TBLPROPERTIES "
-            "(   'transient_lastDdlTime' = '1712859290') AS select * from abc.def",
-            ["first", "last"],
-        ),
-        ("CREATE OR REPLACE VIEW abc.ghi AS select * from abc.def", None),
-        ("CREATE OR REPLACE VIEW abc.ghi ('first','last') AS select a,b from abc.def", ["first", "last"]),
-    ],
-)
-def test_get_columns_from_view(src, columns):
-    query_columns = FromTable.view_columns(src)
-
-    assert query_columns == columns

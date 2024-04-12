@@ -248,14 +248,8 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
 
 def test_migrate_view_should_produce_proper_queries(ws):
     errors = {}
-    rows = {
-        "SHOW CREATE TABLE": [
-            {
-                "createtab_stmt": "CREATE OR REPLACE VIEW "
-                "hive_metastore.db1_src.view_src AS SELECT * FROM db1_src.managed_dbfs"
-            }
-        ],
-    }
+    original_view = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src AS SELECT * FROM db1_src.managed_dbfs"
+    rows = {"SHOW CREATE TABLE": [{"createtab_stmt": original_view}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
@@ -266,13 +260,11 @@ def test_migrate_view_should_produce_proper_queries(ws):
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
     }
-    migration_index = create_autospec(MigrationIndex)
-    migration_index.get.return_value = MigrationStatus(
-        src_schema="db1_src",
-        src_table="managed_dbfs",
-        dst_catalog="ucx_default",
-        dst_schema="db1_dst",
-        dst_table="managed_dbfs",
+    migration_index = MigrationIndex(
+        [
+            MigrationStatus("db1_src", "managed_dbfs", "ucx_default", "db1_dst", "new_managed_dbfs"),
+            MigrationStatus("db1_src", "view_src", "ucx_default", "db1_dst", "view_dst"),
+        ]
     )
     migration_status_refresher.index.return_value = migration_index
     principal_grants = create_autospec(PrincipalACL)
@@ -288,31 +280,20 @@ def test_migrate_view_should_produce_proper_queries(ws):
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
-    assert (
-        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM ucx_default.db1_dst.managed_dbfs;"
-        in backend.queries
+    create = "CREATE OR REPLACE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst AS SELECT * FROM ucx_default.db1_dst.new_managed_dbfs"
+    assert create in backend.queries
+    src = (
+        "ALTER VIEW hive_metastore.db1_src.view_src SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
     )
-    assert (
-        "ALTER VIEW hive_metastore.db1_src.view_src "
-        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.view_dst');"
-    ) in backend.queries
-    assert (
-        f"ALTER VIEW ucx_default.db1_dst.view_dst "
-        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , "
-        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
-    ) in backend.queries
+    assert src in backend.queries
+    dst = f"ALTER VIEW ucx_default.db1_dst.view_dst SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+    assert dst in backend.queries
 
 
 def test_migrate_view_with_columns(ws):
     errors = {}
-    rows = {
-        "SHOW CREATE TABLE": [
-            {
-                "createtab_stmt": "CREATE OR REPLACE VIEW "
-                "hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
-            }
-        ],
-    }
+    create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
+    rows = {"SHOW CREATE TABLE": [{"createtab_stmt": create}]}
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
@@ -323,13 +304,11 @@ def test_migrate_view_with_columns(ws):
     migration_status_refresher.get_seen_tables.return_value = {
         "ucx_default.db1_dst.managed_dbfs": "hive_metastore.db1_src.managed_dbfs"
     }
-    migration_index = create_autospec(MigrationIndex)
-    migration_index.get.return_value = MigrationStatus(
-        src_schema="db1_src",
-        src_table="managed_dbfs",
-        dst_catalog="ucx_default",
-        dst_schema="db1_dst",
-        dst_table="managed_dbfs",
+    migration_index = MigrationIndex(
+        [
+            MigrationStatus("db1_src", "managed_dbfs", "ucx_default", "db1_dst", "new_managed_dbfs"),
+            MigrationStatus("db1_src", "view_src", "ucx_default", "db1_dst", "view_dst"),
+        ]
     )
     migration_status_refresher.index.return_value = migration_index
     principal_grants = create_autospec(PrincipalACL)
@@ -345,10 +324,8 @@ def test_migrate_view_with_columns(ws):
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
-    assert (
-        "CREATE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst (a, b) AS SELECT * FROM ucx_default.db1_dst.managed_dbfs;"
-        in backend.queries
-    )
+    create = "CREATE OR REPLACE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst (a, b) AS SELECT * FROM ucx_default.db1_dst.new_managed_dbfs"
+    assert create in backend.queries
 
 
 def get_table_migrator(backend: SqlBackend) -> TablesMigrator:

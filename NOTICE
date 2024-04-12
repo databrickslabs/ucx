@@ -14,3 +14,7 @@ PyYAML - https://github.com/yaml/pyyaml
 Copyright (c) 2017-2021 Ingy döt Net
 Copyright (c) 2006-2016 Kirill Simonov
 License - https://github.com/yaml/pyyaml/blob/main/LICENSE
+
+SQLGlot - https://sqlglot.com
+Copyright (c) 2023 Toby Mao
+License - https://github.com/tobymao/sqlglot/blob/main/LICENSE
