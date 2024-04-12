@@ -19,7 +19,7 @@ class FromTable(Linter, Fixer):
         return 'table-migrate'
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code):
+        for statement in sqlglot.parse(code, dialect='databricks'):
             if not statement:
                 continue
             for table in statement.find_all(Table):
