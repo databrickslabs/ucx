@@ -300,7 +300,11 @@ def test_access_connector_handler_list_access_connectors(
     access_connectors = access_connector_client.list("test")
     assert len(access_connectors) > 0
 
-    access_connector = access_connectors[0]
+
+def test_access_connector_handler_get(
+    access_connector_client: AccessConnectorClient,
+) -> None:
+    access_connector = access_connector_client.get("test", "rg-test", "test-access-connector")
     assert access_connector.subscription_id == "test"
     assert access_connector.resource_group == "rg-test"
     assert access_connector.name == "test-access-connector"
