@@ -15,7 +15,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.dependencies import SourceContainer
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -88,7 +88,7 @@ _FOLDERS = {
     Policy: 'assessment/policies',
     TableToMigrate: 'hive_metastore/tables',
     EndpointConfPair: 'assessment/warehouses',
-    Notebook: 'source_code/notebooks',
+    SourceContainer: 'source_code/samples',
 }
 
 

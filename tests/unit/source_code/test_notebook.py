@@ -5,7 +5,7 @@ from databricks.sdk.service.workspace import Language, ObjectType
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
@@ -56,7 +56,7 @@ SQL_NOTEBOOK_SAMPLE = (
 )
 def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]):
     path = source[0]
-    sources: list[str] = _load_sources(Notebook, path)
+    sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
     notebook = Notebook.parse(path, sources[0], source[1])
     assert notebook is not None
@@ -76,7 +76,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
 )
 def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     path = source[0]
-    sources: list[str] = _load_sources(Notebook, path)
+    sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
     notebook = Notebook.parse(path, sources[0], source[1])
     assert notebook is not None
@@ -99,7 +99,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
 )
 def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str]]):
     path = source[0]
-    sources: list[str] = _load_sources(Notebook, path)
+    sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
     notebook = Notebook.parse(path, sources[0], source[1])
     assert notebook is not None
@@ -123,7 +123,7 @@ def mock_dependency_loader(paths: list[str], sources: list[str], languages: list
 
 def test_notebook_builds_leaf_dependency_graph():
     paths = ["leaf1.py.txt"]
-    sources: list[str] = _load_sources(Notebook, *paths)
+    sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
@@ -135,7 +135,7 @@ def test_notebook_builds_leaf_dependency_graph():
 
 def test_notebook_builds_depth1_dependency_graph():
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(Notebook, *paths)
+    sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
@@ -148,7 +148,7 @@ def test_notebook_builds_depth1_dependency_graph():
 
 def test_notebook_builds_depth2_dependency_graph():
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(Notebook, *paths)
+    sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
@@ -161,7 +161,7 @@ def test_notebook_builds_depth2_dependency_graph():
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(Notebook, *paths)
+    sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     old_load_dependency_side_effect = loader.load_dependency.side_effect
@@ -183,7 +183,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
 
 def test_notebook_builds_cyclical_dependency_graph():
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
-    sources: list[str] = _load_sources(Notebook, *paths)
+    sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
@@ -196,7 +196,7 @@ def test_notebook_builds_cyclical_dependency_graph():
 
 def test_notebook_builds_python_dependency_graph():
     paths = ["root4.py.txt", "leaf3.py.txt"]
-    sources: list[str] = _load_sources(Notebook, *paths)
+    sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
@@ -208,7 +208,7 @@ def test_notebook_builds_python_dependency_graph():
 
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(Notebook, "run_notebooks.py.txt")
+    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py.txt")
     linter = PythonLinter()
     advices = list(linter.lint(sources[0]))
     assert [
@@ -224,7 +224,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
 
 
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(Notebook, "root4.py.txt")
+    sources: list[str] = _load_sources(SourceContainer, "root4.py.txt")
     linter = PythonLinter()
     advices = list(linter.lint(sources[0]))
     assert [
