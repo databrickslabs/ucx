@@ -241,28 +241,28 @@ class CellLanguage(Enum):
     def extract_cells(self, source: str) -> list[Cell] | None:
         lines = source.split('\n')
         header = f"{self.comment_prefix} {NOTEBOOK_HEADER}"
-
         if not lines[0].startswith(header):
             raise ValueError("Not a Databricks notebook source!")
 
         def make_cell(cell_lines: list[str], start: int = 0):
             # trim leading blank lines
-            while len(cell_lines) > 0 and len(cell_lines[0]) == 0:
-                cell_lines.pop(0)
+            new_cell_lines = cell_lines
+            while len(new_cell_lines) > 0 and len(new_cell_lines[0]) == 0:
+                new_cell_lines.pop(0)
                 start += 1
 
             # trim trailing blank lines
-            while len(cell_lines) > 0 and len(cell_lines[-1]) == 0:
-                cell_lines.pop(-1)
+            while len(new_cell_lines) > 0 and len(new_cell_lines[-1]) == 0:
+                new_cell_lines.pop(-1)
             cell_language = self.read_cell_language(cell_lines)
             if cell_language is None:
                 cell_language = self
             else:
                 before = len(cell_lines)
-                self._remove_magic_wrapper(cell_lines, cell_language)
+                new_cell_lines = self._remove_magic_wrapper(new_cell_lines, cell_language)
                 start += before - len(cell_lines)
 
-            cell_source = '\n'.join(cell_lines)
+            cell_source = '\n'.join(new_cell_lines)
             cell = cell_language.new_cell(cell_source)
             cell.original_offset = start
             return cell
@@ -288,25 +288,29 @@ class CellLanguage(Enum):
 
         return cells
 
-    def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage):
+    def _process_line(self, line: str, prefix: str, lang_prefix: str, cell_language: CellLanguage) -> list[str]:
+        if line.startswith(prefix):
+            line = line[len(prefix) :]
+            if cell_language.requires_isolated_pi and line.startswith(lang_prefix):
+                new_line = line[len(lang_prefix) :]
+                return (
+                    [f"{cell_language.comment_prefix} {LANGUAGE_PI}", new_line.strip()]
+                    if new_line.strip()
+                    else [f"{cell_language.comment_prefix} {LANGUAGE_PI}"]
+                )
+            return [line]
+        elif line.startswith(self.comment_prefix):
+            return [f"{cell_language.comment_prefix} {COMMENT_PI}{line}"]
+        else:
+            return [line]
+
+    def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage) -> list[str]:
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
         lang_prefix = f"{LANGUAGE_PREFIX}{cell_language.magic_name}"
-        prefix_len = len(prefix)
-        for i, line in enumerate(lines):
-            if line.startswith(prefix):
-                line = line[prefix_len:]
-                # Do not lose the statement after the cell language specifier
-                # Previously this logic checked for an isolated PI, but it is better
-                # to be more permissive in this kind of tool.
-                if line.startswith(lang_prefix):
-                    line = line[len(lang_prefix) :].strip()
-                    if len(line) == 0:
-                        line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
-                lines[i] = line
-                continue
-            if line.startswith(self.comment_prefix):
-                line = f"{cell_language.comment_prefix} {COMMENT_PI}{line}"
-                lines[i] = line
+        new_lines = []
+        for line in lines:
+            new_lines.extend(self._process_line(line, prefix, lang_prefix, cell_language))
+        return new_lines
 
     def wrap_with_magic(self, code: str, cell_language: CellLanguage) -> str:
         language_pi_prefix = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
