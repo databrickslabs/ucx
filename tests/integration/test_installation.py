@@ -595,15 +595,12 @@ def test_table_migration_job(
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
-    # TODO - DBFS API does not support instance profile based mounts
-    if not ws.config.is_azure:
-        pytest.skip("Temporarily does not work on AWS")
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     tables: dict[str, TableInfo] = {"src_managed_table": make_table(schema_name=schema.name)}
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
-    tables["src_external_table"] = make_table(schema_name=schema.name, external_csv=new_mounted_location)
+    tables["src_external_table"] = make_table(
+        schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    )
     # create destination catalog and schema
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
     tables["src_view1"] = make_table(
@@ -675,9 +672,37 @@ def test_table_migration_job(
     )
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
-        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', f'{env_or_skip("TEST_MOUNT_CONTAINER")}/a')],
         Mount,
     )
+    if ws.config.is_azure:
+        installation.save(
+            [
+                StoragePermissionMapping(
+                    'abfss://things@labsazurethings.dfs.core.windows.net',
+                    'dummy_application_id',
+                    'principal_1',
+                    'WRITE_FILES',
+                    'Application',
+                    'directory_id_ss1',
+                )
+            ],
+            filename='azure_storage_account_info.csv',
+        )
+    if ws.config.is_aws:
+        installation.save(
+            [
+                StoragePermissionMapping(
+                    'abfss://things@labsazurethings.dfs.core.windows.net',
+                    'dummy_application_id',
+                    'principal_1',
+                    'WRITE_FILES',
+                    'Application',
+                    'directory_id_ss1',
+                )
+            ],
+            filename='azure_storage_account_info.csv',
+        )
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.tables",
         [
@@ -720,19 +745,7 @@ def test_table_migration_job(
         ],
         Grant,
     )
-    installation.save(
-        [
-            StoragePermissionMapping(
-                'abfss://things@labsazurethings.dfs.core.windows.net',
-                'dummy_application_id',
-                'principal_1',
-                'WRITE_FILES',
-                'Application',
-                'directory_id_ss1',
-            )
-        ],
-        filename='azure_storage_account_info.csv',
-    )
+
     deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert deployed_workflow.validate_step("migrate-tables")
@@ -765,16 +778,11 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     make_dbfs_data_copy,
     sql_backend,
 ):
-    # TODO - DBFS API does not support instance profile based mounts
-    if not ws.config.is_azure:
-        pytest.skip("Temporarily does not work on AWS")
     # create external and managed tables to be migrated
     schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     src_managed_table = make_table(schema_name=schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = make_table(schema_name=schema.name, external_csv=new_mounted_location)
+    src_external_table = make_table(schema_name=schema.name, external_csv=existing_mounted_location)
     # create destination catalog and schema
     dst_catalog = make_catalog()
     make_schema(catalog_name=dst_catalog.name, name=schema.name)
@@ -809,9 +817,37 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     installation.save(migrate_rules, filename='mapping.csv')
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
-        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', 'abfss://things@labsazurethings.dfs.core.windows.net/a')],
+        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', f'{env_or_skip("TEST_MOUNT_CONTAINER")}/a')],
         Mount,
     )
+    if ws.config.is_azure:
+        installation.save(
+            [
+                StoragePermissionMapping(
+                    'abfss://things@labsazurethings.dfs.core.windows.net',
+                    'dummy_application_id',
+                    'principal_1',
+                    'WRITE_FILES',
+                    'Application',
+                    'directory_id_ss1',
+                )
+            ],
+            filename='azure_storage_account_info.csv',
+        )
+    if ws.config.is_aws:
+        installation.save(
+            [
+                StoragePermissionMapping(
+                    'abfss://things@labsazurethings.dfs.core.windows.net',
+                    'dummy_application_id',
+                    'principal_1',
+                    'WRITE_FILES',
+                    'Application',
+                    'directory_id_ss1',
+                )
+            ],
+            filename='azure_storage_account_info.csv',
+        )
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.tables",
         [
@@ -845,19 +881,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         ],
         Grant,
     )
-    installation.save(
-        [
-            StoragePermissionMapping(
-                'abfss://things@labsazurethings.dfs.core.windows.net',
-                'dummy_application_id',
-                'principal_1',
-                'WRITE_FILES',
-                'Application',
-                'directory_id_ss1',
-            )
-        ],
-        filename='azure_storage_account_info.csv',
-    )
+
     deployed_workflow.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert deployed_workflow.validate_step("migrate-tables")

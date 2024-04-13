@@ -557,11 +557,7 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_c
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables_with_principal_acl_azure(
-    ws,
-    make_user,
-    prepared_principal_acl,
-    make_cluster_permissions,
-    make_cluster
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -588,12 +584,7 @@ def test_migrate_managed_tables_with_principal_acl_azure(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_managed_tables_with_principal_acl_aws(
-    ws,
-    make_user,
-    prepared_principal_acl,
-    make_cluster_permissions,
-    make_cluster,
-    env_or_skip
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
     if not ws.config.is_aws:
         pytest.skip("temporary: only works in azure test env")

@@ -363,7 +363,9 @@ class TestRuntimeContext(RuntimeContext):
 
     @cached_property
     def mounts_crawler(self):
-        mount = Mount(f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', f"{self._env_or_skip("TEST_MOUNT_CONTAINER")}/a")
+        mount = Mount(
+            f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/a'
+        )
         return StaticMountCrawler(
             [mount],
             self.sql_backend,
