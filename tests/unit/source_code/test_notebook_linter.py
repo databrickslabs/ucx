@@ -67,6 +67,7 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
         ),
         (
             languages.Language.PYTHON,
+            # 3 alerts
             """# Databricks notebook source
 # MAGIC %md # This is a Python notebook, that has SQL cell embedded
 
@@ -100,6 +101,14 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                 ),
                 Deprecation(
                     code='dbfs-query',
+                    message='The use of DBFS is deprecated: dbfs:/mnt/foo',
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='dbfs-query',
                     message='The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g',
                     start_line=0,
                     start_col=0,
@@ -115,6 +124,14 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                     start_col=23,
                     end_line=5,
                     end_col=40,
+                ),
+                Deprecation(
+                    code='dbfs-query',
+                    message='The use of DBFS is deprecated: dbfs:/mnt/foo',
+                    start_line=8,
+                    start_col=0,
+                    end_line=8,
+                    end_col=1024,
                 ),
                 Deprecation(
                     code='dbfs-query',

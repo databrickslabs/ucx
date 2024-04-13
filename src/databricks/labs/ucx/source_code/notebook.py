@@ -290,12 +290,18 @@ class CellLanguage(Enum):
 
     def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage):
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
+        lang_prefix = f"{LANGUAGE_PREFIX}{cell_language.magic_name}"
         prefix_len = len(prefix)
         for i, line in enumerate(lines):
             if line.startswith(prefix):
                 line = line[prefix_len:]
-                if cell_language.requires_isolated_pi and line.startswith(LANGUAGE_PREFIX):
-                    line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
+                # Do not lose the statement after the cell language specifier
+                # Previously this logic checked for an isolated PI, but it is better
+                # to be more permissive in this kind of tool.
+                if line.startswith(lang_prefix):
+                    line = line[len(lang_prefix) :].strip()
+                    if len(line) == 0:
+                        line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
                 lines[i] = line
                 continue
             if line.startswith(self.comment_prefix):
