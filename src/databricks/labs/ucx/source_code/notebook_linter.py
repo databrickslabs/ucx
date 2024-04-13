@@ -19,7 +19,7 @@ class NotebookLinter:
 
     @classmethod
     def from_source(
-        cls, langs: Languages, source: str, default_language: Language = languages.Language.SQL
+        cls, langs: Languages, source: str, default_language: Language
     ) -> 'NotebookLinter':
         notebook = Notebook.parse("", source, default_language)
         assert notebook is not None
