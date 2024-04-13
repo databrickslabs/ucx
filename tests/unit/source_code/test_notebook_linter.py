@@ -4,7 +4,6 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
 from databricks.labs.ucx.source_code.base import Deprecation, Advisory
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
 index = MigrationIndex([])
@@ -435,12 +434,3 @@ def test_notebook_linter_name():
     source = """-- Databricks notebook source"""
     linter = NotebookLinter.from_source(langs, source, languages.Language.SQL)
     assert linter.name() == "notebook-linter"
-
-
-def test_notebook_linter_from_notebook():
-    langs = Languages(index)
-    source = """-- Databricks notebook source"""
-    notebook = Notebook.parse("", source, languages.Language.SQL)
-    assert notebook is not None
-    linter = NotebookLinter.from_notebook(langs, notebook)
-    assert linter is not None

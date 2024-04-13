@@ -18,10 +18,6 @@ class NotebookLinter:
         self._cell_offsets: list[int] = []
 
     @classmethod
-    def from_notebook(cls, langs: Languages, notebook: Notebook) -> 'NotebookLinter':
-        return cls(langs, notebook)
-
-    @classmethod
     def from_source(
         cls, langs: Languages, source: str, default_language: Language = languages.Language.SQL
     ) -> 'NotebookLinter':
