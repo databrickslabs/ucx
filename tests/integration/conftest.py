@@ -320,6 +320,9 @@ class TestRuntimeContext(RuntimeContext):
         self._grants.append(grant)
         return grant
 
+    def add_table(self, table: TableInfo):
+        self._tables.append(table)
+
     @cached_property
     def config(self) -> WorkspaceConfig:
         return WorkspaceConfig(
