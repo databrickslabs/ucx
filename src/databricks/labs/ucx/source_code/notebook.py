@@ -299,10 +299,9 @@ class CellLanguage(Enum):
                     else [f"{cell_language.comment_prefix} {LANGUAGE_PI}"]
                 )
             return [line]
-        elif line.startswith(self.comment_prefix):
+        if line.startswith(self.comment_prefix):
             return [f"{cell_language.comment_prefix} {COMMENT_PI}{line}"]
-        else:
-            return [line]
+        return [line]
 
     def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage) -> list[str]:
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
