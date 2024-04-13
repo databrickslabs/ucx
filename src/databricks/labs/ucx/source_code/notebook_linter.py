@@ -2,7 +2,6 @@ from collections.abc import Iterable
 
 from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code import languages
 from databricks.labs.ucx.source_code.languages import Languages, Language
 
 
@@ -18,9 +17,7 @@ class NotebookLinter:
         self._cell_offsets: list[int] = []
 
     @classmethod
-    def from_source(
-        cls, langs: Languages, source: str, default_language: Language
-    ) -> 'NotebookLinter':
+    def from_source(cls, langs: Languages, source: str, default_language: Language) -> 'NotebookLinter':
         notebook = Notebook.parse("", source, default_language)
         assert notebook is not None
         return cls(langs, notebook)

@@ -28,18 +28,14 @@ COMMENT_PI = 'COMMENT'
 
 class Cell(ABC):
 
-    def __init__(self, source: str):
-        self._original_offset: int = 0
+    def __init__(self, source: str, original_offset: int = 0):
+        self._original_offset = original_offset
         self._original_code = source
         self._migrated_code = source
 
     @property
     def original_offset(self) -> int:
         return self._original_offset
-
-    @original_offset.setter
-    def original_offset(self, value: int):
-        self._original_offset = value
 
     @property
     def original_code(self):
@@ -235,8 +231,8 @@ class CellLanguage(Enum):
             return None
         return None
 
-    def new_cell(self, source: str) -> Cell:
-        return self._new_cell(source)
+    def new_cell(self, source: str, original_offset: int) -> Cell:
+        return self._new_cell(source, original_offset)
 
     def extract_cells(self, source: str) -> list[Cell] | None:
         lines = source.split('\n')
@@ -244,7 +240,7 @@ class CellLanguage(Enum):
         if not lines[0].startswith(header):
             raise ValueError("Not a Databricks notebook source!")
 
-        def make_cell(cell_lines: list[str], start: int = 0):
+        def make_cell(cell_lines: list[str], start: int):
             # trim leading blank lines
             new_cell_lines = cell_lines
             while len(new_cell_lines) > 0 and len(new_cell_lines[0]) == 0:
@@ -263,8 +259,7 @@ class CellLanguage(Enum):
                 start += before - len(cell_lines)
 
             cell_source = '\n'.join(new_cell_lines)
-            cell = cell_language.new_cell(cell_source)
-            cell.original_offset = start
+            cell = cell_language.new_cell(cell_source, start)
             return cell
 
         cells = []
