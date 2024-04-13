@@ -271,6 +271,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
 @pytest.mark.parametrize(
     'hiveserde_in_place_migrate, describe, ddl, migrated, expected_value',
     [
+        # test migrate parquet hiveserde table in place
         (
             HiveSerdeType.PARQUET,
             MockBackend.rows("col_name", "data_type", "comment")[
@@ -286,12 +287,45 @@ def test_migrate_external_table_failed_sync(ws, caplog):
             True,
             "CREATE TABLE ucx_default.db1_dst.external_dst (id INT) USING PARQUET LOCATION 's3://test/folder/table1'",
         ),
+        # test unsupported hiveserde type
         (
             HiveSerdeType.PARQUET,
             MockBackend.rows("col_name", "data_type", "comment")[("dummy", "dummy", None)],
             MockBackend.rows("createtab_stmt")[("dummy"),],
             False,
             "hive_metastore.db1_src.external_src table can only be migrated using CTAS.",
+        ),
+        # test PARQUET hiveserde table in ORC migration task
+        (
+            HiveSerdeType.ORC,
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
+            ],
+            None,
+            False,
+            "hive_metastore.db1_src.external_src is using PARQUET hiveserde. It won't be in-place migrated in this HiveSerdeType.ORC dedicated task.",
+        ),
+        # test None table_migrate_sql returned
+        (
+            HiveSerdeType.PARQUET,
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
+            ],
+            MockBackend.rows("createtab_stmt")[("dummy"),],
+            False,
+            "Failed to generate in-place migration DDL for hive_metastore.db1_src.external_src, skip the in-place migration. It can be migrated in CTAS workflow",
+        ),
+        # test not in place migration
+        (
+            None,
+            None,
+            None,
+            False,
+            "",
         ),
     ],
 )
@@ -324,12 +358,12 @@ def test_migrate_external_hiveserde_table_in_place(
     )
     mount_crawler = create_autospec(Mounts)
     mount_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
+
     table_migrate.migrate_tables(
         what=What.EXTERNAL_HIVESERDE,
         hiveserde_in_place_migrate=hiveserde_in_place_migrate,
         mounts_crawler=mount_crawler,
     )
-
     if migrated:
         assert expected_value in backend.queries
     else:

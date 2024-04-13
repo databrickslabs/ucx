@@ -377,7 +377,9 @@ def test_is_partitioned_flag():
         # un-supported hiveserde test, and no table location test
         (
             Table("hive_metastore", "schema", "table", "EXTERNAL", "HIVE"),
-            [Mount("test", "test"),],
+            [
+                Mount("test", "test"),
+            ],
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "LazyBinaryColumnarSerDe", None),
                 ("InputFormat", "RCFileInputFormat", None),

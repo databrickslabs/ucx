@@ -66,7 +66,7 @@ class TablesMigrator:
         self,
         what: What,
         acl_strategy: list[AclMigrationWhat] | None = None,
-        hiveserde_in_place_migrate: str | None = None,
+        hiveserde_in_place_migrate: HiveSerdeType | None = None,
         mounts_crawler: Mounts | None = None,
     ):
         if what in [What.DB_DATASET, What.UNKNOWN]:
@@ -100,7 +100,7 @@ class TablesMigrator:
         all_migrated_groups,
         all_principal_grants,
         mounts: Iterable[Mount] | None = None,
-        hiveserde_in_place_migrate: str | None = None,
+        hiveserde_in_place_migrate: HiveSerdeType | None = None,
     ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
@@ -155,7 +155,7 @@ class TablesMigrator:
         src_table: TableToMigrate,
         grants: list[Grant] | None = None,
         mounts: Iterable[Mount] | None = None,
-        hiveserde_in_place_migrate: str | None = None,
+        hiveserde_in_place_migrate: HiveSerdeType | None = None,
     ):
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
@@ -230,7 +230,7 @@ class TablesMigrator:
         rule: Rule,
         grants: list[Grant] | None = None,
         mounts: Iterable[Mount] | None = None,
-        hiveserde_in_place_migrate: str | None = None,
+        hiveserde_in_place_migrate: HiveSerdeType | None = None,
     ):
         if not hiveserde_in_place_migrate:
             # TODO: Add sql_migrate_external_hiveserde_ctas here
@@ -260,7 +260,7 @@ class TablesMigrator:
             rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_type, dst_table_location
         )
         if not table_migrate_sql:
-            logger.warning(
+            logger.error(
                 f"Failed to generate in-place migration DDL for {src_table.key}, skip the in-place migration. It can be migrated in CTAS workflow"
             )
             return False
