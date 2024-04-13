@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, SecurableType
-from databricks.sdk.service.compute import DataSecurityMode
+from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule
@@ -498,15 +498,12 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
 
 @pytest.fixture
-def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_catalog, make_schema, make_cluster):
-    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{runtime_ctx.inventory_database}'
-    make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)
+def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_catalog, make_schema):
     src_schema = make_schema(catalog_name="hive_metastore")
     src_external_table = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name,
         schema_name=src_schema.name,
-        external_csv=new_mounted_location,
+        external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c',
     )
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -524,7 +521,6 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_c
     return (
         runtime_ctx,
         f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
-        cluster.cluster_id,
     )
 
 
@@ -534,15 +530,17 @@ def test_migrate_managed_tables_with_principal_acl_azure(
     make_user,
     prepared_principal_acl,
     make_cluster_permissions,
+    make_cluster
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    ctx, table_full_name, cluster_id = prepared_principal_acl
+    ctx, table_full_name = prepared_principal_acl
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     ctx.with_dummy_azure_resource_permission()
     table_migrate = ctx.tables_migrator
     user = make_user()
     make_cluster_permissions(
-        object_id=cluster_id,
+        object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
@@ -564,19 +562,25 @@ def test_migrate_managed_tables_with_principal_acl_aws(
     prepared_principal_acl,
     make_cluster_permissions,
     make_cluster,
+    env_or_skip
 ):
     if not ws.config.is_aws:
         pytest.skip("temporary: only works in azure test env")
-    ctx, table_full_name, cluster_id = prepared_principal_acl
+    ctx, table_full_name = prepared_principal_acl
     ctx.with_dummy_aws_resource_permission()
+    cluster = make_cluster(
+        single_node=True,
+        data_security_mode=DataSecurityMode.NONE,
+        aws_attributes=AwsAttributes(instance_profile_arn=env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE")),
+    )
     table_migrate = ctx.tables_migrator
     user = make_user()
     make_cluster_permissions(
-        object_id=cluster_id,
+        object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
