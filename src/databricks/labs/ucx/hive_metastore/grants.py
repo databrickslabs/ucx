@@ -546,11 +546,9 @@ class PrincipalACL:
             grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
-            for cluster_usage_grant in cluster_usage:
-                grants.add(Grant(cluster_id, "ALL PRIVILEGES", catalog="hive_metastore",
-                      database=table.database, table=table.name))
-
-
+            for loc in locations:
+                external_location_grants = [Grant(principal, "ALL PRIVILEGES", external_location=loc) for principal in principals]
+                grants.update(external_location_grants)
         return list(grants)
 
     def get_spn_mount_grants(self) -> list[Grant]:
