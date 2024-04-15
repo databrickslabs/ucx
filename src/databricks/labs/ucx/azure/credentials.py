@@ -227,7 +227,9 @@ class ServicePrincipalMigration(SecretsMixin):
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run_service_principal_migration(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
+    def run_service_principal_migration(
+        self, prompts: Prompts, include_names: set[str] | None = None
+    ) -> list[StorageCredentialValidationResult]:
 
         sp_list_with_secret = self._generate_migration_list(include_names)
 
@@ -253,9 +255,7 @@ class ServicePrincipalMigration(SecretsMixin):
         return execution_result
 
     def run_access_connector_migration(self, prompts: Prompts) -> list[StorageCredentialValidationResult]:
-        plan_confirmed = prompts.confirm(
-            "Please confirm to create an access connector for each storage account."
-        )
+        plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
         if plan_confirmed is not True:
             return []
 

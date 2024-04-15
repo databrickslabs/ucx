@@ -10,7 +10,6 @@ from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.assessment.crawlers import logger
 from databricks.labs.ucx.azure.resources import (
-    AzureResource,
     AzureResources,
     PrincipalSecret,
     StorageAccount,
@@ -102,21 +101,21 @@ class AzureResourcePermissions:
         tenant_id = self._azurerm.tenant_id()
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         for storage in storage_accounts:
-            policy_dict[
-                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net"
-            ] = self._policy_config(uber_principal.client.client_id)
-            policy_dict[
-                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net"
-            ] = self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
-            policy_dict[
-                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net"
-            ] = self._policy_config(endpoint)
+            policy_dict[f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net"] = (
+                self._policy_config(uber_principal.client.client_id)
+            )
+            policy_dict[f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net"] = (
+                self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+            )
+            policy_dict[f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net"] = (
+                self._policy_config(endpoint)
+            )
             policy_dict[f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net"] = (
                 self._policy_config("OAuth")
             )
-            policy_dict[
-                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"
-            ] = self._policy_config(f"{{secrets/{inventory_database}/uber_principal_secret}}")
+            policy_dict[f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"] = (
+                self._policy_config(f"{{secrets/{inventory_database}/uber_principal_secret}}")
+            )
         return json.dumps(policy_dict)
 
     @staticmethod

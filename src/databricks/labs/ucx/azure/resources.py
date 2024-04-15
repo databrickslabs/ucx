@@ -310,13 +310,13 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
-    def apply_storage_permission(self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str):
+    def apply_storage_permission(
+        self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str
+    ):
         try:
             role_id = _ROLES[role_name]
             path = f"{storage_account.id}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
-            role_definition_id = (
-                f"/subscriptions/{storage_account.id.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
-            )
+            role_definition_id = f"/subscriptions/{storage_account.id.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
             body = {
                 "properties": {
                     "roleDefinitionId": role_definition_id,
