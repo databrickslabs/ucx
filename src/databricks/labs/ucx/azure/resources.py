@@ -528,7 +528,7 @@ class AzureResources:
         name: str,
         location: str,
         tags: dict[str, str] | None,
-    ) -> None:
+    ) -> AccessConnector:
         """Create access connector.
 
         Docs:
@@ -542,6 +542,9 @@ class AzureResources:
         if tags is not None:
             body["tags"] = tags
         self._mgmt.put(url, api_version="2023-05-01", body=body)
+
+        access_connector = self.get_access_connector(subscription_id, resource_group_name, name)
+        return access_connector
 
     def delete_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> None:
         """Delete an access connector.
