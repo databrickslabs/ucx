@@ -699,9 +699,6 @@ def make_cluster(ws, make_random):
         if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
 
-        if "aws_attributes" in kwargs:
-            kwargs["aws_attributes"] = kwargs["aws_attributes"]
-
         return ws.clusters.create(
             cluster_name=cluster_name,
             spark_version=spark_version,
