@@ -8,20 +8,20 @@ class SitePackage:
 
     @staticmethod
     def parse(path: Path):
-        modules: list[str] = []
-        with open(Path(path, "RECORD")) as record_file:
+        with open(Path(path, "RECORD"), encoding="utf-8") as record_file:
             lines = record_file.readlines()
-            modules = [line.split(',')[0] for line in lines]
+            files = [line.split(',')[0] for line in lines]
+            modules = list(filter(lambda line: line.endswith(".py"), files))
         top_levels_path = Path(path, "top_level.txt")
         if top_levels_path.exists():
-            with open(top_levels_path) as top_levels_file:
+            with open(top_levels_path, encoding="utf-8") as top_levels_file:
                 top_levels = [line.strip() for line in top_levels_file.readlines()]
         else:
             dir_name = path.name
             # strip extension
             dir_name = dir_name[: dir_name.rindex('.')]
             # strip version
-            dir_name = dir_name[:dir_name.rindex('-')]
+            dir_name = dir_name[: dir_name.rindex('-')]
             top_levels = [dir_name]
         return SitePackage(path, top_levels, modules)
 
@@ -40,7 +40,7 @@ class SitePackages:
     @staticmethod
     def parse(site_packages_path: str):
         dist_info_dirs = [dir for dir in os.listdir(site_packages_path) if dir.endswith(".dist-info")]
-        packages = [SitePackage.parse(Path(site_packages_path,dist_info_dir)) for dist_info_dir in dist_info_dirs]
+        packages = [SitePackage.parse(Path(site_packages_path, dist_info_dir)) for dist_info_dir in dist_info_dirs]
         return SitePackages(packages)
 
     def __init__(self, packages: list[SitePackage]):
