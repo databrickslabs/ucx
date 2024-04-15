@@ -90,6 +90,9 @@ class DependencyLoader:
         from databricks.labs.ucx.source_code.files import WorkspaceFile
 
         assert object_info.path is not None
+        # TODO https://github.com/databrickslabs/ucx/issues/1363
+        # the below assumes that the dependency was discovered whilst processing a Python notebook or cell
+        # which is safe since Python is the only language supported as of writing
         language = Language.PYTHON if object_info.language is None else object_info.language
         source = self._load_source(object_info)
         return WorkspaceFile(object_info.path, source, language)
