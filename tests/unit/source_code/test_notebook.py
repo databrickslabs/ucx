@@ -85,8 +85,6 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     # ignore trailing whitespaces
     actual_purified = re.sub(r'\s+$', '', new_source, flags=re.MULTILINE)
     expected_purified = re.sub(r'\s+$', '', sources[0], flags=re.MULTILINE)
-    if actual_purified != expected_purified:
-        print("what have you done jim?")
     assert actual_purified == expected_purified
 
 

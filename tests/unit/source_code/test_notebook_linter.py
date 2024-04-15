@@ -10,7 +10,7 @@ index = MigrationIndex([])
 
 
 @pytest.mark.parametrize(
-    "lang, source, expected, adjusted",
+    "lang, source, expected",
     [
         # 2 alerts
         (
@@ -27,24 +27,6 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
 -- MAGIC %python
 -- MAGIC display(spark.read.csv('/mnt/things/e/f/g'))
 """,
-            [
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: dbfs:/mnt/whatever',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: /mnt/things/e/f/g',
-                    start_line=2,
-                    start_col=23,
-                    end_line=2,
-                    end_col=40,
-                ),
-            ],
             [
                 Deprecation(
                     code='dbfs-query',
@@ -89,32 +71,6 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 # MAGIC   csv.`dbfs:/mnt/bar/e/f/g` 
 # MAGIC WHERE _c1 > 5
 """,
-            [
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: /mnt/things/e/f/g',
-                    start_line=1,
-                    start_col=23,
-                    end_line=1,
-                    end_col=40,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: dbfs:/mnt/foo',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-            ],
             [
                 Deprecation(
                     code='dbfs-usage',
@@ -187,120 +143,6 @@ SELECT * FROM delta.`/mnt/...` WHERE foo > 6
 
 MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """,
-            [
-                Advisory(
-                    code='dbfs-usage',
-                    message='Possible deprecated file system path: dbfs:/...',
-                    start_line=3,
-                    start_col=7,
-                    end_line=3,
-                    end_col=16,
-                ),
-                Advisory(
-                    code='dbfs-usage',
-                    message='Possible deprecated file system path: /dbfs/mnt',
-                    start_line=4,
-                    start_col=7,
-                    end_line=4,
-                    end_col=16,
-                ),
-                Advisory(
-                    code='dbfs-usage',
-                    message='Possible deprecated file system path: /mnt/',
-                    start_line=5,
-                    start_col=7,
-                    end_line=5,
-                    end_col=12,
-                ),
-                Advisory(
-                    code='dbfs-usage',
-                    message='Possible deprecated file system path: dbfs:/...',
-                    start_line=6,
-                    start_col=7,
-                    end_line=6,
-                    end_col=16,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: /dbfs/mnt/data',
-                    start_line=7,
-                    start_col=10,
-                    end_line=7,
-                    end_col=24,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: /dbfs/mnt/data',
-                    start_line=9,
-                    start_col=10,
-                    end_line=9,
-                    end_col=24,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: /mnt/foo/bar',
-                    start_line=11,
-                    start_col=19,
-                    end_line=11,
-                    end_col=31,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: dbfs:/mnt/foo/bar',
-                    start_line=12,
-                    start_col=19,
-                    end_line=12,
-                    end_col=36,
-                ),
-                Deprecation(
-                    code='dbfs-usage',
-                    message='Deprecated file system path in call to: dbfs://mnt/foo/bar',
-                    start_line=13,
-                    start_col=19,
-                    end_line=13,
-                    end_col=37,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: dbfs:/...',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: /mnt/...',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: /a/b/c',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: /...',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-                Deprecation(
-                    code='dbfs-query',
-                    message='The use of DBFS is deprecated: /dbfs/...',
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                ),
-            ],
             [
                 Advisory(
                     code='dbfs-usage',
@@ -419,14 +261,12 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
         # Add more test cases here
     ],
 )
-def test_notebook_linter(lang, source, expected, adjusted):
+def test_notebook_linter(lang, source, expected):
     langs = Languages(index)
     linter = NotebookLinter.from_source(langs, source, lang)
     assert linter is not None
-    raw_list = list(linter.lint())
-    assert raw_list == expected
-    adjusted_list = list(linter.adjust_advices(raw_list))
-    assert adjusted_list == adjusted
+    gathered = list(linter.lint())
+    assert gathered == expected
 
 
 def test_notebook_linter_name():

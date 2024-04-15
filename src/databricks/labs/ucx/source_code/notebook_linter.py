@@ -14,7 +14,6 @@ class NotebookLinter:
     def __init__(self, langs: Languages, notebook: Notebook):
         self._languages: Languages = langs
         self._notebook: Notebook = notebook
-        self._cell_offsets: list[int] = []
 
     @classmethod
     def from_source(cls, langs: Languages, source: str, default_language: Language) -> 'NotebookLinter':
@@ -28,13 +27,9 @@ class NotebookLinter:
                 continue
             linter = self._languages.linter(cell.language.language)
             for advice in linter.lint(cell.original_code):
-                yield advice
-                self._cell_offsets.append(cell.original_offset)
-
-    def adjust_advices(self, advices: list[Advice]) -> Iterable[Advice]:
-        for advice, offset in zip(advices, self._cell_offsets):
-            advice = advice.replace(start_line=advice.start_line + offset, end_line=advice.end_line + offset)
-            yield advice
+                yield advice.replace(
+                    start_line=advice.start_line + cell.original_offset, end_line=advice.end_line + cell.original_offset
+                )
 
     @staticmethod
     def name() -> str:

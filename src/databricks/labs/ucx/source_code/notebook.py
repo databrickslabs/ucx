@@ -242,23 +242,20 @@ class CellLanguage(Enum):
 
         def make_cell(cell_lines: list[str], start: int):
             # trim leading blank lines
-            new_cell_lines = cell_lines
-            while len(new_cell_lines) > 0 and len(new_cell_lines[0]) == 0:
-                new_cell_lines.pop(0)
+            while len(cell_lines) > 0 and len(cell_lines[0]) == 0:
+                cell_lines.pop(0)
                 start += 1
 
             # trim trailing blank lines
-            while len(new_cell_lines) > 0 and len(new_cell_lines[-1]) == 0:
-                new_cell_lines.pop(-1)
+            while len(cell_lines) > 0 and len(cell_lines[-1]) == 0:
+                cell_lines.pop(-1)
             cell_language = self.read_cell_language(cell_lines)
             if cell_language is None:
                 cell_language = self
             else:
-                before = len(cell_lines)
-                new_cell_lines = self._remove_magic_wrapper(new_cell_lines, cell_language)
-                start += before - len(cell_lines)
+                cell_lines = self._remove_magic_wrapper(cell_lines, cell_language)
 
-            cell_source = '\n'.join(new_cell_lines)
+            cell_source = '\n'.join(cell_lines)
             cell = cell_language.new_cell(cell_source, start)
             return cell
 
@@ -287,12 +284,10 @@ class CellLanguage(Enum):
         if line.startswith(prefix):
             line = line[len(prefix) :]
             if cell_language.requires_isolated_pi and line.startswith(lang_prefix):
-                new_line = line[len(lang_prefix) :]
-                return (
-                    [f"{cell_language.comment_prefix} {LANGUAGE_PI}", new_line.strip()]
-                    if new_line.strip()
-                    else [f"{cell_language.comment_prefix} {LANGUAGE_PI}"]
-                )
+                new_line = line[len(lang_prefix) :].strip()
+                if new_line:
+                    return [f"{cell_language.comment_prefix} {LANGUAGE_PI}", new_line.strip()]
+                return [f"{cell_language.comment_prefix} {LANGUAGE_PI}"]
             return [line]
         if line.startswith(self.comment_prefix):
             return [f"{cell_language.comment_prefix} {COMMENT_PI}{line}"]
