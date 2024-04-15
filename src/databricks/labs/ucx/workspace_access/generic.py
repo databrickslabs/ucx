@@ -61,6 +61,24 @@ class Listing:
         logger.info(f"Listed {self._object_type} in {since}")
 
 
+class StaticListing(Listing):
+    """This class is only supposed to be used in testing scenarios."""
+
+    def __init__(self, include_object_permissions: list[str]):
+        super().__init__(lambda : [], '_', '_')
+        self._items: list[GenericPermissionsInfo] = []
+        self._object_types: set[str] = set()
+        for pair in include_object_permissions:
+            object_type, object_id = pair.split(":")
+            self._items.append(GenericPermissionsInfo(object_id, object_type))
+
+    def object_types(self) -> set[str]:
+        return self._object_types
+
+    def __iter__(self):
+        yield from self._items
+
+
 class GenericPermissionsSupport(AclSupport):
     def __init__(
         self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=1)

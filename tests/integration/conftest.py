@@ -318,6 +318,8 @@ class TestRuntimeContext(RuntimeContext):
         self,
         principal: str,
         action_type: str,
+        table_info: TableInfo | None = None,
+        schema_info: SchemaInfo | None = None,
         catalog: str | None = None,
         database: str | None = None,
         table: str | None = None,
@@ -326,6 +328,13 @@ class TestRuntimeContext(RuntimeContext):
         any_file: bool = False,
         anonymous_function: bool = False,
     ):
+        if table_info:
+            catalog = table_info.catalog_name
+            database = table_info.schema_name
+            table = table_info.name
+        if schema_info:
+            catalog = schema_info.catalog_name
+            database = schema_info.name
         grant = Grant(
             principal=principal,
             action_type=action_type,
@@ -351,11 +360,13 @@ class TestRuntimeContext(RuntimeContext):
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
             connect=self.workspace_client.config,
+            renamed_group_prefix=f'tmp-{self.inventory_database}-',
+            include_group_names=self.created_groups,
+            include_databases=self.created_databases,
         )
 
     @cached_property
     def installation(self):
-        # TODO: we may need to do a real installation instead of a mock
         return MockInstallation()
 
     @cached_property
@@ -382,24 +393,23 @@ class TestRuntimeContext(RuntimeContext):
 
     @cached_property
     def created_groups(self):
-        # TODO: save to workspace config
         created_groups = []
         for group in self._groups:
             created_groups.append(group.display_name)
         return created_groups
 
-    @cached_property
-    def tables_crawler(self):
-        # and override the config
-        return TablesCrawler(self.sql_backend, self.inventory_database, self.created_databases)
+    # @cached_property
+    # def tables_crawler(self):
+    #     # and override the config
+    #     return TablesCrawler(self.sql_backend, self.inventory_database, self.created_databases)
 
-    @cached_property
-    def udfs_crawler(self):
-        return StaticUdfsCrawler(self.sql_backend, self.inventory_database, self._udfs)
+    # @cached_property
+    # def udfs_crawler(self):
+    #     return StaticUdfsCrawler(self.sql_backend, self.inventory_database, self._udfs)
 
-    @cached_property
-    def grants_crawler(self):
-        return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.created_databases)
+    # @cached_property
+    # def grants_crawler(self):
+    #     return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.created_databases)
 
     @cached_property
     def azure_service_principal_crawler(self):

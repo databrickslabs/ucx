@@ -467,6 +467,7 @@ class WorkspaceInstallation(InstallationMixin):
         if self.config.trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
+        return True
 
     def _create_database(self):
         try:
