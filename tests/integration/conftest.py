@@ -390,8 +390,8 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, env_or_skip)
 
 
 class LocalAzureCliTest(WorkspaceContext):
-    def __init__(self, ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
-        super().__init__(ws, {})
+    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
+        super().__init__(_ws, {})
         self._env_or_skip = env_or_skip_fixture
 
     @cached_property

@@ -261,7 +261,7 @@ class ServicePrincipalMigration(SecretsMixin):
 
         self._resource_permissions.create_access_connectors_for_storage_accounts()
 
-        return list()
+        return []
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         service_principal_migration_results = self.run_service_principal_migration(prompts, include_names)
