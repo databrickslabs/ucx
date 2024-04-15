@@ -22,6 +22,7 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -52,6 +53,7 @@ class Grant:
     table: str | None = None
     view: str | None = None
     udf: str | None = None
+    external_location: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
@@ -63,6 +65,7 @@ class Grant:
         table: str | None = None,
         view: str | None = None,
         udf: str | None = None,
+        external_location: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> tuple[str, str]:
@@ -81,6 +84,8 @@ class Grant:
         if database is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             return "DATABASE", f"{catalog}.{database}"
+        if external_location is not None:
+            return "EXTERNAL LOCATION", f"{external_location}"
         if any_file:
             return "ANY FILE", ""
         if anonymous_function:
@@ -90,7 +95,7 @@ class Grant:
             return "CATALOG", catalog
         msg = (
             f"invalid grant keys: catalog={catalog}, database={database}, view={view}, udf={udf}"
-            f"any_file={any_file}, anonymous_function={anonymous_function}"
+            f"external_location={external_location}, any_file={any_file}, anonymous_function={anonymous_function}"
         )
         raise ValueError(msg)
 
@@ -106,6 +111,7 @@ class Grant:
             table=self.table,
             view=self.view,
             udf=self.udf,
+            external_location=self.external_location,
             any_file=self.any_file,
             anonymous_function=self.anonymous_function,
         )
@@ -263,6 +269,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         table: str | None = None,
         view: str | None = None,
         udf: str | None = None,
+        external_location: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> list[Grant]:
@@ -275,6 +282,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             table (str | None): The table name (optional).
             view (str | None): The view name (optional).
             udf (str | None): The udf name (optional).
+            external_location (str | None): The external location (optional).
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
 
@@ -301,6 +309,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             table=self._try_valid(table),
             view=self._try_valid(view),
             udf=self._try_valid(udf),
+            external_location=self._try_valid(external_location),
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
@@ -327,6 +336,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
                     udf=udf,
                     database=database,
                     catalog=catalog,
+                    external_location=external_location,
                     any_file=any_file,
                     anonymous_function=anonymous_function,
                 )
@@ -513,7 +523,7 @@ class PrincipalACL:
         tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
         cluster_locations: dict[str, dict],
-        spn_crawler: AzureServicePrincipalCrawler,
+        external_locations: ExternalLocations,
     ):
         self._backend = backend
         self._ws = ws
@@ -521,7 +531,7 @@ class PrincipalACL:
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
-        self._spn_crawler = spn_crawler
+        self._external_locations = external_locations
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
@@ -536,6 +546,10 @@ class PrincipalACL:
             grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
+            for cluster_usage_grant in cluster_usage:
+                grants.add(Grant(cluster_id, "ALL PRIVILEGES", catalog="hive_metastore",
+                      database=table.database, table=table.name))
+
 
         return list(grants)
 
@@ -546,22 +560,18 @@ class PrincipalACL:
 
         # get all clusters in the workspace
         clusters = self._ws.clusters.list()
-        inventory_database = self._installation.load(str, "inventory_database")
+        tables = self._tables_crawler.snapshot()
 
-        tables = TablesInMounts(
-            self._backend,
-            self._ws,
-            inventory_database,
-            self.mounts_crawler,
-            mounts,
-        )
+        # get the external locations that the mounts get converted to
+        external_locations = self._external_locations._external_location_list()
 
         for table in tables:
-            for cluster in clusters:
-                # set grants for all the tables that use the mounts
-                grant = Grant(cluster.cluster_id, "ALL PRIVILEGES", catalog="hive_metastore",
-                              database=table.database, table=table.name)
-                grants.add(grant)
+            if table.object_type == "EXTERNAL" and "mnt" in table.location:
+                for cluster in clusters:
+                    # set grants for all the tables that use the mounts
+                    grant = Grant(cluster.cluster_id, "ALL PRIVILEGES", catalog="hive_metastore",
+                                  database=table.database, table=table.name)
+                    grants.add(grant)
         return list(grants)
 
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
