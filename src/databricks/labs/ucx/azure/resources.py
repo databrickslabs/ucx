@@ -359,7 +359,7 @@ class AzureResources:
                 try:
                     storage_account = StorageAccount.from_raw_resource(RawResource(response))
                 except KeyError:
-                    logger.warning(f"Tried getting non-existing access connector: {url}")
+                    logger.warning(f"Failed parsing storage account: {response}")
                 else:
                     yield storage_account
 
