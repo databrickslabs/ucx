@@ -253,7 +253,11 @@ class ServicePrincipalMigration(SecretsMixin):
         return execution_result
 
     def run_access_connector_migration(self, prompts: Prompts) -> list[StorageCredentialValidationResult]:
-        _ = prompts
+        plan_confirmed = prompts.confirm(
+            "Please confirm to create an access connector for each storage account."
+        )
+        if plan_confirmed is not True:
+            return []
         return list()
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
