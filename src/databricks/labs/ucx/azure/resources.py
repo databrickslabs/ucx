@@ -103,9 +103,7 @@ class Principal:
 
 @dataclass
 class StorageAccount:
-    id: str
-    subscription_id: str
-    resource_group: str
+    id: AzureResource
     name: str
     location: str
 
@@ -300,7 +298,7 @@ class AzureResources:
             role_id = _ROLES[role_name]
             path = f"{str(storage_account.id)}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
             role_definition_id = (
-                f"/subscriptions/{storage_account.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
+                f"/subscriptions/{storage_account.id.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
             )
             body = {
                 "properties": {
@@ -345,9 +343,7 @@ class AzureResources:
                     continue
                 raw = RawResource(response)
                 storage_account = StorageAccount(
-                    id=str(raw.id),
-                    subscription_id=raw.id.subscription_id,
-                    resource_group=raw.id.resource_group,
+                    id=raw.id,
                     name=raw.id.storage_account,
                     location=raw.get("location", ""),
                 )
