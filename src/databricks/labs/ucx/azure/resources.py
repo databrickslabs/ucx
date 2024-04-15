@@ -137,25 +137,25 @@ class AccessConnector:
     @classmethod
     def from_raw_resource(cls, raw: RawResource) -> "AccessConnector":
         if raw.id is None:
-            raise ValueError(f"Missing id: {raw}")
+            raise KeyError(f"Missing id: {raw}")
 
         name = raw.get("name", "")
         if name == "":
-            raise ValueError(f"Missing name: {raw}")
+            raise KeyError(f"Missing name: {raw}")
 
         location = raw.get("location", "")
         if location == "":
-            raise ValueError(f"Missing location: {raw}")
+            raise KeyError(f"Missing location: {raw}")
 
         identity = raw.get("identity", {})
         identity_type = identity.get("type")
         if identity_type is None:
-            raise ValueError(f"Missing identity type: {raw}")
+            raise KeyError(f"Missing identity type: {raw}")
         elif identity_type == "UserAssigned":
             if len(identity.keys()) > 1:
-                raise ValueError(f"Multiple user assigned identities: {identity.keys()}")
+                raise KeyError(f"Multiple user assigned identities: {identity.keys()}")
             elif len(identity.keys()) == 0:
-                raise ValueError(f"No user assigned identity: {identity.keys()}")
+                raise KeyError(f"No user assigned identity: {identity.keys()}")
             else:
                 managed_identity_id = list(identity.keys())[0]
             principal_id = identity[managed_identity_id]["principalId"]
@@ -166,7 +166,7 @@ class AccessConnector:
             managed_identity_id = client_id = None
             tenant_id = identity["tenantId"]
         else:
-            raise ValueError(f"Unsupported identity type in {cls}: {identity_type}")
+            raise KeyError(f"Unsupported identity type: {identity_type}")
 
         access_connector = cls(
             id=raw.id,
@@ -482,7 +482,7 @@ class AzureResources:
         raw = RawResource(response)
         try:
             access_connector = AccessConnector.from_raw_resource(raw)
-        except ValueError:
+        except KeyError:
             logger.warning(f"Tried getting non-existing access connector: {url}")
             access_connector = None
         return access_connector
@@ -509,7 +509,7 @@ class AzureResources:
         for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
             try:
                 yield AccessConnector.from_raw_resource(raw)
-            except ValueError:
+            except KeyError:
                 logger.warning(f"Could not parse access connector {raw}")
 
     def create_or_update_access_connector(
