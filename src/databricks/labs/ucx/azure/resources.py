@@ -249,12 +249,12 @@ class AzureResources:
             logger.error(msg)
             raise PermissionDenied(msg) from None
 
-    def apply_storage_permission(self, principal_id: str, resource: AzureResource, role_name: str, role_guid: str):
+    def apply_storage_permission(self, principal_id: str, storage_account: StorageAccount, role_name: str, role_guid: str):
         try:
             role_id = _ROLES[role_name]
-            path = f"{str(resource)}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
+            path = f"{str(storage_account.id)}/providers/Microsoft.Authorization/roleAssignments/{role_guid}"
             role_definition_id = (
-                f"/subscriptions/{resource.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
+                f"/subscriptions/{storage_account.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{role_id}"
             )
             body = {
                 "properties": {
@@ -266,7 +266,7 @@ class AzureResources:
             self._mgmt.put(path, "2022-04-01", body)
         except ResourceConflict:
             logger.warning(
-                f"Role assignment already exists for role {role_guid} on storage {resource.storage_account}"
+                f"Role assignment already exists for role {role_guid} on storage {storage_account.name}"
                 f" for spn {principal_id}."
             )
         except PermissionDenied:
