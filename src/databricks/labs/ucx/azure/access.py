@@ -196,21 +196,19 @@ class AzureResourcePermissions:
                 "Please check if assessment job is run"
             )
             return
-        storage_account_info = []
+
         for storage in self._azurerm.storage_accounts():
             if storage.name in used_storage_accounts:
-                storage_account_info.append(storage)
-        for storage_account in storage_account_info:
-            access_connector = self._azurerm.create_or_update_access_connector(
-                storage_account.id.subscription_id,
-                storage_account.id.resource_group,
-                f"ac-{storage_account.name}",
-                storage_account.location,
-                tags={"CreatedBy": "ucx"},
-            )
-            self._apply_storage_permission(
-                access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account
-            )
+                access_connector = self._azurerm.create_or_update_access_connector(
+                    storage.id.subscription_id,
+                    storage.id.resource_group,
+                    f"ac-{storage.name}",
+                    storage.location,
+                    tags={"CreatedBy": "ucx"},
+                )
+                self._apply_storage_permission(
+                    access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage
+                )
 
     def _apply_storage_permission(
         self,
