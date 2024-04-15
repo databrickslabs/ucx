@@ -99,7 +99,10 @@ def run_migration(ws, sql_backend):
             installation, ws, resource_permissions, sp_crawler, StorageCredentialManager(ws)
         )
         return spn_migration.run(
-            MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"}),
+            MockPrompts({
+                "Above Azure Service Principals will be migrated to UC storage credentials *": "Yes",
+                "Please confirm to create an access connector for each storage account.": "Yes",
+            }),
             credentials,
         )
 
