@@ -199,9 +199,7 @@ class AzureResourcePermissions:
             tags={"CreatedBy": "ucx"},
             wait_for_provisioning=True,
         )
-        self._apply_storage_permission(
-            access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account
-        )
+        self._apply_storage_permission(access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account)
 
     def create_access_connectors_for_storage_accounts(self) -> None:
         used_storage_accounts = self._get_storage_accounts()
