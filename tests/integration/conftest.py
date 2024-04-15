@@ -15,6 +15,9 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
@@ -650,3 +653,107 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
+
+
+@pytest.fixture
+def new_installation(ws, sql_backend, env_or_skip, make_random):
+    cleanup = []
+
+    def installation_factory(
+        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+        installation: Installation | None = None,
+        prod_info: ProductInfo | None = None,
+        environ: dict[str, str] | None = None,
+        extend_prompts: dict[str, str] | None = None,
+        inventory_schema_name: str | None = None,
+        skip_dashboards: bool = True,
+    ):
+        logger.debug("Creating new installation...")
+        if not prod_info:
+            prod_info = ProductInfo.for_testing(WorkspaceConfig)
+        if not environ:
+            environ = {}
+        if not inventory_schema_name:
+            inventory_schema_name = f"ucx_S{make_random(4).lower()}"
+        renamed_group_prefix = f"rename-{prod_info.product_name()}-"
+        prompts = MockPrompts(
+            {
+                r'Open job overview in your browser.*': 'no',
+                r'Do you want to uninstall ucx.*': 'yes',
+                r'Do you want to delete the inventory database.*': 'yes',
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r"Choose how to map the workspace groups.*": "1",
+                r".*connect to the external metastore?.*": "yes",
+                r"Choose a cluster policy": "0",
+                r".*Inventory Database.*": inventory_schema_name,
+                r".*Backup prefix*": renamed_group_prefix,
+                r".*": "",
+            }
+            | (extend_prompts or {})
+        )
+
+        logger.debug("Waiting for clusters to start...")
+        default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
+        tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+        table_migration_cluster_id = env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+        Threads.strict(
+            "ensure clusters running",
+            [
+                functools.partial(ws.clusters.ensure_cluster_is_running, default_cluster_id),
+                functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
+                functools.partial(ws.clusters.ensure_cluster_is_running, table_migration_cluster_id),
+            ],
+        )
+        logger.debug("Waiting for clusters to start...")
+
+        if not installation:
+            installation = Installation(ws, prod_info.product_name())
+        install_state = InstallState.from_installation(installation)
+        installer = WorkspaceInstaller(prompts, installation, ws, prod_info, environ)
+        workspace_config = installer.configure()
+        installation = prod_info.current_installation(ws)
+        overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id, "table_migration": table_migration_cluster_id}
+        workspace_config.override_clusters = overrides
+
+        if workspace_config.workspace_start_path == '/':
+            workspace_config.workspace_start_path = installation.install_folder()
+        if config_transform:
+            workspace_config = config_transform(workspace_config)
+
+        installation.save(workspace_config)
+
+        tasks = Workflows.all().tasks()
+
+        # TODO: see if we want to move building wheel as a context manager for yield factory,
+        # so that we can shave off couple of seconds and build wheel only once per session
+        # instead of every test
+        workflows_installation = WorkflowsDeployment(
+            workspace_config,
+            installation,
+            install_state,
+            ws,
+            prod_info.wheels(ws),
+            prod_info,
+            timedelta(minutes=3),
+            tasks,
+            skip_dashboards=skip_dashboards,
+        )
+        workspace_installation = WorkspaceInstallation(
+            workspace_config,
+            installation,
+            install_state,
+            sql_backend,
+            ws,
+            workflows_installation,
+            prompts,
+            prod_info,
+            skip_dashboards=skip_dashboards,
+        )
+        workspace_installation.run()
+        cleanup.append(workspace_installation)
+        return workspace_installation, DeployedWorkflows(ws, install_state, timedelta(minutes=3))
+
+    yield installation_factory
+
+    for pending in cleanup:
+        pending.uninstall()

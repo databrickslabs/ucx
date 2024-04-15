@@ -56,22 +56,15 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("ext_hms", [True, False])
 def test_migrate_tables_with_cache_should_not_create_table(
     ws,
     sql_backend,
-    ext_hms_backend,
     runtime_ctx,
-    ext_hms_runtime_ctx,
     make_random,
     make_catalog,
-    ext_hms: bool,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        sql_backend = ext_hms_backend
-        runtime_ctx = ext_hms_runtime_ctx
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
 
     dst_catalog = make_catalog()
@@ -120,23 +113,16 @@ def test_migrate_tables_with_cache_should_not_create_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("ext_hms", [True, False])
 def test_migrate_external_table(
     ws,
     sql_backend,
-    ext_hms_backend,
     runtime_ctx,
-    ext_hms_runtime_ctx,
     make_catalog,
     make_mounted_location,
     make_dbfs_data_copy,
-    ext_hms: bool,
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        sql_backend = ext_hms_backend
-        runtime_ctx = ext_hms_runtime_ctx
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
     # external table migration tests
@@ -168,12 +154,9 @@ def test_migrate_external_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=1))
-@pytest.mark.parametrize("ext_hms", [True, False])
-def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, ext_hms_runtime_ctx, env_or_skip, ext_hms: bool):
+def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        runtime_ctx = ext_hms_runtime_ctx
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=existing_mounted_location)
@@ -197,13 +180,9 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, ext_hms_run
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("ext_hms", [True, False])
-def test_migrate_view(ws, sql_backend, ext_hms_backend, runtime_ctx, ext_hms_runtime_ctx, make_catalog, ext_hms: bool):
+def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        sql_backend = ext_hms_backend
-        runtime_ctx = ext_hms_runtime_ctx
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     src_view1 = runtime_ctx.make_table(
@@ -273,15 +252,9 @@ def test_migrate_view(ws, sql_backend, ext_hms_backend, runtime_ctx, ext_hms_run
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("ext_hms", [True, False])
-def test_revert_migrated_table(
-    sql_backend, ext_hms_backend, runtime_ctx, ext_hms_runtime_ctx, make_catalog, ext_hms: bool
-):
+def test_revert_migrated_table(sql_backend, runtime_ctx, make_catalog):
     if not runtime_ctx.workspace_client.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        sql_backend = ext_hms_backend
-        runtime_ctx = ext_hms_runtime_ctx
     src_schema1 = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_schema2 = runtime_ctx.make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema1.name)
@@ -349,15 +322,9 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("ext_hms", [True, False])
-def test_mapping_reverts_table(
-    ws, sql_backend, ext_hms_backend, runtime_ctx, ext_hms_runtime_ctx, make_catalog, ext_hms: bool
-):
+def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        sql_backend = ext_hms_backend
-        runtime_ctx = ext_hms_runtime_ctx
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
@@ -406,15 +373,9 @@ def test_mapping_reverts_table(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize("ext_hms", [True, False])
-def test_migrate_managed_tables_with_acl(
-    ws, sql_backend, ext_hms_backend, runtime_ctx, ext_hms_runtime_ctx, make_catalog, make_user, ext_hms: bool
-):
+def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_user):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    if ext_hms:
-        runtime_ctx = ext_hms_runtime_ctx
-        sql_backend = ext_hms_backend
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
