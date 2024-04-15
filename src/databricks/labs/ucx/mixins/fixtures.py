@@ -699,9 +699,6 @@ def make_cluster(ws, make_random):
         if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
 
-        if "aws_attributes" in kwargs:
-            kwargs["aws_attributes"] = kwargs["aws_attributes"]
-
         return ws.clusters.create(
             cluster_name=cluster_name,
             spark_version=spark_version,
@@ -1189,12 +1186,7 @@ def make_feature_table(ws, make_random):
 @pytest.fixture
 def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
     if ws.config.is_aws:
-        cluster = make_cluster(
-            single_node=True,
-            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
-            aws_attributes=compute.AwsAttributes(instance_profile_arn=env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE")),
-        ).result()
-        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: cluster.cluster_id)
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
 
     def create(*, src_path: str, dst_path: str):
         if ws.config.is_aws:
