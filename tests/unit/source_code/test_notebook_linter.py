@@ -22,6 +22,10 @@ index = MigrationIndex([])
 
 SELECT * FROM csv.`dbfs:/mnt/whatever`
 
+
+
+    
+
 -- COMMAND ----------
 
 -- MAGIC %python
@@ -39,9 +43,9 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/things/e/f/g',
-                    start_line=10,
+                    start_line=14,
                     start_col=23,
-                    end_line=10,
+                    end_line=14,
                     end_col=40,
                 ),
             ],
@@ -64,12 +68,19 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 
 # MAGIC %md mess around with formatting
 
+
+    
+
 # COMMAND ----------
+
 
 # MAGIC %sql
 # MAGIC SELECT * FROM 
 # MAGIC   csv.`dbfs:/mnt/bar/e/f/g` 
 # MAGIC WHERE _c1 > 5
+
+
+
 """,
             [
                 Deprecation(
@@ -91,9 +102,9 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g',
-                    start_line=16,
+                    start_line=20,
                     start_col=0,
-                    end_line=16,
+                    end_line=20,
                     end_col=1024,
                 ),
             ],
@@ -262,6 +273,9 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
     ],
 )
 def test_notebook_linter(lang, source, expected):
+    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+    # Hence SQL statement advice offsets can be wrong because of comments and statements
+    # over multiple lines.
     langs = Languages(index)
     linter = NotebookLinter.from_source(langs, source, lang)
     assert linter is not None
