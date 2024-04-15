@@ -8,6 +8,7 @@ from databricks.labs.ucx.azure.resources import (
     AzureResource,
     AzureResources,
     Principal,
+    StorageAccount,
 )
 
 from . import azure_api_client, get_az_api_mapping
@@ -36,9 +37,9 @@ def test_storage_accounts():
     storage_accounts = list(azure_resource.storage_accounts())
     assert len(storage_accounts) == 2
     for storage_account in storage_accounts:
-        assert storage_account.resource_group == "rg1"
+        assert storage_account.id.resource_group == "rg1"
         assert storage_account.name in {"sto2", "sto3"}
-        assert storage_account.subscription_id == "002"
+        assert storage_account.id.subscription_id == "002"
 
 
 def test_containers():
@@ -106,9 +107,13 @@ def test_create_service_principal_no_access():
 def test_apply_storage_permission():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
-    azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
+    azure_storage = StorageAccount(
+        id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+    )
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
-    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
+    path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
     body = {
         'properties': {
             'principalId': 'test',
@@ -123,7 +128,11 @@ def test_apply_storage_permission():
 def test_apply_storage_permission_no_access():
     api_client = azure_api_client()
     api_client.put.side_effect = PermissionDenied()
-    azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
+    azure_storage = StorageAccount(
+        id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+    )
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
         azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
@@ -147,10 +156,14 @@ def test_delete_service_principal():
 def test_apply_storage_permission_assignment_present():
     api_client = azure_api_client()
     api_client.put.side_effect = ResourceConflict()
-    azure_storage = AzureResource("subscriptions/002/resourceGroups/rg1/storageAccounts/sto2")
+    azure_storage = StorageAccount(
+        id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
+        name="sto2",
+        location="eastus",
+    )
     azure_resource = AzureResources(api_client, api_client)
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
-    path = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
+    path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
     body = {
         'properties': {
             'principalId': 'test',

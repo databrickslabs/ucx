@@ -75,8 +75,8 @@ class AzureResource:
 
 class RawResource:
     def __init__(self, raw_resource: dict[str, Any]):
-        if 'id' not in raw_resource:
-            raise ValueError("Raw resource must contain an 'id' field")
+        if "id" not in raw_resource:
+            raise KeyError("Raw resource must contain an 'id' field")
         self._id = AzureResource(raw_resource["id"])
         self._raw_resource = raw_resource
 

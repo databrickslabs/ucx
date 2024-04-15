@@ -16,6 +16,7 @@ from databricks.labs.ucx.azure.resources import (
     AzureResources,
     AzureRoleAssignment,
     Principal,
+    StorageAccount,
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
@@ -77,8 +78,16 @@ def test_save_spn_permissions_valid_azure_storage_account():
     storage_accounts = '/subscriptions/abc/providers/Microsoft.Storage/storageAccounts'
     containers = f'{storage_accounts}/storage1/blobServices/default/containers'
     azure_resources.storage_accounts.return_value = [
-        AzureResource(f'{storage_accounts}/storage1'),
-        AzureResource(f'{storage_accounts}/storage2'),
+        StorageAccount(
+            id=AzureResource('{storage_accounts}/storage1'),
+            name="storage1",
+            location="westeu",
+        ),
+        StorageAccount(
+            id=AzureResource('{storage_accounts}/storage2'),
+            name="storage2",
+            location="westeu",
+        ),
     ]
     azure_resources.containers.return_value = [
         AzureResource(f'{containers}/container1'),
