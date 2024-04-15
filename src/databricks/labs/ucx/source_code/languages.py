@@ -5,7 +5,6 @@ from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter
 from databricks.labs.ucx.source_code.pyspark import SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter, FromDbfsFolder
-from databricks.labs.ucx.source_code.s3fs import S3FSUsageLinter
 
 
 class Languages:
@@ -14,7 +13,7 @@ class Languages:
         from_table = FromTable(index)
         dbfs_from_folder = FromDbfsFolder()
         self._linters = {
-            Language.PYTHON: SequentialLinter([SparkSql(from_table, index), DBFSUsageLinter(), S3FSUsageLinter()]),
+            Language.PYTHON: SequentialLinter([SparkSql(from_table, index), DBFSUsageLinter()]),
             Language.SQL: SequentialLinter([from_table, dbfs_from_folder]),
         }
         self._fixers: dict[Language, list[Fixer]] = {

@@ -1,0 +1,29 @@
+%YAML 1.2
+---
+identifier:
+  name: leeds
+  version: ^0.24.0 # since version is specified, this entry only applies to versions matching the version number
+top_level: leeds
+packages:
+  - name: leeds
+    compatibility: full
+    failures:
+      - some failure 1
+  - name: databricks.sdk.service.compute
+    compatibility: full
+    failures:
+      - some failure 1
+---
+identifier:
+  name: s3fs
+  # all versions are incompatible
+top_level: s3fs
+packages:
+  - name: s3fs
+    compatibility: none
+    failures:
+      - the use of s3fs is deprecated
+  - name: s3fs.core
+    compatibility: none
+    failures:
+      - deprecated

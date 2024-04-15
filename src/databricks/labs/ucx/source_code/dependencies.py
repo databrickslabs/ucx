@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import abc
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
 class Dependency:
@@ -104,6 +105,7 @@ class DependencyLoader:
 class DependencyResolver:
     def __init__(self, whitelist: Whitelist | None = None):
         self._whitelist = Whitelist() if whitelist is None else whitelist
+        self._advices: list[Advice] = []
 
     def resolve(self, dependency: Dependency) -> Dependency | None:
         if dependency.type == ObjectType.NOTEBOOK:
@@ -111,8 +113,22 @@ class DependencyResolver:
         compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is not None:
+            if compatibility == UCCompatibility.NONE:
+                self._advices.append(
+                    Deprecation(
+                        code="dependency-check",
+                        message=f"Use of dependency {dependency.path} is deprecated",
+                        start_line=0,
+                        start_col=0,
+                        end_line=0,
+                        end_col=0,
+                    )
+                )
             return None
         return dependency
+
+    def get_advices(self) -> Iterable[Advice]:
+        yield from self._advices
 
 
 class DependencyGraph:

@@ -1,21 +1,32 @@
+from unittest.mock import create_autospec
+
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
-from databricks.labs.ucx.source_code.s3fs import S3FSUsageLinter
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
+
+from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
+from databricks.labs.ucx.source_code.whitelist import Whitelist
+from tests.unit import _load_sources
+
+S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
+
 
 @pytest.mark.parametrize(
-    "code, expected",
+    "source, expected",
     [
         (
             "import s3fs",
             [
                 Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=1,
-                    start_col=7,
-                    end_line=1,
-                    end_col=11,
+                    code='dependency-check',
+                    message=S3FS_DEPRECATION_MESSAGE,
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
                 )
             ],
         ),
@@ -23,41 +34,41 @@ from databricks.labs.ucx.source_code.s3fs import S3FSUsageLinter
             "from s3fs import something",
             [
                 Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=1,
+                    code='dependency-check',
+                    message=S3FS_DEPRECATION_MESSAGE,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
-                    end_col=26,
+                    end_line=0,
+                    end_col=0,
                 )
             ],
         ),
-        ("import os", []),
-        ("from os import path", []),
+        ("import leeds", []),
+        ("from leeds import path", []),
         (
-            "import s3fs, os",
+            "import s3fs, leeds",
             [
                 Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=1,
-                    start_col=7,
-                    end_line=1,
-                    end_col=11,
+                    code='dependency-check',
+                    message=S3FS_DEPRECATION_MESSAGE,
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
                 )
             ],
         ),
-        ("from os import path, s3fs", []),
+        ("from leeds import path, s3fs", []),
         (
             "def func():\n    import s3fs",
             [
                 Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=2,
-                    start_col=11,
-                    end_line=2,
-                    end_col=15,
+                    code='dependency-check',
+                    message=S3FS_DEPRECATION_MESSAGE,
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
                 )
             ],
         ),
@@ -65,25 +76,12 @@ from databricks.labs.ucx.source_code.s3fs import S3FSUsageLinter
             "import s3fs as s",
             [
                 Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=1,
-                    start_col=7,
-                    end_line=1,
-                    end_col=11,
-                )
-            ],
-        ),
-        (
-            "import os, \\\n    s3fs",
-            [
-                Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=2,
-                    start_col=4,
-                    end_line=2,
-                    end_col=8,
+                    code='dependency-check',
+                    message=S3FS_DEPRECATION_MESSAGE,
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
                 )
             ],
         ),
@@ -91,23 +89,27 @@ from databricks.labs.ucx.source_code.s3fs import S3FSUsageLinter
             "from s3fs.subpackage import something",
             [
                 Deprecation(
-                    code='s3fs-usage',
-                    message='The use of s3fs is deprecated',
-                    start_line=1,
+                    code='dependency-check',
+                    message='Use of dependency s3fs.subpackage is deprecated',
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
-                    end_col=37,
+                    end_line=0,
+                    end_col=0,
                 )
             ],
         ),
         ("", []),
     ],
 )
-def test_detect_s3fs_import(self, code: str, expected: list[Advice]):
-    linter = S3FSUsageLinter()
-    advices = list(linter.lint(code))
+def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
+    datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
+    whitelist = Whitelist.parse(datas[0])
+    resolver = DependencyResolver(whitelist)
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
+    ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws), resolver)
+    object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
+    migrator.build_dependency_graph(object_info)
+    advices = list(resolver.get_advices())
     assert advices == expected
-
-def test_s3fs_name(self):
-    linter = S3FSUsageLinter()
-    assert linter.name() == 's3fs-usage'
