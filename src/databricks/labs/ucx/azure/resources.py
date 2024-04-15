@@ -129,16 +129,43 @@ class AccessConnector:
     id: AzureResource
     name: str
     location: str
-    identity: dict[str, str] = field(default_factory=dict)
+    identity_type: str  # SystemAssigned or UserAssigned
+    principal_id: str
+    managed_identity_type: str | None = None  # str when identity_type is UserAssigned
+    client_id: str | None = None  # str when identity_type is UserAssigned
+    tenant_id: str | None = None  # str when identity_type is SystemAssigned
     tags: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_raw_resource(cls, raw: RawResource) -> "AccessConnector":
+        identity = raw.get("identity", {})
+        identity_type = identity.get("type")
+        if identity_type is None:
+            raise ValueError(f"Missing identity type: {raw}")
+        elif identity_type == "UserAssigned":
+            if len(identity.keys()) > 1:
+                raise ValueError(f"Multiple user assigned identities in {cls} is unsupported: {identity.keys()}")
+            else:
+                managed_identity_id = list(identity.keys())[0]
+            principal_id = identity[managed_identity_id]["principalId"]
+            client_id = identity[managed_identity_id]["clientId"]
+            tenant_id = None
+        elif identity_type == "SystemAssigned":
+            principal_id = identity["principalId"]
+            managed_identity_id = client_id = None
+            tenant_id = identity["tenantId"]
+        else:
+            raise ValueError(f"Unsupported identity type in {cls}: {identity_type}")
+
         access_connector = cls(
             id=raw.id,
             name=raw.get("name", ""),
             location=raw.get("location", ""),
-            identity=raw.get("identity", {}),
+            identity_type=identity_type,
+            principal_id=principal_id,
+            managed_identity_type=managed_identity_id,
+            client_id=client_id,
+            tenant_id=tenant_id,
             tags=raw.get("tags", {}),
         )
         return access_connector
