@@ -94,7 +94,7 @@ class AzureResourcePermissions:
     def _update_cluster_policy_definition(
         self,
         policy_definition: str,
-        storage_accounts: list[AzureResource],
+        storage_accounts: list[StorageAccount],
         uber_principal: PrincipalSecret,
         inventory_database: str,
     ) -> str:
@@ -103,19 +103,19 @@ class AzureResourcePermissions:
         endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
         for storage in storage_accounts:
             policy_dict[
-                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.storage_account}.dfs.core.windows.net"
+                f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net"
             ] = self._policy_config(uber_principal.client.client_id)
             policy_dict[
-                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.storage_account}.dfs.core.windows.net"
+                f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net"
             ] = self._policy_config("org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
             policy_dict[
-                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.storage_account}.dfs.core.windows.net"
+                f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net"
             ] = self._policy_config(endpoint)
-            policy_dict[f"spark_conf.fs.azure.account.auth.type.{storage.storage_account}.dfs.core.windows.net"] = (
+            policy_dict[f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net"] = (
                 self._policy_config("OAuth")
             )
             policy_dict[
-                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.storage_account}.dfs.core.windows.net"
+                f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"
             ] = self._policy_config(f"{{secrets/{inventory_database}/uber_principal_secret}}")
         return json.dumps(policy_dict)
 
@@ -126,7 +126,7 @@ class AzureResourcePermissions:
     def _update_cluster_policy_with_spn(
         self,
         policy_id: str,
-        storage_accounts: list[AzureResource],
+        storage_accounts: list[StorageAccount],
         uber_principal: PrincipalSecret,
         inventory_database: str,
     ):
