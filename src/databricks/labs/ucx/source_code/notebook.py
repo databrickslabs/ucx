@@ -167,6 +167,22 @@ class RunCell(Cell):
         pass
 
 
+class ShellCell(Cell):
+
+    @property
+    def language(self):
+        return CellLanguage.SHELL
+
+    def is_runnable(self) -> bool:
+        return True  # TODO
+
+    def build_dependency_graph(self, parent: DependencyGraph):
+        pass  # nothing to do
+
+    def migrate_notebook_path(self):
+        pass
+
+
 class PipCell(Cell):
 
     @property
@@ -190,6 +206,7 @@ class CellLanguage(Enum):
     SQL = Language.SQL, 'sql', '--', True, SQLCell
     RUN = None, 'run', '', False, RunCell
     PIP = None, 'pip', '', False, PipCell
+    SHELL = None, 'sh', '', False, ShellCell
     # see https://spec.commonmark.org/0.31.2/#html-comment
     MARKDOWN = None, 'md', "<!--->", False, MarkdownCell
     R = Language.R, 'r', '#', True, RCell

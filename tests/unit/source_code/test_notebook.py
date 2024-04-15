@@ -41,6 +41,11 @@ SQL_NOTEBOOK_SAMPLE = (
     Language.SQL,
     ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
+SHELL_NOTEBOOK_SAMPLE = (
+    "notebook-with-shell-cell.py.txt",
+    Language.PYTHON,
+    ['python', 'sh'],
+)
 PIP_NOTEBOOK_SAMPLE = (
     "notebook-with-pip-cell.py.txt",
     Language.PYTHON,
@@ -57,6 +62,7 @@ PIP_NOTEBOOK_SAMPLE = (
         SCALA_NOTEBOOK_SAMPLE,
         R_NOTEBOOK_SAMPLE,
         SQL_NOTEBOOK_SAMPLE,
+        SHELL_NOTEBOOK_SAMPLE,
         PIP_NOTEBOOK_SAMPLE,
     ],
 )
