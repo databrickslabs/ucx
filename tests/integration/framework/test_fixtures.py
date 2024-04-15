@@ -103,5 +103,7 @@ def test_table_fixture(make_table):
 def test_dbfs_fixture(make_dbfs_data_copy, make_random, env_or_skip):
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    logger.info(f"Created new dbfs data copy: "
-                f"{make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)}")
+    logger.info(
+        f"Created new dbfs data copy: "
+        f"{make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)}"
+    )
