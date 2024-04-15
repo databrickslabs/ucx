@@ -544,6 +544,7 @@ class AzureResources:
         self._mgmt.put(url, api_version="2023-05-01", body=body)
 
         access_connector = self.get_access_connector(subscription_id, resource_group_name, name)
+        assert access_connector is not None
         return access_connector
 
     def delete_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> None:
