@@ -187,6 +187,27 @@ class AzureResourcePermissions:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
+    def create_access_connectors_for_storage_accounts(self) -> None:
+        used_storage_accounts = self._get_storage_accounts()
+        if len(used_storage_accounts) == 0:
+            logger.warning(
+                "There are no external table present with azure storage account. "
+                "Please check if assessment job is run"
+            )
+            return
+        storage_account_info = []
+        for storage in self._azurerm.storage_accounts():
+            if storage.name in used_storage_accounts:
+                storage_account_info.append(storage)
+        for storage_account in storage_account_info:
+            self._azurerm.create_or_update_access_connector(
+                storage_account.subscription_id,
+                storage_account.resource_group,
+                f"ac-{storage_account.name}",
+                storage_account.location,
+                tags={"CreatedBy": "ucx"},
+            )
+
     def _apply_storage_permission(self, storage_account_info: list[AzureResource], uber_principal: PrincipalSecret):
         for storage in storage_account_info:
             role_name = str(uuid.uuid4())

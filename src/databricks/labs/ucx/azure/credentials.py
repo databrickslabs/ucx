@@ -258,6 +258,9 @@ class ServicePrincipalMigration(SecretsMixin):
         )
         if plan_confirmed is not True:
             return []
+
+        self._resource_permissions.create_access_connectors_for_storage_accounts()
+
         return list()
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
