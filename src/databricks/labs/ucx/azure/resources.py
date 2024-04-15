@@ -473,7 +473,7 @@ class AzureResources:
             return principal.client_id
         return None
 
-    def get_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector:
+    def get_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> AccessConnector | None:
         """Get an access connector.
 
         Docs:
@@ -482,7 +482,11 @@ class AzureResources:
         url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         response = self._mgmt.get(url, api_version="2023-05-01")
         raw = RawResource(response)
-        access_connector = AccessConnector.from_raw_resource(raw)
+        try:
+            access_connector = AccessConnector.from_raw_resource(raw)
+        except ValueError:
+            logger.warning(f"Tried getting non-existing access connector: {url}")
+            access_connector = None
         return access_connector
 
     def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
@@ -505,7 +509,10 @@ class AzureResources:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
         """
         for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
-            yield AccessConnector.from_raw_resource(raw)
+            try:
+                yield AccessConnector.from_raw_resource(raw)
+            except ValueError:
+                logger.warning(f"Could not parse access connector {raw}")
 
     def create_or_update_access_connector(
         self,

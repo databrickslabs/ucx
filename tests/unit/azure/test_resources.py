@@ -276,6 +276,7 @@ def test_azure_resources_get_access_connector() -> None:
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
     access_connector = azure_resource.get_access_connector("test", "rg-test", "test-access-connector")
+    assert access_connector is not None
     assert access_connector.name == "test-access-connector"
     assert access_connector.tags["application"] == "databricks"
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
