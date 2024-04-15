@@ -227,7 +227,7 @@ class ServicePrincipalMigration(SecretsMixin):
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
+    def run_service_principal_migration(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
 
         sp_list_with_secret = self._generate_migration_list(include_names)
 
@@ -251,3 +251,6 @@ class ServicePrincipalMigration(SecretsMixin):
         else:
             logger.info("No Azure Service Principal migrated to UC Storage credentials")
         return execution_result
+
+    def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
+        return self.run_service_principal_migration(prompts, include_names)
