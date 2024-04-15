@@ -95,7 +95,7 @@ class Whitelist:
             known_packages.extend(pips)
         self._known_packages: dict[str, list[KnownPackage]] = {}
         for known in known_packages:
-            top_levels = known.top_level if isinstance(known.top_level, list) else [known.top_level]
+            top_levels: list[str] = known.top_level if isinstance(known.top_level, list) else [known.top_level]
             for top_level in top_levels:
                 packs = self._known_packages.get(top_level, None)
                 if packs is None:
