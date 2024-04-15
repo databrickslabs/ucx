@@ -14,6 +14,7 @@ from typing import BinaryIO
 
 import pytest
 from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -31,6 +32,7 @@ from databricks.sdk.service.catalog import (
     TableInfo,
     TableType,
 )
+from databricks.sdk.service.compute import Language
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedModelInput,
@@ -397,13 +399,13 @@ def _make_permissions_factory(name, resource_type, levels, id_retriever):
 
     def _make_permissions(ws):
         def create(
-            *,
-            object_id: str,
-            permission_level: iam.PermissionLevel | None = None,
-            group_name: str | None = None,
-            user_name: str | None = None,
-            service_principal_name: str | None = None,
-            access_control_list: list[iam.AccessControlRequest] | None = None,
+                *,
+                object_id: str,
+                permission_level: iam.PermissionLevel | None = None,
+                group_name: str | None = None,
+                user_name: str | None = None,
+                service_principal_name: str | None = None,
+                access_control_list: list[iam.AccessControlRequest] | None = None,
         ):
             nothing_specified = permission_level is None and access_control_list is None
             both_specified = permission_level is not None and access_control_list is not None
@@ -469,12 +471,12 @@ def _make_redash_permissions_factory(name, resource_type, levels, id_retriever):
 
     def _make_permissions(ws):
         def create(
-            *,
-            object_id: str,
-            permission_level: sql.PermissionLevel | None = None,
-            group_name: str | None = None,
-            user_name: str | None = None,
-            access_control_list: list[sql.AccessControl] | None = None,
+                *,
+                object_id: str,
+                permission_level: sql.PermissionLevel | None = None,
+                group_name: str | None = None,
+                user_name: str | None = None,
+                access_control_list: list[sql.AccessControl] | None = None,
         ):
             nothing_specified = permission_level is None and access_control_list is None
             both_specified = permission_level is not None and access_control_list is not None
@@ -607,12 +609,12 @@ def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
 def _make_group(name, cfg, interface, make_random):
     @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(
-        *,
-        members: list[str] | None = None,
-        roles: list[str] | None = None,
-        entitlements: list[str] | None = None,
-        display_name: str | None = None,
-        **kwargs,
+            *,
+            members: list[str] | None = None,
+            roles: list[str] | None = None,
+            entitlements: list[str] | None = None,
+            display_name: str | None = None,
+            **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
         if members is not None:
@@ -674,12 +676,12 @@ def make_cluster_policy(ws, make_random):
 @pytest.fixture
 def make_cluster(ws, make_random):
     def create(
-        *,
-        single_node: bool = False,
-        cluster_name: str | None = None,
-        spark_version: str | None = None,
-        autotermination_minutes=10,
-        **kwargs,
+            *,
+            single_node: bool = False,
+            cluster_name: str | None = None,
+            spark_version: str | None = None,
+            autotermination_minutes=10,
+            **kwargs,
     ):
         if cluster_name is None:
             cluster_name = f"sdk-{make_random(4)}"
@@ -698,6 +700,9 @@ def make_cluster(ws, make_random):
         if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
 
+        if "aws_attributes" in kwargs:
+            kwargs["aws_attributes"] = kwargs["aws_attributes"]
+
         return ws.clusters.create(
             cluster_name=cluster_name,
             spark_version=spark_version,
@@ -711,10 +716,10 @@ def make_cluster(ws, make_random):
 @pytest.fixture
 def make_experiment(ws, make_random):
     def create(
-        *,
-        path: str | None = None,
-        experiment_name: str | None = None,
-        **kwargs,
+            *,
+            path: str | None = None,
+            experiment_name: str | None = None,
+            **kwargs,
     ):
         if path is None:
             path = f"/Users/{ws.current_user.me().user_name}/{make_random(4)}"
@@ -792,9 +797,9 @@ def make_job(ws, make_random, make_notebook):
 @pytest.fixture
 def make_model(ws, make_random):
     def create(
-        *,
-        model_name: str | None = None,
-        **kwargs,
+            *,
+            model_name: str | None = None,
+            **kwargs,
     ):
         if model_name is None:
             model_name = f"sdk-{make_random(4)}"
@@ -832,13 +837,13 @@ def make_pipeline(ws, make_random, make_notebook):
 @pytest.fixture
 def make_warehouse(ws, make_random):
     def create(
-        *,
-        warehouse_name: str | None = None,
-        warehouse_type: CreateWarehouseRequestWarehouseType | None = None,
-        cluster_size: str | None = None,
-        max_num_clusters: int = 1,
-        enable_serverless_compute: bool = False,
-        **kwargs,
+            *,
+            warehouse_name: str | None = None,
+            warehouse_type: CreateWarehouseRequestWarehouseType | None = None,
+            cluster_size: str | None = None,
+            max_num_clusters: int = 1,
+            enable_serverless_compute: bool = False,
+            **kwargs,
     ):
         if warehouse_name is None:
             warehouse_name = f"sdk-{make_random(4)}"
@@ -961,16 +966,16 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
     def create(
-        *,
-        catalog_name="hive_metastore",
-        schema_name: str | None = None,
-        name: str | None = None,
-        ctas: str | None = None,
-        non_delta: bool = False,
-        external: bool = False,
-        external_csv: str | None = None,
-        view: bool = False,
-        tbl_properties: dict[str, str] | None = None,
+            *,
+            catalog_name="hive_metastore",
+            schema_name: str | None = None,
+            name: str | None = None,
+            ctas: str | None = None,
+            non_delta: bool = False,
+            external: bool = False,
+            external_csv: str | None = None,
+            view: bool = False,
+            tbl_properties: dict[str, str] | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1052,7 +1057,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 @pytest.fixture
 def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., FunctionInfo], None, None]:
     def create(
-        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
+            *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
     ) -> FunctionInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1113,13 +1118,13 @@ def make_query(ws, make_table, make_random):
 @pytest.fixture
 def make_storage_credential(ws):
     def create(
-        *,
-        credential_name: str,
-        application_id: str = "",
-        client_secret: str = "",
-        directory_id: str = "",
-        aws_iam_role_arn: str = "",
-        read_only=False,
+            *,
+            credential_name: str,
+            application_id: str = "",
+            client_secret: str = "",
+            directory_id: str = "",
+            aws_iam_role_arn: str = "",
+            read_only=False,
     ) -> StorageCredentialInfo:
         if aws_iam_role_arn != "":
             storage_credential = ws.storage_credentials.create(
@@ -1183,12 +1188,27 @@ def make_feature_table(ws, make_random):
 
 
 @pytest.fixture
-def make_dbfs_data_copy(ws):
+def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
+    if ws.config.is_aws:
+        cluster = make_cluster(
+            single_node=True,
+            instance_pool_id=env_or_skip("TEST_INSTANCE_POOL_ID"),
+            aws_attributes=compute.AwsAttributes(
+                instance_profile_arn=env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"))
+        ).result()
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: cluster.cluster_id)
+
     def create(*, src_path: str, dst_path: str):
-        ws.dbfs.copy(src_path, dst_path, recursive=True)
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.copy(src_path, dst_path, recursive=True)
         return dst_path
 
     def remove(dst_path: str):
-        ws.dbfs.delete(dst_path, recursive=True)
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.delete(dst_path, recursive=True)
 
     yield from factory("make_dbfs_data_copy", create, remove)
