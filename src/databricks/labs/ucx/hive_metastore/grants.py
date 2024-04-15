@@ -546,11 +546,12 @@ class PrincipalACL:
 
         # get all clusters in the workspace
         clusters = self._ws.clusters.list()
+        inventory_database = self._installation.load(str, "inventory_database")
 
         tables = TablesInMounts(
             self._backend,
             self._ws,
-            self.inventory_database,  # how to get this?
+            inventory_database,
             self.mounts_crawler,
             mounts,
         )
