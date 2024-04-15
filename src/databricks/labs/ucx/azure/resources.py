@@ -138,6 +138,17 @@ class AccessConnector:
 
     @classmethod
     def from_raw_resource(cls, raw: RawResource) -> "AccessConnector":
+        if raw.id is None:
+            raise ValueError(f"Missing id: {raw}")
+
+        name = raw.get("name", "")
+        if name == "":
+            raise ValueError(f"Missing name: {raw}")
+
+        location = raw.get("location", "")
+        if location == "":
+            raise ValueError(f"Missing location: {raw}")
+
         identity = raw.get("identity", {})
         identity_type = identity.get("type")
         if identity_type is None:
@@ -159,8 +170,8 @@ class AccessConnector:
 
         access_connector = cls(
             id=raw.id,
-            name=raw.get("name", ""),
-            location=raw.get("location", ""),
+            name=name,
+            location=location,
             identity_type=identity_type,
             principal_id=principal_id,
             managed_identity_type=managed_identity_id,
