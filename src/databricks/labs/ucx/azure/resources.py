@@ -107,6 +107,22 @@ class StorageAccount:
     name: str
     location: str
 
+    @classmethod
+    def from_raw_resource(cls, raw: RawResource) -> "StorageAccount":
+        if raw.id is None:
+            raise KeyError(f"Missing id: {raw}")
+
+        name = raw.get("name", "")
+        if name == "":
+            raise KeyError(f"Missing name: {raw}")
+
+        storage_account = cls(
+            id=raw.id,
+            name=name,
+            location=raw.get("location", ""),
+        )
+        return storage_account
+
 
 @dataclass
 class PrincipalSecret:
@@ -340,14 +356,7 @@ class AzureResources:
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
             for response in self._mgmt.get(path, "2023-01-01").get("value", []):
-                if response.get("id") is None:
-                    continue
-                raw = RawResource(response)
-                storage_account = StorageAccount(
-                    id=raw.id,
-                    name=raw.id.storage_account,
-                    location=raw.get("location", ""),
-                )
+                storage_account = StorageAccount.from_raw_resource(RawResource(response))
                 yield storage_account
 
     def containers(self, storage: AzureResource):
