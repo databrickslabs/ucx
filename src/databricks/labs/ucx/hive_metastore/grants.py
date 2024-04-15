@@ -31,6 +31,8 @@ from databricks.labs.ucx.hive_metastore.locations import (
 )
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore import TablesInMounts
+
 
 logger = logging.getLogger(__name__)
 
@@ -511,6 +513,7 @@ class PrincipalACL:
         tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
         cluster_locations: dict[str, dict],
+        spn_crawler: AzureServicePrincipalCrawler,
     ):
         self._backend = backend
         self._ws = ws
@@ -518,6 +521,7 @@ class PrincipalACL:
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
+        self._spn_crawler = spn_crawler
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
@@ -536,24 +540,28 @@ class PrincipalACL:
         return list(grants)
 
     def get_spn_mount_grants(self) -> list[Grant]:
-        # get all mounts in the workspace
+        # get all workspace-wide mounts
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
 
-        for mount in mounts:
-            # get the spn associated with the mount
-            spn_info = self._mounts_crawler.get_spn(mount)
+        # get all clusters in the workspace
+        clusters = self._ws.clusters.list()
 
-            if spn_info is not None:
-                # get the users and clusters that have access to SPN
-                principals = self._get_cluster_principal_mapping(spn_info.cluster_id)
+        tables = TablesInMounts(
+            self._backend,
+            self._ws,
+            self.inventory_database,  # how to get this?
+            self.mounts_crawler,
+            mounts,
+        )
 
-                # convert these users and clusters to UC ACLs
-                for principal in principals:
-                    # The permissions should be set according to your requirements
-                    grant = Grant(principal, "ALL PRIVILEGES", catalog="hive_metastore", database=mount.database)
-                    grants.append(grant)
-        return grants
+        for table in tables:
+            for cluster in clusters:
+                # set grants for all the tables that use the mounts
+                grant = Grant(cluster.cluster_id, "ALL PRIVILEGES", catalog="hive_metastore",
+                              database=table.database, table=table.name)
+                grants.add(grant)
+        return list(grants)
 
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
         if table.view_text is not None:
