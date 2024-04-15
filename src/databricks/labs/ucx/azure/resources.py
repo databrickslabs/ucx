@@ -1,4 +1,5 @@
 import urllib.parse
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -143,6 +144,7 @@ class AccessConnector:
     id: AzureResource
     name: str
     location: str
+    provisioning_state: str  # https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/get?view=rest-databricks-2023-05-01&tabs=HTTP#provisioningstate
     identity_type: str  # SystemAssigned or UserAssigned
     principal_id: str
     managed_identity_type: str | None = None  # str when identity_type is UserAssigned
@@ -162,6 +164,10 @@ class AccessConnector:
         location = raw.get("location", "")
         if location == "":
             raise KeyError(f"Missing location: {raw}")
+
+        provisioning_state = raw.get("properties", {}).get("provisioningState", "")
+        if provisioning_state == "":
+            raise KeyError(f"Missing provisioning state: {raw}")
 
         identity = raw.get("identity", {})
         identity_type = identity.get("type")
@@ -185,6 +191,7 @@ class AccessConnector:
             id=raw.id,
             name=name,
             location=location,
+            provisioning_state=provisioning_state,
             identity_type=identity_type,
             principal_id=principal_id,
             managed_identity_type=managed_identity_id,
@@ -528,6 +535,9 @@ class AzureResources:
         name: str,
         location: str,
         tags: dict[str, str] | None,
+        *,
+        wait_for_provisioning: bool = False,
+        wait_for_provisioning_timeout_in_seconds: int = 300,
     ) -> AccessConnector:
         """Create access connector.
 
@@ -545,6 +555,16 @@ class AzureResources:
 
         access_connector = self.get_access_connector(subscription_id, resource_group_name, name)
         assert access_connector is not None
+
+        start_time = time.time()
+        if wait_for_provisioning and access_connector.provisioning_state != "Succeeded":
+            if time.time() - start_time > wait_for_provisioning_timeout_in_seconds:
+                raise TimeoutError(f"Timeout waiting for creating or updating access connector: {url}")
+            time.sleep(5)
+
+            access_connector = self.get_access_connector(subscription_id, resource_group_name, name)
+            assert access_connector is not None
+
         return access_connector
 
     def delete_access_connector(self, subscription_id: str, resource_group_name: str, name: str) -> None:

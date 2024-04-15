@@ -197,6 +197,7 @@ class AzureResourcePermissions:
             f"ac-{storage_account.name}",
             storage_account.location,
             tags={"CreatedBy": "ucx"},
+            wait_for_provisioning=True,
         )
         self._apply_storage_permission(
             access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account
@@ -216,7 +217,7 @@ class AzureResourcePermissions:
             if storage.name in used_storage_accounts:
                 tasks.append(partial(self._create_access_connector_for_storage_account, storage=storage))
 
-        thread_name = "Creating access connectors for storage accounts: "
+        thread_name = "Creating access connectors for storage accounts"
         _, errors = Threads.gather(thread_name, tasks)
         if len(errors) > 0:
             raise ManyError(errors)
