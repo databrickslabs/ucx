@@ -205,11 +205,10 @@ class AzureAPIClient:
 
         return _credentials
 
-    def get(self, path: str, api_version: str | None = None, query: dict[str, Any] | None = None):
+    def get(self, path: str, api_version: str | None = None, query: dict[str, str] | None = None):
         headers = {"Accept": "application/json"}
-        if not query:
-            query = {}
-        if api_version:
+        query: dict[str, str] = query or {}
+        if api_version is not None:
             query["api-version"] = api_version
         return self.api_client.do("GET", path, query, headers)
 
@@ -217,7 +216,7 @@ class AzureAPIClient:
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
         if api_version is not None:
-            query = {"api-version": api_version}
+            query["api-version"] = api_version
         if body is not None:
             return self.api_client.do("PUT", path, query, headers, body)
         return None
@@ -234,7 +233,7 @@ class AzureAPIClient:
         headers = {"Content-Type": "application/json"}
         query: dict[str, str] = {}
         if api_version is not None:
-            query = {"api-version": api_version}
+            query["api-version"] = api_version
         return self.api_client.do("DELETE", path, query, headers)
 
     def token(self):
