@@ -167,12 +167,29 @@ class RunCell(Cell):
         pass
 
 
+class ShellCell(Cell):
+
+    @property
+    def language(self):
+        return CellLanguage.SHELL
+
+    def is_runnable(self) -> bool:
+        return True  # TODO
+
+    def build_dependency_graph(self, parent: DependencyGraph):
+        pass  # nothing to do
+
+    def migrate_notebook_path(self):
+        pass
+
+
 class CellLanguage(Enum):
     # long magic_names must come first to avoid shorter ones being matched
     PYTHON = Language.PYTHON, 'python', '#', True, PythonCell
     SCALA = Language.SCALA, 'scala', '//', True, ScalaCell
     SQL = Language.SQL, 'sql', '--', True, SQLCell
     RUN = None, 'run', '', False, RunCell
+    SHELL = None, 'sh', '', False, ShellCell
     # see https://spec.commonmark.org/0.31.2/#html-comment
     MARKDOWN = None, 'md', "<!--->", False, MarkdownCell
     R = Language.R, 'r', '#', True, RCell

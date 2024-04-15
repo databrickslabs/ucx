@@ -41,6 +41,11 @@ SQL_NOTEBOOK_SAMPLE = (
     Language.SQL,
     ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
+SHELL_NOTEBOOK_SAMPLE = (
+    "notebook-with-shell-cell.py.txt",
+    Language.PYTHON,
+    ['python', 'sh'],
+)
 # fmt: on
 
 
@@ -52,6 +57,7 @@ SQL_NOTEBOOK_SAMPLE = (
         SCALA_NOTEBOOK_SAMPLE,
         R_NOTEBOOK_SAMPLE,
         SQL_NOTEBOOK_SAMPLE,
+        SHELL_NOTEBOOK_SAMPLE,
     ],
 )
 def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]):
