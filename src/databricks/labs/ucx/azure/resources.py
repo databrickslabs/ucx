@@ -223,10 +223,10 @@ class AzureAPIClient:
 
     def get(self, path: str, api_version: str | None = None, query: dict[str, str] | None = None):
         headers = {"Accept": "application/json"}
-        query: dict[str, str] = query or {}
+        _query: dict[str, str] = query or {}
         if api_version is not None:
-            query["api-version"] = api_version
-        return self.api_client.do("GET", path, query, headers)
+            _query["api-version"] = api_version
+        return self.api_client.do("GET", path, _query, headers)
 
     def put(self, path: str, api_version: str | None = None, body: dict | None = None):
         headers = {"Content-Type": "application/json"}
