@@ -165,15 +165,12 @@ class AccessConnector:
 
         identity = raw.get("identity", {})
         identity_type = identity.get("type")
-        if identity_type is None:
-            raise KeyError(f"Missing identity type: {raw}")
-        elif identity_type == "UserAssigned":
+        if identity_type == "UserAssigned":
             if len(identity.keys()) > 1:
                 raise KeyError(f"Multiple user assigned identities: {identity.keys()}")
-            elif len(identity.keys()) == 0:
+            if len(identity.keys()) == 0:
                 raise KeyError(f"No user assigned identity: {identity.keys()}")
-            else:
-                managed_identity_id = list(identity.keys())[0]
+            managed_identity_id = list(identity.keys())[0]
             principal_id = identity[managed_identity_id]["principalId"]
             client_id = identity[managed_identity_id]["clientId"]
             tenant_id = None
