@@ -153,7 +153,9 @@ class AccessConnector:
             raise ValueError(f"Missing identity type: {raw}")
         elif identity_type == "UserAssigned":
             if len(identity.keys()) > 1:
-                raise ValueError(f"Multiple user assigned identities in {cls} is unsupported: {identity.keys()}")
+                raise ValueError(f"Multiple user assigned identities: {identity.keys()}")
+            elif len(identity.keys()) == 0:
+                raise ValueError(f"No user assigned identity: {identity.keys()}")
             else:
                 managed_identity_id = list(identity.keys())[0]
             principal_id = identity[managed_identity_id]["principalId"]
