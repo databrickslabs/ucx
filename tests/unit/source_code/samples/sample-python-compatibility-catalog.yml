@@ -21,7 +21,9 @@ packages:
 identifier:
   name: databricks-sdk
   # since version is omitted, this entry applies to all versions for which there is no versioned entry
-top_level: databricks
+top_level:
+  - databricks
+  - databrix
 packages:
   - name: databricks.sdk.service.dashboards
     compatibility: full

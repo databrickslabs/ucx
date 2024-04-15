@@ -95,11 +95,13 @@ class Whitelist:
             known_packages.extend(pips)
         self._known_packages: dict[str, list[KnownPackage]] = {}
         for known in known_packages:
-            packs = self._known_packages.get(known.top_level, None)
-            if packs is None:
-                packs = []
-                self._known_packages[known.top_level] = packs
-            packs.append(known)
+            top_levels = known.top_level if isinstance(known.top_level, list) else [known.top_level]
+            for top_level in top_levels:
+                packs = self._known_packages.get(top_level, None)
+                if packs is None:
+                    packs = []
+                    self._known_packages[top_level] = packs
+                packs.append(known)
 
     def compatibility(self, name: str) -> UCCompatibility | None:
         root = name.split('.')[0]
