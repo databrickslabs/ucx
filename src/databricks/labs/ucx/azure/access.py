@@ -53,7 +53,7 @@ class AzureResourcePermissions:
     def _map_storage(self, storage: StorageAccount) -> list[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.name}")
         out = []
-        for container in self._azurerm.containers(AzureResource(storage.id)):
+        for container in self._azurerm.containers(storage.id):
             for role_assignment in self._azurerm.role_assignments(str(container)):
                 # one principal may be assigned multiple roles with overlapping dataActions, hence appearing
                 # here in duplicates. hence, role name -> permission level is not enough for the perfect scenario.
@@ -201,8 +201,8 @@ class AzureResourcePermissions:
                 storage_account_info.append(storage)
         for storage_account in storage_account_info:
             self._azurerm.create_or_update_access_connector(
-                storage_account.subscription_id,
-                storage_account.resource_group,
+                storage_account.id.subscription_id,
+                storage_account.id.resource_group,
                 f"ac-{storage_account.name}",
                 storage_account.location,
                 tags={"CreatedBy": "ucx"},
