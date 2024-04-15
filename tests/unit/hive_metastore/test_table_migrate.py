@@ -346,6 +346,8 @@ def test_migrate_external_hiveserde_table_in_place(
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
+    mount_crawler = create_autospec(Mounts)
+    mount_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -355,15 +357,11 @@ def test_migrate_external_hiveserde_table_in_place(
         group_manager,
         migration_status_refresher,
         principal_grants,
-    )
-    mount_crawler = create_autospec(Mounts)
-    mount_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
-
-    table_migrate.migrate_tables(
-        what=What.EXTERNAL_HIVESERDE,
         hiveserde_in_place_migrate=hiveserde_in_place_migrate,
         mounts_crawler=mount_crawler,
     )
+
+    table_migrate.migrate_tables(what=What.EXTERNAL_HIVESERDE)
     if migrated:
         assert expected_value in backend.queries
     else:
