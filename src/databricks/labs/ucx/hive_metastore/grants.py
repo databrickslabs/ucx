@@ -535,6 +535,26 @@ class PrincipalACL:
 
         return list(grants)
 
+    def get_spn_mount_grants(self) -> list[Grant]:
+        # get all mounts in the workspace
+        mounts = list(self._mounts_crawler.snapshot())
+        grants: set[Grant] = set()
+
+        for mount in mounts:
+            # get the spn associated with the mount
+            spn_info = self._mounts_crawler.get_spn(mount)
+
+            if spn_info is not None:
+                # get the users and clusters that have access to SPN
+                principals = self._get_cluster_principal_mapping(spn_info.cluster_id)
+
+                # convert these users and clusters to UC ACLs
+                for principal in principals:
+                    # The permissions should be set according to your requirements
+                    grant = Grant(principal, "ALL PRIVILEGES", catalog="hive_metastore", database=mount.database)
+                    grants.append(grant)
+        return grants
+
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
@@ -615,14 +635,4 @@ class PrincipalACL:
                 principal_list.append(acl.service_principal_name)
         return principal_list
 
-    def get_spn_mount_grants(self) -> list[Grant]:
-        grants = []
 
-
-        # get mounts and spn mapping
-
-        # get mounts and table mapping
-
-        # get user, table and cluster mapping
-
-        return None
