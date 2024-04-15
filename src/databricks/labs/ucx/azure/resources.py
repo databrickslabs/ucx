@@ -135,6 +135,20 @@ class AccessConnector:
     properties: dict[str, str] = field(default_factory=dict)
     system_data: dict[str, str] = field(default_factory=dict)
 
+    @classmethod
+    def from_raw_resource(cls, raw: RawResource) -> "AccessConnector":
+        access_connector = cls(
+            id=str(raw.id),
+            name=raw.get("name", ""),
+            location=raw.get("location", ""),
+            type=raw.get("type", ""),
+            identity=raw.get("identity", {}),
+            tags=raw.get("tags", {}),
+            properties=raw.get("properties", {}),
+            system_data=raw.get("systemData", {}),
+        )
+        return access_connector
+
 
 class AzureAPIClient:
     def __init__(self, host_endpoint: str, service_endpoint: str):
@@ -436,16 +450,7 @@ class AzureResources:
         url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         response = self._mgmt.get(url, api_version="2023-05-01")
         raw = RawResource(response)
-        access_connector = AccessConnector(
-            id=str(raw.id),
-            name=raw.get("name", ""),
-            location=raw.get("location", ""),
-            type=raw.get("type", ""),
-            identity=raw.get("identity", {}),
-            tags=raw.get("tags", {}),
-            properties=raw.get("properties", {}),
-            system_data=raw.get("systemData", {}),
-        )
+        access_connector = AccessConnector.from_raw_resource(raw)
         return access_connector
 
     def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
@@ -468,16 +473,7 @@ class AzureResources:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
         """
         for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
-            yield AccessConnector(
-                id=str(raw.id),
-                name=raw.get("name", ""),
-                location=raw.get("location", ""),
-                type=raw.get("type", ""),
-                identity=raw.get("identity", {}),
-                tags=raw.get("tags", {}),
-                properties=raw.get("properties", {}),
-                system_data=raw.get("systemData", {}),
-            )
+            yield AccessConnector.from_raw_resource(raw)
 
     def create_or_update_access_connector(
         self,
