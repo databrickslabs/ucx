@@ -558,10 +558,9 @@ class AzureResources:
         self._mgmt.put(url, api_version="2023-05-01", body=body)
 
         access_connector = self.get_access_connector(subscription_id, resource_group_name, name)
-        assert access_connector is not None
 
         start_time = time.time()
-        if wait_for_provisioning and access_connector.provisioning_state != "Succeeded":
+        if access_connector is None or (wait_for_provisioning and access_connector.provisioning_state != "Succeeded"):
             if time.time() - start_time > wait_for_provisioning_timeout_in_seconds:
                 raise TimeoutError(f"Timeout waiting for creating or updating access connector: {url}")
             time.sleep(5)
