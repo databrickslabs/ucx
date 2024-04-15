@@ -602,7 +602,7 @@ def test_migrate_managed_tables_with_principal_acl_aws(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
-    table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
