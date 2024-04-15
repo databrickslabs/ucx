@@ -356,8 +356,12 @@ class AzureResources:
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
             for response in self._mgmt.get(path, "2023-01-01").get("value", []):
-                storage_account = StorageAccount.from_raw_resource(RawResource(response))
-                yield storage_account
+                try:
+                    storage_account = StorageAccount.from_raw_resource(RawResource(response))
+                except KeyError:
+                    logger.warning(f"Tried getting non-existing access connector: {url}")
+                else:
+                    yield storage_account
 
     def containers(self, storage: AzureResource):
         for raw in self._mgmt.get(f"{storage}/blobServices/default/containers", "2023-01-01").get("value", []):
