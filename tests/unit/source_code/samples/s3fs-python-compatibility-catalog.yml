@@ -2,7 +2,7 @@
 ---
 identifier:
   name: leeds
-  version: ^0.24.0 # since version is specified, this entry only applies to versions matching the version number
+  # All versions are compatible
 top_level: leeds
 packages:
   - name: leeds
