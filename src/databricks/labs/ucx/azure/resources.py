@@ -509,7 +509,11 @@ class AzureResources:
         while True:
             res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
             for resource in res["value"]:
-                yield RawResource(resource)
+                try:
+                    yield RawResource(resource)
+                except KeyError:
+                    logger.warning(f"Could not parse resource: {resource}")
+
             next_link = res.get("nextLink", None)
             if not next_link:
                 break
@@ -526,7 +530,7 @@ class AzureResources:
             try:
                 yield AccessConnector.from_raw_resource(raw)
             except KeyError:
-                logger.warning(f"Could not parse access connector {raw}")
+                logger.warning(f"Could not parse access connector: {raw}")
 
     def create_or_update_access_connector(
         self,
