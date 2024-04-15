@@ -233,7 +233,7 @@ class AWSResourcePermissions:
             raise NotFound(msg) from err
 
     @staticmethod
-    def _get_iam_role_from_cluster_policy(cluster_policy_definition: str) -> str | None:
+    def get_iam_role_from_cluster_policy(cluster_policy_definition: str) -> str | None:
         definition_dict = json.loads(cluster_policy_definition)
         if definition_dict.get("aws_attributes.instance_profile_arn") is not None:
             instance_profile_arn = definition_dict.get("aws_attributes.instance_profile_arn").get("value")
@@ -303,7 +303,7 @@ class AWSResourcePermissions:
             return
 
         cluster_policy = self._get_cluster_policy(config.policy_id)
-        iam_role_name_in_cluster_policy = self._get_iam_role_from_cluster_policy(str(cluster_policy.definition))
+        iam_role_name_in_cluster_policy = self.get_iam_role_from_cluster_policy(str(cluster_policy.definition))
 
         iam_policy_name = f"UCX_MIGRATION_POLICY_{config.inventory_database}"
         if iam_role_name_in_cluster_policy and self.role_exists(iam_role_name_in_cluster_policy):

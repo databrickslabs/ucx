@@ -20,6 +20,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
     AzureACL,
     GrantsCrawler,
     PrincipalACL,
+    AwsACL,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
@@ -101,6 +102,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def is_aws(self) -> bool:
         return self.connect_config.is_aws
+
+    @cached_property
+    def is_gcp(self) -> bool:
+        return not self.is_aws and not self.is_azure
 
     @cached_property
     def inventory_database(self) -> str:
@@ -237,18 +242,33 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def aws_acl(self):
+        return AwsACL(
+            self.workspace_client,
+            self.sql_backend,
+            self.installation,
+        )
+
+    @cached_property
+    def principal_locations(self):
+        eligible_locations = {}
+        if self.is_azure:
+            eligible_locations = self.azure_acl.get_eligible_locations_principals()
+        if self.is_aws:
+            eligible_locations = self.aws_acl.get_eligible_locations_principals()
+        if self.is_gcp:
+            raise NotImplementedError("Not implemented for GCP.")
+        return eligible_locations
+
+    @cached_property
     def principal_acl(self):
-        if not self.is_azure:
-            # test_mapping_reverts_table and test_revert_migrated_table depend on this
-            raise NotImplementedError("Azure only for now")
-        eligible = self.azure_acl.get_eligible_locations_principals()
         return PrincipalACL(
             self.workspace_client,
             self.sql_backend,
             self.installation,
             self.tables_crawler,
             self.mounts_crawler,
-            eligible,
+            self.principal_locations,
         )
 
     @cached_property

@@ -205,7 +205,9 @@ def test_no_step_in_repair_run(ws):
 def test_revert_migrated_tables(ws, caplog):
     # test with no schema and no table, user confirm to not retry
     prompts = MockPrompts({'.*': 'no'})
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test', is_gcp=False
+    )
     assert revert_migrated_tables(ws, prompts, schema=None, table=None, ctx=ctx) is None
 
     # test with no schema and no table, user confirm to retry, but no ucx installation found

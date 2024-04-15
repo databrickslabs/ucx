@@ -12,10 +12,12 @@ from databricks.sdk.service.catalog import FunctionInfo, TableInfo
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
@@ -244,8 +246,24 @@ class TestRuntimeContext(RuntimeContext):
             ]
         )
 
+    def with_dummy_aws_resource_permission(self):
+        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
+        self.with_aws_storage_permissions(
+            [
+                AWSRoleAction(
+                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
+                    's3',
+                    'WRITE_FILES',
+                    's3://labs-things/*',
+                )
+            ]
+        )
+
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
+
+    def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
+        self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
 
     def with_table_mapping_rule(
         self,
@@ -352,9 +370,9 @@ class TestRuntimeContext(RuntimeContext):
 
     @cached_property
     def mounts_crawler(self):
-        # TODO: replace with env variable and make AWS and Azure versions
-        real_location = 'abfss://things@labsazurethings.dfs.core.windows.net/a'
-        mount = Mount(f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', real_location)
+        mount = Mount(
+            f'/mnt/{self._env_or_skip("TEST_MOUNT_NAME")}/a', f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/a'
+        )
         return StaticMountCrawler(
             [mount],
             self.sql_backend,
