@@ -1,6 +1,5 @@
 import logging
-from collections.abc import Callable
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import replace
 from datetime import timedelta
 from typing import ClassVar, Protocol, TypeVar
@@ -17,7 +16,6 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Language
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,7 +25,6 @@ class DataclassInstance(Protocol):
 
 Result = TypeVar("Result", bound=DataclassInstance)
 Dataclass = type[DataclassInstance]
-ResultFn = Callable[[], Iterable[Result]]
 
 
 class CommandContextBackend(SqlBackend):
@@ -57,7 +54,6 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_assessment_and_migration_job_ext_hms(ws, new_installation, env_or_skip):
-
     _, deployed_workflow = new_installation(
         lambda wc: replace(wc, override_clusters=None),
         skip_dashboards=False,
