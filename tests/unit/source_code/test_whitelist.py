@@ -10,3 +10,4 @@ def test_reads_whitelist():
     assert whitelist.compatibility("databricks.sdk.service.compute") == UCCompatibility.FULL
     assert whitelist.compatibility("sys") == UCCompatibility.FULL
     assert whitelist.compatibility("os.path") == UCCompatibility.FULL
+    assert whitelist.compatibility("databrix") == UCCompatibility.NONE
