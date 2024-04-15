@@ -281,7 +281,7 @@ def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migr
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            "Please confirm to create an access connector for each storage account.": "No",
         }
     )
     assert len(sp_migration.run(prompts)) == num_migrated
@@ -301,7 +301,7 @@ def test_read_secret_read_exception(caplog, ws, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            "Please confirm to create an access connector for each storage account.": "No",
         }
     )
 
@@ -318,7 +318,7 @@ def test_print_action_plan(caplog, ws, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            "Please confirm to create an access connector for each storage account.": "No",
         }
     )
 
@@ -350,7 +350,7 @@ def test_run(ws, installation, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            "Please confirm to create an access connector for each storage account.": "No",
         }
     )
 
