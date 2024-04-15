@@ -537,6 +537,7 @@ class PrincipalACL:
         tables = self._tables_crawler.snapshot()
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
+        external_locations = list(self._ws.external_locations.list())
 
         for cluster_id, locations in self._cluster_locations.items():
             principals = self._get_cluster_principal_mapping(cluster_id)
@@ -546,8 +547,8 @@ class PrincipalACL:
             grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
-            for loc in locations:
-                external_location_grants = [Grant(principal, "ALL PRIVILEGES", external_location=loc) for principal in principals]
+            for external_location in external_locations:
+                external_location_grants = [Grant(principal, "ALL PRIVILEGES", external_location=external_location.url) for principal in principals]
                 grants.update(external_location_grants)
         return list(grants)
 
