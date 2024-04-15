@@ -943,10 +943,7 @@ def make_schema(ws, sql_backend, ext_hms_backend, make_random) -> Generator[Call
     def create(*, catalog_name: str = "hive_metastore", name: str | None = None, ext_hms: bool = False) -> SchemaInfo:
         if name is None:
             name = f"ucx_S{make_random(4)}".lower()
-        if ext_hms:  # external hive metastore
-            backend = ext_hms_backend
-        else:
-            backend = sql_backend
+        backend = ext_hms_backend if ext_hms else sql_backend
         full_name = f"{catalog_name}.{name}".lower()
         backend.execute(f"CREATE SCHEMA {full_name}")
         schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
@@ -957,10 +954,7 @@ def make_schema(ws, sql_backend, ext_hms_backend, make_random) -> Generator[Call
         return schema_info
 
     def remove(schema_info: SchemaInfo, ext_hms: bool = False):
-        if ext_hms:  # external hive metastore
-            backend = ext_hms_backend
-        else:
-            backend = sql_backend
+        backend = ext_hms_backend if ext_hms else sql_backend
         try:
             backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE")
         except RuntimeError as e:

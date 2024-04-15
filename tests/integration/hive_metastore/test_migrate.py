@@ -140,8 +140,8 @@ def test_migrate_external_table(
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
     # external table migration tests
-    old_mounted_location, new_mounted_location = make_mounted_location()
-    make_dbfs_data_copy(src_path=old_mounted_location, dst_path=new_mounted_location)
+    existing_mounted_location, new_mounted_location = make_mounted_location()
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
