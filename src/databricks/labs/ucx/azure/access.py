@@ -179,7 +179,9 @@ class AzureResourcePermissions:
             f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
         )
         try:
-            self._apply_storage_permission(uber_principal, *storage_account_info)
+            self._apply_storage_permission(
+                uber_principal.client.object_id, "STORAGE_BLOB_DATA_READER", *storage_account_info
+            )
             self._installation.save(config)
             self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
         except PermissionError:
@@ -199,22 +201,28 @@ class AzureResourcePermissions:
             if storage.name in used_storage_accounts:
                 storage_account_info.append(storage)
         for storage_account in storage_account_info:
-            self._azurerm.create_or_update_access_connector(
+            access_connector = self._azurerm.create_or_update_access_connector(
                 storage_account.id.subscription_id,
                 storage_account.id.resource_group,
                 f"ac-{storage_account.name}",
                 storage_account.location,
                 tags={"CreatedBy": "ucx"},
             )
-
-    def _apply_storage_permission(self, uber_principal: PrincipalSecret, *storage_accounts: StorageAccount):
-        for storage in storage_accounts:
-            role_name = str(uuid.uuid4())
-            self._azurerm.apply_storage_permission(
-                uber_principal.client.object_id, storage, "STORAGE_BLOB_DATA_READER", role_name
+            self._apply_storage_permission(
+                access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account
             )
+
+    def _apply_storage_permission(
+        self,
+        principal_id: str,
+        role_name: str,
+        *storage_accounts: StorageAccount,
+    ):
+        for storage in storage_accounts:
+            role_guid = str(uuid.uuid4())
+            self._azurerm.apply_storage_permission(principal_id, storage, role_name, role_guid)
             logger.debug(
-                f"Storage Data Blob Reader permission applied for spn {uber_principal.client.client_id} "
+                f"Storage Data Blob Reader permission applied for spn {principal_id} "
                 f"to storage account {storage.name}"
             )
 
