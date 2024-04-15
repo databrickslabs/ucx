@@ -32,6 +32,13 @@ def workflows(w: WorkspaceClient):
 
 
 @ucx.command
+def logs(w: WorkspaceClient, workflow: str | None = None):
+    """Show logs of the latest job run"""
+    ctx = WorkspaceContext(w)
+    ctx.deployed_workflows.relay_logs(workflow)
+
+
+@ucx.command
 def open_remote_config(w: WorkspaceClient):
     """Opens remote configuration in the browser"""
     ctx = WorkspaceContext(w)

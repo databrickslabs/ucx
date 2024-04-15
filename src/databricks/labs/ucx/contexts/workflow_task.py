@@ -90,6 +90,7 @@ class RuntimeContext(GlobalContext):
             self.mounts_crawler,
             self.config.include_mounts,
             self.config.exclude_paths_in_mount,
+            self.config.include_paths_in_mount,
         )
 
     @cached_property
@@ -101,4 +102,5 @@ class RuntimeContext(GlobalContext):
             int(self.named_parameters["parent_run_id"]),
             self.sql_backend,
             self.inventory_database,
+            int(self.named_parameters.get("attempt", "0")),
         )

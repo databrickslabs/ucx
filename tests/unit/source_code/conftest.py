@@ -1,9 +1,9 @@
 import pytest
 
-from databricks.labs.ucx.hive_metastore.table_migrate import (
-    MigrationIndex,
+from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatus,
 )
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 
 
 @pytest.fixture

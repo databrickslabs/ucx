@@ -72,4 +72,10 @@ jobs:
           fetch-depth: 0
 
       - name: Verify no lint disabled in the new code
-        run: sh .github/workflows/no-cheat.sh
+        run: |
+          NEW_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^+')
+          CHEAT=$(echo "${NEW_CODE}" | grep '# pylint: disable' | grep -v "CHEAT" | wc -c)
+          if [ "${CHEAT}" -ne 0 ]; then
+            echo "Do not cheat the linter: ${CHEAT}"
+            exit 1
+          fi

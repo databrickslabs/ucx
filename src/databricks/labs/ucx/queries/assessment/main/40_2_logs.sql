@@ -11,6 +11,6 @@ SELECT
   message
 FROM $inventory.logs
 WHERE job_run_id = (
-    SELECT job_run_id FROM $inventory.logs WHERE timestamp = (SELECT MAX(timestamp) FROM $inventory.logs)
+    SELECT DISTINCT job_run_id FROM $inventory.logs WHERE timestamp = (SELECT MAX(timestamp) FROM $inventory.logs)
 )
 ORDER BY timestamp ASC

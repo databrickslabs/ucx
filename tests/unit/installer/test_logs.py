@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk.errors import InternalError
 
-from databricks.labs.ucx.framework.tasks import TaskLogger
 from databricks.labs.ucx.installer import logs
-from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder, PartialLogRecord
+from databricks.labs.ucx.installer.logs import TaskRunWarningRecorder, PartialLogRecord, TaskLogger
+from tests.unit.framework.test_tasks import _log_contents
 
 COMPONENT = "databricks.logs"
 WORKFLOW = "tests"
@@ -101,7 +102,7 @@ def test_logs_processor_snapshot_rows(tmp_path: Path, log_path: Path, attribute:
         backend,
         "default",
     )
-    with pytest.raises(RuntimeError):
+    with pytest.raises(InternalError):
         log_processor.snapshot()
     rows = backend.rows_written_for(log_processor.full_name, "append")
     assert all(
@@ -121,7 +122,34 @@ def test_logs_processor_snapshot_error(tmp_path: Path, log_path: Path):
         backend,
         "default",
     )
-    with pytest.raises(RuntimeError) as e:
+    with pytest.raises(InternalError) as e:
         log_processor.snapshot()
     assert "Watch out!" in e.value.args[0]
     assert "Warning message." not in e.value.args[0]
+
+
+def test_task_failure(tmp_path):
+    with pytest.raises(ValueError):
+        with TaskLogger(tmp_path, "assessment", "123", "crawl-tables", "234"):
+            raise ValueError("some value not found")
+    contents = _log_contents(tmp_path)
+    assert len(contents) == 2
+    # CLI debug info present
+    assert "databricks workspace export" in contents["logs/assessment/run-234-0/crawl-tables.log"]
+    # log file name present
+    assert "logs/assessment/run-234-0/crawl-tables.log" in contents["logs/assessment/run-234-0/crawl-tables.log"]
+    # traceback present
+    assert 'raise ValueError("some value not found")' in contents["logs/assessment/run-234-0/crawl-tables.log"]
+
+
+def test_task_logger(tmp_path):
+    app_logger = logging.getLogger("databricks.labs.ucx.foo")
+    databricks_logger = logging.getLogger("databricks.sdk.core")
+    with TaskLogger(tmp_path, "assessment", "123", "crawl-tables", "234") as task_logger:
+        app_logger.info(f"log file is {task_logger.log_file}")
+        databricks_logger.debug("something from sdk")
+    contents = _log_contents(tmp_path)
+    assert len(contents) == 2
+    assert "log file is" in contents["logs/assessment/run-234-0/crawl-tables.log"]
+    assert "something from sdk" in contents["logs/assessment/run-234-0/crawl-tables.log"]
+    assert "[run #234](/#job/123/run/234)" in contents["logs/assessment/run-234-0/README.md"]

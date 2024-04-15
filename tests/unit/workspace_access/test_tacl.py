@@ -2,6 +2,7 @@ import json
 
 import pytest
 from databricks.labs.lsql.backends import MockBackend
+from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
@@ -535,7 +536,7 @@ def test_verify_task_should_fail_if_permissions_not_applied():
     )
 
     task = table_acl_support.get_verify_task(item)
-    with pytest.raises(ValueError):
+    with pytest.raises(NotFound):
         task()
 
 

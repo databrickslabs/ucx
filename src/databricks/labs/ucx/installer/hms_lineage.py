@@ -26,13 +26,15 @@ class HiveMetastoreLineageEnabler:
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
-    def apply(self, prompts: Prompts):
+    def apply(self, prompts: Prompts, is_account_install: bool = False):
         script = self._check_lineage_spark_config_exists()
         if script:
             if script.enabled:
                 logger.info("HMS lineage init script already exists and enabled")
                 return
-            if prompts.confirm("HMS lineage collection init script is disabled, do you want to enable it?"):
+            if is_account_install or prompts.confirm(
+                "HMS lineage collection init script is disabled, do you want to enable it?"
+            ):
                 logger.info("Enabling Global Init Script...")
                 self._enable_global_init_script(script)
             return
@@ -41,7 +43,9 @@ class HiveMetastoreLineageEnabler:
             "helps in your migration process from HMS to UC by allowing you to programmatically query HMS "
             "lineage data."
         )
-        if prompts.confirm("No HMS lineage collection init script exists, do you want to create one?"):
+        if is_account_install or prompts.confirm(
+            "No HMS lineage collection init script exists, do you want to create one?"
+        ):
             logger.info("Creating Global Init Script...")
             self._add_global_init_script()
 

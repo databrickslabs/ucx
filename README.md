@@ -19,7 +19,8 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 * [Installation](#installation)
   * [Authenticate Databricks CLI](#authenticate-databricks-cli)
   * [Install UCX](#install-ucx)
-  * [\[ADVANCED\] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
+  * [[ADVANCED] Force install over existing UCX](#advanced-force-install-over-existing-ucx)
+  * [[ADVANCED] Installing UCX on all workspaces within a Databricks account](#advanced-installing-ucx-on-all-workspaces-within-a-databricks-account)
   * [Upgrading UCX for newer versions](#upgrading-ucx-for-newer-versions)
   * [Uninstall UCX](#uninstall-ucx)
 * [Migration process](#migration-process)
@@ -34,6 +35,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
     * [Other considerations](#other-considerations)
 * [Utility commands](#utility-commands)
+  * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
   * [`repair-run` command](#repair-run-command)
   * [`workflows` command](#workflows-command)
@@ -164,6 +166,19 @@ At this moment there is no global override over a user installation of UCX. As t
 * `UCX_FORCE_INSTALL=user databricks labs install ucx` - will force the installation to be for user only
 * `UCX_FORCE_INSTALL=global databricks labs install ucx` - will force the installation to be for root only
 
+
+[[back to top](#databricks-labs-ucx)]
+
+## [ADVANCED] Installing UCX on all workspaces within a Databricks account
+Setting the environment variable `UCX_FORCE_INSTALL` to 'account' will install UCX on all workspaces within a Databricks account.
+
+* `UCX_FORCE_INSTALL=account databricks labs install ucx`
+
+After the first installation, UCX will prompt the user to confirm whether to install UCX on the remaining workspaces with the same answers. If confirmed, the remaining installations will be completed silently.
+
+This installation mode will automatically select the following options:
+* Automatically create and enable HMS lineage init script
+* Automatically create a new SQL warehouse for UCX assessment
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -430,6 +445,20 @@ See more details in [Table migration commands](#table-migration-commands)
 [[back to top](#databricks-labs-ucx)]
 
 # Utility commands
+
+## `logs` command
+
+```text
+$ databricks labs ucx logs [--workflow WORKFLOW_NAME] [--debug]
+```
+
+This command displays the logs of the last run of the specified workflow. If no workflow is specified, it displays 
+the logs of the workflow that was run the last. This command is useful for developers and administrators who want to 
+check the logs of the last run of a workflow and ensure that it was executed as expected. It can also be used for 
+debugging purposes when a workflow is not behaving as expected. By default, only `INFO`, `WARNING`, and `ERROR` logs
+are displayed. To display `DEBUG` logs, use the `--debug` flag.
+
+[[back to top](#databricks-labs-ucx)] 
 
 ## `ensure-assessment-run` command
 

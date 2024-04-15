@@ -4,7 +4,7 @@ from datetime import timedelta
 import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.catalog import Privilege, SecurableType
+from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.iam import PermissionLevel
 
@@ -205,7 +205,98 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, make_schema
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    src_schema = make_schema(catalog_name="hive_metastore")
+    src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
+    view1_sql = f"SELECT * FROM {src_managed_table.full_name}"
+    src_view1 = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name, schema_name=src_schema.name, ctas=view1_sql, view=True
+    )
+    view2_sql = f"SELECT * FROM {src_view1.full_name}"
+    src_view2 = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name, schema_name=src_schema.name, ctas=view2_sql, view=True
+    )
+
+    sql_backend.execute(
+        f"CREATE VIEW {src_schema.full_name}.view3 (col1,col2) as " f"SELECT * FROM {src_managed_table.full_name}"
+    )
+    runtime_ctx.add_table(
+        TableInfo(
+            catalog_name=src_schema.catalog_name,
+            schema_name=src_schema.name,
+            name="view3",
+            table_type=TableType.VIEW,
+            full_name=f"{src_schema.full_name}.view3",
+            view_definition=f"SELECT * FROM {src_managed_table.full_name}",
+        )
+    )
+
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
+
+    rules = [
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_managed_table.name,
+            src_managed_table.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_view1.name,
+            src_view1.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            src_view2.name,
+            src_view2.name,
+        ),
+        Rule(
+            "workspace",
+            dst_catalog.name,
+            src_schema.name,
+            dst_schema.name,
+            "view3",
+            "view3",
+        ),
+    ]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.tables_migrator.index()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    runtime_ctx.migration_status_refresher.snapshot()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.VIEW)
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 4
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    view1_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view1.name}").view_definition
+    assert view1_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_managed_table.name}"
+    view2_view_text = ws.tables.get(f"{dst_schema.full_name}.{src_view2.name}").view_definition
+    assert view2_view_text == f"SELECT * FROM {dst_schema.full_name}.{src_view1.name}"
+    view3_view_text = next(iter(sql_backend.fetch(f"SHOW CREATE TABLE {dst_schema.full_name}.view3")))["createtab_stmt"]
+    assert "(col1,col2)" in view3_view_text.replace("\n", "").replace(" ", "").lower()
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_revert_migrated_table(sql_backend, runtime_ctx, make_schema, make_catalog):
+    if not runtime_ctx.workspace_client.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     src_schema1 = make_schema(catalog_name="hive_metastore")
     src_schema2 = make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema1.name)
@@ -317,6 +408,8 @@ def test_mapping_skips_tables_databases(ws, sql_backend, inventory_schema, make_
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_schema, make_catalog):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     src_schema = make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
@@ -437,6 +530,8 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
 @pytest.fixture
 def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_catalog, make_schema, make_cluster):
+    if not runtime_ctx.workspace_client.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{runtime_ctx.inventory_database}'
     make_dbfs_data_copy(src_path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c', dst_path=new_mounted_location)

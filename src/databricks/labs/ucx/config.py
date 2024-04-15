@@ -48,10 +48,16 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_databases: list[str] | None = None
 
     # Whether the tables in mounts crawler should crawl a specific list of mounts.
-    # If not specified, it will list all moubts.
+    # If not specified, it will list all mounts.
     include_mounts: list[str] | None = None
     exclude_paths_in_mount: list[str] | None = None
     include_paths_in_mount: list[str] | None = None
+
+    # Whether to trigger assessment job after installation
+    trigger_job: bool = False
+
+    # List of workspace ids ucx is installed on, only applied to account-level installation
+    installed_workspace_ids: list[int] | None = None
 
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")

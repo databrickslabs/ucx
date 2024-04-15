@@ -704,7 +704,7 @@ def test_verify_task_should_fail_if_permissions_not_matching():
     )
     task = sup.get_verify_task(item)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(NotFound):
         task()
 
 

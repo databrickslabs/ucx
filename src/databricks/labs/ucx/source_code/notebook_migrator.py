@@ -2,13 +2,39 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import DependencyGraph, Notebook, RunCell
+from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyGraph,
+    Dependency,
+    DependencyLoader,
+    DependencyResolver,
+)
 
 
 class NotebookMigrator:
-    def __init__(self, ws: WorkspaceClient, languages: Languages):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        languages: Languages,
+        loader: DependencyLoader,
+        resolver: DependencyResolver | None = None,
+    ):
         self._ws = ws
         self._languages = languages
+        self._loader = loader
+        self._resolver = resolver
+
+    def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
+        if not object_info.path or not object_info.object_type:
+            raise ValueError(f"Not a valid source of code: {object_info.path}")
+        if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
+            raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
+        dependency = Dependency.from_object_info(object_info)
+        graph = DependencyGraph(dependency, None, self._loader, self._resolver)
+        container = self._loader.load_dependency(dependency)
+        if container is not None:
+            container.build_dependency_graph(graph)
+        return graph
 
     def revert(self, object_info: ObjectInfo):
         if not object_info.path:
@@ -21,23 +47,16 @@ class NotebookMigrator:
     def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        notebook = self._load_notebook(object_info)
+        notebook = self._loader.load_dependency(Dependency.from_object_info(object_info))
+        assert isinstance(notebook, Notebook)
         return self._apply(notebook)
-
-    def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
-        if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
-            raise ValueError("Not a valid Notebook")
-        notebook = self._load_notebook(object_info)
-        dependencies = DependencyGraph(object_info.path, None, self._load_notebook_from_path)
-        notebook.build_dependency_graph(dependencies)
-        return dependencies
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
-                # TODO data on what to change to ?
+                # TODO migration data ?
                 if cell.migrate_notebook_path():
                     changed = True
                 continue
@@ -52,27 +71,3 @@ class NotebookMigrator:
             self._ws.workspace.upload(notebook.path, notebook.to_migrated_code().encode("utf-8"))
             # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
         return changed
-
-    def _load_notebook_from_path(self, path: str) -> Notebook:
-        object_info = self._load_object(path)
-        if object_info.object_type is not ObjectType.NOTEBOOK:
-            raise ValueError(f"Not a Notebook: {path}")
-        return self._load_notebook(object_info)
-
-    def _load_object(self, path: str) -> ObjectInfo:
-        result = self._ws.workspace.list(path)
-        object_info = next((oi for oi in result), None)
-        if object_info is None:
-            raise ValueError(f"Could not locate object at '{path}'")
-        return object_info
-
-    def _load_notebook(self, object_info: ObjectInfo) -> Notebook:
-        assert object_info is not None and object_info.path is not None and object_info.language is not None
-        source = self._load_source(object_info)
-        return Notebook.parse(object_info.path, source, object_info.language)
-
-    def _load_source(self, object_info: ObjectInfo) -> str:
-        if not object_info.language or not object_info.path:
-            raise ValueError(f"Invalid ObjectInfo: {object_info}")
-        with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
-            return f.read().decode("utf-8")

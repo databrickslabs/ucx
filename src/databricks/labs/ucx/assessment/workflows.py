@@ -1,5 +1,10 @@
+import logging
+
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Workflow, job_task
+
+
+logger = logging.getLogger(__name__)
 
 
 class Assessment(Workflow):
@@ -207,12 +212,17 @@ class Assessment(Workflow):
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-class DestroySchema(Workflow):
+class Failing(Workflow):
     def __init__(self):
-        super().__init__('099-destroy-schema')
+        super().__init__('failing')
 
     @job_task
-    def destroy_schema(self, ctx: RuntimeContext):
-        """This _clean-up_ workflow allows to removes the `$inventory` database, with all the inventory tables created by
-        the previous workflow runs. Use this to reset the entire state and start with the assessment step again."""
-        ctx.sql_backend.execute(f"DROP DATABASE {ctx.inventory_database} CASCADE")
+    def failing_task(self, ctx: RuntimeContext):
+        """This task always fails. It is used to test the failure handling of the framework."""
+        attempt = ctx.named_parameters.get("attempt", "0")
+        if int(attempt) > 0:
+            logger.info("This task is no longer failing.")
+            return
+        logger.warning("This is a test warning message.")
+        logger.error("This is a test error message.")
+        raise ValueError("This task is supposed to fail.")

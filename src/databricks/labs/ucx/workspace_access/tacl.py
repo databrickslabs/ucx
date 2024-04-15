@@ -7,6 +7,7 @@ from datetime import timedelta
 from functools import partial
 
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
@@ -107,7 +108,7 @@ class TableAclSupport(AclSupport):
             self._sql_backend.execute(sql)
 
         object_type, object_id = grant.this_type_and_key()
-        retry_on_value_error = retried(on=[ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=[NotFound], timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, grant)
 
@@ -127,7 +128,7 @@ class TableAclSupport(AclSupport):
                 f"acl to be applied={acl_action_types}\n"
                 f"acl found in the object={on_current_principal}\n"
             )
-            raise ValueError(msg)
+            raise NotFound(msg)
         return False
 
     def get_verify_task(self, item: Permissions) -> Callable[[], bool]:

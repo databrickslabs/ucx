@@ -4,7 +4,7 @@ from typing import ClassVar
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceConflict
+from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
@@ -38,29 +38,35 @@ class AccountWorkspaces:
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         return self._ac.get_workspace_client(workspace)
 
-    def workspace_clients(self) -> list[WorkspaceClient]:
+    def workspace_clients(self, workspaces: list[Workspace] | None) -> list[WorkspaceClient]:
         """
         Return a list of WorkspaceClient for each configured workspace in the account
         :return: list[WorkspaceClient]
         """
+        if workspaces is None:
+            workspaces = self._workspaces()
         clients = []
-        for workspace in self._workspaces():
+        for workspace in workspaces:
             ws = self.client_for(workspace)
             clients.append(ws)
         return clients
 
-    def sync_workspace_info(self):
+    def sync_workspace_info(self, workspaces: list[Workspace] | None = None):
         """
         Create a json dump for each Workspace in account
         For each user that has ucx installed in their workspace,
         upload the json dump of workspace info in the .ucx folder
         """
-        workspaces = []
-        for workspace in self._workspaces():
-            workspaces.append(workspace)
-        for ws in self.workspace_clients():
-            for installation in Installation.existing(ws, "ucx"):
-                installation.save(workspaces, filename=self.SYNC_FILE_NAME)
+        if workspaces is None:
+            workspaces = []
+            for workspace in self._workspaces():
+                workspaces.append(workspace)
+        for ws in self.workspace_clients(workspaces):
+            try:
+                for installation in Installation.existing(ws, "ucx"):
+                    installation.save(workspaces, filename=self.SYNC_FILE_NAME)
+            except (PermissionDenied, NotFound, ValueError):
+                logger.warning(f"Failed to save workspace info for {ws.config.host}")
 
     def create_account_level_groups(self, prompts: Prompts, workspace_ids: list[int] | None = None):
         acc_groups = self._get_account_groups()

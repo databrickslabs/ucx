@@ -1,18 +1,13 @@
 import dataclasses
-import datetime
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import (
@@ -20,32 +15,20 @@ from databricks.labs.ucx.hive_metastore.mapping import (
     TableMapping,
     TableToMigrate,
 )
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
     MigrationCount,
     Table,
     What,
 )
-from databricks.labs.ucx.hive_metastore.views_sequencer import (
+from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
     ViewToMigrate,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class MigrationStatus:
-    src_schema: str
-    src_table: str
-    dst_catalog: str | None = None
-    dst_schema: str | None = None
-    dst_table: str | None = None
-    update_ts: str | None = None
-
-    def destination(self):
-        return f"{self.dst_catalog}.{self.dst_schema}.{self.dst_table}".lower()
 
 
 class TablesMigrator:
@@ -76,7 +59,7 @@ class TablesMigrator:
 
     def migrate_tables(self, what: What, acl_strategy: list[AclMigrationWhat] | None = None):
         if what in [What.DB_DATASET, What.UNKNOWN]:
-            logger.error(f"Can't migrate tables with type { what.name }")
+            logger.error(f"Can't migrate tables with type {what.name}")
             return None
         all_grants_to_migrate = None if acl_strategy is None else self._gc.snapshot()
         all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
@@ -111,8 +94,9 @@ class TablesMigrator:
 
     def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
+        self._migration_status_refresher.reset()
         all_tasks = []
-        sequencer = ViewsMigrationSequencer(tables_to_migrate)
+        sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index())
         batches = sequencer.sequence_batches()
         for batch in batches:
             tasks = []
@@ -128,8 +112,8 @@ class TablesMigrator:
                     )
                 )
             Threads.strict("migrate views", tasks)
+            self._migration_status_refresher.reset()
             all_tasks.extend(tasks)
-            self._init_seen_tables()
         return all_tasks
 
     def _compute_grants(
@@ -168,21 +152,33 @@ class TablesMigrator:
             logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
             return True
         if self._view_can_be_migrated(src_view):
-            return self._migrate_view_table(src_view.src, src_view.rule, grants)
+            return self._migrate_view_table(src_view, grants)
         logger.info(f"View {src_view.src.key} is not supported for migration")
         return True
 
     def _view_can_be_migrated(self, view: ViewToMigrate):
         # dependencies have already been computed, therefore an empty dict is good enough
-        for table in view.table_dependencies():
-            if not self._table_already_migrated(table.rule.as_uc_table_key):
-                logger.info(f"View {view.src.key} cannot be migrated because {table.src.key} is not migrated yet")
-                return False
-        for depview in view.view_dependencies():
-            if not self._table_already_migrated(depview.rule.as_uc_table_key):
-                logger.info(f"View {view.src.key} cannot be migrated because {depview.src.key} is not migrated yet")
+        for table in view.dependencies:
+            if not self.index().get(table.schema, table.name):
+                logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
+
+    def _migrate_view_table(self, src_view: ViewToMigrate, grants: list[Grant] | None = None):
+        view_migrate_sql = self._sql_migrate_view(src_view)
+        logger.debug(f"Migrating view {src_view.src.key} to using SQL query: {view_migrate_sql}")
+        self._backend.execute(view_migrate_sql)
+        self._backend.execute(src_view.src.sql_alter_to(src_view.rule.as_uc_table_key))
+        self._backend.execute(src_view.src.sql_alter_from(src_view.rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_acl(src_view.src, src_view.rule, grants)
+
+    def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
+        # We have to fetch create statement this way because of columns in:
+        # CREATE VIEW x.y (col1, col2) AS SELECT * FROM w.t
+        create_statement = self._backend.fetch(f"SHOW CREATE TABLE {src_view.src.safe_sql_key}")
+        src_view.src.view_text = next(iter(create_statement))["createtab_stmt"]
+        migration_index = self._migration_status_refresher.index()
+        return src_view.sql_migrate_view(migration_index)
 
     def _migrate_external_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
@@ -202,15 +198,6 @@ class TablesMigrator:
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
         logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
-        self._backend.execute(table_migrate_sql)
-        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grants)
-
-    def _migrate_view_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        target_table_key = rule.as_uc_table_key
-        table_migrate_sql = src_table.sql_migrate_view(target_table_key)
-        logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
@@ -347,94 +334,3 @@ class TablesMigrator:
                 grant = dataclasses.replace(grant, principal=matched_group[0])
             matched_grants.append(grant)
         return matched_grants
-
-
-class MigrationIndex:
-    def __init__(self, tables: list[MigrationStatus]):
-        self._index = {(ms.src_schema, ms.src_table): ms for ms in tables}
-
-    def is_migrated(self, schema: str, table: str) -> bool:
-        """Check if a table is migrated."""
-        return self.get(schema, table) is not None
-
-    def get(self, schema: str, table: str) -> MigrationStatus | None:
-        """Get the migration status for a table. If the table is not migrated, return None."""
-        dst = self._index.get((schema.lower(), table.lower()))
-        if not dst or not dst.dst_table:
-            return None
-        return dst
-
-
-class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
-    def __init__(self, ws: WorkspaceClient, sbe: SqlBackend, schema, table_crawler: TablesCrawler):
-        super().__init__(sbe, "hive_metastore", schema, "migration_status", MigrationStatus)
-        self._ws = ws
-        self._table_crawler = table_crawler
-
-    def snapshot(self) -> Iterable[MigrationStatus]:
-        return self._snapshot(self._try_fetch, self._crawl)
-
-    def index(self) -> MigrationIndex:
-        return MigrationIndex(list(self.snapshot()))
-
-    def get_seen_tables(self) -> dict[str, str]:
-        seen_tables: dict[str, str] = {}
-        for schema in self._iter_schemas():
-            try:
-                tables = self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name)
-            except NotFound:
-                logger.warning(
-                    f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
-                )
-                continue
-            for table in tables:
-                if not table.properties:
-                    continue
-                if "upgraded_from" not in table.properties:
-                    continue
-                if not table.full_name:
-                    logger.warning(f"The table {table.name} in {schema.name} has no full name")
-                    continue
-                seen_tables[table.full_name.lower()] = table.properties["upgraded_from"].lower()
-        return seen_tables
-
-    def is_migrated(self, schema: str, table: str) -> bool:
-        result = self._backend.fetch(f"SHOW TBLPROPERTIES {escape_sql_identifier(schema + '.' + table)}")
-        for value in result:
-            if value["key"] == "upgraded_to":
-                logger.info(f"{schema}.{table} is set as migrated")
-                return True
-        logger.info(f"{schema}.{table} is set as not migrated")
-        return False
-
-    def _crawl(self) -> Iterable[MigrationStatus]:
-        all_tables = self._table_crawler.snapshot()
-        reverse_seen = {v: k for k, v in self.get_seen_tables().items()}
-        timestamp = datetime.datetime.now(datetime.timezone.utc).timestamp()
-        for table in all_tables:
-            src_schema = table.database.lower()
-            src_table = table.name.lower()
-            table_migration_status = MigrationStatus(
-                src_schema=src_schema,
-                src_table=src_table,
-                update_ts=str(timestamp),
-            )
-            if table.key in reverse_seen and self.is_migrated(src_schema, src_table):
-                target_table = reverse_seen[table.key]
-                if len(target_table.split(".")) == 3:
-                    table_migration_status.dst_catalog = target_table.split(".")[0]
-                    table_migration_status.dst_schema = target_table.split(".")[1]
-                    table_migration_status.dst_table = target_table.split(".")[2]
-            yield table_migration_status
-
-    def _try_fetch(self) -> Iterable[MigrationStatus]:
-        for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):
-            yield MigrationStatus(*row)
-
-    def _iter_schemas(self):
-        for catalog in self._ws.catalogs.list():
-            try:
-                yield from self._ws.schemas.list(catalog_name=catalog.name)
-            except NotFound:
-                logger.warning(f"Catalog {catalog.name} no longer exists. Skipping checking its migration status.")
-                continue

@@ -134,7 +134,7 @@ class GenericPermissionsSupport(AclSupport):
                 f"acl to be applied={acl}\n"
                 f"acl found in the object={remote_permission_as_request}\n"
             )
-            raise ValueError(msg)
+            raise NotFound(msg)
         return False
 
     def get_verify_task(self, item: Permissions) -> Callable[[], bool]:
@@ -156,7 +156,7 @@ class GenericPermissionsSupport(AclSupport):
         update_retried_check = update_retry_on_value_error(self._safe_update_permissions)
         update_retried_check(object_type, object_id, acl)
 
-        retry_on_value_error = retried(on=[*retryable_exceptions, ValueError], timeout=self._verify_timeout)
+        retry_on_value_error = retried(on=retryable_exceptions, timeout=self._verify_timeout)
         retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, acl)
 
