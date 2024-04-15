@@ -2,8 +2,6 @@ import functools
 import json
 import logging
 import os.path
-import random
-import string
 import sys
 from collections.abc import Callable
 from dataclasses import replace
@@ -48,11 +46,7 @@ from databricks.labs.ucx.workspace_access.generic import (
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.redash import RedashPermissionsSupport
-from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 from tests.integration.conftest import (
-    StaticGrantsCrawler,
-    StaticTablesCrawler,
-    StaticUdfsCrawler,
     TestRuntimeContext,
 )
 
@@ -86,7 +80,9 @@ class TestInstallationContext(TestRuntimeContext):
         user = self._make_user()
         members = [user.id]
         ws_group = self.make_group(
-            display_name=workspace_group_name, members=members, entitlements=["allow-cluster-create"],
+            display_name=workspace_group_name,
+            members=members,
+            entitlements=["allow-cluster-create"],
         )
         acc_group = self._make_acc_group(display_name=account_group_name, members=members)
         return ws_group, acc_group
@@ -115,12 +111,16 @@ class TestInstallationContext(TestRuntimeContext):
 
     @cached_property
     def environ(self) -> dict[str, str]:
-        return dict(**os.environ)
+        return {**os.environ}
 
     @cached_property
     def workspace_installer(self):
         return WorkspaceInstaller(
-            self.prompts, self.installation, self.workspace_client, self.product_info, self.environ,
+            self.prompts,
+            self.installation,
+            self.workspace_client,
+            self.product_info,
+            self.environ,
         )
 
     @cached_property
@@ -188,10 +188,6 @@ class TestInstallationContext(TestRuntimeContext):
         )
 
     @cached_property
-    def workspace_installation_run(self):
-        return self.workspace_installation.run()
-
-    @cached_property
     def extend_prompts(self):
         return {}
 
@@ -219,7 +215,7 @@ class TestInstallationContext(TestRuntimeContext):
 
 
 @pytest.fixture
-def installation_ctx(
+def installation_ctx(  # pylint: disable=too-many-arguments
     ws,
     sql_backend,
     make_table,
@@ -349,7 +345,7 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
         pending.uninstall()
 
 
-def test_experimental_permissions_migration_for_group_with_same_name(  # pylint: disable=too-many-locals
+def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx,
     ws,
     sql_backend,
@@ -364,7 +360,6 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
         permission_level=PermissionLevel.CAN_USE,
         group_name=migrated_group.name_in_workspace,
     )
-    installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
 
     schema_a = installation_ctx.make_schema()
     table_a = installation_ctx.make_table(schema_name=schema_a.name)
@@ -376,7 +371,9 @@ def test_experimental_permissions_migration_for_group_with_same_name(  # pylint:
 
     installation_ctx.deployed_workflows.run_workflow("migrate-groups-experimental")
 
-    object_permissions = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    object_permissions = installation_ctx.generic_permissions_support.load_as_dict(
+        "cluster-policies", cluster_policy.policy_id
+    )
     new_schema_grants = installation_ctx.grants_crawler.for_schema_info(schema_a)
 
     assert {"USAGE", "OWN"} == new_schema_grants[migrated_group.name_in_account]
@@ -424,10 +421,9 @@ def test_job_cluster_policy(ws, new_installation):
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_running_real_assessment_job(
-    ws, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
-):
-    ws_group_a, _ = make_ucx_group()
+def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions):
+    ctx = installation_ctx.replace(skip_dashboards=False)
+    ws_group_a, _ = ctx.make_ucx_group()
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -435,23 +431,20 @@ def test_running_real_assessment_job(
         permission_level=PermissionLevel.CAN_USE,
         group_name=ws_group_a.display_name,
     )
+    ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
+    ctx.workspace_installation.run()
 
-    _, deployed_workflow = new_installation(
-        lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]),
-        skip_dashboards=False,
-    )
-    deployed_workflow.run_workflow("assessment")
+    ctx.deployed_workflows.run_workflow("assessment")
 
-    generic_permissions = GenericPermissionsSupport(ws, [])
-    before = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert before[ws_group_a.display_name] == PermissionLevel.CAN_USE
+    after = ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert after[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
-    ws, sql_backend, new_installation, make_ucx_group, make_cluster_policy, make_cluster_policy_permissions
+    ws, sql_backend, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a, acc_group_a = make_ucx_group()
+    ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
 
     # perhaps we also want to do table grants here (to test acl cluster)
     cluster_policy = make_cluster_policy()
@@ -461,23 +454,15 @@ def test_running_real_migrate_groups_job(
         group_name=ws_group_a.display_name,
     )
 
-    generic_permissions = GenericPermissionsSupport(
-        ws,
-        [
-            Listing(ws.cluster_policies.list, "policy_id", "cluster-policies"),
-        ],
-    )
+    installation_ctx.__dict__['include_object_permissions'] = [f"cluster-policies:{cluster_policy.policy_id}"]
+    installation_ctx.workspace_installation.run()
+    installation_ctx.permission_manager.inventorize_permissions()
 
-    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    inventory_database = install.config.inventory_database
-    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
-    permission_manager.inventorize_permissions()
+    installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
-    deployed_workflow.run_workflow("migrate-groups")
-
-    found = generic_permissions.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
     assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
-    assert found[f"{install.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
+    assert found[f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))

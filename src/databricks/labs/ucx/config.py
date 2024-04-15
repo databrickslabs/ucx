@@ -59,7 +59,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # List of workspace ids ucx is installed on, only applied to account-level installation
     installed_workspace_ids: list[int] | None = None
 
-    # Whether the assessment should capture only specific object permissions. Internal use only.
+    # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
 
     def replace_inventory_variable(self, text: str) -> str:

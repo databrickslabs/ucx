@@ -33,7 +33,6 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.workspace_access import generic, redash
-from databricks.labs.ucx.workspace_access.generic import GenericPermissionsInfo
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
@@ -123,17 +122,9 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
-    def override_permission_listing(self):
-        if not self.config.include_object_permissions:
-            return None
-        return [generic.StaticListing(self.config.include_object_permissions)]
-
-    @cached_property
-    def acl_listing(self):
-        if self.override_permission_listing:
-            return self.override_permission_listing
+    def generic_permissions_support(self):
         models_listing = generic.models_listing(self.workspace_client, self.config.num_threads)
-        return [
+        acl_listing = [
             generic.Listing(self.workspace_client.clusters.list, "cluster_id", "clusters"),
             generic.Listing(self.workspace_client.cluster_policies.list, "policy_id", "cluster-policies"),
             generic.Listing(self.workspace_client.instance_pools.list, "instance_pool_id", "instance-pools"),
@@ -149,10 +140,11 @@ class GlobalContext(abc.ABC):
             generic.Listing(generic.feature_tables_root_page, "object_id", "feature-tables"),
             self.workspace_listing,
         ]
-
-    @cached_property
-    def generic_permissions_support(self):
-        return generic.GenericPermissionsSupport(self.workspace_client, self.acl_listing)
+        return generic.GenericPermissionsSupport(
+            self.workspace_client,
+            acl_listing,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def redash_permissions_support(self):
@@ -161,19 +153,28 @@ class GlobalContext(abc.ABC):
             redash.Listing(self.workspace_client.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
             redash.Listing(self.workspace_client.queries.list, sql.ObjectTypePlural.QUERIES),
         ]
-        return redash.RedashPermissionsSupport(self.workspace_client, acl_listing)
+        return redash.RedashPermissionsSupport(
+            self.workspace_client,
+            acl_listing,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def scim_entitlements_support(self):
-        return ScimSupport(self.workspace_client)
+        return ScimSupport(self.workspace_client, include_object_permissions=self.config.include_object_permissions)
 
     @cached_property
     def secret_scope_acl_support(self):
+        # Secret ACLs are not used much in tests, so skipping include_object_permissions
         return SecretScopesSupport(self.workspace_client)
 
     @cached_property
     def legacy_table_acl_support(self):
-        return TableAclSupport(self.grants_crawler, self.sql_backend)
+        return TableAclSupport(
+            self.grants_crawler,
+            self.sql_backend,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def permission_manager(self):

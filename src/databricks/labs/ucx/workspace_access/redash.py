@@ -14,7 +14,7 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
 from databricks.sdk.service.sql import ObjectTypePlural, SetResponse
 
-from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,9 @@ class Listing:
         for item in self._func():
             yield SqlPermissionsInfo(item.id, self._request_type)
 
+    def __repr__(self):
+        return f"Listing({self.object_type} via {self._func.__qualname__})"
+
 
 class RedashPermissionsSupport(AclSupport):
     def __init__(
@@ -52,11 +55,13 @@ class RedashPermissionsSupport(AclSupport):
         # The validation step should keep retrying for at least 10 mins until the get api returns the new group name.
         # More details here: https://databricks.atlassian.net/browse/ES-992619
         verify_timeout: timedelta | None = timedelta(minutes=11),
+        include_object_permissions: list[str] | None = None,
     ):
         self._ws = ws
         self._listings = listings
         self._set_permissions_timeout = set_permissions_timeout
         self._verify_timeout = verify_timeout
+        self._include_object_permissions = include_object_permissions
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
@@ -66,6 +71,10 @@ class RedashPermissionsSupport(AclSupport):
         return any(g in mentioned_groups for g in [info.name_in_workspace for info in migration_state.groups])
 
     def get_crawler_tasks(self):
+        if self._include_object_permissions:
+            for item in StaticListing(self._include_object_permissions, self.object_types()):
+                yield partial(self._crawler_task, item.object_id, item.object_type)
+            return
         for listing in self._listings:
             for item in listing:
                 yield partial(self._crawler_task, item.object_id, item.request_type)
@@ -256,6 +265,9 @@ class RedashPermissionsSupport(AclSupport):
         except NotFound:
             logger.warning(f"Deleted on platform: {object_type} {object_id}")
             return None
+
+    def __repr__(self):
+        return f"RedashPermissionsSupport({self._listings})"
 
 
 def redash_listing_wrapper(
