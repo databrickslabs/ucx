@@ -126,7 +126,7 @@ class AzureRoleAssignment:
 
 @dataclass
 class AccessConnector:
-    id: str
+    id: AzureResource
     name: str
     location: str
     type: str = "Microsoft.Databricks/accessConnectors"
@@ -138,7 +138,7 @@ class AccessConnector:
     @classmethod
     def from_raw_resource(cls, raw: RawResource) -> "AccessConnector":
         access_connector = cls(
-            id=str(raw.id),
+            id=raw.id,
             name=raw.get("name", ""),
             location=raw.get("location", ""),
             type=raw.get("type", ""),
