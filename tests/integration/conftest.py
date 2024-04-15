@@ -249,7 +249,14 @@ class TestRuntimeContext(RuntimeContext):
     def with_dummy_aws_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
         self.with_aws_storage_permissions(
-            [AWSRoleAction('arn:aws:iam::184784626197:instance-profile/labs-data-access', 's3', 'WRITE_FILES', 's3://labs-things/*')]
+            [
+                AWSRoleAction(
+                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
+                    's3',
+                    'WRITE_FILES',
+                    's3://labs-things/*',
+                )
+            ]
         )
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):

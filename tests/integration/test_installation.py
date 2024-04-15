@@ -23,6 +23,7 @@ from databricks.sdk.service.catalog import TableInfo
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
+from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -692,16 +693,14 @@ def test_table_migration_job(
     if ws.config.is_aws:
         installation.save(
             [
-                StoragePermissionMapping(
-                    'abfss://things@labsazurethings.dfs.core.windows.net',
-                    'dummy_application_id',
-                    'principal_1',
+                AWSRoleAction(
+                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
+                    's3',
                     'WRITE_FILES',
-                    'Application',
-                    'directory_id_ss1',
+                    's3://labs-things/*',
                 )
             ],
-            filename='azure_storage_account_info.csv',
+            filename='aws_instance_profile_info.csv',
         )
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.tables",
@@ -837,16 +836,14 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     if ws.config.is_aws:
         installation.save(
             [
-                StoragePermissionMapping(
-                    'abfss://things@labsazurethings.dfs.core.windows.net',
-                    'dummy_application_id',
-                    'principal_1',
+                AWSRoleAction(
+                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
+                    's3',
                     'WRITE_FILES',
-                    'Application',
-                    'directory_id_ss1',
+                    's3://labs-things/*',
                 )
             ],
-            filename='azure_storage_account_info.csv',
+            filename='aws_instance_profile_info.csv',
         )
     sql_backend.save_table(
         f"{installation.load(WorkspaceConfig).inventory_database}.tables",
