@@ -37,8 +37,7 @@ def test_storage_accounts():
     assert len(storage_accounts) == 2
     for storage_account in storage_accounts:
         assert storage_account.resource_group == "rg1"
-        assert storage_account.storage_account in {"sto2", "sto3"}
-        assert storage_account.container is None
+        assert storage_account.name in {"sto2", "sto3"}
         assert storage_account.subscription_id == "002"
 
 

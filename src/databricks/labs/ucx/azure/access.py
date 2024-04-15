@@ -13,6 +13,7 @@ from databricks.labs.ucx.azure.resources import (
     AzureResource,
     AzureResources,
     PrincipalSecret,
+    StorageAccount,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -49,10 +50,10 @@ class AzureResourcePermissions:
             "Storage Blob Data Reader": Privilege.READ_FILES,
         }
 
-    def _map_storage(self, storage: AzureResource) -> list[StoragePermissionMapping]:
-        logger.info(f"Fetching role assignment for {storage.storage_account}")
+    def _map_storage(self, storage: StorageAccount) -> list[StoragePermissionMapping]:
+        logger.info(f"Fetching role assignment for {storage.name}")
         out = []
-        for container in self._azurerm.containers(storage):
+        for container in self._azurerm.containers(AzureResource(storage.id)):
             for role_assignment in self._azurerm.role_assignments(str(container)):
                 # one principal may be assigned multiple roles with overlapping dataActions, hence appearing
                 # here in duplicates. hence, role name -> permission level is not enough for the perfect scenario.
@@ -81,7 +82,7 @@ class AzureResourcePermissions:
             return None
         storage_account_infos = []
         for storage in self._azurerm.storage_accounts():
-            if storage.storage_account not in used_storage_accounts:
+            if storage.name not in used_storage_accounts:
                 continue
             for mapping in self._map_storage(storage):
                 storage_account_infos.append(mapping)
@@ -169,7 +170,7 @@ class AzureResourcePermissions:
             return
         storage_account_info = []
         for storage in self._azurerm.storage_accounts():
-            if storage.storage_account in used_storage_accounts:
+            if storage.name in used_storage_accounts:
                 storage_account_info.append(storage)
         logger.info("Creating service principal")
         uber_principal = self._azurerm.create_service_principal(uber_principal_name)

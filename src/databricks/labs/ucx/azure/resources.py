@@ -102,6 +102,15 @@ class Principal:
 
 
 @dataclass
+class StorageAccount:
+    id: str
+    subscription_id: str
+    resource_group: str
+    name: str
+    location: str
+
+
+@dataclass
 class PrincipalSecret:
     client: Principal
     secret: str
@@ -281,15 +290,22 @@ class AzureResources:
                 continue
             yield subscription
 
-    def storage_accounts(self) -> Iterable[AzureResource]:
+    def storage_accounts(self) -> Iterable[StorageAccount]:
         for subscription in self.subscriptions():
             logger.info(f"Checking in subscription {subscription.name} for storage accounts")
             path = f"/subscriptions/{subscription.subscription_id}/providers/Microsoft.Storage/storageAccounts"
-            for storage in self._mgmt.get(path, "2023-01-01").get("value", []):
-                resource_id = storage.get("id")
-                if not resource_id:
+            for response in self._mgmt.get(path, "2023-01-01").get("value", []):
+                if response.get("id") is None:
                     continue
-                yield AzureResource(resource_id)
+                raw = RawResource(response)
+                storage_account = StorageAccount(
+                    id=str(raw.id),
+                    subscription_id=raw.id.subscription_id,
+                    resource_group=raw.id.resource_group,
+                    name=raw.id.storage_account,
+                    location=raw.get("location", ""),
+                )
+                yield storage_account
 
     def containers(self, storage: AzureResource):
         for raw in self._mgmt.get(f"{storage}/blobServices/default/containers", "2023-01-01").get("value", []):
