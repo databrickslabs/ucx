@@ -180,7 +180,7 @@ class AzureResourcePermissions:
             f"Created service principal of client_id {config.uber_spn_id}. " f"Applying permission on storage accounts"
         )
         try:
-            self._apply_storage_permission(storage_account_info, uber_principal)
+            self._apply_storage_permission(uber_principal, *storage_account_info)
             self._installation.save(config)
             self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
         except PermissionError:
@@ -208,15 +208,15 @@ class AzureResourcePermissions:
                 tags={"CreatedBy": "ucx"},
             )
 
-    def _apply_storage_permission(self, storage_account_info: list[AzureResource], uber_principal: PrincipalSecret):
-        for storage in storage_account_info:
+    def _apply_storage_permission(self, uber_principal: PrincipalSecret, *storage_accounts: StorageAccount):
+        for storage in storage_accounts:
             role_name = str(uuid.uuid4())
             self._azurerm.apply_storage_permission(
                 uber_principal.client.object_id, storage, "STORAGE_BLOB_DATA_READER", role_name
             )
             logger.debug(
                 f"Storage Data Blob Reader permission applied for spn {uber_principal.client.client_id} "
-                f"to storage account {storage.storage_account}"
+                f"to storage account {storage.name}"
             )
 
     def _create_scope(self, uber_principal: PrincipalSecret, inventory_database: str):
