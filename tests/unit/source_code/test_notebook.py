@@ -46,6 +46,11 @@ SHELL_NOTEBOOK_SAMPLE = (
     Language.PYTHON,
     ['python', 'sh'],
 )
+PIP_NOTEBOOK_SAMPLE = (
+    "notebook-with-pip-cell.py.txt",
+    Language.PYTHON,
+    ['python', 'pip'],
+)
 # fmt: on
 
 
@@ -58,6 +63,7 @@ SHELL_NOTEBOOK_SAMPLE = (
         R_NOTEBOOK_SAMPLE,
         SQL_NOTEBOOK_SAMPLE,
         SHELL_NOTEBOOK_SAMPLE,
+        PIP_NOTEBOOK_SAMPLE,
     ],
 )
 def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]):
