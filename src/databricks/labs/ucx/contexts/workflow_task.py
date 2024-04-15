@@ -90,6 +90,7 @@ class RuntimeContext(GlobalContext):
             self.mounts_crawler,
             self.config.include_mounts,
             self.config.exclude_paths_in_mount,
+            self.config.include_paths_in_mount
         )
 
     @cached_property
