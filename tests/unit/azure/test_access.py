@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import call, create_autospec
 
 import pytest
@@ -384,6 +385,6 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
 
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
 
-    with caplog.at_level("DEBUG"):
+    with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx"):
         azure_resource_permission.create_access_connectors_for_storage_accounts()
         assert any("STORAGE_BLOB_DATA_READER" in message for message in caplog.messages)
