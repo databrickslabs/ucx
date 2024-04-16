@@ -244,14 +244,6 @@ class ServicePrincipalMigration(SecretsMixin):
             self._storage_credential_manager.create_with_client_secret(spn)
             execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
 
-        if execution_result:
-            results_file = self.save(execution_result)
-            logger.info(
-                f"Completed migration from Azure Service Principal to UC Storage credentials"
-                f"Please check {results_file} for validation results"
-            )
-        else:
-            logger.info("No Azure Service Principal migrated to UC Storage credentials")
         return execution_result
 
     def create_access_connectors(self, prompts: Prompts) -> list[StorageCredentialValidationResult]:
@@ -266,4 +258,15 @@ class ServicePrincipalMigration(SecretsMixin):
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         sp_results = self.migrate_service_principals(prompts, include_names)
         ac_results = self.create_access_connectors(prompts)
+
+        execution_results = sp_results + ac_results
+        if execution_results:
+            results_file = self.save(execution_results)
+            logger.info(
+                "Completed migration from Azure Service Principal to UC Storage credentials "
+                "and creation of Azure Databricks access connectors with UC storage credentials. "
+                f"Please check {results_file} for validation results"
+            )
+        else:
+            logger.info("No Azure Service Principal migrated or Azure Databricks access connector created.")
         return sp_results + ac_results
