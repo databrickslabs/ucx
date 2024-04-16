@@ -79,12 +79,12 @@ def test_save_spn_permissions_valid_azure_storage_account():
     containers = f'{storage_accounts}/storage1/blobServices/default/containers'
     azure_resources.storage_accounts.return_value = [
         StorageAccount(
-            id=AzureResource('{storage_accounts}/storage1'),
+            id=AzureResource(f'{storage_accounts}/storage1'),
             name="storage1",
             location="westeu",
         ),
         StorageAccount(
-            id=AzureResource('{storage_accounts}/storage2'),
+            id=AzureResource(f'{storage_accounts}/storage2'),
             name="storage2",
             location="westeu",
         ),
