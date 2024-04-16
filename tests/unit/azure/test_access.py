@@ -301,7 +301,10 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
 
     azure_resource_permission.create_access_connectors_for_storage_accounts()
-    assert "There are no external table present with azure storage account. Please check if assessment job is run" in caplog.messages
+    assert (
+        "There are no external table present with azure storage account. Please check if assessment job is run"
+        in caplog.messages
+    )
 
 
 def test_create_access_connectors_for_storage_accounts_one_access_connector():
@@ -309,7 +312,7 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector():
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"] ]
+        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
     }
     backend = MockBackend(rows=rows)
 
@@ -350,7 +353,7 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
     w = create_autospec(WorkspaceClient)
 
     rows = {
-        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"] ]
+        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
     }
     backend = MockBackend(rows=rows)
 
