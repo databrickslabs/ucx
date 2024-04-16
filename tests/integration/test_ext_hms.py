@@ -36,11 +36,11 @@ class CommandContextBackend(SqlBackend):
         debug_truncate_bytes = ws.config.debug_truncate_bytes
         self._debug_truncate_bytes = debug_truncate_bytes if isinstance(debug_truncate_bytes, int) else 96
 
-    def execute(self, sql: str) -> None:
+    def execute(self, sql: str, *, catalog: str | None = None, schema: str | None = None) -> None:
         logger.debug(f"[api][execute] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         self._sql.run(sql)
 
-    def fetch(self, sql: str) -> Iterator[Row]:
+    def fetch(self, sql: str, *, catalog: str | None = None, schema: str | None = None) -> Iterator[Row]:
         logger.debug(f"[api][fetch] {self._only_n_bytes(sql, self._debug_truncate_bytes)}")
         return self._sql.run(sql, result_as_json=True)
 
