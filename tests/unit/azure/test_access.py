@@ -12,6 +12,7 @@ from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import (
+    AccessConnector,
     AzureResource,
     AzureResources,
     AzureRoleAssignment,
@@ -301,3 +302,44 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
 
     azure_resource_permission.create_access_connectors_for_storage_accounts()
     assert "There are no external table present with azure storage account. Please check if assessment job is run" in caplog.messages
+
+
+def test_create_access_connectors_for_storage_accounts_one_access_connector():
+    """One access connector should be created for one storage account."""
+    w = create_autospec(WorkspaceClient)
+
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"] ]
+    }
+    backend = MockBackend(rows=rows)
+
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+
+    azure_resources = create_autospec(AzureResources)
+    azure_resources.storage_accounts.return_value = [
+        StorageAccount(
+            id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
+            name="storage1",
+            location="westeu",
+        )
+    ]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azure_resources.create_or_update_access_connector.return_value = AccessConnector(
+        id=access_connector_id,
+        name="ac-test",
+        location="westeu",
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+
+    access_connectors = azure_resource_permission.create_access_connectors_for_storage_accounts()
+    assert len(access_connectors) == 1
+    assert access_connectors[0].name == "ac-test"
