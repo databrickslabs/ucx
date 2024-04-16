@@ -134,7 +134,8 @@ class StaticTablesCrawler(TablesCrawler):
                 object_type=f"{_.table_type.value}",
                 view_text=_.view_definition,
                 location=_.storage_location,
-                table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else None,  # type: ignore[arg-type]
+                table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else "",
+                # type: ignore[arg-type]
             )
             for _ in tables
         ]
@@ -182,7 +183,7 @@ class StaticMountCrawler(Mounts):
         return self._mounts
 
 
-class TestRuntimeContext(RuntimeContext):
+class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-methods
     def __init__(
         self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
     ):
