@@ -39,7 +39,7 @@ def test_azure_resource_access_connector_list_create_get_delete(az_cli_ctx, env_
         resource_group_name,
         access_connector_name,
     )
-    assert new_access_connector.id == str(access_connector_id)
+    assert new_access_connector.id == access_connector_id
     assert new_access_connector.location == location
     assert new_access_connector.tags == tags
 
