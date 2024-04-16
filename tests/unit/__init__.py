@@ -131,10 +131,9 @@ def _secret_not_found(secret_scope, _):
     msg = f"Secret Scope {secret_scope} does not exist!"
     raise NotFound(msg)
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
 
-
+# can't remove **kwargs because it receives format=xxx
+# pylint: disable=unused-argument
 def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *args, **kwargs):
     filename = args[0]
     if filename.startswith('./'):
