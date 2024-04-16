@@ -8,7 +8,6 @@ from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
 from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
-from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect, site_packages_mock
 
@@ -109,8 +108,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
     ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
-    sp = site_packages_mock()
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp), resolver)
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps), resolver)
     object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     advices = list(resolver.get_advices())

@@ -75,7 +75,10 @@ class DependencyLoader:
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         # libraries have precedence over workspace objects
         if dependency.type is DependencyType.PACKAGE_FILE:
+            # pylint: disable=import-outside-toplevel
+            # local import to avoid cyclic dependency
             from databricks.labs.ucx.source_code.site_packages import PackageDependency
+
             assert isinstance(dependency, PackageDependency)
             return dependency.load()
         site_package = self._site_packages[dependency.path]

@@ -51,7 +51,7 @@ class SitePackage(SourceContainer):
 
     def load_module_source_code(self, path: str):
         source_path = Path(self._dist_info_path.parent, path)
-        with source_path.open("r") as f:
+        with source_path.open("r", encoding="utf-8") as f:
             return f.read()
 
     def register_dependency(self, graph: DependencyGraph, path: str):
@@ -60,7 +60,6 @@ class SitePackage(SourceContainer):
             if module_path in self._module_paths:
                 return graph.register_dependency(PackageDependency(self, module_path))
         return graph.register_dependency(Dependency(None, path))
-
 
 
 class PackageDependency(Dependency):
@@ -88,8 +87,9 @@ class PackageFile(SourceContainer):
         if self._source_code is None:
             self._source_code = self._package.load_module_source_code(self._path)
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, graph: DependencyGraph):
         self._load_source_code()
+        assert self._source_code is not None
         linter = ASTLinter.parse(self._source_code)
         # running a notebook from a site-package is highly unlikely but who knows...
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
@@ -98,10 +98,10 @@ class PackageFile(SourceContainer):
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
                 dependency = Dependency(DependencyType.NOTEBOOK, path.value.strip("'").strip('"'))
-                parent.register_dependency(dependency)
+                graph.register_dependency(dependency)
         names = PythonLinter.list_import_sources(linter)
         for name in names:
-            self._package.register_dependency(parent, name)
+            self._package.register_dependency(graph, name)
 
 
 class SitePackages:
