@@ -549,24 +549,24 @@ class PrincipalACL:
         return list(grants)
 
 
-    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
+    def _get_mount_location_and_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
-            return None
+            return None, None
         if table.location is None:
-            return None
+            return None, None
         if table.location.startswith('dbfs:/mnt') or table.location.startswith('/dbfs/mnt'):
             mount_location = ExternalLocations.resolve_mount(table.location, mounts)
             for loc, privilege in locations.items():
                 if loc is not None and mount_location.startswith(loc):
-                    return privilege
-            return None
+                    return mount_location, privilege
+            return None, None
         if table.location.startswith('dbfs:/') or table.location.startswith('/dbfs/'):
-            return "WRITE_FILES"
+            return None, "WRITE_FILES"
 
         for loc, privilege in locations.items():
             if loc is not None and table.location.startswith(loc):
-                return privilege
+                return None, privilege
         return None
 
     def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
@@ -581,7 +581,7 @@ class PrincipalACL:
         grants = []
         filtered_tables = []
         for table in tables:
-            privilege = self._get_privilege(table, locations, mounts)
+            _, privilege = self._get_mount_location_and_privilege(table, locations, mounts)
             if privilege == "READ_FILES":
                 grants.extend(
                     [Grant(principal, "SELECT", table.catalog, table.database, table.name) for principal in principals]
@@ -635,9 +635,10 @@ class PrincipalACL:
                                       mounts: list[Mount]) -> list[Grant]:
         grants = []
         for table in tables:
-            mount_location = ExternalLocations.resolve_mount(table.location, mounts)
+            mount_location, privilege = self._get_mount_location_and_privilege(table, locations, mounts)
             grants.extend(
-                [Grant(principal, "ALL PRIVILEGES", external_location=mount_location, table=table.name, database=table.database) for principal in principals]
+                [Grant(principal, privilege, external_location=mount_location,
+                       table=table.name, database=table.database) for principal in principals]
             )
 
         return grants
