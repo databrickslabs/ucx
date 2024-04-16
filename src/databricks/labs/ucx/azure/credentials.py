@@ -243,10 +243,18 @@ class ServicePrincipalMigration(SecretsMixin):
     ) -> list[StorageCredentialValidationResult]:
         _ = service_principal_migration_info
         # TODO: Add permission mapping for access connectors
-        storage_account_permissions = defaultdict(list)
+        storage_role_with_least_privileges = min(
+            zip(AzureResourcePermissions.LEVELS.keys(), AzureResourcePermissions.LEVELS.values()),
+            key=lambda level: level[1]
+        )[0]
+        storage_account_permissions = defaultdict(lambda: storage_role_with_least_privileges)
         for spn in service_principal_migration_info:
-            storage_account_permissions[spn.permission_mapping.storage_account].append(spn.permission_mapping.role_name)
-        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
+            current_role_name = storage_account_permissions[spn.permission_mapping.storage_account]
+            if AzureResourcePermissions.LEVELS[spn.permission_mapping.role_name][0] > AzureResourcePermissions.LEVELS[current_role_name][0]:
+                storage_account_permissions[spn.permission_mapping.storage_account] = spn.permission_mapping.role_name
+        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts(
+            storage_account_permissions
+        )
 
         execution_result = []
         for access_connector in access_connectors:
