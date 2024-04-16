@@ -140,7 +140,11 @@ class GlobalContext(abc.ABC):
             generic.Listing(generic.feature_tables_root_page, "object_id", "feature-tables"),
             self.workspace_listing,
         ]
-        return generic.GenericPermissionsSupport(self.workspace_client, acl_listing)
+        return generic.GenericPermissionsSupport(
+            self.workspace_client,
+            acl_listing,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def redash_permissions_support(self):
@@ -149,19 +153,28 @@ class GlobalContext(abc.ABC):
             redash.Listing(self.workspace_client.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
             redash.Listing(self.workspace_client.queries.list, sql.ObjectTypePlural.QUERIES),
         ]
-        return redash.RedashPermissionsSupport(self.workspace_client, acl_listing)
+        return redash.RedashPermissionsSupport(
+            self.workspace_client,
+            acl_listing,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def scim_entitlements_support(self):
-        return ScimSupport(self.workspace_client)
+        return ScimSupport(self.workspace_client, include_object_permissions=self.config.include_object_permissions)
 
     @cached_property
     def secret_scope_acl_support(self):
+        # Secret ACLs are not used much in tests, so skipping include_object_permissions
         return SecretScopesSupport(self.workspace_client)
 
     @cached_property
     def legacy_table_acl_support(self):
-        return TableAclSupport(self.grants_crawler, self.sql_backend)
+        return TableAclSupport(
+            self.grants_crawler,
+            self.sql_backend,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def permission_manager(self):

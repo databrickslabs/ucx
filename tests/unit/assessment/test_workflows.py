@@ -24,10 +24,9 @@ def test_runtime_crawl_grants(run_workflow):
     assert "SELECT * FROM hive_metastore.ucx.grants" in ctx.sql_backend.queries
 
 
-@pytest.mark.skip("crawl_permissions fails, filed GH issue #1129")
 def test_runtime_crawl_permissions(run_workflow):
     ctx = run_workflow(Assessment.crawl_permissions)
-    assert "SELECT * FROM hive_metastore.ucx.permissions" in ctx.sql_backend.queries
+    assert "DROP TABLE IF EXISTS hive_metastore.ucx.permissions" in ctx.sql_backend.queries
 
 
 def test_runtime_crawl_groups(run_workflow):

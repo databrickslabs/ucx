@@ -18,16 +18,22 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import Group, Patch, PatchSchema
 
-from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
 
 class ScimSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = timedelta(minutes=1)):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        verify_timeout: timedelta | None = timedelta(minutes=1),
+        include_object_permissions: list[str] | None = None,
+    ):
         self._ws = ws
         self._verify_timeout = verify_timeout
+        self._include_object_permissions = include_object_permissions
         self._snapshot = {}
         # TODO: we may need to inject GroupManager here for proper group listing
         for group in self._ws.groups.list(attributes="id,displayName,meta,roles,entitlements"):
@@ -40,6 +46,10 @@ class ScimSupport(AclSupport):
         return any(g.id_in_workspace == item.object_id for g in migration_state.groups)
 
     def get_crawler_tasks(self):
+        if self._include_object_permissions:
+            for item in StaticListing(self._include_object_permissions, self.object_types()):
+                yield partial(self._crawler_task, item.object_id, item.object_type)
+            return
         for group in self._snapshot.values():
             meta = group.meta
             if not meta:

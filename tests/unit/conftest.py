@@ -52,7 +52,10 @@ def run_workflow(mocker):
             if 'installation' not in replace:
                 replace['installation'] = installation
             if 'workspace_client' not in replace:
-                replace['workspace_client'] = create_autospec(WorkspaceClient)
+                ws = create_autospec(WorkspaceClient)
+                ws.api_client.do.return_value = {}
+                ws.permissions.get.return_value = {}
+                replace['workspace_client'] = ws
             if 'sql_backend' not in replace:
                 replace['sql_backend'] = MockBackend()
             if 'config' not in replace:
