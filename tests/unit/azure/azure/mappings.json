@@ -40,15 +40,18 @@
     "/subscriptions/002/providers/Microsoft.Storage/storageAccounts": {
       "value": [
         {
-          "name": "sto1"
+          "name": "sto1",
+          "location": "westeu"
         },
         {
           "name": "sto2",
-          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2",
+          "location": "westeu"
         },
         {
           "name": "sto3",
-          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3"
+          "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
+          "location": "westeu"
         }
       ]
     },
