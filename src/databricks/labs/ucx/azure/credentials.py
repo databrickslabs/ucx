@@ -262,6 +262,7 @@ class ServicePrincipalMigration(SecretsMixin):
                 comment="Created by ucx",
                 read_only=AzureResourcePermissions.LEVELS[role_name][1] == Privilege.READ_FILES.value,
             )
+            # NOTE validate requires an url with a container, while code above considers storage account level only
             # execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
 
         return execution_result
