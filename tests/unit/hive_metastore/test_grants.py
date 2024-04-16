@@ -42,6 +42,15 @@ def test_type_and_key_catalog():
     assert grant.object_key == "mycatalog"
 
 
+def test_type_and_key_external_location():
+    grant = Grant.type_and_key(external_location="myexternallocation")
+    assert grant == ("EXTERNAL LOCATION", "myexternallocation")
+
+    grant = Grant(principal="user", action_type="SELECT", external_location="myexternallocation")
+    assert grant.this_type_and_key()[0] == "EXTERNAL LOCATION"
+    assert grant.object_key == "myexternallocation"
+
+
 def test_type_and_key_any_file():
     grant = Grant.type_and_key(any_file=True)
     assert grant == ("ANY FILE", "")

@@ -537,7 +537,6 @@ class PrincipalACL:
         tables = self._tables_crawler.snapshot()
         mounts = list(self._mounts_crawler.snapshot())
         grants: set[Grant] = set()
-        external_locations = list(self._ws.external_locations.list())
 
         for cluster_id, locations in self._cluster_locations.items():
             principals = self._get_cluster_principal_mapping(cluster_id)
@@ -547,31 +546,10 @@ class PrincipalACL:
             grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
-            for external_location in external_locations:
-                external_location_grants = [Grant(principal, "ALL PRIVILEGES", external_location=external_location.url) for principal in principals]
-                grants.update(external_location_grants)
+            external_locations_grants = self._get_external_location_grants(locations, principals, tables, mounts)
+            grants.update(external_locations_grants)
         return list(grants)
 
-    def get_spn_mount_grants(self) -> list[Grant]:
-        # get all workspace-wide mounts
-        mounts = list(self._mounts_crawler.snapshot())
-        grants: set[Grant] = set()
-
-        # get all clusters in the workspace
-        clusters = self._ws.clusters.list()
-        tables = self._tables_crawler.snapshot()
-
-        # get the external locations that the mounts get converted to
-        external_locations = self._external_locations._external_location_list()
-
-        for table in tables:
-            if table.object_type == "EXTERNAL" and "mnt" in table.location:
-                for cluster in clusters:
-                    # set grants for all the tables that use the mounts
-                    grant = Grant(cluster.cluster_id, "ALL PRIVILEGES", catalog="hive_metastore",
-                                  database=table.database, table=table.name)
-                    grants.add(grant)
-        return list(grants)
 
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
         if table.view_text is not None:
@@ -653,4 +631,17 @@ class PrincipalACL:
                 principal_list.append(acl.service_principal_name)
         return principal_list
 
+
+    def _get_external_location_grants(self, locations: dict[str, str],
+                                      principals: list[str],
+                                      tables: list[Table],
+                                      mounts: list[Mount]) -> list[Grant]:
+        grants = []
+        for table in tables:
+            mount_location = ExternalLocations.resolve_mount(table.location, mounts)
+            grants.extend(
+                [Grant(principal, "ALL PRIVILEGES", external_location=mount_location, table=table.name, database=table.database) for principal in principals]
+            )
+
+        return grants
 
