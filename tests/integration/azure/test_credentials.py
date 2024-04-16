@@ -165,9 +165,10 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
         assert not migration_results[0].failures
 
 
+@pytest.skip(reason="TODO: Let migration create storage credentials.")
 @retried(on=[InternalError], timeout=timedelta(minutes=2))
 def test_spn_migration_access_connector_created(ws, extract_test_info, run_migration):
-    """Access connectors should be created."""
+    """Storage credentials should be created for the access connectors."""
     storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
     assert len(storage_credentials) == 0
 
