@@ -14,6 +14,7 @@ from typing import BinaryIO
 
 import pytest
 from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -1183,12 +1184,21 @@ def make_feature_table(ws, make_random):
 
 
 @pytest.fixture
-def make_dbfs_data_copy(ws):
+def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
     def create(*, src_path: str, dst_path: str):
-        ws.dbfs.copy(src_path, dst_path, recursive=True)
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.copy(src_path, dst_path, recursive=True)
         return dst_path
 
     def remove(dst_path: str):
-        ws.dbfs.delete(dst_path, recursive=True)
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.delete(dst_path, recursive=True)
 
     yield from factory("make_dbfs_data_copy", create, remove)
