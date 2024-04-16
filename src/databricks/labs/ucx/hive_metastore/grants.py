@@ -50,7 +50,6 @@ class Grant:
     table: str | None = None
     view: str | None = None
     udf: str | None = None
-    mount: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
