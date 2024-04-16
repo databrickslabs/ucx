@@ -62,7 +62,6 @@ class Grant:
         table: str | None = None,
         view: str | None = None,
         udf: str | None = None,
-        mount: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> tuple[str, str]:
@@ -81,8 +80,6 @@ class Grant:
         if database is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             return "DATABASE", f"{catalog}.{database}"
-        if mount is not None:
-            return "MOUNT", f"{mount}"
         if any_file:
             return "ANY FILE", ""
         if anonymous_function:
@@ -92,7 +89,7 @@ class Grant:
             return "CATALOG", catalog
         msg = (
             f"invalid grant keys: catalog={catalog}, database={database}, view={view}, udf={udf}"
-            f"mount={mount}, any_file={any_file}, anonymous_function={anonymous_function}"
+            f"any_file={any_file}, anonymous_function={anonymous_function}"
         )
         raise ValueError(msg)
 
@@ -108,7 +105,6 @@ class Grant:
             table=self.table,
             view=self.view,
             udf=self.udf,
-            mount=self.mount,
             any_file=self.any_file,
             anonymous_function=self.anonymous_function,
         )
@@ -266,7 +262,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
         table: str | None = None,
         view: str | None = None,
         udf: str | None = None,
-        mount: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> list[Grant]:
@@ -279,7 +274,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
             table (str | None): The table name (optional).
             view (str | None): The view name (optional).
             udf (str | None): The udf name (optional).
-            mount (str | None): The external location (optional).
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
 
@@ -306,7 +300,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
             table=self._try_valid(table),
             view=self._try_valid(view),
             udf=self._try_valid(udf),
-            mount=self._try_valid(mount),
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
@@ -333,7 +326,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
                     udf=udf,
                     database=database,
                     catalog=catalog,
-                    mount=mount,
                     any_file=any_file,
                     anonymous_function=anonymous_function,
                 )
