@@ -21,12 +21,10 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, sql
-from databricks.sdk.service.catalog import TableInfo
+from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
-from databricks.labs.ucx.azure.access import StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
@@ -114,6 +112,10 @@ class TestInstallationContext(TestRuntimeContext):
         )
 
     @cached_property
+    def config_transform(self) -> Callable[[WorkspaceConfig], WorkspaceConfig]:
+        return lambda wc: wc
+
+    @cached_property
     def include_object_permissions(self):
         return None
 
@@ -134,6 +136,7 @@ class TestInstallationContext(TestRuntimeContext):
             include_databases=self.created_databases,
             include_object_permissions=self.include_object_permissions,
         )
+        workspace_config = self.config_transform(workspace_config)
         self.installation.save(workspace_config)
         return workspace_config
 
@@ -382,7 +385,7 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
     workflow_run_logs = list(ws.workspace.list(f"{install_folder}/logs"))
     assert len(workflow_run_logs) == 1
 
-    inventory_database = installation_ctx.config.inventory_database
+    inventory_database = installation_ctx.inventory_database
     (records,) = next(sql_backend.fetch(f"SELECT COUNT(*) AS cnt FROM {inventory_database}.logs"))
     assert records == 3
 
@@ -394,9 +397,7 @@ def test_job_cluster_policy(ws, installation_ctx):
     cluster_policy = ws.cluster_policies.get(policy_id=installation_ctx.config.policy_id)
     policy_definition = json.loads(cluster_policy.definition)
 
-    assert (
-        cluster_policy.name == f"Unity Catalog Migration ({installation_ctx.config.inventory_database}) ({user_name})"
-    )
+    assert cluster_policy.name == f"Unity Catalog Migration ({installation_ctx.inventory_database}) ({user_name})"
 
     spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
     assert policy_definition["spark_version"]["value"] == spark_version
@@ -541,7 +542,7 @@ def test_uninstallation(ws, sql_backend, installation_ctx):
     with pytest.raises(InvalidParameterValue):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
-        sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.config.inventory_database}")
+        sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
 
 
 def test_fresh_global_installation(ws, new_installation):
@@ -680,21 +681,56 @@ def test_check_inventory_database_exists(ws, new_installation, make_random):
 def test_table_migration_job(
     ws,
     installation_ctx,
-    make_catalog,
     env_or_skip,
-    make_random,
-    make_dbfs_data_copy,
-    sql_backend,
+    prepare_tables_for_migration,
 ):
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
+
+    ctx = installation_ctx.replace(
+        config_transform=lambda wc: replace(wc, override_clusters=None),
+        extend_prompts={
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
+            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    tables, dst_schema = prepare_tables_for_migration
+
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("migrate-tables")
+    # assert the workflow is successful
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
+    # assert the tables are migrated
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+    # assert the cluster is configured correctly
+    for job_cluster in ws.jobs.get(
+        ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
+    ).settings.job_clusters:
+        assert job_cluster.new_cluster.autoscale.min_workers == 2
+        assert job_cluster.new_cluster.autoscale.max_workers == 20
+        assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
+
+
+@pytest.fixture
+def prepare_tables_for_migration(
+    ws, installation_ctx, make_catalog, make_random, make_dbfs_data_copy, env_or_skip
+) -> tuple[dict[str, TableInfo], SchemaInfo]:
     # create external and managed tables to be migrated
     schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    tables: dict[str, TableInfo] = {"src_managed_table": installation_ctx.make_table(schema_name=schema.name)}
-    tables["src_external_table"] = installation_ctx.make_table(
-        schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    )
+    tables: dict[str, TableInfo] = {
+        "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
+        "src_external_table": installation_ctx.make_table(
+            schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+        ),
+    }
     # create destination catalog and schema
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
     tables["src_view1"] = installation_ctx.make_table(
@@ -710,135 +746,44 @@ def test_table_migration_job(
         ctas=src_view2_text,
         view=True,
     )
+    # create destination catalog and schema
     dst_catalog = make_catalog()
-    installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
-    ctx = installation_ctx.replace(
-        extend_prompts={
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
-            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
-            r".*Do you want to update the existing installation?.*": 'yes',
-        }
-    )
-
-    ctx.workspace_installation.run()
-
-    rules = [Rule.from_src_dst(table, schema) for _, table in tables.items()]
-    ctx.with_table_mapping_rules(rules)
+    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
+    migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
+    installation_ctx.with_table_mapping_rules(migrate_rules)
     if ws.config.is_azure:
-        ctx.with_azure_storage_permissions(
-            [
-                StoragePermissionMapping(
-                    'abfss://things@labsazurethings.dfs.core.windows.net',
-                    'dummy_application_id',
-                    'principal_1',
-                    'WRITE_FILES',
-                    'Application',
-                    'directory_id_ss1',
-                )
-            ]
-        )
+        installation_ctx.with_dummy_azure_resource_permission()
     if ws.config.is_aws:
-        ctx.with_aws_storage_permissions(
-            [
-                AWSRoleAction(
-                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
-                    's3',
-                    'WRITE_FILES',
-                    's3://labs-things/*',
-                )
-            ]
-        )
-
-    ctx.deployed_workflows.run_workflow("migrate-tables")
-    # assert the workflow is successful
-    assert ctx.deployed_workflows.validate_step("migrate-tables")
-    # assert the tables are migrated
-    try:
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_managed_table'].name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_external_table'].name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_view1'].name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_view2'].name}").name
-    except NotFound:
-        assert False, f"Table or view not found in {dst_catalog.name}.{schema.name}"
-    # assert the cluster is configured correctly
-    for job_cluster in ws.jobs.get(
-        ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
-    ).settings.job_clusters:
-        assert job_cluster.new_cluster.autoscale.min_workers == 2
-        assert job_cluster.new_cluster.autoscale.max_workers == 20
-        assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
+        installation_ctx.with_dummy_aws_resource_permission()
+    installation_ctx.save_tables()
+    installation_ctx.save_mounts()
+    installation_ctx.with_dummy_grants_and_tacls()
+    return tables, dst_schema
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(
     ws,
     installation_ctx,
-    make_catalog,
+    prepare_tables_for_migration,
     env_or_skip,
-    make_random,
-    make_dbfs_data_copy,
-    sql_backend,
 ):
-    # create external and managed tables to be migrated
-    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    src_managed_table = installation_ctx.make_table(schema_name=schema.name)
-    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = installation_ctx.make_table(schema_name=schema.name, external_csv=new_mounted_location)
-    # create destination catalog and schema
-    dst_catalog = make_catalog()
-    installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
-
+    tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-
     ctx.workspace_installation.run()
-    migrate_rules = [
-        Rule.from_src_dst(src_managed_table, schema),
-        Rule.from_src_dst(src_external_table, schema),
-    ]
-    ctx.with_table_mapping_rules(migrate_rules)
-    if ws.config.is_azure:
-        ctx.with_azure_storage_permissions(
-            [
-                StoragePermissionMapping(
-                    'abfss://things@labsazurethings.dfs.core.windows.net',
-                    'dummy_application_id',
-                    'principal_1',
-                    'WRITE_FILES',
-                    'Application',
-                    'directory_id_ss1',
-                )
-            ]
-        )
-    if ws.config.is_aws:
-        ctx.with_aws_storage_permissions(
-            [
-                AWSRoleAction(
-                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
-                    's3',
-                    'WRITE_FILES',
-                    's3://labs-things/*',
-                )
-            ]
-        )
     ctx.deployed_workflows.run_workflow("migrate-tables")
     # assert the workflow is successful
     assert ctx.deployed_workflows.validate_step("migrate-tables")
     # assert the tables are migrated
-    try:
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
-        assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_external_table.name}").name
-    except NotFound:
-        assert (
-            False
-        ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{schema.name}"
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
     # assert the cluster is configured correctly on the migrate tables tasks
     install_state = ctx.installation.load(RawState)
     job_id = install_state.resources["jobs"]["migrate-tables"]

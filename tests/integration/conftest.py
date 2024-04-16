@@ -224,27 +224,6 @@ class TestRuntimeContext(RuntimeContext):
     def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
         self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
 
-    def with_table_mapping_rule(
-        self,
-        catalog_name: str,
-        src_schema: str,
-        dst_schema: str,
-        src_table: str,
-        dst_table: str,
-    ):
-        self.with_table_mapping_rules(
-            [
-                Rule(
-                    workspace_name="workspace",
-                    catalog_name=catalog_name,
-                    src_schema=src_schema,
-                    dst_schema=dst_schema,
-                    src_table=src_table,
-                    dst_table=dst_table,
-                )
-            ]
-        )
-
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
 
@@ -317,6 +296,57 @@ class TestRuntimeContext(RuntimeContext):
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
             include_group_names=self.created_groups,
             include_databases=self.created_databases,
+        )
+
+    def save_tables(self):
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.tables",
+            [
+                Table(
+                    catalog=table.catalog_name,
+                    database=table.schema_name,
+                    name=table.name,
+                    object_type=table.table_type.value,
+                    table_format=table.data_source_format.value if table.data_source_format is not None else "",
+                    location=str(table.storage_location or ""),
+                    view_text=table.view_definition,
+                )
+                for table in self._tables
+            ],
+            Table,
+        )
+
+    def save_mounts(self):
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.mounts",
+            self.mounts_crawler.snapshot(),
+            Mount,
+        )
+
+    def with_dummy_grants_and_tacls(self):
+        self.sql_backend.save_table(
+            f"{self.inventory_database}.groups",
+            [
+                MigratedGroup(
+                    "group_id",
+                    "test_group_ws",
+                    "test_group_ac",
+                    "tmp",
+                )
+            ],
+            MigratedGroup,
+        )
+        self.sql_backend.save_table(
+            f"{self.inventory_database}.grants",
+            [
+                Grant(
+                    "test_user",
+                    "SELECT",
+                    database="test_database",
+                    table="test_table",
+                )
+            ],
+            Grant,
         )
 
     @cached_property
