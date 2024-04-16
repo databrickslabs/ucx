@@ -12,6 +12,7 @@ from databricks.sdk.service.catalog import Privilege
 
 from databricks.labs.ucx.assessment.crawlers import logger
 from databricks.labs.ucx.azure.resources import (
+    AccessConnector,
     AzureResources,
     PrincipalSecret,
     StorageAccount,
@@ -192,7 +193,7 @@ class AzureResourcePermissions:
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
-    ) -> None:
+    ) -> AccessConnector:
         access_connector = self._azurerm.create_or_update_access_connector(
             storage_account.id.subscription_id,
             storage_account.id.resource_group,
@@ -202,8 +203,9 @@ class AzureResourcePermissions:
             wait_for_provisioning=True,
         )
         self._apply_storage_permission(access_connector.principal_id, role_name, storage_account)
+        return access_connector
 
-    def create_access_connectors_for_storage_accounts(self) -> None:
+    def create_access_connectors_for_storage_accounts(self) -> list[AccessConnector]:
         used_storage_accounts = self._get_storage_accounts()
         if len(used_storage_accounts) == 0:
             logger.warning(
@@ -213,14 +215,16 @@ class AzureResourcePermissions:
             return
 
         tasks = []
-        for storage in self._azurerm.storage_accounts():
-            if storage.name in used_storage_accounts:
-                tasks.append(partial(self._create_access_connector_for_storage_account, storage=storage))
+        for storage_account in self._azurerm.storage_accounts():
+            if storage_account.name not in used_storage_accounts:
+                continue
+            tasks.append(partial(self._create_access_connector_for_storage_account, storage_account=storage_account))
 
         thread_name = "Creating access connectors for storage accounts"
-        _, errors = Threads.gather(thread_name, tasks)
+        results, errors = Threads.gather(thread_name, tasks)
         if len(errors) > 0:
             raise ManyError(errors)
+        return results
 
     def _apply_storage_permission(
         self,
