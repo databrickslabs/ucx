@@ -22,7 +22,6 @@ from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
 )
-from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore.locations import (
@@ -32,8 +31,6 @@ from databricks.labs.ucx.hive_metastore.locations import (
 )
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
-from databricks.labs.ucx.hive_metastore import TablesInMounts
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +50,7 @@ class Grant:
     table: str | None = None
     view: str | None = None
     udf: str | None = None
-    external_location: str | None = None
+    mount: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
 
@@ -65,7 +62,7 @@ class Grant:
         table: str | None = None,
         view: str | None = None,
         udf: str | None = None,
-        external_location: str | None = None,
+        mount: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> tuple[str, str]:
@@ -84,8 +81,8 @@ class Grant:
         if database is not None:
             catalog = "hive_metastore" if catalog is None else catalog
             return "DATABASE", f"{catalog}.{database}"
-        if external_location is not None:
-            return "EXTERNAL LOCATION", f"{external_location}"
+        if mount is not None:
+            return "MOUNT", f"{mount}"
         if any_file:
             return "ANY FILE", ""
         if anonymous_function:
@@ -95,7 +92,7 @@ class Grant:
             return "CATALOG", catalog
         msg = (
             f"invalid grant keys: catalog={catalog}, database={database}, view={view}, udf={udf}"
-            f"external_location={external_location}, any_file={any_file}, anonymous_function={anonymous_function}"
+            f"mount={mount}, any_file={any_file}, anonymous_function={anonymous_function}"
         )
         raise ValueError(msg)
 
@@ -111,7 +108,7 @@ class Grant:
             table=self.table,
             view=self.view,
             udf=self.udf,
-            external_location=self.external_location,
+            mount=self.mount,
             any_file=self.any_file,
             anonymous_function=self.anonymous_function,
         )
@@ -269,7 +266,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
         table: str | None = None,
         view: str | None = None,
         udf: str | None = None,
-        external_location: str | None = None,
+        mount: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
     ) -> list[Grant]:
@@ -282,7 +279,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             table (str | None): The table name (optional).
             view (str | None): The view name (optional).
             udf (str | None): The udf name (optional).
-            external_location (str | None): The external location (optional).
+            mount (str | None): The external location (optional).
             any_file (bool): Whether to include any file grants (optional).
             anonymous_function (bool): Whether to include anonymous function grants (optional).
 
@@ -309,7 +306,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
             table=self._try_valid(table),
             view=self._try_valid(view),
             udf=self._try_valid(udf),
-            external_location=self._try_valid(external_location),
+            mount=self._try_valid(mount),
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
@@ -336,7 +333,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
                     udf=udf,
                     database=database,
                     catalog=catalog,
-                    external_location=external_location,
+                    mount=mount,
                     any_file=any_file,
                     anonymous_function=anonymous_function,
                 )
@@ -544,29 +541,26 @@ class PrincipalACL:
             grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
-            external_locations_grants = self._get_external_location_grants(locations, principals, tables, mounts)
-            grants.update(external_locations_grants)
         return list(grants)
 
-
-    def _get_mount_location_and_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
+    def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
         if table.view_text is not None:
             # return nothing for view so that it goes to the separate view logic
-            return None, None
+            return None
         if table.location is None:
-            return None, None
+            return None
         if table.location.startswith('dbfs:/mnt') or table.location.startswith('/dbfs/mnt'):
             mount_location = ExternalLocations.resolve_mount(table.location, mounts)
             for loc, privilege in locations.items():
                 if loc is not None and mount_location.startswith(loc):
-                    return mount_location, privilege
-            return None, None
+                    return privilege
+            return None
         if table.location.startswith('dbfs:/') or table.location.startswith('/dbfs/'):
-            return None, "WRITE_FILES"
+            return "WRITE_FILES"
 
         for loc, privilege in locations.items():
             if loc is not None and table.location.startswith(loc):
-                return None, privilege
+                return privilege
         return None
 
     def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
@@ -581,7 +575,7 @@ class PrincipalACL:
         grants = []
         filtered_tables = []
         for table in tables:
-            _, privilege = self._get_mount_location_and_privilege(table, locations, mounts)
+            privilege = self._get_privilege(table, locations, mounts)
             if privilege == "READ_FILES":
                 grants.extend(
                     [Grant(principal, "SELECT", table.catalog, table.database, table.name) for principal in principals]
@@ -628,18 +622,3 @@ class PrincipalACL:
             if acl.service_principal_name is not None:
                 principal_list.append(acl.service_principal_name)
         return principal_list
-
-    def _get_external_location_grants(self, locations: dict[str, str],
-                                      principals: list[str],
-                                      tables: list[Table],
-                                      mounts: list[Mount]) -> list[Grant]:
-        grants = []
-        for table in tables:
-            mount_location, privilege = self._get_mount_location_and_privilege(table, locations, mounts)
-            grants.extend(
-                [Grant(principal, privilege, external_location=mount_location,
-                       table=table.name, database=table.database) for principal in principals]
-            )
-
-        return grants
-
