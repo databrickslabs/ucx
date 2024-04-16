@@ -29,17 +29,21 @@ def test_replace_installation():
             'azure_storage_account_info.csv': [
                 {
                     'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "first-application-id",
                     'directory_id': 'tenant',
                     'principal': "oneenv-adls",
                     'privilege': "WRITE_FILES",
+                    'role_name': 'Storage Blob Data Contributor',
                     'type': "Application",
                 },
                 {
                     'prefix': 'abfss://ucx2@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "second-application-id",
                     'principal': "ziyuan-user-assigned-mi",
                     'privilege': "WRITE_FILES",
+                    'role_name': 'Storage Blob Data Contributor',
                     'type': "ManagedIdentity",
                 },
             ],

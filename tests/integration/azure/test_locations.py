@@ -34,16 +34,20 @@ def test_run(caplog, ws, sql_backend, inventory_schema):
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "redacted-for-github-929e765443eb",
                     'principal': "oneenv-adls",
                     'privilege': "WRITE_FILES",
+                    'role_name': 'Storage Blob Data Contributor',
                     'type': "Application",
                 },
                 {
                     'prefix': 'abfss://ucx2@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "redacted-for-github-ebcef6708997",
                     'principal': "ziyuan-user-assigned-mi",
                     'privilege': "WRITE_FILES",
+                    'role_name': 'Storage Blob Data Contributor',
                     'type': "ManagedIdentity",
                 },
             ]
@@ -83,9 +87,11 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema):
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'abfss://ucx1@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "redacted-for-github-ff66ffe1d728",
                     'principal': "ziyuanqin-uc-test-ac",
                     'privilege': "READ_FILES",
+                    'role_name': 'Storage Data Blob Reader',
                     'type': "ManagedIdentity",
                 }
             ]
@@ -124,9 +130,11 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema):
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'abfss://ucx3@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "no-such-id",
                     'principal': "dummy_principal",
                     'privilege': "WRITE_FILES",
+                    'role_name': "Storage Data Blob Contributor",
                     'type': "Application",
                 },
             ]
@@ -168,9 +176,11 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema):
             "azure_storage_account_info.csv": [
                 {
                     'prefix': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+                    'storage_account': 'ziyuanqintest',
                     'client_id': "redacted-for-github-929e765443eb",
                     'principal': "oneenv-adls",
                     'privilege': "WRITE_FILES",
+                    'role_name': 'Storage Blob Data Contributor',
                     'type': "Application",
                 }
             ]

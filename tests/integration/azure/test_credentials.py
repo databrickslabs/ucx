@@ -105,9 +105,11 @@ def run_migration(ws, sql_backend, inventory_schema):
                 "azure_storage_account_info.csv": [
                     {
                         'prefix': external_location.location,
+                        'storage_account': storage_account.name,
                         'client_id': test_info.application_id,
                         'principal': test_info.credential_name,
                         'privilege': "READ_FILES" if read_only else "WRITE_FILES",
+                        'role_name': 'Storage Blob Data ' + 'Reader' if read_only else 'Contributor',
                         'type': "Application",
                         'directory_id': test_info.directory_id,
                     },
