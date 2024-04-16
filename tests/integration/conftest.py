@@ -1,14 +1,23 @@
+from collections.abc import Callable
+import functools
 import collections
+import os
 import logging
 import warnings
+from dataclasses import replace
 from functools import partial, cached_property
+from datetime import timedelta
 
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
+from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.tui import MockPrompts
+from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.catalog import FunctionInfo, TableInfo
+from databricks.sdk.service.catalog import TableInfo, SchemaInfo
+from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.account import WorkspaceInfo
@@ -20,17 +29,20 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
+from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
-from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.workspace_access.groups import MigratedGroup, GroupManager
 
 logging.getLogger("tests").setLevel("DEBUG")
 logging.getLogger("databricks.labs.ucx").setLevel("DEBUG")
@@ -123,58 +135,14 @@ class StaticTablesCrawler(TablesCrawler):
                 object_type=f"{_.table_type.value}",
                 view_text=_.view_definition,
                 location=_.storage_location,
-                table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else None,  # type: ignore[arg-type]
+                table_format=f"{_.data_source_format.value}" if _.table_type.value != "VIEW" else "",
+                # type: ignore[arg-type]
             )
             for _ in tables
         ]
 
     def snapshot(self) -> list[Table]:
         return self._tables
-
-
-class StaticUdfsCrawler(UdfsCrawler):
-    def __init__(self, sb: SqlBackend, schema: str, udfs: list[FunctionInfo]):
-        super().__init__(sb, schema)
-        self._udfs = [
-            Udf(
-                catalog=_.catalog_name,
-                database=_.schema_name,
-                name=_.name,
-                body="5",
-                comment="_",
-                data_access="CONTAINS SQL",
-                deterministic=True,
-                func_input="STRING",
-                func_returns="INT",
-                func_type="SQL",
-            )
-            for _ in udfs
-        ]
-
-    def snapshot(self) -> list[Udf]:
-        return self._udfs
-
-
-class StaticGrantsCrawler(GrantsCrawler):
-    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, grants: list[Grant]):
-        super().__init__(tc, udf)
-        self._grants = [
-            Grant(
-                principal=_.principal,
-                action_type=_.action_type,
-                catalog=_.catalog,
-                database=_.database,
-                table=_.table,
-                view=_.view,
-                udf=_.udf,
-                any_file=_.any_file,
-                anonymous_function=_.anonymous_function,
-            )
-            for _ in grants
-        ]
-
-    def snapshot(self) -> list[Grant]:
-        return self._grants
 
 
 class StaticTableMapping(TableMapping):
@@ -216,15 +184,19 @@ class StaticMountCrawler(Mounts):
         return self._mounts
 
 
-class TestRuntimeContext(RuntimeContext):
-    def __init__(self, make_table_fixture, make_schema_fixture, make_udf_fixture, env_or_skip_fixture):
+class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-methods
+    def __init__(
+        self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
+    ):
         super().__init__()
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
+        self._make_group = make_group_fixture
         self._env_or_skip = env_or_skip_fixture
-        self._tables = []
-        self._schemas = []
+        self._tables: list[TableInfo] = []
+        self._schemas: list[SchemaInfo] = []
+        self._groups: list[Group] = []
         self._udfs = []
         self._grants = []
         # TODO: add methods to pre-populate the following:
@@ -235,8 +207,7 @@ class TestRuntimeContext(RuntimeContext):
         self.with_azure_storage_permissions(
             [
                 StoragePermissionMapping(
-                    # TODO: replace with env variable
-                    prefix='abfss://things@labsazurethings.dfs.core.windows.net',
+                    prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
                     client_id='dummy_application_id',
                     principal='principal_1',
                     privilege='WRITE_FILES',
@@ -251,10 +222,10 @@ class TestRuntimeContext(RuntimeContext):
         self.with_aws_storage_permissions(
             [
                 AWSRoleAction(
-                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
+                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
                     's3',
                     'WRITE_FILES',
-                    's3://labs-things/*',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
                 )
             ]
         )
@@ -265,29 +236,18 @@ class TestRuntimeContext(RuntimeContext):
     def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
         self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
 
-    def with_table_mapping_rule(
-        self,
-        catalog_name: str,
-        src_schema: str,
-        dst_schema: str,
-        src_table: str,
-        dst_table: str,
-    ):
-        self.with_table_mapping_rules(
-            [
-                Rule(
-                    workspace_name="workspace",
-                    catalog_name=catalog_name,
-                    src_schema=src_schema,
-                    dst_schema=dst_schema,
-                    src_table=src_table,
-                    dst_table=dst_table,
-                )
-            ]
-        )
-
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
+
+    def make_schema(self, **kwargs):
+        schema_info = self._make_schema(**kwargs)
+        self._schemas.append(schema_info)
+        return schema_info
+
+    def make_group(self, **kwargs):
+        group_info = self._make_group(**kwargs)
+        self._groups.append(group_info)
+        return group_info
 
     def make_table(self, **kwargs):
         table_info = self._make_table(**kwargs)
@@ -303,6 +263,8 @@ class TestRuntimeContext(RuntimeContext):
         self,
         principal: str,
         action_type: str,
+        table_info: TableInfo | None = None,
+        schema_info: SchemaInfo | None = None,
         catalog: str | None = None,
         database: str | None = None,
         table: str | None = None,
@@ -311,6 +273,13 @@ class TestRuntimeContext(RuntimeContext):
         any_file: bool = False,
         anonymous_function: bool = False,
     ):
+        if table_info:
+            catalog = table_info.catalog_name
+            database = table_info.schema_name
+            table = table_info.name
+        if schema_info:
+            catalog = schema_info.catalog_name
+            database = schema_info.name
         grant = Grant(
             principal=principal,
             action_type=action_type,
@@ -336,11 +305,66 @@ class TestRuntimeContext(RuntimeContext):
             warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
             inventory_database=self.inventory_database,
             connect=self.workspace_client.config,
+            renamed_group_prefix=f'tmp-{self.inventory_database}-',
+            include_group_names=self.created_groups,
+            include_databases=self.created_databases,
+        )
+
+    def save_tables(self):
+        # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.tables",
+            [
+                Table(
+                    catalog=table.catalog_name,
+                    database=table.schema_name,
+                    name=table.name,
+                    object_type=str(table.table_type.value or ""),
+                    table_format=table.data_source_format.value if table.data_source_format is not None else "",
+                    location=str(table.storage_location or ""),
+                    view_text=table.view_definition,
+                )
+                for table in self._tables
+            ],
+            Table,
+        )
+
+    def save_mounts(self):
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.mounts",
+            self.mounts_crawler.snapshot(),
+            Mount,
+        )
+
+    def with_dummy_grants_and_tacls(self):
+        # inject dummy group and table acl to avoid crawling which will slow down tests like test_table_migration_job
+        self.sql_backend.save_table(
+            f"{self.inventory_database}.groups",
+            [
+                MigratedGroup(
+                    "group_id",
+                    "test_group_ws",
+                    "test_group_ac",
+                    "tmp",
+                )
+            ],
+            MigratedGroup,
+        )
+        self.sql_backend.save_table(
+            f"{self.inventory_database}.grants",
+            [
+                Grant(
+                    "test_user",
+                    "SELECT",
+                    database="test_database",
+                    table="test_table",
+                )
+            ],
+            Grant,
         )
 
     @cached_property
     def installation(self):
-        # TODO: we may need to do a real installation instead of a mock
         return MockInstallation()
 
     @cached_property
@@ -348,16 +372,29 @@ class TestRuntimeContext(RuntimeContext):
         return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
-    def tables_crawler(self):
-        return StaticTablesCrawler(self.sql_backend, self.inventory_database, self._tables)
+    def created_databases(self):
+        created_databases: set[str] = set()
+        for schema_info in self._schemas:
+            if schema_info.catalog_name != "hive_metastore":
+                continue
+            created_databases.add(schema_info.name)
+        for table_info in self._tables:
+            if table_info.catalog_name != "hive_metastore":
+                continue
+            created_databases.add(table_info.schema_name)
+        for grant in self._grants:
+            if grant.catalog != "hive_metastore":
+                continue
+            if grant.database:
+                created_databases.add(grant.database)
+        return list(created_databases)
 
     @cached_property
-    def udfs_crawler(self):
-        return StaticUdfsCrawler(self.sql_backend, self.inventory_database, self._udfs)
-
-    @cached_property
-    def grants_crawler(self):
-        return StaticGrantsCrawler(self.tables_crawler, self.udfs_crawler, self._grants)
+    def created_groups(self):
+        created_groups = []
+        for group in self._groups:
+            created_groups.append(group.display_name)
+        return created_groups
 
     @cached_property
     def azure_service_principal_crawler(self):
@@ -380,8 +417,236 @@ class TestRuntimeContext(RuntimeContext):
             self.inventory_database,
         )
 
+    @cached_property
+    def group_manager(self):
+        return GroupManager(
+            self.sql_backend,
+            self.workspace_client,
+            self.inventory_database,
+            self.created_groups,
+            self.config.renamed_group_prefix,
+            workspace_group_regex=self.config.workspace_group_regex,
+            workspace_group_replace=self.config.workspace_group_replace,
+            account_group_regex=self.config.account_group_regex,
+            external_id_match=self.config.group_match_by_external_id,
+        )
+
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, env_or_skip):
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf, env_or_skip)
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
+
+
+class LocalAzureCliTest(WorkspaceContext):
+    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
+        super().__init__(_ws, {})
+        self._env_or_skip = env_or_skip_fixture
+
+    @cached_property
+    def azure_cli_authenticated(self):
+        if not self.is_azure:
+            pytest.skip("Azure only")
+        if self.connect_config.auth_type != "azure-cli":
+            pytest.skip("Local test only")
+        return True
+
+    @cached_property
+    def azure_subscription_id(self):
+        return self._env_or_skip("TEST_SUBSCRIPTION_ID")
+
+
+@pytest.fixture
+def az_cli_ctx(ws, env_or_skip):
+    return LocalAzureCliTest(ws, env_or_skip)
+
+
+class TestInstallationContext(TestRuntimeContext):
+    def __init__(
+        self,
+        make_table_fixture,
+        make_schema_fixture,
+        make_udf_fixture,
+        make_group_fixture,
+        env_or_skip_fixture,
+        make_random_fixture,
+        make_acc_group_fixture,
+        make_user_fixture,
+    ):
+        super().__init__(
+            make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
+        )
+        self._make_random = make_random_fixture
+        self._make_acc_group = make_acc_group_fixture
+        self._make_user = make_user_fixture
+
+    def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
+        if not workspace_group_name:
+            workspace_group_name = f"ucx_{self._make_random(4)}"
+        if not account_group_name:
+            account_group_name = workspace_group_name
+        user = self._make_user()
+        members = [user.id]
+        ws_group = self.make_group(
+            display_name=workspace_group_name,
+            members=members,
+            entitlements=["allow-cluster-create"],
+        )
+        acc_group = self._make_acc_group(display_name=account_group_name, members=members)
+        return ws_group, acc_group
+
+    @cached_property
+    def running_clusters(self):
+        logger.debug("Waiting for clusters to start...")
+        default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
+        tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
+        table_migration_cluster_id = self._env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
+        ensure_cluster_is_running = self.workspace_client.clusters.ensure_cluster_is_running
+        Threads.strict(
+            "ensure clusters running",
+            [
+                functools.partial(ensure_cluster_is_running, default_cluster_id),
+                functools.partial(ensure_cluster_is_running, tacl_cluster_id),
+                functools.partial(ensure_cluster_is_running, table_migration_cluster_id),
+            ],
+        )
+        logger.debug("Waiting for clusters to start...")
+        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
+
+    @cached_property
+    def installation(self):
+        return Installation(self.workspace_client, self.product_info.product_name())
+
+    @cached_property
+    def environ(self) -> dict[str, str]:
+        return {**os.environ}
+
+    @cached_property
+    def workspace_installer(self):
+        return WorkspaceInstaller(
+            self.prompts,
+            self.installation,
+            self.workspace_client,
+            self.product_info,
+            self.environ,
+        )
+
+    @cached_property
+    def config_transform(self) -> Callable[[WorkspaceConfig], WorkspaceConfig]:
+        return lambda wc: wc
+
+    @cached_property
+    def include_object_permissions(self):
+        return None
+
+    @cached_property
+    def config(self) -> WorkspaceConfig:
+        workspace_config = self.workspace_installer.configure()
+        default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
+        workspace_config = replace(
+            workspace_config,
+            override_clusters={
+                "main": default_cluster_id,
+                "tacl": tacl_cluster_id,
+                "table_migration": table_migration_cluster_id,
+            },
+            workspace_start_path=self.installation.install_folder(),
+            renamed_group_prefix=self.renamed_group_prefix,
+            include_group_names=self.created_groups,
+            include_databases=self.created_databases,
+            include_object_permissions=self.include_object_permissions,
+        )
+        workspace_config = self.config_transform(workspace_config)
+        self.installation.save(workspace_config)
+        return workspace_config
+
+    @cached_property
+    def product_info(self):
+        return ProductInfo.for_testing(WorkspaceConfig)
+
+    @cached_property
+    def tasks(self):
+        return Workflows.all().tasks()
+
+    @cached_property
+    def skip_dashboards(self):
+        return True
+
+    @cached_property
+    def workflows_deployment(self):
+        return WorkflowsDeployment(
+            self.config,
+            self.installation,
+            self.install_state,
+            self.workspace_client,
+            self.product_info.wheels(self.workspace_client),
+            self.product_info,
+            timedelta(minutes=3),
+            self.tasks,
+            skip_dashboards=self.skip_dashboards,
+        )
+
+    @cached_property
+    def workspace_installation(self):
+        return WorkspaceInstallation(
+            self.config,
+            self.installation,
+            self.install_state,
+            self.sql_backend,
+            self.workspace_client,
+            self.workflows_deployment,
+            self.prompts,
+            self.product_info,
+            skip_dashboards=self.skip_dashboards,
+        )
+
+    @cached_property
+    def extend_prompts(self):
+        return {}
+
+    @cached_property
+    def renamed_group_prefix(self):
+        return f"rename-{self.product_info.product_name()}-"
+
+    @cached_property
+    def prompts(self):
+        return MockPrompts(
+            {
+                r'Open job overview in your browser.*': 'no',
+                r'Do you want to uninstall ucx.*': 'yes',
+                r'Do you want to delete the inventory database.*': 'yes',
+                r".*PRO or SERVERLESS SQL warehouse.*": "1",
+                r"Choose how to map the workspace groups.*": "1",
+                r".*Inventory Database.*": self.inventory_database,
+                r".*Backup prefix*": self.renamed_group_prefix,
+                r".*": "",
+            }
+            | (self.extend_prompts or {})
+        )
+
+
+@pytest.fixture
+def installation_ctx(  # pylint: disable=too-many-arguments
+    ws,
+    sql_backend,
+    make_table,
+    make_schema,
+    make_udf,
+    make_group,
+    env_or_skip,
+    make_random,
+    make_acc_group,
+    make_user,
+):
+    ctx = TestInstallationContext(
+        make_table,
+        make_schema,
+        make_udf,
+        make_group,
+        env_or_skip,
+        make_random,
+        make_acc_group,
+        make_user,
+    )
+    yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
+    ctx.workspace_installation.uninstall()

@@ -37,3 +37,21 @@ class AclSupport:
     @abstractmethod
     def object_types(self) -> set[str]:
         """This method returns a set of strings, that represent object types that are applicable by this instance."""
+
+
+class StaticListing:
+    """This class is only supposed to be used in testing scenarios."""
+
+    def __init__(self, include_object_permissions: list[str], object_types: set[str]):
+        self._include_object_permissions = include_object_permissions
+        self._object_types = object_types
+
+    def __iter__(self):
+        for pair in self._include_object_permissions:
+            object_type, object_id = pair.split(":")
+            if object_type not in self._object_types:
+                continue
+            yield Permissions(object_id, object_type, '')
+
+    def __repr__(self):
+        return f"StaticListing({self._include_object_permissions})"
