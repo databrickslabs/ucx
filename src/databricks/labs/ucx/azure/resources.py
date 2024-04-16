@@ -503,11 +503,11 @@ class AzureResources:
             access_connector = None
         return access_connector
 
-    def list_resources(self, subscription_id: str, resource_type: str) -> Iterable[RawResource]:
+    def list_resources(self, subscription: AzureSubscription, resource_type: str) -> Iterable[RawResource]:
         """List all resources of a type within subscription"""
         query = {"api-version": "2020-06-01", "$filter": f"resourceType eq '{resource_type}'"}
         while True:
-            res = self._mgmt.get(f"/subscriptions/{subscription_id}/resources", query=query)
+            res = self._mgmt.get(f"/subscriptions/{subscription.subscription_id}/resources", query=query)
             for resource in res["value"]:
                 try:
                     yield RawResource(resource)
@@ -520,17 +520,18 @@ class AzureResources:
             parsed_link = urllib.parse.urlparse(next_link)
             query = dict(urllib.parse.parse_qsl(parsed_link.query))
 
-    def access_connectors(self, subscription_id: str) -> Iterable[AccessConnector]:
+    def access_connectors(self) -> Iterable[AccessConnector]:
         """List all access connector within subscription
 
         Docs:
             https://learn.microsoft.com/en-us/rest/api/databricks/access-connectors/list-by-subscription?view=rest-databricks-2023-05-01&tabs=HTTP
         """
-        for raw in self.list_resources(subscription_id, "Microsoft.Databricks/accessConnectors"):
-            try:
-                yield AccessConnector.from_raw_resource(raw)
-            except KeyError:
-                logger.warning(f"Could not parse access connector: {raw}")
+        for subscription in self.subscriptions():
+            for raw in self.list_resources(subscription, "Microsoft.Databricks/accessConnectors"):
+                try:
+                    yield AccessConnector.from_raw_resource(raw)
+                except KeyError:
+                    logger.warning(f"Could not parse access connector: {raw}")
 
     def create_or_update_access_connector(
         self,

@@ -23,7 +23,7 @@ def test_azure_resource_access_connector_list_create_get_delete(az_cli_ctx, env_
         f"/Microsoft.Databricks/accessConnectors/{access_connector_name}"
     )
 
-    access_connectors = az_cli_ctx.azure_resources.access_connectors(subscription_id)
+    access_connectors = az_cli_ctx.azure_resources.access_connectors()
     access_connector_ids = [access_connector.id for access_connector in access_connectors]
     assert access_connector_id not in access_connector_ids
 
@@ -49,6 +49,6 @@ def test_azure_resource_access_connector_list_create_get_delete(az_cli_ctx, env_
         access_connector_name,
     )
 
-    access_connectors = az_cli_ctx.azure_resources.access_connectors(subscription_id)
+    access_connectors = az_cli_ctx.azure_resources.access_connectors()
     access_connector_ids = [access_connector.id for access_connector in access_connectors]
     assert access_connector_id not in access_connector_ids

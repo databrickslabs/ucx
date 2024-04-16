@@ -280,7 +280,7 @@ def test_azure_resources_list_access_connectors() -> None:
     """Non-zero access connectors are mocked"""
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
-    access_connectors = azure_resource.access_connectors("test")
+    access_connectors = azure_resource.access_connectors()
     assert len(list(access_connectors)) > 0
 
 
