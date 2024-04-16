@@ -210,7 +210,12 @@ class AzureResourcePermissions:
         self._apply_storage_permission(access_connector.principal_id, role_name, storage_account)
         return access_connector
 
-    def create_access_connectors_for_storage_accounts(self, storage_account_permissions: dict[str, str]) -> list[AccessConnector]:
+    def create_access_connectors_for_storage_accounts(
+        self, storage_account_permissions: dict[str, str] | None = None
+    ) -> list[AccessConnector]:
+        if storage_account_permissions is None:
+            storage_account_permissions = {}
+
         used_storage_accounts = self._get_storage_accounts()
         if len(used_storage_accounts) == 0:
             logger.warning(
@@ -223,7 +228,11 @@ class AzureResourcePermissions:
         for storage_account in self._azurerm.storage_accounts():
             if storage_account.name not in used_storage_accounts:
                 continue
-            tasks.append(partial(self._create_access_connector_for_storage_account, storage_account=storage_account))
+            tasks.append(partial(
+                self._create_access_connector_for_storage_account,
+                storage_account=storage_account,
+                role_name=storage_account_permissions.get(storage_account.name, "STORAGE_BLOB_DATA_READER"),
+            ))
 
         thread_name = "Creating access connectors for storage accounts"
         results, errors = Threads.gather(thread_name, tasks)
