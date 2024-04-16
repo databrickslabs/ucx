@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 
 from databricks.labs.blueprint.installation import Installation
@@ -242,6 +243,9 @@ class ServicePrincipalMigration(SecretsMixin):
     ) -> list[StorageCredentialValidationResult]:
         _ = service_principal_migration_info
         # TODO: Add permission mapping for access connectors
+        storage_account_permissions = defaultdict(list)
+        for spn in service_principal_migration_info:
+            storage_account_permissions[spn.permission_mapping.storage_account].append(spn.permission_mapping.role_name)
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
         execution_result = []
