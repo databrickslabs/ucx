@@ -229,18 +229,6 @@ class PythonLinter(Linter):
         return linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
 
     @staticmethod
-    def list_import_sources_1(linter: ASTLinter) -> list[str]:
-        nodes = linter.locate(ast.Import, [])
-        files = [alias.name for node in nodes for alias in node.names]
-        nodes = linter.locate(ast.ImportFrom, [])
-        files.extend(node.module for node in nodes)
-        nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
-        files.extend(node.args[0].value for node in nodes)
-        nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
-        files.extend(node.args[0].value for node in nodes)
-        return files
-
-    @staticmethod
     def list_import_sources(linter: ASTLinter) -> list[ImportSource]:
         import_sources: list[ImportSource] = []
         nodes = linter.locate(ast.Import, [])

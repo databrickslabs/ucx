@@ -11,8 +11,6 @@ from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect
 
-S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
-
 
 @pytest.mark.parametrize(
     "source, expected",
@@ -22,7 +20,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             [
                 Deprecation(
                     code='dependency-check',
-                    message=S3FS_DEPRECATION_MESSAGE,
+                    message="Deprecated import: --string-- <- s3fs",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -35,7 +33,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             [
                 Deprecation(
                     code='dependency-check',
-                    message=S3FS_DEPRECATION_MESSAGE,
+                    message="Deprecated import from: --string-- <- s3fs",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -50,7 +48,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             [
                 Deprecation(
                     code='dependency-check',
-                    message=S3FS_DEPRECATION_MESSAGE,
+                    message="Deprecated import: --string-- <- s3fs",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -64,7 +62,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             [
                 Deprecation(
                     code='dependency-check',
-                    message=S3FS_DEPRECATION_MESSAGE,
+                    message="Deprecated import: --string-- <- s3fs",
                     start_line=2,
                     start_col=4,
                     end_line=2,
@@ -77,7 +75,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             [
                 Deprecation(
                     code='dependency-check',
-                    message=S3FS_DEPRECATION_MESSAGE,
+                    message="Deprecated import: --string-- <- s3fs",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -90,7 +88,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             [
                 Deprecation(
                     code='dependency-check',
-                    message='Use of dependency s3fs.subpackage is deprecated',
+                    message="Deprecated import from: --string-- <- s3fs.subpackage",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -107,11 +105,11 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     resolver = DependencyResolver(whitelist)
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
-    ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
+    ws.workspace.get_status.return_value = ObjectInfo(path="--string--", object_type=ObjectType.FILE)
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws), resolver)
-    object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
-    migrator.build_dependency_graph(object_info)
-    advices = list(resolver.get_advices())
+    object_info = ObjectInfo(path="--string--", language=Language.PYTHON, object_type=ObjectType.FILE)
+    graph = migrator.build_dependency_graph(object_info)
+    advices = list(graph.lint())
     assert advices == expected
 
 
@@ -121,7 +119,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
         [
             Deprecation(
                 code='dependency-check',
-                message='Use of dependency s3fs is deprecated',
+                # Note test input file names
+                message="Deprecated import: root9.py.txt <- leaf9 <- s3fs",
                 start_line=1,
                 start_col=0,
                 end_line=1,
@@ -147,6 +146,6 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws), resolver)
     object_info = ObjectInfo(path="root9.py.txt", object_type=ObjectType.FILE)
-    migrator.build_dependency_graph(object_info)
-    advices = list(resolver.get_advices())
+    graph = migrator.build_dependency_graph(object_info)
+    advices = list(graph.lint())
     assert advices == expected

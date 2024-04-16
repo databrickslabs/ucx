@@ -23,6 +23,16 @@ class Dependency:
         self._type = object_type
         self._path = path
         self._source = source
+        self._compatibility: UCCompatibility | None = None
+
+    @property
+    def compatibility(self) -> UCCompatibility | None:
+        return self._compatibility
+
+    # cannot do this in construction as the resolver must decide the compatibility
+    @compatibility.setter
+    def compatibility(self, value: UCCompatibility):
+        self._compatibility = value
 
     @property
     def type(self) -> ObjectType | None:
@@ -116,37 +126,15 @@ class DependencyResolver:
         self._whitelist = Whitelist() if whitelist is None else whitelist
         self._advices: list[Advice] = []
 
+    def compatibility(self, dependency: Dependency) -> UCCompatibility | None:
+        return self._whitelist.compatibility(dependency.path)
+
     def resolve(self, dependency: Dependency) -> Dependency | None:
         if dependency.type == ObjectType.NOTEBOOK:
             return dependency
-        compatibility = self._whitelist.compatibility(dependency.path)
+        dependency.compatibility = self.compatibility(dependency)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
-        if compatibility is not None:
-            if compatibility == UCCompatibility.NONE:
-                if dependency.source is not None:
-                    self._advices.append(
-                        dependency.source.location.as_deprecation().replace(
-                            code="dependency-check",
-                            message=f"Use of dependency {dependency.path} is deprecated",
-                        ),
-                    )
-                else:
-                    self._advices.append(
-                        Deprecation(
-                            code="dependency-check",
-                            message=f"Use of dependency {dependency.path} is deprecated",
-                            start_col=0,
-                            end_col=0,
-                            start_line=0,
-                            end_line=0,
-                        )
-                    )
-
-            return None
         return dependency
-
-    def get_advices(self) -> Iterable[Advice]:
-        yield from self._advices
 
 
 class DependencyGraph:
@@ -176,15 +164,23 @@ class DependencyGraph:
         resolved = self._resolver.resolve(dependency)
         if resolved is None:
             return None
+
         # already registered ?
         child_graph = self.locate_dependency(resolved)
         if child_graph is not None:
             self._dependencies[resolved] = child_graph
             return child_graph
+
         # nay, create the child graph and populate it
         child_graph = DependencyGraph(resolved, self, self._loader, self._resolver)
         self._dependencies[resolved] = child_graph
+        if resolved.compatibility:
+            # We do not descend into dependencies that are already known in some
+            # way as they will be linted or migrated.
+            return None
+
         container = self._loader.load_dependency(resolved)
+
         if not container:
             return None
         container.build_dependency_graph(child_graph)
@@ -219,10 +215,14 @@ class DependencyGraph:
         def add_to_dependencies(graph: DependencyGraph) -> bool:
             if graph.dependency in dependencies:
                 return True
+
             dependencies.add(graph.dependency)
             return False
 
-        self.visit(add_to_dependencies)
+        # Do not add self as a dependency on itself
+        for dependency in self._dependencies.values():
+            dependency.visit(add_to_dependencies)
+
         return dependencies
 
     @property
@@ -237,3 +237,42 @@ class DependencyGraph:
             if dependency.visit(visit_node):
                 return True
         return False
+
+    # Single linter right now, will change to register multiple linters using a similar method to
+    # SerialLinter
+    def lint(self) -> Iterable[Advice]:
+        advices: list[Advice] = []
+        trace: list[str] = []
+
+        def build_trace():
+            return " <- ".join(trace)
+
+        def check_compatibility(graph):
+            dependency = graph.dependency
+            trace.append(dependency.path)
+            compatibility = self._resolver.compatibility(dependency)
+            if compatibility and compatibility == UCCompatibility.NONE:
+                if dependency.source is not None:
+                    import_type = dependency.source.location.code
+                    advices.append(
+                        dependency.source.location.as_deprecation().replace(
+                            code="dependency-check",
+                            message="Deprecated " + import_type + ": " + build_trace(),
+                        ),
+                    )
+                else:
+                    advices.append(
+                        Deprecation(
+                            code="dependency-check",
+                            message=f"Use of dependency {dependency.path} is deprecated",
+                            start_col=0,
+                            end_col=0,
+                            start_line=0,
+                            end_line=0,
+                        )
+                    )
+            if len(self._dependencies) == 0:
+                trace.pop()
+
+        self.visit(check_compatibility)
+        yield from advices
