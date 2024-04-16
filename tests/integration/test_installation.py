@@ -59,7 +59,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
 
 
 @pytest.fixture
-def new_installation(ws, sql_backend, env_or_skip, make_random):
+def new_installation(ws, env_or_skip, make_random):
     cleanup = []
 
     def factory(
@@ -110,8 +110,6 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx,
-    ws,
-    sql_backend,
     make_cluster_policy,
     make_cluster_policy_permissions,
 ):
@@ -204,9 +202,7 @@ def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, 
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_running_real_migrate_groups_job(
-    ws, sql_backend, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
-):
+def test_running_real_migrate_groups_job(ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions):
     ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
 
     # perhaps we also want to do table grants here (to test acl cluster)
@@ -229,9 +225,7 @@ def test_running_real_migrate_groups_job(
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_running_real_validate_groups_permissions_job(
-    ws, sql_backend, installation_ctx, make_query, make_query_permissions
-):
+def test_running_real_validate_groups_permissions_job(installation_ctx, make_query, make_query_permissions):
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
     query = make_query()
@@ -251,7 +245,7 @@ def test_running_real_validate_groups_permissions_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job_fails(
-    ws, sql_backend, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
+    ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
@@ -276,7 +270,7 @@ def test_running_real_validate_groups_permissions_job_fails(
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_running_real_remove_backup_groups_job(ws, sql_backend, installation_ctx):
+def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
@@ -424,7 +418,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
         )
 
 
-def test_check_inventory_database_exists(ws, installation_ctx, make_random):
+def test_check_inventory_database_exists(ws, installation_ctx):
     installation_ctx.installation = Installation.assume_global(ws, installation_ctx.product_info.product_name())
     installation_ctx.installation.save(installation_ctx.config)
     inventory_database = installation_ctx.inventory_database
