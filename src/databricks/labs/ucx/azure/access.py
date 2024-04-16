@@ -212,7 +212,7 @@ class AzureResourcePermissions:
                 "There are no external table present with azure storage account. "
                 "Please check if assessment job is run"
             )
-            return
+            return []
 
         tasks = []
         for storage_account in self._azurerm.storage_accounts():
@@ -224,7 +224,7 @@ class AzureResourcePermissions:
         results, errors = Threads.gather(thread_name, tasks)
         if len(errors) > 0:
             raise ManyError(errors)
-        return results
+        return list(results)
 
     def _apply_storage_permission(
         self,
