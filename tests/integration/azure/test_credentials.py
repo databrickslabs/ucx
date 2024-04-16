@@ -2,6 +2,7 @@ import base64
 import re
 from dataclasses import dataclass
 from datetime import timedelta
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -16,8 +17,14 @@ from databricks.labs.ucx.azure.credentials import (
     StorageCredentialManager,
     StorageCredentialValidationResult,
 )
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.azure.resources import (
+    AccessConnector,
+    AzureAPIClient,
+    AzureResource,
+    AzureResources,
+    StorageAccount,
+)
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations
 from tests.integration.conftest import StaticServicePrincipalCrawler
 
 
@@ -56,7 +63,7 @@ def extract_test_info(ws, env_or_skip, make_random):
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend):
+def run_migration(ws, sql_backend, inventory_schema):
     def inner(
         test_info: MigrationTestInfo,
         credentials: set[str] | None = None,
@@ -69,14 +76,33 @@ def run_migration(ws, sql_backend):
             ws.config.arm_environment.service_management_endpoint,
         )
         graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_mgmt_client, graph_client)
-        locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
+        azurerm = create_autospec(AzureResources(azure_mgmt_client, graph_client))
+
+        storage_account_id = "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/labsazurethings"
+        storage_account = StorageAccount(AzureResource(storage_account_id), "labsazurethings", "westeu")
+        azurerm.storage_accounts.return_value = [storage_account]
+
+        access_connector_id = "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-labsazurethings"
+        access_connector = AccessConnector(
+            AzureResource(access_connector_id),
+            "ac-labsazurethings",
+            "westeu",
+            provisioning_state="Succeeded",
+            identity_type="SystemAssigned",
+            principal_id="labsazurethings-principal-id",
+            tenant_id="test-tenant"
+        )
+        azurerm.create_or_update_access_connector.return_value = access_connector
+
+        external_location = ExternalLocation(f"abfss://things@{storage_account.name}.dfs.core.windows.net/folder1", 1)
+        sql_backend.save_table(f"{inventory_schema}.external_locations", [external_location], ExternalLocation)
+        locations = ExternalLocations(ws, sql_backend, inventory_schema)
 
         installation = MockInstallation(
             {
                 "azure_storage_account_info.csv": [
                     {
-                        'prefix': 'abfss://things@labsazurethings.dfs.core.windows.net/avoid_ext_loc_overlap',
+                        'prefix': external_location.location,
                         'client_id': test_info.application_id,
                         'principal': test_info.credential_name,
                         'privilege': "READ_FILES" if read_only else "WRITE_FILES",
