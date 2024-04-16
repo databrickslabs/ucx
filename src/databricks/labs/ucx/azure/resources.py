@@ -117,11 +117,11 @@ class StorageAccount:
         if name == "":
             raise KeyError(f"Missing name: {raw}")
 
-        storage_account = cls(
-            id=raw.id,
-            name=name,
-            location=raw.get("location", ""),
-        )
+        location = raw.get("location", "")
+        if location == "":
+            raise KeyError(f"Missing location: {raw}")
+
+        storage_account = cls(id=raw.id, name=name, location=location)
         return storage_account
 
 
