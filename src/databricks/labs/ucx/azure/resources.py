@@ -520,7 +520,7 @@ class AzureResources:
             parsed_link = urllib.parse.urlparse(next_link)
             query = dict(urllib.parse.parse_qsl(parsed_link.query))
 
-    def list_access_connectors(self, subscription_id: str) -> Iterable[AccessConnector]:
+    def access_connectors(self, subscription_id: str) -> Iterable[AccessConnector]:
         """List all access connector within subscription
 
         Docs:
