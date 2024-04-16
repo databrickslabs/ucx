@@ -7,7 +7,7 @@ from enum import Enum, auto
 from functools import partial
 
 import sqlglot
-from sqlglot.expressions import Table as SQLTable
+from sqlglot import expressions
 from sqlglot.expressions import LocationProperty
 from sqlglot.errors import ParseError
 
@@ -274,11 +274,11 @@ class Table:
             logger.error(f"sqlglot parsed none statement from 'SHOW CREATE TABLE' DDL for {self.key}")
             return None
 
-        src_table = statement.find(SQLTable)
+        src_table = statement.find(expressions.Table)
         if not src_table:
             logger.error(f"sqlglot failed to extract table object from parsed DDL for {self.key}")
             return None
-        new_table = SQLTable(catalog=catalog_name, db=dst_schema, this=dst_table)
+        new_table = expressions.Table(catalog=catalog_name, db=dst_schema, this=dst_table)
         src_table.replace(new_table)
 
         if replace_location:

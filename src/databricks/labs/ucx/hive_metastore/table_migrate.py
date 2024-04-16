@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class TablesMigrator:
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         table_crawler: TablesCrawler,
         grant_crawler: GrantsCrawler,
