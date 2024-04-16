@@ -224,7 +224,7 @@ class AzureResourcePermissions:
                 "There are no external table present with azure storage account. "
                 "Please check if assessment job is run"
             )
-            return
+            return []
 
         tasks, role_names = [], []
         for storage_account in self._azurerm.storage_accounts():
