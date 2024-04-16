@@ -310,6 +310,7 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
         )
 
     def save_tables(self):
+        # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
         return self.sql_backend.save_table(
             f"{self.inventory_database}.tables",
             [
@@ -335,6 +336,7 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
         )
 
     def with_dummy_grants_and_tacls(self):
+        # inject dummy group and table acl to avoid crawling which will slow down tests like test_table_migration_job
         self.sql_backend.save_table(
             f"{self.inventory_database}.groups",
             [

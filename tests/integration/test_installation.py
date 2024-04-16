@@ -364,7 +364,6 @@ def prepare_tables_for_migration(
             schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
         ),
     }
-    # create destination catalog and schema
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
     tables["src_view1"] = installation_ctx.make_table(
         catalog_name=schema.catalog_name,
@@ -388,7 +387,6 @@ def prepare_tables_for_migration(
         installation_ctx.with_dummy_azure_resource_permission()
     if ws.config.is_aws:
         installation_ctx.with_dummy_aws_resource_permission()
-    # need to populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
     installation_ctx.save_tables()
     installation_ctx.save_mounts()
     installation_ctx.with_dummy_grants_and_tacls()
