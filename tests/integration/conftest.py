@@ -6,7 +6,6 @@ import logging
 import warnings
 from dataclasses import replace
 from functools import partial, cached_property
-from typing import Callable
 from datetime import timedelta
 
 import databricks.sdk.core
@@ -437,7 +436,6 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
 def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
     ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
-
 
 
 class LocalAzureCliTest(WorkspaceContext):
