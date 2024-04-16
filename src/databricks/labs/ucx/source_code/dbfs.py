@@ -16,6 +16,7 @@ class DetectDbfsVisitor(ast.NodeVisitor):
     def __init__(self):
         self._advices: list[Advice] = []
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
+        self._reported_locations = set()  # Set to store reported locations
 
     def visit_Call(self, node):  # pylint: disable=invalid-name
         for arg in node.args:
@@ -31,6 +32,8 @@ class DetectDbfsVisitor(ast.NodeVisitor):
                             end_col=arg.col_offset + len(arg.s),
                         )
                     )
+                    # Record the location of the reported constant, so we do not double report
+                    self._reported_locations.add((arg.lineno, arg.col_offset))
         self.generic_visit(node)
 
     def visit_Constant(self, node):
@@ -39,17 +42,19 @@ class DetectDbfsVisitor(ast.NodeVisitor):
             self._check_str_constant(node)
 
     def _check_str_constant(self, node):
-        if any(node.s.startswith(prefix) for prefix in self._fs_prefixes):
-            self._advices.append(
-                Advisory(
-                    code='dbfs-usage',
-                    message=f"Possible deprecated file system path: {node.s}",
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.lineno,
-                    end_col=node.col_offset + len(node.s),
+        # Check if the location has been reported before
+        if (node.lineno, node.col_offset) not in self._reported_locations:
+            if any(node.s.startswith(prefix) for prefix in self._fs_prefixes):
+                self._advices.append(
+                    Advisory(
+                        code='dbfs-usage',
+                        message=f"Possible deprecated file system path: {node.s}",
+                        start_line=node.lineno,
+                        start_col=node.col_offset,
+                        end_line=node.lineno,
+                        end_col=node.col_offset + len(node.s),
+                    )
                 )
-            )
         self.generic_visit(node)
 
     def get_advices(self) -> Iterable[Advice]:

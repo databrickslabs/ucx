@@ -1,4 +1,5 @@
 from unittest.mock import create_autospec
+import re
 
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType
@@ -94,8 +95,8 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     assert notebook is not None
     new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
-    actual_purified = new_source.replace(' \n', '\n')
-    expected_purified = sources[0].replace(' \n', '\n')
+    actual_purified = re.sub(r'\s+$', '', new_source, flags=re.MULTILINE)
+    expected_purified = re.sub(r'\s+$', '', sources[0], flags=re.MULTILINE)
     assert actual_purified == expected_purified
 
 
