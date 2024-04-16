@@ -10,7 +10,7 @@ from functools import cached_property
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
-from databricks.labs.blueprint.installer import InstallState, RawState
+from databricks.labs.blueprint.installer import RawState
 from databricks.labs.blueprint.parallel import Threads, ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
@@ -29,7 +29,6 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
 from databricks.labs.ucx.installer.workflows import (
-    DeployedWorkflows,
     WorkflowsDeployment,
 )
 from databricks.labs.ucx.runtime import Workflows
@@ -237,13 +236,11 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
     cleanup = []
 
     def factory(
-        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
         installation: Installation | None = None,
         product_info: ProductInfo | None = None,
         environ: dict[str, str] | None = None,
         extend_prompts: dict[str, str] | None = None,
         inventory_schema_name: str | None = None,
-        skip_dashboards: bool = True,
     ):
         logger.debug("Creating new installation...")
         if not product_info:
@@ -269,71 +266,19 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
             | (extend_prompts or {})
         )
 
-        logger.debug("Waiting for clusters to start...")
-        default_cluster_id = env_or_skip("TEST_DEFAULT_CLUSTER_ID")
-        tacl_cluster_id = env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
-        table_migration_cluster_id = env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
-        Threads.strict(
-            "ensure clusters running",
-            [
-                functools.partial(ws.clusters.ensure_cluster_is_running, default_cluster_id),
-                functools.partial(ws.clusters.ensure_cluster_is_running, tacl_cluster_id),
-                functools.partial(ws.clusters.ensure_cluster_is_running, table_migration_cluster_id),
-            ],
-        )
-        logger.debug("Waiting for clusters to start...")
-
         if not installation:
             installation = Installation(ws, product_info.product_name())
-        install_state = InstallState.from_installation(installation)
         installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
         workspace_config = installer.configure()
         installation = product_info.current_installation(ws)
-        overrides = {"main": default_cluster_id, "tacl": tacl_cluster_id, "table_migration": table_migration_cluster_id}
-        workspace_config.override_clusters = overrides
-
-        if workspace_config.workspace_start_path == '/':
-            workspace_config.workspace_start_path = installation.install_folder()
-        if config_transform:
-            workspace_config = config_transform(workspace_config)
-
         installation.save(workspace_config)
-
-        tasks = Workflows.all().tasks()
-
-        # TODO: see if we want to move building wheel as a context manager for yield factory,
-        # so that we can shave off couple of seconds and build wheel only once per session
-        # instead of every test
-        workflows_installation = WorkflowsDeployment(
-            workspace_config,
-            installation,
-            install_state,
-            ws,
-            product_info.wheels(ws),
-            product_info,
-            timedelta(minutes=3),
-            tasks,
-            skip_dashboards=skip_dashboards,
-        )
-        workspace_installation = WorkspaceInstallation(
-            workspace_config,
-            installation,
-            install_state,
-            sql_backend,
-            ws,
-            workflows_installation,
-            prompts,
-            product_info,
-            skip_dashboards=skip_dashboards,
-        )
-        workspace_installation.run()
-        cleanup.append(workspace_installation)
-        return workspace_installation, DeployedWorkflows(ws, install_state, timedelta(minutes=3))
+        cleanup.append(installation)
+        return installation
 
     yield factory
 
     for pending in cleanup:
-        pending.uninstall()
+        pending.remove()
 
 
 def test_experimental_permissions_migration_for_group_with_same_name(
@@ -545,46 +490,44 @@ def test_uninstallation(ws, sql_backend, installation_ctx):
         sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
 
 
-def test_fresh_global_installation(ws, new_installation):
-    product_info = ProductInfo.for_testing(WorkspaceConfig)
-    global_installation, _ = new_installation(
-        product_info=product_info,
-        installation=Installation.assume_global(ws, product_info.product_name()),
+def test_fresh_global_installation(ws, installation_ctx):
+    installation_ctx.installation = Installation.assume_global(ws, installation_ctx.product_info.product_name())
+    installation_ctx.installation.save(installation_ctx.config)
+    assert (
+        installation_ctx.workspace_installation.folder
+        == f"/Applications/{installation_ctx.product_info.product_name()}"
     )
-    assert global_installation.folder == f"/Applications/{product_info.product_name()}"
-    global_installation.uninstall()
 
 
 def test_fresh_user_installation(ws, installation_ctx):
-    installation_ctx.workspace_installation.run()
+    installation_ctx.installation.save(installation_ctx.config)
     assert (
         installation_ctx.workspace_installation.folder
         == f"/Users/{ws.current_user.me().user_name}/.{installation_ctx.product_info.product_name()}"
     )
 
 
-def test_global_installation_on_existing_global_install(ws, new_installation):
-    product_info = ProductInfo.for_testing(WorkspaceConfig)
-    existing_global_installation, _ = new_installation(
-        product_info=product_info,
-        installation=Installation.assume_global(ws, product_info.product_name()),
+def test_global_installation_on_existing_global_install(ws, installation_ctx):
+    installation_ctx.installation = Installation.assume_global(ws, installation_ctx.product_info.product_name())
+    installation_ctx.installation.save(installation_ctx.config)
+    assert (
+        installation_ctx.workspace_installation.folder
+        == f"/Applications/{installation_ctx.product_info.product_name()}"
     )
-    assert existing_global_installation.folder == f"/Applications/{product_info.product_name()}"
-    reinstall_global, _ = new_installation(
-        product_info=product_info,
-        installation=Installation.assume_global(ws, product_info.product_name()),
+    installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-    assert reinstall_global.folder == f"/Applications/{product_info.product_name()}"
-    reinstall_global.uninstall()
+    installation_ctx.__dict__.pop("workspace_installer")
+    installation_ctx.__dict__.pop("prompts")
+    installation_ctx.workspace_installer.configure()
 
 
 def test_user_installation_on_existing_global_install(ws, new_installation, make_random):
     # existing install at global level
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    existing_global_installation, _ = new_installation(
+    new_installation(
         product_info=product_info,
         installation=Installation.assume_global(ws, product_info.product_name()),
     )
@@ -602,7 +545,7 @@ def test_user_installation_on_existing_global_install(ws, new_installation, make
         )
 
     # successful override with confirmation
-    reinstall_user_force, _ = new_installation(
+    reinstall_user_force = new_installation(
         product_info=product_info,
         installation=Installation.assume_global(ws, product_info.product_name()),
         environ={'UCX_FORCE_INSTALL': 'user'},
@@ -612,19 +555,21 @@ def test_user_installation_on_existing_global_install(ws, new_installation, make
         },
         inventory_schema_name=f"ucx_S{make_random(4)}_reinstall",
     )
-    assert reinstall_user_force.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
-    reinstall_user_force.uninstall()
-    existing_global_installation.uninstall()
+    assert (
+        reinstall_user_force.install_folder()
+        == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+    )
 
 
 def test_global_installation_on_existing_user_install(ws, new_installation):
     # existing installation at user level
     product_info = ProductInfo.for_testing(WorkspaceConfig)
-    existing_user_installation, _ = new_installation(
+    existing_user_installation = new_installation(
         product_info=product_info, installation=Installation.assume_user_home(ws, product_info.product_name())
     )
     assert (
-        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+        existing_user_installation.install_folder()
+        == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
@@ -650,73 +595,26 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
                 r".*Do you want to update the existing installation?.*": 'yes',
             },
         )
-    existing_user_installation.uninstall()
 
 
-def test_check_inventory_database_exists(ws, new_installation, make_random):
-    product_info = ProductInfo.for_testing(WorkspaceConfig)
-    install, _ = new_installation(
-        product_info=product_info,
-        installation=Installation.assume_global(ws, product_info.product_name()),
-        inventory_schema_name=f"ucx_S{make_random(4)}_exists",
-    )
-    inventory_database = install.config.inventory_database
+def test_check_inventory_database_exists(ws, installation_ctx, make_random):
+    installation_ctx.installation = Installation.assume_global(ws, installation_ctx.product_info.product_name())
+    installation_ctx.installation.save(installation_ctx.config)
+    inventory_database = installation_ctx.inventory_database
 
     with pytest.raises(
         AlreadyExists, match=f"Inventory database '{inventory_database}' already exists in another installation"
     ):
-        new_installation(
-            product_info=product_info,
-            installation=Installation.assume_global(ws, product_info.product_name()),
-            environ={'UCX_FORCE_INSTALL': 'user'},
+        installation_ctx.installation = Installation.assume_user_home(ws, installation_ctx.product_info.product_name())
+        installation_ctx.__dict__.pop("workspace_installer")
+        installation_ctx.__dict__.pop("prompts")
+        installation_ctx.replace(
             extend_prompts={
                 r".*UCX is already installed on this workspace.*": 'yes',
                 r".*Do you want to update the existing installation?.*": 'yes',
             },
-            inventory_schema_name=inventory_database,
         )
-
-
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
-def test_table_migration_job(
-    ws,
-    installation_ctx,
-    env_or_skip,
-    prepare_tables_for_migration,
-):
-    # skip this test if not in nightly test job or debug mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        env_or_skip("TEST_NIGHTLY")
-
-    ctx = installation_ctx.replace(
-        config_transform=lambda wc: replace(wc, override_clusters=None),
-        extend_prompts={
-            r"Parallelism for migrating.*": "1000",
-            r"Min workers for auto-scale.*": "2",
-            r"Max workers for auto-scale.*": "20",
-            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
-            r".*Do you want to update the existing installation?.*": 'yes',
-        },
-    )
-    tables, dst_schema = prepare_tables_for_migration
-
-    ctx.workspace_installation.run()
-    ctx.deployed_workflows.run_workflow("migrate-tables")
-    # assert the workflow is successful
-    assert ctx.deployed_workflows.validate_step("migrate-tables")
-    # assert the tables are migrated
-    for table in tables.values():
-        try:
-            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
-        except NotFound:
-            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
-    # assert the cluster is configured correctly
-    for job_cluster in ws.jobs.get(
-        ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
-    ).settings.job_clusters:
-        assert job_cluster.new_cluster.autoscale.min_workers == 2
-        assert job_cluster.new_cluster.autoscale.max_workers == 20
-        assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
+        installation_ctx.workspace_installer.configure()
 
 
 @pytest.fixture
@@ -762,6 +660,48 @@ def prepare_tables_for_migration(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_table_migration_job(
+    ws,
+    installation_ctx,
+    env_or_skip,
+    prepare_tables_for_migration,
+):
+    # skip this test if not in nightly test job or debug mode
+    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
+        env_or_skip("TEST_NIGHTLY")
+
+    ctx = installation_ctx.replace(
+        config_transform=lambda wc: replace(wc, override_clusters=None),
+        extend_prompts={
+            r"Parallelism for migrating.*": "1000",
+            r"Min workers for auto-scale.*": "2",
+            r"Max workers for auto-scale.*": "20",
+            r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    tables, dst_schema = prepare_tables_for_migration
+
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("migrate-tables")
+    # assert the workflow is successful
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
+    # assert the tables are migrated
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+    # assert the cluster is configured correctly
+    for job_cluster in ws.jobs.get(
+        ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
+    ).settings.job_clusters:
+        assert job_cluster.new_cluster.autoscale.min_workers == 2
+        assert job_cluster.new_cluster.autoscale.max_workers == 20
+        assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(
     ws,
     installation_ctx,
@@ -801,3 +741,12 @@ def test_compare_remote_local_install_versions(ws, installation_ctx):
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         installation_ctx.workspace_installer.configure()
+
+    installation_ctx.replace(
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    installation_ctx.__dict__.pop("workspace_installer")
+    installation_ctx.__dict__.pop("prompts")
+    installation_ctx.workspace_installer.configure()
