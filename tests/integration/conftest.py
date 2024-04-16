@@ -600,6 +600,7 @@ class TestInstallationContext(TestRuntimeContext):
             | (self.extend_prompts or {})
         )
 
+
 @pytest.fixture
 def installation_ctx(  # pylint: disable=too-many-arguments
     ws,
