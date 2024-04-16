@@ -262,7 +262,7 @@ class ServicePrincipalMigration(SecretsMixin):
             results_file = self.save(execution_results)
             logger.info(
                 "Completed migration from Azure Service Principal to UC Storage credentials "
-                "and creation of Databricks Access Connectors for storage accounts " 
+                "and creation of Databricks Access Connectors for storage accounts "
                 f"Please check {results_file} for validation results"
             )
         else:
