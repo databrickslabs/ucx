@@ -279,7 +279,7 @@ def test_managed_identity_not_found():
 def test_azure_resources_list_access_connectors() -> None:
     """Non-zero access connectors are mocked"""
     api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client)
+    azure_resource = AzureResources(api_client, api_client, include_subscriptions=["002"])
     access_connectors = azure_resource.access_connectors()
     assert len(list(access_connectors)) > 0
 
@@ -288,7 +288,7 @@ def test_azure_resources_get_access_connector() -> None:
     """Should return the properties of the mocked response."""
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
-    access_connector = azure_resource.get_access_connector("test", "rg-test", "test-access-connector")
+    access_connector = azure_resource.get_access_connector("002", "rg-test", "test-access-connector")
     assert access_connector is not None
     assert access_connector.name == "test-access-connector"
     assert access_connector.tags["application"] == "databricks"
