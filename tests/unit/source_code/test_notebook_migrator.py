@@ -7,12 +7,14 @@ from databricks.labs.ucx.source_code.dependencies import DependencyLoader
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 
 
 def test_apply_invalid_object_fails():
     ws = create_autospec(WorkspaceClient)
     languages = create_autospec(Languages)
-    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws))
+    sp = create_autospec(SitePackages)
+    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws, sp))
     object_info = ObjectInfo(language=Language.PYTHON)
     assert not migrator.apply(object_info)
 
@@ -20,7 +22,8 @@ def test_apply_invalid_object_fails():
 def test_revert_invalid_object_fails():
     ws = create_autospec(WorkspaceClient)
     languages = create_autospec(Languages)
-    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws))
+    sp = create_autospec(SitePackages)
+    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws, sp))
     object_info = ObjectInfo(language=Language.PYTHON)
     assert not migrator.revert(object_info)
 
@@ -29,7 +32,8 @@ def test_revert_restores_original_code():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = b'original_code'
     languages = create_autospec(Languages)
-    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws))
+    sp = create_autospec(SitePackages)
+    migrator = NotebookMigrator(ws, languages, DependencyLoader(ws, sp))
     object_info = ObjectInfo(path='path', language=Language.PYTHON)
     migrator.revert(object_info)
     ws.workspace.download.assert_called_with('path.bak', format=ExportFormat.SOURCE)

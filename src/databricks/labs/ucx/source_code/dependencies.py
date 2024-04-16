@@ -8,6 +8,7 @@ from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportForma
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
@@ -63,10 +64,14 @@ class SourceContainer(abc.ABC):
 
 class DependencyLoader:
 
-    def __init__(self, ws: WorkspaceClient):
+    def __init__(self, ws: WorkspaceClient, site_packages: SitePackages):
         self._ws = ws
+        self._site_packages = site_packages
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        package = self._load_site_package(dependency)
+        if package is not None:
+            return package
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
@@ -75,6 +80,9 @@ class DependencyLoader:
         if object_info.object_type in [ObjectType.LIBRARY, ObjectType.DIRECTORY, ObjectType.DASHBOARD, ObjectType.REPO]:
             return None
         raise NotImplementedError(str(object_info.object_type))
+
+    def _load_site_package(self, dependency: Dependency) -> SourceContainer | None:
+        return None
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
         object_info = self._ws.workspace.get_status(dependency.path)
