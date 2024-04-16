@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from functools import partial
@@ -10,7 +11,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceAlreadyExists
 from databricks.sdk.service.catalog import Privilege
 
-from databricks.labs.ucx.assessment.crawlers import logger
 from databricks.labs.ucx.azure.resources import (
     AccessConnector,
     AzureResources,
@@ -19,6 +19,9 @@ from databricks.labs.ucx.azure.resources import (
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
