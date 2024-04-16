@@ -26,36 +26,8 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-from tests.integration.conftest import TestInstallationContext
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture
-def installation_ctx(  # pylint: disable=too-many-arguments
-    ws,
-    sql_backend,
-    make_table,
-    make_schema,
-    make_udf,
-    make_group,
-    env_or_skip,
-    make_random,
-    make_acc_group,
-    make_user,
-):
-    ctx = TestInstallationContext(
-        make_table,
-        make_schema,
-        make_udf,
-        make_group,
-        env_or_skip,
-        make_random,
-        make_acc_group,
-        make_user,
-    )
-    yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
-    ctx.workspace_installation.uninstall()
 
 
 @pytest.fixture
