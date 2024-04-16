@@ -195,7 +195,9 @@ class AzureResourcePermissions:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
-    def _create_access_connector_for_storage_account(self, storage_account: StorageAccount) -> AccessConnector:
+    def _create_access_connector_for_storage_account(
+        self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER",
+    ) -> AccessConnector:
         access_connector = self._azurerm.create_or_update_access_connector(
             storage_account.id.subscription_id,
             storage_account.id.resource_group,
@@ -204,7 +206,8 @@ class AzureResourcePermissions:
             tags={"CreatedBy": "ucx"},
             wait_for_provisioning=True,
         )
-        self._apply_storage_permission(access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account)
+        role_name = role_name.replace(" ", "_").upper()
+        self._apply_storage_permission(access_connector.principal_id, role_name, storage_account)
         return access_connector
 
     def create_access_connectors_for_storage_accounts(self, storage_account_permissions: dict[str, str]) -> list[AccessConnector]:
