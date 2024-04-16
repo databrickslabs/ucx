@@ -194,8 +194,7 @@ class TestRuntimeContext(RuntimeContext):
         self.with_azure_storage_permissions(
             [
                 StoragePermissionMapping(
-                    # TODO: replace with env variable
-                    prefix='abfss://things@labsazurethings.dfs.core.windows.net',
+                    prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
                     client_id='dummy_application_id',
                     principal='principal_1',
                     privilege='WRITE_FILES',
@@ -210,10 +209,10 @@ class TestRuntimeContext(RuntimeContext):
         self.with_aws_storage_permissions(
             [
                 AWSRoleAction(
-                    'arn:aws:iam::184784626197:instance-profile/labs-data-access',
+                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
                     's3',
                     'WRITE_FILES',
-                    's3://labs-things/*',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
                 )
             ]
         )
