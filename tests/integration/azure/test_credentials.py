@@ -168,13 +168,13 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
 @retried(on=[InternalError], timeout=timedelta(minutes=2))
 def test_spn_migration_access_connector_created(ws, extract_test_info, run_migration):
     """Access connectors should be created."""
-    access_connector_storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
-    assert len(access_connector_storage_credentials) == 0
+    storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
+    assert len(storage_credentials) == 0
 
     try:
         run_migration(extract_test_info, migrate_service_principals="No", create_access_connectors="Yes")
     finally:
         save_delete_credential(ws, extract_test_info.credential_name)
 
-    access_connector_storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
-    assert len(access_connector_storage_credentials) > 0
+    storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
+    assert len(storage_credentials) > 0
