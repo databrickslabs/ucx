@@ -230,7 +230,8 @@ class ServicePrincipalMigration(SecretsMixin):
         return self._installation.save(migration_results, filename=self._output_file)
 
     def migrate_service_principals(
-        self, service_principal_migration_info: list[ServicePrincipalMigrationInfo],
+        self,
+        service_principal_migration_info: list[ServicePrincipalMigrationInfo],
     ) -> list[StorageCredentialValidationResult]:
         execution_result = []
         for spn in service_principal_migration_info:
@@ -239,16 +240,20 @@ class ServicePrincipalMigration(SecretsMixin):
         return execution_result
 
     def create_access_connectors(
-        self, service_principal_migration_info: list[ServicePrincipalMigrationInfo],
+        self,
+        service_principal_migration_info: list[ServicePrincipalMigrationInfo],
     ) -> list[StorageCredentialValidationResult]:
         storage_role_with_least_privileges = min(
             zip(AzureResourcePermissions.LEVELS.keys(), AzureResourcePermissions.LEVELS.values()),
-            key=lambda level: level[1]
+            key=lambda level: level[1],
         )[0]
         storage_account_permissions = defaultdict(lambda: storage_role_with_least_privileges)
         for spn in service_principal_migration_info:
             current_role_name = storage_account_permissions[spn.permission_mapping.storage_account]
-            if AzureResourcePermissions.LEVELS[spn.permission_mapping.role_name][0] > AzureResourcePermissions.LEVELS[current_role_name][0]:
+            if (
+                AzureResourcePermissions.LEVELS[spn.permission_mapping.role_name][0]
+                > AzureResourcePermissions.LEVELS[current_role_name][0]
+            ):
                 storage_account_permissions[spn.permission_mapping.storage_account] = spn.permission_mapping.role_name
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts(
             storage_account_permissions

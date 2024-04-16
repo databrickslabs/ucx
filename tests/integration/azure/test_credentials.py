@@ -78,7 +78,9 @@ def run_migration(ws, sql_backend, inventory_schema):
         graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
         azurerm = create_autospec(AzureResources(azure_mgmt_client, graph_client))
 
-        storage_account_id = "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/labsazurethings"
+        storage_account_id = (
+            "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/labsazurethings"
+        )
         storage_account = StorageAccount(AzureResource(storage_account_id), "labsazurethings", "westeu")
         azurerm.storage_accounts.return_value = [storage_account]
 
@@ -90,7 +92,7 @@ def run_migration(ws, sql_backend, inventory_schema):
             provisioning_state="Succeeded",
             identity_type="SystemAssigned",
             principal_id="labsazurethings-principal-id",
-            tenant_id="test-tenant"
+            tenant_id="test-tenant",
         )
         azurerm.create_or_update_access_connector.return_value = access_connector
 
@@ -129,10 +131,12 @@ def run_migration(ws, sql_backend, inventory_schema):
             installation, ws, resource_permissions, sp_crawler, StorageCredentialManager(ws)
         )
         return spn_migration.run(
-            MockPrompts({
-                "Above Azure Service Principals will be migrated to UC storage credentials *": migrate_service_principals,
-                "Please confirm to create an access connector for each storage account.": create_access_connectors,
-            }),
+            MockPrompts(
+                {
+                    "Above Azure Service Principals will be migrated to UC storage credentials *": migrate_service_principals,
+                    "Please confirm to create an access connector for each storage account.": create_access_connectors,
+                }
+            ),
             credentials,
         )
 

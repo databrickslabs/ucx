@@ -196,7 +196,9 @@ class AzureResourcePermissions:
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
 
     def _create_access_connector_for_storage_account(
-        self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER",
+        self,
+        storage_account: StorageAccount,
+        role_name: str = "STORAGE_BLOB_DATA_READER",
     ) -> AccessConnector:
         access_connector = self._azurerm.create_or_update_access_connector(
             storage_account.id.subscription_id,
@@ -231,11 +233,13 @@ class AzureResourcePermissions:
             role_name = storage_account_permissions.get(storage_account.name, "Storage Blob Data Reader")
 
             role_names.append(role_name)
-            tasks.append(partial(
-                self._create_access_connector_for_storage_account,
-                storage_account=storage_account,
-                role_name=role_name,
-            ))
+            tasks.append(
+                partial(
+                    self._create_access_connector_for_storage_account,
+                    storage_account=storage_account,
+                    role_name=role_name,
+                )
+            )
 
         thread_name = "Creating access connectors for storage accounts"
         results, errors = Threads.gather(thread_name, tasks)
