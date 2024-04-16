@@ -1,8 +1,10 @@
+import dataclasses
 import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import replace
 from datetime import timedelta
-from typing import ClassVar, Protocol, TypeVar
+from types import UnionType
+from typing import Any, ClassVar, Protocol, TypeVar
 
 import pytest
 from databricks.labs.blueprint.commands import CommandExecutor
@@ -43,7 +45,41 @@ class CommandContextBackend(SqlBackend):
         return self._sql.run(sql, result_as_json=True)
 
     def save_table(self, full_name: str, rows: Sequence[DataclassInstance], klass: Dataclass, mode="append"):
-        return NotImplementedError()
+        rows = self._filter_none_rows(rows, klass)
+        self.create_table(full_name, klass)
+        if len(rows) == 0:
+            return
+        fields = dataclasses.fields(klass)
+        field_names = [f.name for f in fields]
+        if mode == "overwrite":
+            self.execute(f"TRUNCATE TABLE {full_name}")
+        for i in range(0, len(rows), self._max_records_per_batch):
+            batch = rows[i : i + self._max_records_per_batch]
+            vals = "), (".join(self._row_to_sql(r, fields) for r in batch)
+            sql = f'INSERT INTO {full_name} ({", ".join(field_names)}) VALUES ({vals})'
+            self.execute(sql)
+
+    @staticmethod
+    def _row_to_sql(row: DataclassInstance, fields: tuple[dataclasses.Field[Any], ...]):
+        data = []
+        for f in fields:
+            value = getattr(row, f.name)
+            field_type = f.type
+            if isinstance(field_type, UnionType):
+                field_type = field_type.__args__[0]
+            if value is None:
+                data.append("NULL")
+            elif field_type == bool:
+                data.append("TRUE" if value else "FALSE")
+            elif field_type == str:
+                value = str(value).replace("'", "''")
+                data.append(f"'{value}'")
+            elif field_type == int:
+                data.append(f"{value}")
+            else:
+                msg = f"unknown type: {field_type}"
+                raise ValueError(msg)
+        return ", ".join(data)
 
 
 @pytest.fixture

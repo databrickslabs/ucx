@@ -913,12 +913,6 @@ def sql_backend(ws, env_or_skip) -> StatementExecutionBackend:
 
 
 @pytest.fixture
-def ext_hms_backend(ws, env_or_skip) -> DatabricksConnectBackend:
-    ws.config.cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
-    return DatabricksConnectBackend(ws)
-
-
-@pytest.fixture
 def inventory_schema(make_schema):
     return make_schema(catalog_name="hive_metastore").name
 
@@ -939,13 +933,12 @@ def make_catalog(ws, sql_backend, make_random) -> Generator[Callable[..., Catalo
 
 
 @pytest.fixture
-def make_schema(ws, sql_backend, ext_hms_backend, make_random) -> Generator[Callable[..., SchemaInfo], None, None]:
-    def create(*, catalog_name: str = "hive_metastore", name: str | None = None, ext_hms: bool = False) -> SchemaInfo:
+def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaInfo], None, None]:
+    def create(*, catalog_name: str = "hive_metastore", name: str | None = None) -> SchemaInfo:
         if name is None:
             name = f"ucx_S{make_random(4)}".lower()
-        backend = ext_hms_backend if ext_hms else sql_backend
         full_name = f"{catalog_name}.{name}".lower()
-        backend.execute(f"CREATE SCHEMA {full_name}")
+        sql_backend.execute(f"CREATE SCHEMA {full_name}")
         schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
         logger.info(
             f"Schema {schema_info.full_name}: "
@@ -953,10 +946,9 @@ def make_schema(ws, sql_backend, ext_hms_backend, make_random) -> Generator[Call
         )
         return schema_info
 
-    def remove(schema_info: SchemaInfo, ext_hms: bool = False):
-        backend = ext_hms_backend if ext_hms else sql_backend
+    def remove(schema_info: SchemaInfo):
         try:
-            backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE")
+            sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE")
         except RuntimeError as e:
             if "SCHEMA_NOT_FOUND" in str(e):
                 logger.warning("Schema was already dropped while executing the test", exc_info=e)
@@ -968,10 +960,8 @@ def make_schema(ws, sql_backend, ext_hms_backend, make_random) -> Generator[Call
 
 @pytest.fixture
 # pylint: disable-next=too-many-statements
-def make_table(
-    ws, sql_backend, ext_hms_backend, make_schema, make_random
-) -> Generator[Callable[..., TableInfo], None, None]:
-    def create(  # pylint: disable=too-many-arguments, too-many-locals
+def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
+    def create(
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
@@ -982,11 +972,9 @@ def make_table(
         external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
-        ext_hms: bool = False,
     ) -> TableInfo:
-        backend = ext_hms_backend if ext_hms else sql_backend
         if schema_name is None:
-            schema = make_schema(catalog_name=catalog_name, ext_hms=ext_hms)
+            schema = make_schema(catalog_name=catalog_name)
             catalog_name = schema.catalog_name
             schema_name = schema.name
         if name is None:
@@ -1030,7 +1018,7 @@ def make_table(
             str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
-        backend.execute(ddl)
+        sql_backend.execute(ddl)
         table_info = TableInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,
@@ -1048,10 +1036,9 @@ def make_table(
         )
         return table_info
 
-    def remove(table_info: TableInfo, ext_hms: bool = False):
-        backend = ext_hms_backend if ext_hms else sql_backend
+    def remove(table_info: TableInfo):
         try:
-            backend.execute(f"DROP TABLE IF EXISTS {table_info.full_name}")
+            sql_backend.execute(f"DROP TABLE IF EXISTS {table_info.full_name}")
         except RuntimeError as e:
             if "Cannot drop a view" in str(e):
                 sql_backend.execute(f"DROP VIEW IF EXISTS {table_info.full_name}")
@@ -1064,15 +1051,12 @@ def make_table(
 
 
 @pytest.fixture
-def make_udf(
-    sql_backend, ext_hms_backend, make_schema, make_random
-) -> Generator[Callable[..., FunctionInfo], None, None]:
+def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., FunctionInfo], None, None]:
     def create(
-        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None, ext_hms: bool = False
+        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
     ) -> FunctionInfo:
-        backend = ext_hms_backend if ext_hms else sql_backend
         if schema_name is None:
-            schema = make_schema(catalog_name=catalog_name, ext_hms=ext_hms)
+            schema = make_schema(catalog_name=catalog_name)
             catalog_name = schema.catalog_name
             schema_name = schema.name
 
@@ -1082,7 +1066,7 @@ def make_udf(
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
         ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
 
-        backend.execute(ddl)
+        sql_backend.execute(ddl)
         udf_info = FunctionInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,
@@ -1093,10 +1077,9 @@ def make_udf(
         logger.info(f"Function {udf_info.full_name} crated")
         return udf_info
 
-    def remove(udf_info: FunctionInfo, ext_hms: bool = False):
-        backend = ext_hms_backend if ext_hms else sql_backend
+    def remove(udf_info: FunctionInfo):
         try:
-            backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
+            sql_backend.execute(f"DROP FUNCTION IF EXISTS {udf_info.full_name}")
         except NotFound as e:
             if "SCHEMA_NOT_FOUND" in str(e):
                 logger.warning("Schema was already dropped while executing the test", exc_info=e)
