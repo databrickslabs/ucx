@@ -243,11 +243,11 @@ class ServicePrincipalMigration(SecretsMixin):
         self,
         service_principals: list[ServicePrincipalMigrationInfo],
     ) -> list[StorageCredentialValidationResult]:
-        storage_role_with_least_privileges = min(
+        least_storage_privileges = min(
             zip(AzureResourcePermissions.LEVELS.keys(), AzureResourcePermissions.LEVELS.values()),
             key=lambda level: level[1],
         )[0]
-        storage_account_permissions: dict[str, str] = defaultdict(lambda: storage_role_with_least_privileges)
+        storage_account_permissions: dict[str, str] = defaultdict(lambda: least_storage_privileges)
         for spn in service_principals:
             current_role_name = storage_account_permissions[spn.permission_mapping.storage_account]
             if (
