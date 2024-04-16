@@ -1,17 +1,14 @@
-import functools
 import json
 import logging
 import os.path
 import sys
-from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
-from functools import cached_property
 
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import RawState
-from databricks.labs.blueprint.parallel import Threads, ManyError
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk.errors import (
@@ -27,181 +24,11 @@ from databricks.sdk.service.iam import PermissionLevel
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.mapping import Rule
-from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
-from databricks.labs.ucx.installer.workflows import (
-    WorkflowsDeployment,
-)
-from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-from tests.integration.conftest import (
-    TestRuntimeContext,
-)
+from tests.integration.conftest import TestInstallationContext
 
 logger = logging.getLogger(__name__)
-
-
-class TestInstallationContext(TestRuntimeContext):
-    def __init__(
-        self,
-        make_table_fixture,
-        make_schema_fixture,
-        make_udf_fixture,
-        make_group_fixture,
-        env_or_skip_fixture,
-        make_random_fixture,
-        make_acc_group_fixture,
-        make_user_fixture,
-    ):
-        super().__init__(
-            make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
-        )
-        self._make_random = make_random_fixture
-        self._make_acc_group = make_acc_group_fixture
-        self._make_user = make_user_fixture
-
-    def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
-        if not workspace_group_name:
-            workspace_group_name = f"ucx_{self._make_random(4)}"
-        if not account_group_name:
-            account_group_name = workspace_group_name
-        user = self._make_user()
-        members = [user.id]
-        ws_group = self.make_group(
-            display_name=workspace_group_name,
-            members=members,
-            entitlements=["allow-cluster-create"],
-        )
-        acc_group = self._make_acc_group(display_name=account_group_name, members=members)
-        return ws_group, acc_group
-
-    @cached_property
-    def running_clusters(self):
-        logger.debug("Waiting for clusters to start...")
-        default_cluster_id = self._env_or_skip("TEST_DEFAULT_CLUSTER_ID")
-        tacl_cluster_id = self._env_or_skip("TEST_LEGACY_TABLE_ACL_CLUSTER_ID")
-        table_migration_cluster_id = self._env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
-        ensure_cluster_is_running = self.workspace_client.clusters.ensure_cluster_is_running
-        Threads.strict(
-            "ensure clusters running",
-            [
-                functools.partial(ensure_cluster_is_running, default_cluster_id),
-                functools.partial(ensure_cluster_is_running, tacl_cluster_id),
-                functools.partial(ensure_cluster_is_running, table_migration_cluster_id),
-            ],
-        )
-        logger.debug("Waiting for clusters to start...")
-        return default_cluster_id, tacl_cluster_id, table_migration_cluster_id
-
-    @cached_property
-    def installation(self):
-        return Installation(self.workspace_client, self.product_info.product_name())
-
-    @cached_property
-    def environ(self) -> dict[str, str]:
-        return {**os.environ}
-
-    @cached_property
-    def workspace_installer(self):
-        return WorkspaceInstaller(
-            self.prompts,
-            self.installation,
-            self.workspace_client,
-            self.product_info,
-            self.environ,
-        )
-
-    @cached_property
-    def config_transform(self) -> Callable[[WorkspaceConfig], WorkspaceConfig]:
-        return lambda wc: wc
-
-    @cached_property
-    def include_object_permissions(self):
-        return None
-
-    @cached_property
-    def config(self) -> WorkspaceConfig:
-        workspace_config = self.workspace_installer.configure()
-        default_cluster_id, tacl_cluster_id, table_migration_cluster_id = self.running_clusters
-        workspace_config = replace(
-            workspace_config,
-            override_clusters={
-                "main": default_cluster_id,
-                "tacl": tacl_cluster_id,
-                "table_migration": table_migration_cluster_id,
-            },
-            workspace_start_path=self.installation.install_folder(),
-            renamed_group_prefix=self.renamed_group_prefix,
-            include_group_names=self.created_groups,
-            include_databases=self.created_databases,
-            include_object_permissions=self.include_object_permissions,
-        )
-        workspace_config = self.config_transform(workspace_config)
-        self.installation.save(workspace_config)
-        return workspace_config
-
-    @cached_property
-    def product_info(self):
-        return ProductInfo.for_testing(WorkspaceConfig)
-
-    @cached_property
-    def tasks(self):
-        return Workflows.all().tasks()
-
-    @cached_property
-    def skip_dashboards(self):
-        return True
-
-    @cached_property
-    def workflows_deployment(self):
-        return WorkflowsDeployment(
-            self.config,
-            self.installation,
-            self.install_state,
-            self.workspace_client,
-            self.product_info.wheels(self.workspace_client),
-            self.product_info,
-            timedelta(minutes=3),
-            self.tasks,
-            skip_dashboards=self.skip_dashboards,
-        )
-
-    @cached_property
-    def workspace_installation(self):
-        return WorkspaceInstallation(
-            self.config,
-            self.installation,
-            self.install_state,
-            self.sql_backend,
-            self.workspace_client,
-            self.workflows_deployment,
-            self.prompts,
-            self.product_info,
-            skip_dashboards=self.skip_dashboards,
-        )
-
-    @cached_property
-    def extend_prompts(self):
-        return {}
-
-    @cached_property
-    def renamed_group_prefix(self):
-        return f"rename-{self.product_info.product_name()}-"
-
-    @cached_property
-    def prompts(self):
-        return MockPrompts(
-            {
-                r'Open job overview in your browser.*': 'no',
-                r'Do you want to uninstall ucx.*': 'yes',
-                r'Do you want to delete the inventory database.*': 'yes',
-                r".*PRO or SERVERLESS SQL warehouse.*": "1",
-                r"Choose how to map the workspace groups.*": "1",
-                r".*Inventory Database.*": self.inventory_database,
-                r".*Backup prefix*": self.renamed_group_prefix,
-                r".*": "",
-            }
-            | (self.extend_prompts or {})
-        )
 
 
 @pytest.fixture
