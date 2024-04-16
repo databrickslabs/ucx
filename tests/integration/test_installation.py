@@ -532,18 +532,16 @@ def test_repair_run_workflow_job(installation_ctx, mocker):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_uninstallation(ws, sql_backend, new_installation):
-    install, _ = new_installation()
-    installation = Installation(ws, product=os.path.basename(install.folder), install_folder=install.folder)
-    state = InstallState.from_installation(installation)
-    assessment_job_id = state.jobs["assessment"]
-    install.uninstall()
+def test_uninstallation(ws, sql_backend, installation_ctx):
+    installation_ctx.workspace_installation.run()
+    assessment_job_id = installation_ctx.install_state.jobs["assessment"]
+    installation_ctx.workspace_installation.uninstall()
     with pytest.raises(NotFound):
-        ws.workspace.get_status(install.folder)
+        ws.workspace.get_status(installation_ctx.workspace_installation.folder)
     with pytest.raises(InvalidParameterValue):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
-        sql_backend.execute(f"show tables from hive_metastore.{install.config.inventory_database}")
+        sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.config.inventory_database}")
 
 
 def test_fresh_global_installation(ws, new_installation):
@@ -556,14 +554,12 @@ def test_fresh_global_installation(ws, new_installation):
     global_installation.uninstall()
 
 
-def test_fresh_user_installation(ws, new_installation):
-    product_info = ProductInfo.for_testing(WorkspaceConfig)
-    user_installation, _ = new_installation(
-        product_info=product_info,
-        installation=Installation.assume_user_home(ws, product_info.product_name()),
+def test_fresh_user_installation(ws, installation_ctx):
+    installation_ctx.workspace_installation.run()
+    assert (
+        installation_ctx.workspace_installation.folder
+        == f"/Users/{ws.current_user.me().user_name}/.{installation_ctx.product_info.product_name()}"
     )
-    assert user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
-    user_installation.uninstall()
 
 
 def test_global_installation_on_existing_global_install(ws, new_installation):
@@ -685,8 +681,6 @@ def test_table_migration_job(
     ws,
     installation_ctx,
     make_catalog,
-    make_schema,
-    make_table,
     env_or_skip,
     make_random,
     make_dbfs_data_copy,
@@ -696,28 +690,28 @@ def test_table_migration_job(
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
     # create external and managed tables to be migrated
-    schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    tables: dict[str, TableInfo] = {"src_managed_table": make_table(schema_name=schema.name)}
-    tables["src_external_table"] = make_table(
+    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    tables: dict[str, TableInfo] = {"src_managed_table": installation_ctx.make_table(schema_name=schema.name)}
+    tables["src_external_table"] = installation_ctx.make_table(
         schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     )
     # create destination catalog and schema
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
-    tables["src_view1"] = make_table(
+    tables["src_view1"] = installation_ctx.make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view1_text,
         view=True,
     )
     src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
-    tables["src_view2"] = make_table(
+    tables["src_view2"] = installation_ctx.make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view2_text,
         view=True,
     )
     dst_catalog = make_catalog()
-    make_schema(catalog_name=dst_catalog.name, name=schema.name)
+    installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
     ctx = installation_ctx.replace(
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
@@ -746,7 +740,7 @@ def test_table_migration_job(
             ]
         )
     if ws.config.is_aws:
-        ctx.installation.save(
+        ctx.with_aws_storage_permissions(
             [
                 AWSRoleAction(
                     'arn:aws:iam::184784626197:instance-profile/labs-data-access',
@@ -754,8 +748,7 @@ def test_table_migration_job(
                     'WRITE_FILES',
                     's3://labs-things/*',
                 )
-            ],
-            filename='aws_instance_profile_info.csv',
+            ]
         )
 
     ctx.deployed_workflows.run_workflow("migrate-tables")
@@ -825,7 +818,7 @@ def test_table_migration_job_cluster_override(
             ]
         )
     if ws.config.is_aws:
-        ctx.installation.save(
+        ctx.with_aws_storage_permissions(
             [
                 AWSRoleAction(
                     'arn:aws:iam::184784626197:instance-profile/labs-data-access',
@@ -833,8 +826,7 @@ def test_table_migration_job_cluster_override(
                     'WRITE_FILES',
                     's3://labs-things/*',
                 )
-            ],
-            filename='aws_instance_profile_info.csv',
+            ]
         )
     ctx.deployed_workflows.run_workflow("migrate-tables")
     # assert the workflow is successful
@@ -863,10 +855,4 @@ def test_compare_remote_local_install_versions(ws, installation_ctx):
         RuntimeWarning,
         match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
-        installation_ctx.workspace_installation.run()
-    ctx = installation_ctx.replace(
-        extend_prompts={
-            r".*Do you want to update the existing installation?.*": 'yes',
-        },
-    )
-    ctx.workspace_installation.run()
+        installation_ctx.workspace_installer.configure()
