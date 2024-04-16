@@ -7,6 +7,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
+    AzureManagedIdentity,
     Privilege,
     StorageCredentialInfo,
     ValidationResultResult,
@@ -251,9 +252,20 @@ class ServicePrincipalMigration(SecretsMixin):
         if plan_confirmed is not True:
             return []
 
-        self._resource_permissions.create_access_connectors_for_storage_accounts()
+        # TODO: Add permission mapping for access connectors
+        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
-        return []
+        execution_result = []
+        for access_connector in access_connectors:
+            self._ws.storage_credentials.create(
+                access_connector.name,
+                azure_managed_identity=AzureManagedIdentity(str(access_connector.id)),
+                comment="Created by ucx",
+                # read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
+            )
+            # execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
+
+        return execution_result
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         sp_results = self.migrate_service_principals(prompts, include_names)
