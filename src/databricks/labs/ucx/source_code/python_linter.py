@@ -4,12 +4,22 @@ import abc
 import ast
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TypeVar, Generic
 
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
-
+from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory, Location
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ImportSource:
+    """
+    Represents an import statement in a Python file, including location of the import in tits source file
+    """
+
+    import_string: str
+    location: Location
 
 
 class MatchingVisitor(ast.NodeVisitor):
@@ -218,10 +228,8 @@ class PythonLinter(Linter):
     def list_dbutils_notebook_run_calls(linter: ASTLinter) -> list[ast.Call]:
         return linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
 
-
-# Location propagation changes will start here
     @staticmethod
-    def list_import_sources(linter: ASTLinter) -> list[str]:
+    def list_import_sources_1(linter: ASTLinter) -> list[str]:
         nodes = linter.locate(ast.Import, [])
         files = [alias.name for node in nodes for alias in node.names]
         nodes = linter.locate(ast.ImportFrom, [])
@@ -231,6 +239,72 @@ class PythonLinter(Linter):
         nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
         files.extend(node.args[0].value for node in nodes)
         return files
+
+    @staticmethod
+    def list_import_sources(linter: ASTLinter) -> list[ImportSource]:
+        import_sources: list[ImportSource] = []
+        nodes = linter.locate(ast.Import, [])
+        import_sources.extend(
+            ImportSource(
+                alias.name,
+                Location(
+                    code="import",
+                    message="",
+                    start_line=node.lineno,
+                    end_line=node.end_lineno,
+                    start_col=node.col_offset,
+                    end_col=node.end_col_offset,
+                ),
+            )
+            for node in nodes
+            for alias in node.names
+        )
+        nodes = linter.locate(ast.ImportFrom, [])
+        import_sources.extend(
+            ImportSource(
+                node.module,
+                Location(
+                    code="import from",
+                    message="",
+                    start_line=node.lineno,
+                    end_line=node.end_lineno,
+                    start_col=node.col_offset,
+                    end_col=node.end_col_offset,
+                ),
+            )
+            for node in nodes
+        )
+        nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
+        import_sources.extend(
+            ImportSource(
+                node.args[0].value,
+                Location(
+                    code="import_module",
+                    message="",
+                    start_line=node.lineno,
+                    end_line=node.end_lineno,
+                    start_col=node.col_offset,
+                    end_col=node.end_col_offset,
+                ),
+            )
+            for node in nodes
+        )
+        nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
+        import_sources.extend(
+            ImportSource(
+                node.args[0].value,
+                Location(
+                    code="__import__",
+                    message="",
+                    start_line=node.lineno,
+                    end_line=node.end_lineno,
+                    start_col=node.col_offset,
+                    end_col=node.end_col_offset,
+                ),
+            )
+            for node in nodes
+        )
+        return import_sources
 
     @staticmethod
     def list_appended_sys_paths(linter: ASTLinter) -> list[SysPath]:

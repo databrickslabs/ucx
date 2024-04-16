@@ -7,6 +7,7 @@ from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportForma
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.python_linter import ImportSource
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
@@ -18,9 +19,10 @@ class Dependency:
         assert object_info.path is not None
         return Dependency(object_info.object_type, object_info.path)
 
-    def __init__(self, object_type: ObjectType | None, path: str):
+    def __init__(self, object_type: ObjectType | None, path: str, source: ImportSource | None = None):
         self._type = object_type
         self._path = path
+        self._source = source
 
     @property
     def type(self) -> ObjectType | None:
@@ -29,6 +31,10 @@ class Dependency:
     @property
     def path(self) -> str:
         return self._path
+
+    @property
+    def source(self) -> ImportSource | None:
+        return self._source
 
     def __hash__(self):
         return hash(self.path)
@@ -117,16 +123,25 @@ class DependencyResolver:
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is not None:
             if compatibility == UCCompatibility.NONE:
-                self._advices.append(
-                    Deprecation(
-                        code="dependency-check",
-                        message=f"Use of dependency {dependency.path} is deprecated",
-                        start_line=0,
-                        start_col=0,
-                        end_line=0,
-                        end_col=0,
+                if dependency.source is not None:
+                    self._advices.append(
+                        dependency.source.location.as_deprecation().replace(
+                            code="dependency-check",
+                            message=f"Use of dependency {dependency.path} is deprecated",
+                        ),
                     )
-                )
+                else:
+                    self._advices.append(
+                        Deprecation(
+                            code="dependency-check",
+                            message=f"Use of dependency {dependency.path} is deprecated",
+                            start_col=0,
+                            end_col=0,
+                            start_line=0,
+                            end_line=0,
+                        )
+                    )
+
             return None
         return dependency
 
