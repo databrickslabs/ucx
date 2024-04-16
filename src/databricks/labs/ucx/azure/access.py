@@ -236,8 +236,7 @@ class AzureResourcePermissions:
             role_guid = str(uuid.uuid4())
             self._azurerm.apply_storage_permission(principal_id, storage, role_name, role_guid)
             logger.debug(
-                f"Storage Data Blob Reader permission applied for spn {principal_id} "
-                f"to storage account {storage.name}"
+                f"{role_name} permission applied for spn {principal_id} to storage account {storage.name}"
             )
 
     def _create_scope(self, uber_principal: PrincipalSecret, inventory_database: str):
