@@ -523,7 +523,6 @@ class PrincipalACL:
         tables_crawler: TablesCrawler,
         mounts_crawler: Mounts,
         cluster_locations: dict[str, dict],
-        external_locations: ExternalLocations,
     ):
         self._backend = backend
         self._ws = ws
@@ -531,7 +530,6 @@ class PrincipalACL:
         self._tables_crawler = tables_crawler
         self._mounts_crawler = mounts_crawler
         self._cluster_locations = cluster_locations
-        self._external_locations = external_locations
 
     def get_interactive_cluster_grants(self) -> list[Grant]:
         tables = self._tables_crawler.snapshot()
@@ -630,7 +628,6 @@ class PrincipalACL:
             if acl.service_principal_name is not None:
                 principal_list.append(acl.service_principal_name)
         return principal_list
-
 
     def _get_external_location_grants(self, locations: dict[str, str],
                                       principals: list[str],
