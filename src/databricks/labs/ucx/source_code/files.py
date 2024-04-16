@@ -5,7 +5,7 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency
+from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency, DependencyType
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
@@ -33,11 +33,11 @@ class SourceFile(SourceContainer):
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         notebook_paths = {PythonLinter.get_dbutils_notebook_run_path_arg(call) for call in run_notebook_calls}
         for path in notebook_paths:
-            graph.register_dependency(Dependency(ObjectType.NOTEBOOK, path))
+            graph.register_dependency(Dependency(DependencyType.NOTEBOOK, path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         import_names = PythonLinter.list_import_sources(linter)
         for import_name in import_names:
-            # we don't know yet if it's a file or a library
+            # we don't know yet the type of the dependency
             graph.register_dependency(Dependency(None, import_name))
 
 
@@ -50,7 +50,7 @@ class LocalFile(SourceFile):
 
 
 class LocalFileMigrator:
-    """The Files class is responsible for fixing code files based on their language."""
+    """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
     def __init__(self, languages: Languages):
         self._languages = languages

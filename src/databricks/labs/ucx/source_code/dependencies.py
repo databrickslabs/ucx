@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 from collections.abc import Callable, Iterable
+from enum import Enum
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
@@ -10,20 +11,31 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
+class DependencyType(Enum):
+    NOTEBOOK = ObjectType.NOTEBOOK.value
+    FILE = ObjectType.FILE.value
+    PACKAGE = "PACKAGE"
+
+    @property
+    def object_type(self):
+        return ObjectType[self.value] or None
+
+
 class Dependency:
 
     @staticmethod
     def from_object_info(object_info: ObjectInfo):
         assert object_info.object_type is not None
         assert object_info.path is not None
-        return Dependency(object_info.object_type, object_info.path)
+        dependency_type = DependencyType[object_info.object_type.value]
+        return Dependency(dependency_type, object_info.path)
 
-    def __init__(self, object_type: ObjectType | None, path: str):
-        self._type = object_type
+    def __init__(self, dependency_type: DependencyType | None, path: str):
+        self._type = dependency_type
         self._path = path
 
     @property
-    def type(self) -> ObjectType | None:
+    def type(self) -> DependencyType | None:
         return self._type
 
     @property
@@ -69,7 +81,7 @@ class DependencyLoader:
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         if object_info is None or object_info.object_type is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if dependency.type is not None and object_info.object_type is not dependency.type:
+        if dependency.type is not None and dependency.type.object_type is not object_info.object_type:
             raise ValueError(
                 f"Invalid object at '{dependency.path}', expected a {str(dependency.type)}, got a {str(object_info.object_type)}"
             )

@@ -5,8 +5,12 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver, \
-    Dependency
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyLoader,
+    SourceContainer,
+    DependencyResolver,
+    Dependency,
+)
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect
@@ -188,6 +192,7 @@ def test_build_dependency_graph_visits_site_packages(empty_index):
     resolver = DependencyResolver(whitelist)
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+
     def get_status_side_effect(*args):
         path = args[0]
         return ObjectInfo(path=path, object_type=ObjectType.FILE) if path == "import-site-package.py.txt" else None

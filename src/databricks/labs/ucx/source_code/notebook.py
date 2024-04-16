@@ -10,7 +10,7 @@ from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer, DependencyType
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
@@ -78,7 +78,7 @@ class PythonCell(Cell):
             assert isinstance(call, ast.Call)
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
-                dependency = Dependency(ObjectType.NOTEBOOK, path.value.strip("'").strip('"'))
+                dependency = Dependency(DependencyType.NOTEBOOK, path.value.strip("'").strip('"'))
                 parent.register_dependency(dependency)
         names = PythonLinter.list_import_sources(linter)
         for name in names:
@@ -159,7 +159,7 @@ class RunCell(Cell):
             start = line.index(command)
             if start >= 0:
                 path = line[start + len(command) :].strip()
-                parent.register_dependency(Dependency(ObjectType.NOTEBOOK, path.strip('"')))
+                parent.register_dependency(Dependency(DependencyType.NOTEBOOK, path.strip('"')))
                 return
         raise ValueError("Missing notebook path in %run command")
 
