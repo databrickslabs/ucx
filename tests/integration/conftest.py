@@ -133,51 +133,6 @@ class StaticTablesCrawler(TablesCrawler):
         return self._tables
 
 
-class StaticUdfsCrawler(UdfsCrawler):
-    def __init__(self, sb: SqlBackend, schema: str, udfs: list[FunctionInfo]):
-        super().__init__(sb, schema)
-        self._udfs = [
-            Udf(
-                catalog=_.catalog_name,
-                database=_.schema_name,
-                name=_.name,
-                body="5",
-                comment="_",
-                data_access="CONTAINS SQL",
-                deterministic=True,
-                func_input="STRING",
-                func_returns="INT",
-                func_type="SQL",
-            )
-            for _ in udfs
-        ]
-
-    def snapshot(self) -> list[Udf]:
-        return self._udfs
-
-
-class StaticGrantsCrawler(GrantsCrawler):
-    def __init__(self, tc: TablesCrawler, udf: UdfsCrawler, grants: list[Grant]):
-        super().__init__(tc, udf)
-        self._grants = [
-            Grant(
-                principal=_.principal,
-                action_type=_.action_type,
-                catalog=_.catalog,
-                database=_.database,
-                table=_.table,
-                view=_.view,
-                udf=_.udf,
-                any_file=_.any_file,
-                anonymous_function=_.anonymous_function,
-            )
-            for _ in grants
-        ]
-
-    def snapshot(self) -> list[Grant]:
-        return self._grants
-
-
 class StaticTableMapping(TableMapping):
     def __init__(self, workspace_client: WorkspaceClient, sb: SqlBackend, rules: list[Rule]):
         # TODO: remove this class, it creates difficulties when used together with Permission mapping
@@ -397,19 +352,6 @@ class TestRuntimeContext(RuntimeContext):
         for group in self._groups:
             created_groups.append(group.display_name)
         return created_groups
-
-    # @cached_property
-    # def tables_crawler(self):
-    #     # and override the config
-    #     return TablesCrawler(self.sql_backend, self.inventory_database, self.created_databases)
-
-    # @cached_property
-    # def udfs_crawler(self):
-    #     return StaticUdfsCrawler(self.sql_backend, self.inventory_database, self._udfs)
-
-    # @cached_property
-    # def grants_crawler(self):
-    #     return GrantsCrawler(self.tables_crawler, self.udfs_crawler, self.created_databases)
 
     @cached_property
     def azure_service_principal_crawler(self):
