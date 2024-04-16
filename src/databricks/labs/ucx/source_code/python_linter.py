@@ -218,6 +218,8 @@ class PythonLinter(Linter):
     def list_dbutils_notebook_run_calls(linter: ASTLinter) -> list[ast.Call]:
         return linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
 
+
+# Location propagation changes will start here
     @staticmethod
     def list_import_sources(linter: ASTLinter) -> list[str]:
         nodes = linter.locate(ast.Import, [])
