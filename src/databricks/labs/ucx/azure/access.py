@@ -24,6 +24,7 @@ from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
 @dataclass
 class StoragePermissionMapping:
     prefix: str
+    storage_account: str
     client_id: str
     principal: str
     privilege: str
@@ -66,6 +67,7 @@ class AzureResourcePermissions:
                 out.append(
                     StoragePermissionMapping(
                         prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
+                        storage_account=container.storage_account,
                         client_id=role_assignment.principal.client_id,
                         principal=role_assignment.principal.display_name,
                         privilege=privilege,
