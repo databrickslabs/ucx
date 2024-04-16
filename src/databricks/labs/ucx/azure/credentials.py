@@ -237,7 +237,10 @@ class ServicePrincipalMigration(SecretsMixin):
             execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
         return execution_result
 
-    def create_access_connectors(self) -> list[StorageCredentialValidationResult]:
+    def create_access_connectors(
+        self, service_principal_migration_info: list[ServicePrincipalMigrationInfo],
+    ) -> list[StorageCredentialValidationResult]:
+        _ = service_principal_migration_info
         # TODO: Add permission mapping for access connectors
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
@@ -266,7 +269,7 @@ class ServicePrincipalMigration(SecretsMixin):
 
         plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
         if plan_confirmed:
-            ac_results = self.create_access_connectors()
+            ac_results = self.create_access_connectors(service_principal_migration_info)
         else:
             ac_results = []
 
