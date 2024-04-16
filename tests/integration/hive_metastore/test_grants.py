@@ -4,11 +4,8 @@ from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service.compute import DataSecurityMode
 
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
-from databricks.labs.ucx.hive_metastore.mapping import Rule
-from databricks.sdk.service.iam import PermissionLevel
 
 
 logger = logging.getLogger(__name__)

@@ -445,10 +445,7 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_tables_with_principal_acl_azure(
-    ws,
-    make_user,
-    prepared_principal_acl,
-    make_cluster_permissions,
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
