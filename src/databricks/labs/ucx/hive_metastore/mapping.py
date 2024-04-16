@@ -43,11 +43,11 @@ class Rule:
     def from_src_dst(cls, src_table: TableInfo, dst_schema: SchemaInfo) -> "Rule":
         return cls(
             workspace_name="workspace",
-            catalog_name=dst_schema.catalog_name,
-            src_schema=src_table.schema_name,
-            dst_schema=dst_schema.name,
-            src_table=src_table.name,
-            dst_table=src_table.name,
+            catalog_name=str(dst_schema.catalog_name or ""),
+            src_schema=str(src_table.schema_name or ""),
+            dst_schema=str(dst_schema.name or ""),
+            src_table=str(src_table.name or ""),
+            dst_table=str(src_table.name or ""),
         )
 
     @property

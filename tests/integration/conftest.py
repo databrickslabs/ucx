@@ -8,7 +8,7 @@ import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.catalog import FunctionInfo, TableInfo, SchemaInfo
+from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
@@ -23,11 +23,10 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePe
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
-from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
+from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.hive_metastore.udfs import Udf, UdfsCrawler
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
