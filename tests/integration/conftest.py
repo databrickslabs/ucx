@@ -29,6 +29,7 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -435,6 +436,29 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
 def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
     ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
+
+
+class LocalAzureCliTest(WorkspaceContext):
+    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
+        super().__init__(_ws, {})
+        self._env_or_skip = env_or_skip_fixture
+
+    @cached_property
+    def azure_cli_authenticated(self):
+        if not self.is_azure:
+            pytest.skip("Azure only")
+        if self.connect_config.auth_type != "azure-cli":
+            pytest.skip("Local test only")
+        return True
+
+    @cached_property
+    def azure_subscription_id(self):
+        return self._env_or_skip("TEST_SUBSCRIPTION_ID")
+
+
+@pytest.fixture
+def az_cli_ctx(ws, env_or_skip):
+    return LocalAzureCliTest(ws, env_or_skip)
 
 
 class TestInstallationContext(TestRuntimeContext):

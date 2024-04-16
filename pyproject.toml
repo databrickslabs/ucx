@@ -286,7 +286,7 @@ attr-naming-style = "snake_case"
 # Regular expression matching correct attribute names. Overrides attr-naming-
 # style. If left empty, attribute names will be checked with the set naming
 # style.
-attr-rgx = "[a-z_][a-z0-9_]{2,}$"
+attr-rgx = "[a-z_][a-z0-9_]{1,}$"
 
 # Bad variable names which should always be refused, separated by a comma.
 bad-names = ["foo", "bar", "baz", "toto", "tutu", "tata"]
@@ -301,7 +301,7 @@ class-attribute-naming-style = "any"
 # Regular expression matching correct class attribute names. Overrides class-
 # attribute-naming-style. If left empty, class attribute names will be checked
 # with the set naming style.
-class-attribute-rgx = "([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$"
+class-attribute-rgx = "([A-Za-z_][A-Za-z0-9_]{1,30}|(__.*__))$"
 
 # Naming style matching correct class constant names.
 class-const-naming-style = "UPPER_CASE"

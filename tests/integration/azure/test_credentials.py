@@ -58,7 +58,11 @@ def extract_test_info(ws, env_or_skip, make_random):
 @pytest.fixture
 def run_migration(ws, sql_backend):
     def inner(
-        test_info: MigrationTestInfo, credentials: set[str], read_only=False
+        test_info: MigrationTestInfo,
+        credentials: set[str] | None = None,
+        read_only=False,
+        migrate_service_principals: str = "Yes",
+        create_access_connectors: str = "No",
     ) -> list[StorageCredentialValidationResult]:
         azure_mgmt_client = AzureAPIClient(
             ws.config.arm_environment.resource_manager_endpoint,
@@ -99,7 +103,12 @@ def run_migration(ws, sql_backend):
             installation, ws, resource_permissions, sp_crawler, StorageCredentialManager(ws)
         )
         return spn_migration.run(
-            MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials *": "Yes"}),
+            MockPrompts(
+                {
+                    "Above Azure Service Principals will be migrated to UC storage credentials *": migrate_service_principals,
+                    "Please confirm to create an access connector for each storage account.": create_access_connectors,
+                }
+            ),
             credentials,
         )
 
@@ -154,3 +163,19 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
     else:
         # all validation should pass
         assert not migration_results[0].failures
+
+
+@pytest.mark.skip(reason="TODO: Let migration create storage credentials.")
+@retried(on=[InternalError], timeout=timedelta(minutes=2))
+def test_spn_migration_access_connector_created(ws, extract_test_info, run_migration):
+    """Storage credentials should be created for the access connectors."""
+    storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
+    assert len(storage_credentials) == 0
+
+    try:
+        run_migration(extract_test_info, migrate_service_principals="No", create_access_connectors="Yes")
+    finally:
+        save_delete_credential(ws, extract_test_info.credential_name)
+
+    storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
+    assert len(storage_credentials) > 0
