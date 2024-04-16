@@ -241,8 +241,6 @@ class ServicePrincipalMigration(SecretsMixin):
     def create_access_connectors(
         self, service_principal_migration_info: list[ServicePrincipalMigrationInfo],
     ) -> list[StorageCredentialValidationResult]:
-        _ = service_principal_migration_info
-        # TODO: Add permission mapping for access connectors
         storage_role_with_least_privileges = min(
             zip(AzureResourcePermissions.LEVELS.keys(), AzureResourcePermissions.LEVELS.values()),
             key=lambda level: level[1]
@@ -257,12 +255,12 @@ class ServicePrincipalMigration(SecretsMixin):
         )
 
         execution_result = []
-        for access_connector in access_connectors:
+        for access_connector, role_name in access_connectors:
             self._ws.storage_credentials.create(
                 access_connector.name,
                 azure_managed_identity=AzureManagedIdentity(str(access_connector.id)),
                 comment="Created by ucx",
-                # read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
+                read_only=AzureResourcePermissions.LEVELS[role_name][1] == Privilege.READ_FILES.value,
             )
             # execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
 
