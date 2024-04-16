@@ -229,16 +229,12 @@ class ServicePrincipalMigration(SecretsMixin):
         return self._installation.save(migration_results, filename=self._output_file)
 
     def migrate_service_principals(
-        self, include_names: set[str] | None = None
+        self, service_principal_migration_info: list[ServicePrincipalMigrationInfo],
     ) -> list[StorageCredentialValidationResult]:
-
-        sp_list_with_secret = self._generate_migration_list(include_names)
-
         execution_result = []
-        for spn in sp_list_with_secret:
+        for spn in service_principal_migration_info:
             self._storage_credential_manager.create_with_client_secret(spn)
             execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
-
         return execution_result
 
     def create_access_connectors(self) -> list[StorageCredentialValidationResult]:
@@ -258,11 +254,13 @@ class ServicePrincipalMigration(SecretsMixin):
         return execution_result
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
+        service_principal_migration_info = self._generate_migration_list(include_names)
+
         plan_confirmed = prompts.confirm(
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
         )
         if plan_confirmed:
-            sp_results = self.migrate_service_principals(include_names)
+            sp_results = self.migrate_service_principals(service_principal_migration_info)
         else:
             sp_results = []
 
