@@ -55,15 +55,15 @@ logger = logging.getLogger(__name__)
 
 class TestInstallationContext(TestRuntimeContext):
     def __init__(
-        self,
-        make_table_fixture,
-        make_schema_fixture,
-        make_udf_fixture,
-        make_group_fixture,
-        env_or_skip_fixture,
-        make_random_fixture,
-        make_acc_group_fixture,
-        make_user_fixture,
+            self,
+            make_table_fixture,
+            make_schema_fixture,
+            make_udf_fixture,
+            make_group_fixture,
+            env_or_skip_fixture,
+            make_random_fixture,
+            make_acc_group_fixture,
+            make_user_fixture,
     ):
         super().__init__(
             make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
@@ -204,8 +204,6 @@ class TestInstallationContext(TestRuntimeContext):
                 r'Do you want to delete the inventory database.*': 'yes',
                 r".*PRO or SERVERLESS SQL warehouse.*": "1",
                 r"Choose how to map the workspace groups.*": "1",
-                r".*connect to the external metastore?.*": "yes",
-                r"Choose a cluster policy": "0",
                 r".*Inventory Database.*": self.inventory_database,
                 r".*Backup prefix*": self.renamed_group_prefix,
                 r".*": "",
@@ -216,16 +214,16 @@ class TestInstallationContext(TestRuntimeContext):
 
 @pytest.fixture
 def installation_ctx(  # pylint: disable=too-many-arguments
-    ws,
-    sql_backend,
-    make_table,
-    make_schema,
-    make_udf,
-    make_group,
-    env_or_skip,
-    make_random,
-    make_acc_group,
-    make_user,
+        ws,
+        sql_backend,
+        make_table,
+        make_schema,
+        make_udf,
+        make_group,
+        env_or_skip,
+        make_random,
+        make_acc_group,
+        make_user,
 ):
     ctx = TestInstallationContext(
         make_table,
@@ -246,13 +244,13 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
     cleanup = []
 
     def factory(
-        config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
-        installation: Installation | None = None,
-        product_info: ProductInfo | None = None,
-        environ: dict[str, str] | None = None,
-        extend_prompts: dict[str, str] | None = None,
-        inventory_schema_name: str | None = None,
-        skip_dashboards: bool = True,
+            config_transform: Callable[[WorkspaceConfig], WorkspaceConfig] | None = None,
+            installation: Installation | None = None,
+            product_info: ProductInfo | None = None,
+            environ: dict[str, str] | None = None,
+            extend_prompts: dict[str, str] | None = None,
+            inventory_schema_name: str | None = None,
+            skip_dashboards: bool = True,
     ):
         logger.debug("Creating new installation...")
         if not product_info:
@@ -346,11 +344,11 @@ def new_installation(ws, sql_backend, env_or_skip, make_random):
 
 
 def test_experimental_permissions_migration_for_group_with_same_name(
-    installation_ctx,
-    ws,
-    sql_backend,
-    make_cluster_policy,
-    make_cluster_policy_permissions,
+        installation_ctx,
+        ws,
+        sql_backend,
+        make_cluster_policy,
+        make_cluster_policy_permissions,
 ):
     ws_group, acc_group = installation_ctx.make_ucx_group()
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
@@ -400,21 +398,22 @@ def test_job_failure_propagates_correct_error_message_and_logs(ws, sql_backend, 
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
-def test_job_cluster_policy(ws, new_installation):
-    install, _ = new_installation(lambda wc: replace(wc, override_clusters=None))
+def test_job_cluster_policy(ws, installation_ctx):
+    installation_ctx.workspace_installation.run()
     user_name = ws.current_user.me().user_name
-    cluster_policy = ws.cluster_policies.get(policy_id=install.config.policy_id)
+    cluster_policy = ws.cluster_policies.get(policy_id=installation_ctx.config.policy_id)
     policy_definition = json.loads(cluster_policy.definition)
 
-    assert cluster_policy.name == f"Unity Catalog Migration ({install.config.inventory_database}) ({user_name})"
+    assert (cluster_policy.name ==
+            f"Unity Catalog Migration ({installation_ctx.config.inventory_database}) ({user_name})")
 
     spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
     assert policy_definition["spark_version"]["value"] == spark_version
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
     if ws.config.is_azure:
         assert (
-            policy_definition["azure_attributes.availability"]["value"]
-            == compute.AzureAvailability.ON_DEMAND_AZURE.value
+                policy_definition["azure_attributes.availability"]["value"]
+                == compute.AzureAvailability.ON_DEMAND_AZURE.value
         )
     if ws.config.is_aws:
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
@@ -442,7 +441,7 @@ def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_migrate_groups_job(
-    ws, sql_backend, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
+        ws, sql_backend, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
     ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
 
@@ -467,9 +466,9 @@ def test_running_real_migrate_groups_job(
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job(
-    ws, sql_backend, new_installation, make_group, make_query, make_query_permissions
+        ws, sql_backend, installation_ctx, make_query, make_query_permissions
 ):
-    ws_group_a = make_group()
+    ws_group_a, _ = installation_ctx.make_ucx_group()
 
     query = make_query()
     make_query_permissions(
@@ -478,24 +477,19 @@ def test_running_real_validate_groups_permissions_job(
         group_name=ws_group_a.display_name,
     )
 
-    redash_permissions = RedashPermissionsSupport(
-        ws,
-        [redash.Listing(ws.queries.list, sql.ObjectTypePlural.QUERIES)],
-    )
-
-    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    permission_manager = PermissionManager(sql_backend, install.config.inventory_database, [redash_permissions])
-    permission_manager.inventorize_permissions()
+    installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
+    installation_ctx.workspace_installation.run()
+    installation_ctx.permission_manager.inventorize_permissions()
 
     # assert the job does not throw any exception
-    deployed_workflow.run_workflow("validate-groups-permissions")
+    installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_validate_groups_permissions_job_fails(
-    ws, sql_backend, new_installation, make_group, make_cluster_policy, make_cluster_policy_permissions
+        ws, sql_backend, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
-    ws_group_a = make_group()
+    ws_group_a, _ = installation_ctx.make_ucx_group()
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -504,17 +498,9 @@ def test_running_real_validate_groups_permissions_job_fails(
         group_name=ws_group_a.display_name,
     )
 
-    generic_permissions = GenericPermissionsSupport(
-        ws,
-        [
-            Listing(ws.cluster_policies.list, "policy_id", "cluster-policies"),
-        ],
-    )
-
-    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    inventory_database = install.config.inventory_database
-    permission_manager = PermissionManager(sql_backend, inventory_database, [generic_permissions])
-    permission_manager.inventorize_permissions()
+    installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
+    installation_ctx.workspace_installation.run()
+    installation_ctx.permission_manager.inventorize_permissions()
 
     # remove permission so the validation fails
     ws.permissions.set(
@@ -522,38 +508,36 @@ def test_running_real_validate_groups_permissions_job_fails(
     )
 
     with pytest.raises(ManyError):
-        deployed_workflow.run_workflow("validate-groups-permissions")
+        installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-def test_running_real_remove_backup_groups_job(ws, sql_backend, new_installation, make_ucx_group):
-    ws_group_a, _ = make_ucx_group()
+def test_running_real_remove_backup_groups_job(ws, sql_backend, installation_ctx):
+    ws_group_a, _ = installation_ctx.make_ucx_group()
 
-    install, deployed_workflow = new_installation(lambda wc: replace(wc, include_group_names=[ws_group_a.display_name]))
-    cfg = install.config
-    group_manager = GroupManager(
-        sql_backend, ws, cfg.inventory_database, cfg.include_group_names, cfg.renamed_group_prefix
-    )
-    group_manager.snapshot()
-    group_manager.rename_groups()
-    group_manager.reflect_account_groups_on_workspace()
+    installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
+    installation_ctx.workspace_installation.run()
 
-    deployed_workflow.run_workflow("remove-workspace-local-backup-groups")
+    installation_ctx.group_manager.snapshot()
+    installation_ctx.group_manager.rename_groups()
+    installation_ctx.group_manager.reflect_account_groups_on_workspace()
+
+    installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
     with pytest.raises(NotFound):
         ws.groups.get(ws_group_a.id)
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
-def test_repair_run_workflow_job(new_installation, mocker):
+def test_repair_run_workflow_job(installation_ctx, mocker):
     mocker.patch("webbrowser.open")
-    _, deployed_workflows = new_installation()
+    installation_ctx.workspace_installation.run()
     with pytest.raises(ManyError):
-        deployed_workflows.run_workflow("failing")
+        installation_ctx.deployed_workflows.run_workflow("failing")
 
-    deployed_workflows.repair_run("failing")
+    installation_ctx.deployed_workflows.repair_run("failing")
 
-    assert deployed_workflows.validate_step("failing")
+    assert installation_ctx.deployed_workflows.validate_step("failing")
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -652,7 +636,7 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
         product_info=product_info, installation=Installation.assume_user_home(ws, product_info.product_name())
     )
     assert (
-        existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+            existing_user_installation.folder == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
@@ -691,7 +675,7 @@ def test_check_inventory_database_exists(ws, new_installation, make_random):
     inventory_database = install.config.inventory_database
 
     with pytest.raises(
-        AlreadyExists, match=f"Inventory database '{inventory_database}' already exists in another installation"
+            AlreadyExists, match=f"Inventory database '{inventory_database}' already exists in another installation"
     ):
         new_installation(
             product_info=product_info,
@@ -707,17 +691,16 @@ def test_check_inventory_database_exists(ws, new_installation, make_random):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job(
-    ws,
-    new_installation,
-    make_catalog,
-    make_schema,
-    make_table,
-    env_or_skip,
-    make_random,
-    make_dbfs_data_copy,
-    sql_backend,
+        ws,
+        installation_ctx,
+        make_catalog,
+        make_schema,
+        make_table,
+        env_or_skip,
+        make_random,
+        make_dbfs_data_copy,
+        sql_backend,
 ):
-
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
@@ -744,79 +727,33 @@ def test_table_migration_job(
     )
     dst_catalog = make_catalog()
     make_schema(catalog_name=dst_catalog.name, name=schema.name)
-
-    _, deployed_workflow = new_installation(
-        lambda wc: replace(wc, override_clusters=None),
-        product_info=ProductInfo.from_class(WorkspaceConfig),
+    ctx = installation_ctx.replace(
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
             r"Max workers for auto-scale.*": "20",
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
             r".*Do you want to update the existing installation?.*": 'yes',
-        },
-        inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
+        }
     )
 
-    installation = ProductInfo.from_class(WorkspaceConfig).current_installation(ws)
-    installation.save(
-        [
-            Rule(
-                "ws_name",
-                dst_catalog.name,
-                schema.name,
-                schema.name,
-                tables["src_managed_table"].name,
-                tables["src_managed_table"].name,
-            ),
-            Rule(
-                "ws_name",
-                dst_catalog.name,
-                schema.name,
-                schema.name,
-                tables["src_external_table"].name,
-                tables["src_external_table"].name,
-            ),
-            Rule(
-                "workspace",
-                dst_catalog.name,
-                schema.name,
-                schema.name,
-                tables["src_view1"].name,
-                tables["src_view1"].name,
-            ),
-            Rule(
-                "workspace",
-                dst_catalog.name,
-                schema.name,
-                schema.name,
-                tables["src_view2"].name,
-                tables["src_view2"].name,
-            ),
-        ],
-        filename='mapping.csv',
-    )
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
-        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', f'{env_or_skip("TEST_MOUNT_CONTAINER")}/a')],
-        Mount,
-    )
+    ctx.workspace_installation.run()
+
+    rules = [Rule.from_src_dst(table, schema) for _, table in tables.items()]
+    ctx.with_table_mapping_rules(rules)
     if ws.config.is_azure:
-        installation.save(
-            [
-                StoragePermissionMapping(
-                    'abfss://things@labsazurethings.dfs.core.windows.net',
-                    'dummy_application_id',
-                    'principal_1',
-                    'WRITE_FILES',
-                    'Application',
-                    'directory_id_ss1',
-                )
-            ],
-            filename='azure_storage_account_info.csv',
-        )
+        ctx.with_azure_storage_permissions([
+            StoragePermissionMapping(
+                'abfss://things@labsazurethings.dfs.core.windows.net',
+                'dummy_application_id',
+                'principal_1',
+                'WRITE_FILES',
+                'Application',
+                'directory_id_ss1',
+            )
+        ])
     if ws.config.is_aws:
-        installation.save(
+        ctx.installation.save(
             [
                 AWSRoleAction(
                     'arn:aws:iam::184784626197:instance-profile/labs-data-access',
@@ -827,52 +764,10 @@ def test_table_migration_job(
             ],
             filename='aws_instance_profile_info.csv',
         )
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.tables",
-        [
-            Table(
-                "hive_metastore",
-                schema.name,
-                tables["src_managed_table"].name,
-                "MANAGED",
-                "DELTA",
-                location="dbfs:/test",
-            ),
-            Table("hive_metastore", schema.name, tables["src_external_table"].name, "EXTERNAL", "CSV"),
-            Table("hive_metastore", schema.name, tables["src_view1"].name, "VIEW", "", view_text=src_view1_text),
-            Table("hive_metastore", schema.name, tables["src_view2"].name, "VIEW", "", view_text=src_view2_text),
-        ],
-        Table,
-    )
-    # inject dummy group and table acl to avoid crawling which will slow down the test
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.groups",
-        [
-            MigratedGroup(
-                "group_id",
-                "test_group_ws",
-                "test_group_ac",
-                "tmp",
-            )
-        ],
-        MigratedGroup,
-    )
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.grants",
-        [
-            Grant(
-                "test_user",
-                "SELECT",
-                database="test_database",
-                table="test_table",
-            )
-        ],
-        Grant,
-    )
 
-    deployed_workflow.run_workflow("migrate-tables")
+    ctx.deployed_workflows.run_workflow("migrate-tables")
     # assert the workflow is successful
-    assert deployed_workflow.validate_step("migrate-tables")
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
         assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{tables['src_managed_table'].name}").name
@@ -883,7 +778,7 @@ def test_table_migration_job(
         assert False, f"Table or view not found in {dst_catalog.name}.{schema.name}"
     # assert the cluster is configured correctly
     for job_cluster in ws.jobs.get(
-        installation.load(RawState).resources["jobs"]["migrate-tables"]
+            ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
     ).settings.job_clusters:
         assert job_cluster.new_cluster.autoscale.min_workers == 2
         assert job_cluster.new_cluster.autoscale.max_workers == 20
@@ -892,61 +787,40 @@ def test_table_migration_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job_cluster_override(  # pylint: disable=too-many-locals
-    ws,
-    new_installation,
-    make_catalog,
-    make_schema,
-    make_table,
-    env_or_skip,
-    make_random,
-    make_dbfs_data_copy,
-    sql_backend,
+        ws,
+        installation_ctx,
+        make_catalog,
+        env_or_skip,
+        make_random,
+        make_dbfs_data_copy,
+        sql_backend,
 ):
     # create external and managed tables to be migrated
-    schema = make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    src_managed_table = make_table(schema_name=schema.name)
+    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    src_managed_table = installation_ctx.make_table(schema_name=schema.name)
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-    src_external_table = make_table(schema_name=schema.name, external_csv=existing_mounted_location)
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    src_external_table = installation_ctx.make_table(schema_name=schema.name, external_csv=new_mounted_location)
     # create destination catalog and schema
     dst_catalog = make_catalog()
-    make_schema(catalog_name=dst_catalog.name, name=schema.name)
+    installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
 
     product_info = ProductInfo.from_class(WorkspaceConfig)
-    _, deployed_workflow = new_installation(
-        product_info=product_info,
-        inventory_schema_name=f"ucx_S{make_random(4)}_migrate_inventory",
+    ctx = installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
-    installation = product_info.current_installation(ws)
+
+    ctx.workspace_installation.run()
     migrate_rules = [
-        Rule(
-            "ws_name",
-            dst_catalog.name,
-            schema.name,
-            schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
-        ),
-        Rule(
-            "ws_name",
-            dst_catalog.name,
-            schema.name,
-            schema.name,
-            src_external_table.name,
-            src_external_table.name,
-        ),
+        Rule.from_src_dst(src_managed_table, schema),
+        Rule.from_src_dst(src_external_table, schema),
     ]
-    installation.save(migrate_rules, filename='mapping.csv')
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.mounts",
-        [Mount(f'/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a', f'{env_or_skip("TEST_MOUNT_CONTAINER")}/a')],
-        Mount,
-    )
+    ctx.with_table_mapping_rules(migrate_rules)
     if ws.config.is_azure:
-        installation.save(
-            [
+        ctx.with_azure_storage_permissions([
                 StoragePermissionMapping(
                     'abfss://things@labsazurethings.dfs.core.windows.net',
                     'dummy_application_id',
@@ -955,11 +829,9 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
                     'Application',
                     'directory_id_ss1',
                 )
-            ],
-            filename='azure_storage_account_info.csv',
-        )
+            ])
     if ws.config.is_aws:
-        installation.save(
+        ctx.installation.save(
             [
                 AWSRoleAction(
                     'arn:aws:iam::184784626197:instance-profile/labs-data-access',
@@ -970,43 +842,9 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
             ],
             filename='aws_instance_profile_info.csv',
         )
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.tables",
-        [
-            Table("hive_metastore", schema.name, src_managed_table.name, "MANAGED", "DELTA", location="dbfs:/test"),
-            Table("hive_metastore", schema.name, src_external_table.name, "EXTERNAL", "CSV"),
-        ],
-        Table,
-    )
-    # inject dummy group and table acl to avoid crawling which will slow down the test
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.groups",
-        [
-            MigratedGroup(
-                "group_id",
-                "test_group_ws",
-                "test_group_ac",
-                "tmp",
-            )
-        ],
-        MigratedGroup,
-    )
-    sql_backend.save_table(
-        f"{installation.load(WorkspaceConfig).inventory_database}.grants",
-        [
-            Grant(
-                "test_user",
-                "SELECT",
-                database="test_database",
-                table="test_table",
-            )
-        ],
-        Grant,
-    )
-
-    deployed_workflow.run_workflow("migrate-tables")
+    ctx.deployed_workflows.run_workflow("migrate-tables")
     # assert the workflow is successful
-    assert deployed_workflow.validate_step("migrate-tables")
+    assert ctx.deployed_workflows.validate_step("migrate-tables")
     # assert the tables are migrated
     try:
         assert ws.tables.get(f"{dst_catalog.name}.{schema.name}.{src_managed_table.name}").name
@@ -1016,7 +854,7 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
             False
         ), f"{src_managed_table.name} and {src_external_table.name} not found in {dst_catalog.name}.{schema.name}"
     # assert the cluster is configured correctly on the migrate tables tasks
-    install_state = installation.load(RawState)
+    install_state = ctx.installation.load(RawState)
     job_id = install_state.resources["jobs"]["migrate-tables"]
     assert all(
         task.existing_cluster_id == env_or_skip("TEST_USER_ISOLATION_CLUSTER_ID")
@@ -1025,18 +863,15 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
     )
 
 
-def test_compare_remote_local_install_versions(ws, new_installation):
-    product_info = ProductInfo.for_testing(WorkspaceConfig)
-    new_installation(product_info=product_info)
+def test_compare_remote_local_install_versions(ws, installation_ctx):
+    installation_ctx.workspace_installation.run()
     with pytest.raises(
-        RuntimeWarning,
-        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
+            RuntimeWarning,
+            match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
-        new_installation(product_info=product_info)
-
-    new_installation(
-        product_info=product_info,
-        extend_prompts={
+        installation_ctx.workspace_installation.run()
+    ctx = installation_ctx.replace(extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
     )
+    ctx.workspace_installation.run()

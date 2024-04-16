@@ -9,6 +9,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
+from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
 from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -36,6 +37,17 @@ class Rule:
             dst_schema=table.database,
             src_table=table.name,
             dst_table=table.name,
+        )
+
+    @classmethod
+    def from_src_dst(cls, src_table: TableInfo, dst_schema: SchemaInfo) -> "Rule":
+        return cls(
+            workspace_name="workspace",
+            catalog_name=dst_schema.catalog_name,
+            src_schema=src_table.schema_name,
+            dst_schema=dst_schema.name,
+            src_table=src_table.name,
+            dst_table=src_table.name,
         )
 
     @property

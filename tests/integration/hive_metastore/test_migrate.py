@@ -41,16 +41,7 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog, make
 
     logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
 
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
-        ),
-    ]
+    rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
 
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_azure_resource_permission()
@@ -145,16 +136,7 @@ def test_migrate_external_table(
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_external_table.name,
-            src_external_table.name,
-        ),
-    ]
+    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
 
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_azure_resource_permission()
@@ -238,30 +220,9 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog, make_schema):
     logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
 
     rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_view1.name,
-            src_view1.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_view2.name,
-            src_view2.name,
-        ),
+        Rule.from_src_dst(src_managed_table, dst_schema),
+        Rule.from_src_dst(src_view1, dst_schema),
+        Rule.from_src_dst(src_view2, dst_schema),
         Rule(
             "workspace",
             dst_catalog.name,
@@ -307,22 +268,8 @@ def test_revert_migrated_table(sql_backend, runtime_ctx, make_schema, make_catal
     dst_schema2 = make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
 
     rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema1.name,
-            dst_schema1.name,
-            table_to_revert.name,
-            table_to_revert.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema2.name,
-            dst_schema2.name,
-            table_to_not_revert.name,
-            table_to_not_revert.name,
-        ),
+        Rule.from_src_dst(table_to_revert, dst_schema1),
+        Rule.from_src_dst(table_to_not_revert, dst_schema2),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_azure_resource_permission()
@@ -364,38 +311,10 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
     dst_schema2 = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema2.name)
 
     rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema1.name,
-            dst_schema1.name,
-            table_to_migrate.name,
-            table_to_migrate.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema1.name,
-            dst_schema1.name,
-            table_to_skip.name,
-            table_to_skip.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema1.name,
-            dst_schema1.name,
-            table_databricks_dataset.name,
-            table_databricks_dataset.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema2.name,
-            dst_schema2.name,
-            table_in_skipped_database.name,
-            table_in_skipped_database.name,
-        ),
+        Rule.from_src_dst(table_to_migrate, dst_schema1),
+        Rule.from_src_dst(table_to_skip, dst_schema1),
+        Rule.from_src_dst(table_databricks_dataset, dst_schema1),
+        Rule.from_src_dst(table_in_skipped_database, dst_schema2),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
     table_mapping = runtime_ctx.table_mapping
@@ -416,13 +335,7 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_schema, make_c
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     runtime_ctx.with_dummy_azure_resource_permission()
-    runtime_ctx.with_table_mapping_rule(
-        catalog_name=dst_catalog.name,
-        src_schema=src_schema.name,
-        dst_schema=dst_schema.name,
-        src_table=table_to_skip.name,
-        dst_table=table_to_skip.name,
-    )
+    runtime_ctx.with_table_mapping_rules([Rule.from_src_dst(table_to_skip, dst_schema)])
 
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
@@ -439,22 +352,8 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_schema, make_c
     assert results["upgraded_to"] == "fake_catalog.fake_schema.fake_table"
 
     rules2 = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            table_to_skip.name,
-            table_to_skip.name,
-        ),
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            table_to_revert.name,
-            table_to_revert.name,
-        ),
+        Rule.from_src_dst(table_to_revert, dst_schema),
+        Rule.from_src_dst(table_to_skip, dst_schema),
     ]
     table_mapping2 = StaticTableMapping(ws, sql_backend, rules=rules2)
     mapping2 = table_mapping2.get_tables_to_migrate(runtime_ctx.tables_crawler)
@@ -498,16 +397,7 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
 
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_managed_table.name,
-            src_managed_table.name,
-        ),
-    ]
+    rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_azure_resource_permission()
 
@@ -534,16 +424,7 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_c
     )
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-    rules = [
-        Rule(
-            "workspace",
-            dst_catalog.name,
-            src_schema.name,
-            dst_schema.name,
-            src_external_table.name,
-            src_external_table.name,
-        ),
-    ]
+    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
     runtime_ctx.with_table_mapping_rules(rules)
     return (
         runtime_ctx,
