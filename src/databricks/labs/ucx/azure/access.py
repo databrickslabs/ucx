@@ -36,6 +36,11 @@ class StoragePermissionMapping:
 
 class AzureResourcePermissions:
     FILENAME = 'azure_storage_account_info.csv'
+    LEVELS = {
+        "Storage Blob Data Owner": (3, Privilege.WRITE_FILES),
+        "Storage Blob Data Contributor": (2, Privilege.WRITE_FILES),
+        "Storage Blob Data Reader": (1, Privilege.READ_FILES),
+    }
 
     def __init__(
         self,
@@ -48,11 +53,6 @@ class AzureResourcePermissions:
         self._locations = external_locations
         self._azurerm = azurerm
         self._ws = ws
-        self._levels = {
-            "Storage Blob Data Contributor": Privilege.WRITE_FILES,
-            "Storage Blob Data Owner": Privilege.WRITE_FILES,
-            "Storage Blob Data Reader": Privilege.READ_FILES,
-        }
 
     def _map_storage(self, storage: StorageAccount) -> list[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.name}")
@@ -61,9 +61,9 @@ class AzureResourcePermissions:
             for role_assignment in self._azurerm.role_assignments(str(container)):
                 # one principal may be assigned multiple roles with overlapping dataActions, hence appearing
                 # here in duplicates. hence, role name -> permission level is not enough for the perfect scenario.
-                if role_assignment.role_name not in self._levels:
+                if role_assignment.role_name not in self.LEVELS:
                     continue
-                privilege = self._levels[role_assignment.role_name].value
+                privilege = self.LEVELS[role_assignment.role_name][1].value
                 out.append(
                     StoragePermissionMapping(
                         prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
@@ -207,7 +207,7 @@ class AzureResourcePermissions:
         self._apply_storage_permission(access_connector.principal_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", storage_account)
         return access_connector
 
-    def create_access_connectors_for_storage_accounts(self) -> list[AccessConnector]:
+    def create_access_connectors_for_storage_accounts(self, storage_account_permissions: dict[str, str]) -> list[AccessConnector]:
         used_storage_accounts = self._get_storage_accounts()
         if len(used_storage_accounts) == 0:
             logger.warning(
