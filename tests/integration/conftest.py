@@ -237,9 +237,11 @@ class TestRuntimeContext(RuntimeContext):
                 StoragePermissionMapping(
                     # TODO: replace with env variable
                     prefix='abfss://things@labsazurethings.dfs.core.windows.net',
+                    storage_account='labsazurethings',
                     client_id='dummy_application_id',
                     principal='principal_1',
                     privilege='WRITE_FILES',
+                    role_name='Storage Blob Contributor',
                     type='Application',
                     directory_id='directory_id_ss1',
                 )

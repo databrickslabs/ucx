@@ -163,9 +163,11 @@ def test_create_storage_credentials(credential_manager):
     sp_1 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
             "prefix1",
+            "storage_account1",
             "app_secret1",
             "principal_write",
             "WRITE_FILES",
+            "Storage Blob Contributor",
             "Application",
             "directory_id_1",
         ),
@@ -174,9 +176,11 @@ def test_create_storage_credentials(credential_manager):
     sp_2 = ServicePrincipalMigrationInfo(
         StoragePermissionMapping(
             "prefix2",
+            "storage_account2",
             "app_secret2",
             "principal_read",
             "READ_FILES",
+            "Storage Blob Reader",
             "Application",
             "directory_id_1",
         ),
@@ -194,7 +198,14 @@ def test_create_storage_credentials(credential_manager):
 
 def test_validate_storage_credentials(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_1", "WRITE_FILES", "Application", "directory_id"
+        "prefix",
+        "storage_account",
+        "client_id",
+        "principal_1",
+        "WRITE_FILES",
+        "Storage Blob Contributor",
+        "Application",
+        "directory_id",
     )
 
     # validate normal storage credential
@@ -206,7 +217,14 @@ def test_validate_storage_credentials(credential_manager):
 
 def test_validate_read_only_storage_credentials(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_read", "READ_FILES", "Application", "directory_id_1"
+        "prefix",
+        "storage_account",
+        "client_id",
+        "principal_read",
+        "READ_FILES",
+        "Storage Blob Reader",
+        "Application",
+        "directory_id_1",
     )
 
     # validate read-only storage credential
@@ -218,7 +236,14 @@ def test_validate_read_only_storage_credentials(credential_manager):
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "overlap", "WRITE_FILES", "Application", "directory_id_2"
+        "prefix",
+        "storage_account",
+        "client_id",
+        "overlap",
+        "WRITE_FILES",
+        "Storage Blob Contributor",
+        "Application",
+        "directory_id_2",
     )
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
@@ -231,7 +256,14 @@ def test_validate_storage_credentials_overlap_location(credential_manager):
 
 def test_validate_storage_credentials_non_response(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "none", "WRITE_FILES", "Application", "directory_id"
+        "prefix",
+        "storage_account",
+        "client_id",
+        "none",
+        "WRITE_FILES",
+        "Storage Blob Contributor",
+        "Application",
+        "directory_id",
     )
 
     validation = credential_manager.validate(permission_mapping)
@@ -240,7 +272,14 @@ def test_validate_storage_credentials_non_response(credential_manager):
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
+        "prefix",
+        "storage_account",
+        "client_id",
+        "fail",
+        "WRITE_FILES",
+        "Storage Blob Contributor",
+        "Application",
+        "directory_id_2",
     )
 
     validation = credential_manager.validate(permission_mapping)

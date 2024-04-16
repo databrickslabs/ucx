@@ -681,9 +681,11 @@ def test_table_migration_job(
         [
             StoragePermissionMapping(
                 'abfss://things@labsazurethings.dfs.core.windows.net',
+                'labsazurethings',
                 'dummy_application_id',
                 'principal_1',
                 'WRITE_FILES',
+                'Storage Blob Contributor',
                 'Application',
                 'directory_id_ss1',
             )
@@ -803,9 +805,11 @@ def test_table_migration_job_cluster_override(  # pylint: disable=too-many-local
         [
             StoragePermissionMapping(
                 'abfss://things@labsazurethings.dfs.core.windows.net',
+                'labsazurethings',
                 'dummy_application_id',
                 'principal_1',
                 'WRITE_FILES',
+                'Storage Blob Contributor',
                 'Application',
                 'directory_id_ss1',
             )
