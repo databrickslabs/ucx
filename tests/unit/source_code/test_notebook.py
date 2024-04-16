@@ -5,7 +5,8 @@ from databricks.sdk.service.workspace import Language, ObjectType
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer, \
+    DependencyType
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
@@ -138,7 +139,7 @@ def test_notebook_builds_leaf_dependency_graph():
     sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    dependency = Dependency(DependencyType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
@@ -150,7 +151,7 @@ def test_notebook_builds_depth1_dependency_graph():
     sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    dependency = Dependency(DependencyType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
@@ -163,7 +164,7 @@ def test_notebook_builds_depth2_dependency_graph():
     sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    dependency = Dependency(DependencyType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
@@ -177,7 +178,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
     old_load_dependency_side_effect = loader.load_dependency.side_effect
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    dependency = Dependency(DependencyType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     visited: list[str] = []
 
@@ -198,7 +199,7 @@ def test_notebook_builds_cyclical_dependency_graph():
     sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    dependency = Dependency(DependencyType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
@@ -211,7 +212,7 @@ def test_notebook_builds_python_dependency_graph():
     sources: list[str] = _load_sources(SourceContainer, *paths)
     languages = [Language.PYTHON] * len(paths)
     loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
+    dependency = Dependency(DependencyType.NOTEBOOK, paths[0])
     graph = DependencyGraph(dependency, None, loader)
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)

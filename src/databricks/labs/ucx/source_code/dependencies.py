@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import typing
 from collections.abc import Callable, Iterable
 from enum import Enum
 
@@ -8,14 +9,17 @@ from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportForma
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
-from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
+
+if typing.TYPE_CHECKING:
+    from databricks.labs.ucx.source_code.site_packages import SitePackages
 
 
 class DependencyType(Enum):
     NOTEBOOK = ObjectType.NOTEBOOK.value
     FILE = ObjectType.FILE.value
     PACKAGE = "PACKAGE"
+    PACKAGE_FILE = "PACKAGE_FILE"
 
     @property
     def object_type(self):
@@ -54,7 +58,7 @@ class SourceContainer(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def object_type(self) -> ObjectType:
+    def dependency_type(self) -> DependencyType:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -69,9 +73,14 @@ class DependencyLoader:
         self._site_packages = site_packages
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        package = self._load_site_package(dependency)
-        if package is not None:
-            return package
+        # libraries have precedence over workspace objects
+        if dependency.type is DependencyType.PACKAGE_FILE:
+            from databricks.labs.ucx.source_code.site_packages import PackageDependency
+            assert isinstance(dependency, PackageDependency)
+            return dependency.load()
+        site_package = self._site_packages[dependency.path]
+        if site_package is not None:
+            return site_package
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
@@ -80,9 +89,6 @@ class DependencyLoader:
         if object_info.object_type in [ObjectType.LIBRARY, ObjectType.DIRECTORY, ObjectType.DASHBOARD, ObjectType.REPO]:
             return None
         raise NotImplementedError(str(object_info.object_type))
-
-    def _load_site_package(self, dependency: Dependency) -> SourceContainer | None:
-        return None
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
         object_info = self._ws.workspace.get_status(dependency.path)
@@ -131,7 +137,7 @@ class DependencyResolver:
         self._advices: list[Advice] = []
 
     def resolve(self, dependency: Dependency) -> Dependency | None:
-        if dependency.type == ObjectType.NOTEBOOK:
+        if dependency.type is DependencyType.NOTEBOOK:
             return dependency
         compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382

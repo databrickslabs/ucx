@@ -8,7 +8,7 @@ from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language, ObjectType
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer, DependencyType
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
@@ -353,8 +353,8 @@ class Notebook(SourceContainer):
         self._ends_with_lf = ends_with_lf
 
     @property
-    def object_type(self) -> ObjectType:
-        return ObjectType.NOTEBOOK
+    def dependency_type(self) -> DependencyType:
+        return DependencyType.NOTEBOOK
 
     @property
     def path(self) -> str:

@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.dependencies import (
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources, _download_side_effect
+from tests.unit import _load_sources, _download_side_effect, locate_site_packages, site_packages_mock
 
 
 def test_build_dependency_graph_visits_notebook_notebook_dependencies(empty_index):
@@ -28,9 +28,9 @@ def test_build_dependency_graph_visits_notebook_notebook_dependencies(empty_inde
 
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
-    sp = create_autospec(SitePackages)
+    sps = site_packages_mock()
     ws.workspace.get_status.side_effect = get_status_side_effect
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root3.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)
@@ -52,8 +52,8 @@ def test_build_dependency_graph_visits_notebook_file_dependencies(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root8.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)
@@ -76,8 +76,8 @@ def test_build_dependency_graph_fails_with_unfound_dependency(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = download_side_effect
     ws.workspace.get_status.return_value = None
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root1.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     with pytest.raises(ValueError):
         migrator.build_dependency_graph(object_info)
@@ -95,8 +95,8 @@ def test_build_dependency_graph_visits_file_dependencies(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root5.py.txt", object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)
@@ -114,8 +114,8 @@ def test_build_dependency_graph_visits_recursive_file_dependencies(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root6.py.txt", object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)
@@ -137,8 +137,8 @@ def test_build_dependency_graph_safely_visits_non_file_dependencies(empty_index)
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root7.py.txt", object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)
@@ -156,8 +156,8 @@ def test_build_dependency_graph_throws_with_invalid_dependencies(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="root7.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     with pytest.raises(ValueError):
         migrator.build_dependency_graph(object_info)
@@ -169,8 +169,8 @@ def test_build_dependency_graph_ignores_builtin_dependencies(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.return_value = ObjectInfo(path="builtins.py.txt", object_type=ObjectType.FILE)
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp))
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
     object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
     assert not graph.locate_dependency(Dependency(None, "os"))
@@ -186,8 +186,8 @@ def test_build_dependency_graph_ignores_known_dependencies(empty_index):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.return_value = ObjectInfo(path="builtins.py.txt", object_type=ObjectType.FILE)
-    sp = create_autospec(SitePackages)
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sp), resolver)
+    sps = site_packages_mock()
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps), resolver)
     object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
     assert not graph.locate_dependency(Dependency(None, "databricks"))
@@ -207,7 +207,9 @@ def test_build_dependency_graph_visits_site_packages(empty_index):
         return ObjectInfo(path=path, object_type=ObjectType.FILE) if path == "import-site-package.py.txt" else None
 
     ws.workspace.get_status.side_effect = get_status_side_effect
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws), resolver)
+    site_packages_path = locate_site_packages()
+    site_packages = SitePackages.parse(str(site_packages_path))
+    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, site_packages), resolver)
     object_info = ObjectInfo(path="import-site-package.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
     assert graph.locate_dependency(Dependency(None, "certifi/core.py"))

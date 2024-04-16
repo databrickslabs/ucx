@@ -18,6 +18,7 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.dependencies import SourceContainer
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -186,3 +187,9 @@ def locate_site_packages() -> pathlib.Path:
     python_lib_path = pathlib.Path(project_path, ".venv", "lib")
     actual_python = next(file for file in os.listdir(str(python_lib_path)) if file.startswith("python3."))
     return pathlib.Path(python_lib_path, actual_python, "site-packages")
+
+
+def site_packages_mock():
+    sps = create_autospec(SitePackages)
+    sps.__getitem__.return_value = None
+    return sps

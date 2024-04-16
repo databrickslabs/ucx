@@ -3,7 +3,7 @@ from __future__ import annotations  # for type hints
 import logging
 from pathlib import Path
 
-from databricks.sdk.service.workspace import Language, ObjectType
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency, DependencyType
 from databricks.labs.ucx.source_code.languages import Languages
@@ -23,8 +23,8 @@ class SourceFile(SourceContainer):
         self._language = CellLanguage.of_language(language)
 
     @property
-    def object_type(self) -> ObjectType:
-        return ObjectType.FILE
+    def dependency_type(self) -> DependencyType:
+        return DependencyType.FILE
 
     def build_dependency_graph(self, graph: DependencyGraph) -> None:
         if self._language is not CellLanguage.PYTHON:
