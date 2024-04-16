@@ -228,16 +228,9 @@ class ServicePrincipalMigration(SecretsMixin):
         return self._installation.save(migration_results, filename=self._output_file)
 
     def run_service_principal_migration(
-        self, prompts: Prompts, include_names: set[str] | None = None
+        self, include_names: set[str] | None = None
     ) -> list[StorageCredentialValidationResult]:
-
         sp_list_with_secret = self._generate_migration_list(include_names)
-
-        plan_confirmed = prompts.confirm(
-            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
-        )
-        if plan_confirmed is not True:
-            return []
 
         execution_result = []
         for spn in sp_list_with_secret:
@@ -254,16 +247,23 @@ class ServicePrincipalMigration(SecretsMixin):
             logger.info("No Azure Service Principal migrated to UC Storage credentials")
         return execution_result
 
-    def run_access_connector_migration(self, prompts: Prompts) -> list[StorageCredentialValidationResult]:
-        plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
-        if plan_confirmed is not True:
-            return []
-
+    def run_access_connector_migration(self) -> list[StorageCredentialValidationResult]:
         self._resource_permissions.create_access_connectors_for_storage_accounts()
-
         return []
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
-        sp_results = self.run_service_principal_migration(prompts, include_names)
-        ac_results = self.run_access_connector_migration(prompts)
+        plan_confirmed = prompts.confirm(
+            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
+        )
+        if plan_confirmed:
+            sp_results = self.run_service_principal_migration(include_names)
+        else:
+            sp_results = []
+
+        plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
+        if plan_confirmed:
+            ac_results = self.run_access_connector_migration()
+        else:
+            ac_results = []
+
         return sp_results + ac_results
