@@ -285,3 +285,19 @@ def test_create_global_spn():
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
+
+
+def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(caplog):
+    """A warning should be logged when no storage account is present."""
+    w = create_autospec(WorkspaceClient)
+    backend = MockBackend()
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+
+    azure_resources = create_autospec(AzureResources)
+    azure_resources.storage_accounts.return_value = []
+
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+
+    azure_resource_permission.create_access_connectors_for_storage_accounts()
+    assert "There are no external table present with azure storage account. Please check if assessment job is run" in caplog.messages
