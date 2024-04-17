@@ -31,21 +31,35 @@ class ServicePrincipalMigrationInfo:
 
 @dataclass
 class StorageCredentialValidationResult:
-    name: str
+    name: str | None
     application_id: str
-    read_only: bool
+    read_only: bool | None
     validated_on: str
-    directory_id: str | None = None
+    directory_id: str | None = None  # str when storage credential created for AzureServicePrincipal
     failures: list[str] | None = None
 
     @classmethod
-    def from_validation(cls, permission_mapping: StoragePermissionMapping, failures: list[str] | None):
+    def from_storage_credential_info(
+        cls, storage_credential_info: StorageCredentialInfo, validated_on: str, failures: list[str] | None
+    ):
+        if storage_credential_info.azure_service_principal is not None:
+            application_id = storage_credential_info.azure_service_principal.application_id
+            directory_id = storage_credential_info.azure_service_principal.directory_id
+        elif storage_credential_info.azure_managed_identity is not None:
+            if storage_credential_info.azure_managed_identity.managed_identity_id is not None:
+                application_id = storage_credential_info.azure_managed_identity.managed_identity_id
+            else:
+                application_id = storage_credential_info.azure_managed_identity.access_connector_id
+            directory_id = None
+        else:
+            raise KeyError("Storage credential info is missing an application id.")
+
         return cls(
-            permission_mapping.principal,
-            permission_mapping.client_id,
-            permission_mapping.privilege == Privilege.READ_FILES.value,
-            permission_mapping.prefix,
-            permission_mapping.directory_id,
+            storage_credential_info.name,
+            application_id,
+            storage_credential_info.read_only,
+            validated_on,
+            directory_id,
             failures,
         )
 
@@ -104,12 +118,12 @@ class StorageCredentialManager:
             read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
         )
 
-    def validate(self, permission_mapping: StoragePermissionMapping) -> StorageCredentialValidationResult:
+    def validate(self, storage_credential_info: StorageCredentialInfo, url: str) -> StorageCredentialValidationResult:
         try:
             validation = self._ws.storage_credentials.validate(
-                storage_credential_name=permission_mapping.principal,
-                url=permission_mapping.prefix,
-                read_only=permission_mapping.privilege == Privilege.READ_FILES.value,
+                storage_credential_name=storage_credential_info.name,
+                url=url,
+                read_only=storage_credential_info.read_only,
             )
         except InvalidParameterValue:
             logger.warning(
@@ -117,8 +131,9 @@ class StorageCredentialManager:
                 "the service principal and used for validating the migrated storage credential. "
                 "Skip the validation"
             )
-            return StorageCredentialValidationResult.from_validation(
-                permission_mapping,
+            return StorageCredentialValidationResult.from_storage_credential_info(
+                storage_credential_info,
+                url,
                 [
                     "The validation is skipped because an existing external location overlaps "
                     "with the location used for validation."
@@ -126,8 +141,8 @@ class StorageCredentialManager:
             )
 
         if not validation.results:
-            return StorageCredentialValidationResult.from_validation(
-                permission_mapping, ["Validation returned no results."]
+            return StorageCredentialValidationResult.from_storage_credential_info(
+                storage_credential_info, url, ["Validation returned no results."]
             )
 
         failures = []
@@ -136,7 +151,12 @@ class StorageCredentialManager:
                 continue
             if result.result == ValidationResultResult.FAIL:
                 failures.append(f"{result.operation.value} validation failed with message: {result.message}")
-        return StorageCredentialValidationResult.from_validation(permission_mapping, None if not failures else failures)
+
+        return StorageCredentialValidationResult.from_storage_credential_info(
+            storage_credential_info,
+            url,
+            None if not failures else failures,
+        )
 
 
 class ServicePrincipalMigration(SecretsMixin):

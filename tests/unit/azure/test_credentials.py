@@ -190,57 +190,72 @@ def test_create_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_1", "WRITE_FILES", "Application", "directory_id"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="storage_credential_info",
+        read_only=False,
     )
 
     # validate normal storage credential
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.read_only is False
-    assert validation.name == permission_mapping.principal
+    assert validation.name == storage_credential_info.name
     assert not validation.failures
 
 
 def test_validate_read_only_storage_credentials(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_read", "READ_FILES", "Application", "directory_id_1"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="storage_credential_info",
+        read_only=True,
     )
 
     # validate read-only storage credential
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.read_only is True
-    assert validation.name == permission_mapping.principal
+    assert validation.name == storage_credential_info.name
     assert not validation.failures
 
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "overlap", "WRITE_FILES", "Application", "directory_id_2"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="overlap",
+        read_only=True,
     )
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.failures == [
         "The validation is skipped because an existing external location overlaps with the location used for validation."
     ]
 
 
 def test_validate_storage_credentials_non_response(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "none", "WRITE_FILES", "Application", "directory_id"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="none",
+        read_only=True,
     )
 
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.failures == ["Validation returned no results."]
 
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="fail",
+        read_only=True,
     )
 
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.failures == ["LIST validation failed with message: fail"]
 
 

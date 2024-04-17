@@ -5,6 +5,7 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.catalog import AzureServicePrincipal, StorageCredentialInfo
 
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 
@@ -13,6 +14,16 @@ def test_replace_installation():
     ws = create_autospec(WorkspaceClient)
     ws.config.auth_type = 'azure-cli'
     ws.secrets.get_secret.return_value.value = base64.b64encode(b'1234').decode('utf-8')
+
+    azure_service_principal = AzureServicePrincipal(
+        directory_id="tenant", application_id="first-application-id", client_secret="secret"
+    )
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="oneenv-adls",
+        read_only=False,
+    )
+    ws.storage_credentials.create.return_value = storage_credential_info
 
     spn_info_rows = MockBackend.rows('application_id', 'secret_scope', 'secret_key', 'tenant_id', 'storage_account')
 
@@ -58,7 +69,12 @@ def test_replace_installation():
             }
         ),
     )
-    prompts = MockPrompts({'.*': 'yes'})
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "Please confirm to create an access connector for each storage account.": "No",
+        }
+    )
     ctx.service_principal_migration.run(prompts)
 
     ws.storage_credentials.create.assert_called_once()
@@ -66,10 +82,10 @@ def test_replace_installation():
         'azure_service_principal_migration_result.csv',
         [
             {
-                'application_id': 'first-application-id',
-                'directory_id': 'tenant',
                 'name': 'oneenv-adls',
+                'application_id': 'first-application-id',
                 'validated_on': 'abfss://uctest@ziyuanqintest.dfs.core.windows.net/',
+                'directory_id': 'tenant',
             }
         ],
     )
