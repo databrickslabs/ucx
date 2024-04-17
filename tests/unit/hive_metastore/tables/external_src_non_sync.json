@@ -4,7 +4,7 @@
     "database": "db1_src",
     "name": "external_src",
     "object_type": "EXTERNAL",
-    "table_format": "AVRO"
+    "table_format": "XML"
   },
   "rule": {
     "workspace_name": "workspace",
