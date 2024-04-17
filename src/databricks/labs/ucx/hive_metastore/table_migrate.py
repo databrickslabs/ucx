@@ -143,6 +143,8 @@ class TablesMigrator:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
+        if src_table.src.what == What.EXTERNAL_NO_SYNC:
+            return self._migrate_table_ctas(src_table.src, src_table.rule, grants)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
