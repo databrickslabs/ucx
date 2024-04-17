@@ -1,0 +1,17 @@
+{
+  "src": {
+    "catalog": "hive_metastore",
+    "database": "db1_src",
+    "name": "external_src",
+    "object_type": "EXTERNAL",
+    "table_format": "AVRO"
+  },
+  "rule": {
+    "workspace_name": "workspace",
+    "catalog_name": "ucx_default",
+    "src_schema": "db1_src",
+    "dst_schema": "db1_dst",
+    "src_table": "external_src",
+    "dst_table": "external_dst"
+  }
+}

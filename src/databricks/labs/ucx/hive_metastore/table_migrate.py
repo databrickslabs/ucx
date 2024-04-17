@@ -144,7 +144,7 @@ class TablesMigrator:
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_NO_SYNC:
-            return self._migrate_table_ctas(src_table.src, src_table.rule, grants)
+            return self._migrate_non_sync_table(src_table.src, src_table.rule, grants)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
@@ -208,15 +208,15 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_table_ctas(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        table_migrate_sql = self._get_ctas_sql(src_table, rule)
+    def _migrate_non_sync_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+        table_migrate_sql = self._get_create_in_place_sql(src_table, rule)
         logger.debug(f"Migrating table (CTAS) {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _get_ctas_sql(self, src_table: Table, rule: Rule) -> str:
+    def _get_create_in_place_sql(self, src_table: Table, rule: Rule) -> str:
         create_sql = str(next(self._backend.fetch(src_table.sql_show_create()))[0])
         statements = sqlglot.parse(create_sql, read='databricks')
         assert len(statements) == 1, 'Expected a single statement'
