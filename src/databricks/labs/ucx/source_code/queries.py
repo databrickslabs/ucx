@@ -32,9 +32,6 @@ class FromTable(Linter, Fixer):
                 continue
 
             for table in statement.find_all(Table):
-                catalog = self._catalog(table)
-                if catalog != 'hive_metastore':
-                    continue
                 src_db = table.db if table.db else self._use_schema
                 if not src_db:
                     logger.error(f"Could not determine schema for table {table.name}")

@@ -1,3 +1,4 @@
+
 from databricks.labs.ucx.source_code.base import Deprecation
 from databricks.labs.ucx.source_code.queries import FromTable
 
