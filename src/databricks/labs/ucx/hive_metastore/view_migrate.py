@@ -40,6 +40,18 @@ class ViewToMigrate(TableToMigrate):
                 continue
             yield TableView("hive_metastore", src_db, old_table.name)
 
+    def check_circular_dependency(self, initial_view):
+        queue = []
+        queue.extend(dep for dep in initial_view.dependencies if isinstance(dep, ViewToMigrate))
+        print(queue)
+        while queue:
+            current_view = queue.pop(0)
+            if current_view == initial_view:
+                raise ValueError(
+                    f"Circular dependency detected: {initial_view.src.name} is a dependency of {self.src.name} and vis-a-vis"
+                )
+            queue.extend(dep for dep in current_view.dependencies if isinstance(dep, ViewToMigrate))
+
     def sql_migrate_view(self, index: MigrationIndex) -> str:
         from_table = FromTable(index, use_schema=self.src.database)
         assert self.src.view_text is not None, 'Expected a view text'
@@ -109,8 +121,10 @@ class ViewsMigrationSequencer:
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
+        queue = []
         for view in views:
             view_deps = set(view.dependencies)
+            view.check_circular_dependency(view)
             if len(view_deps) == 0:
                 result.add(view)
             else:
