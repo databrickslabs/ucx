@@ -221,7 +221,13 @@ class AzureResourcePermissions:
         for storage_account in self._azurerm.storage_accounts():
             if storage_account.name not in used_storage_accounts:
                 continue
-            tasks.append(partial(self._create_access_connector_for_storage_account, storage_account=storage_account))
+            task = partial(
+                self._create_access_connector_for_storage_account,
+                storage_account=storage_account,
+                # Fine-grained access is configured within Databricks through unity
+                role_name="STORAGE_BLOB_DATA_CONTRIBUTOR",
+            )
+            tasks.append(task)
 
         thread_name = "Creating access connectors for storage accounts"
         results, errors = Threads.gather(thread_name, tasks)
