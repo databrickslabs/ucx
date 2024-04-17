@@ -545,6 +545,45 @@ def test_update_uc_trust_role(mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
 
     def command_call(cmd: str):
+        if "iam get-role" in cmd:
+            return (
+                0,
+                """
+{
+    "Role": {
+        "Path": "/",
+        "RoleName": "Test-Role",
+        "RoleId": "ABCD",
+        "Arn": "arn:aws:iam::0123456789:role/Test-Role",
+        "CreateDate": "2024-01-01T12:00:00+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "AWS": "arn:aws:iam::0123456789:root"
+                    },
+                    "Action": "sts:AssumeRole"
+                },
+                {
+                    "Effect":"Allow",
+                    "Principal": {
+                        "AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                    },
+                    "Action":"sts:AssumeRole",
+                    "Condition":{"StringEquals":{"sts:ExternalId":"00000"}}
+                } 
+            ]
+        },
+        "Description": "",
+        "MaxSessionDuration": 3600,
+        "RoleLastUsed": {}
+    }
+}
+            """,
+                "",
+            )
         command_calls.append(cmd)
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
@@ -554,8 +593,11 @@ def test_update_uc_trust_role(mocker):
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
         '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":"arn:aws:iam::0123456789:root"},"Action":"sts:AssumeRole"},'
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
         '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
-        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} --output json'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]}]} '
+        '--output json'
     ) in command_calls
 
 
