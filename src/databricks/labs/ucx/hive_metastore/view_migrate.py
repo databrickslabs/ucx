@@ -121,7 +121,6 @@ class ViewsMigrationSequencer:
         # we can't (slightly) optimize by checking len(views) == 0 or 1,
         # because we'd lose the opportunity to check the SQL
         result: set[ViewToMigrate] = set()
-        queue = []
         for view in views:
             view_deps = set(view.dependencies)
             view.check_circular_dependency(view)
