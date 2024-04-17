@@ -108,6 +108,7 @@ class PackageFileDependency(ResolvedDependency):
         return DependencyType.PACKAGE_FILE
 
     def load(self) -> SourceContainer:
+        from databricks.labs.ucx.source_code.site_packages import PackageFile
         return PackageFile(self._package, self.path)
 
 
@@ -299,9 +300,11 @@ class DependencyGraph:
         return child_graph
 
     def locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
+        return self.locate_dependency_with_path(dependency.path)
+
+    def locate_dependency_with_path(self, path: str) -> DependencyGraph | None:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
-        path = dependency.path
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         path = path[2:] if path.startswith('./') else path
 

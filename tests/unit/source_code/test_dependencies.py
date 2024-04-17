@@ -181,8 +181,8 @@ def test_build_dependency_graph_ignores_builtin_dependencies(empty_index):
     migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, whi, sps))
     object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
-    assert not graph.locate_dependency(Dependency(None, "os"))
-    assert not graph.locate_dependency(Dependency(None, "path"))
+    assert not graph.locate_dependency_with_path("os")
+    assert not graph.locate_dependency_with_path("path")
 
 
 def test_build_dependency_graph_ignores_known_dependencies(empty_index):
@@ -197,7 +197,7 @@ def test_build_dependency_graph_ignores_known_dependencies(empty_index):
     migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, whitelist, sps))
     object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
-    assert not graph.locate_dependency(Dependency(None, "databricks"))
+    assert not graph.locate_dependency_with_path("databricks")
 
 
 def test_build_dependency_graph_visits_site_packages(empty_index):
@@ -218,4 +218,4 @@ def test_build_dependency_graph_visits_site_packages(empty_index):
     migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, whitelist, site_packages))
     object_info = ObjectInfo(path="import-site-package.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
-    assert graph.locate_dependency(Dependency(None, "certifi/core.py"))
+    assert graph.locate_dependency_with_path("certifi/core.py")
