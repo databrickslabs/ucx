@@ -9,7 +9,7 @@ from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources, _download_side_effect, site_packages_mock
+from tests.unit import _load_sources, _download_side_effect, site_packages_mock, whitelist_mock
 
 S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
 
@@ -104,12 +104,12 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
 def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
-    resolver = DependencyResolver(whitelist)
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
     ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
     sps = site_packages_mock()
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps), resolver)
+    resolver = DependencyResolver(ws, whitelist, sps)
+    migrator = NotebookMigrator(ws, empty_index, resolver)
     object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     advices = list(resolver.get_advices())
@@ -142,12 +142,12 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
 
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
-    resolver = DependencyResolver(whitelist)
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     sps = site_packages_mock()
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps), resolver)
+    resolver = DependencyResolver(ws, whitelist, sps)
+    migrator = NotebookMigrator(ws, empty_index, resolver)
     object_info = ObjectInfo(path="root9.py.txt", object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
     advices = list(resolver.get_advices())
