@@ -992,10 +992,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
         elif non_delta:
-            table_type = TableType.MANAGED  # pylint: disable=redefined-variable-type
+            table_type = TableType.EXTERNAL  # pylint: disable=redefined-variable-type
             data_source_format = DataSourceFormat.JSON
             storage_location = "dbfs:/databricks-datasets/iot-stream/data-device"
-            ddl = f"{ddl} USING json LOCATION '{storage_location}'"
+            table_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
+            # Modified, otherwise it will identify the table as a DB Dataset
+            ddl = f"{ddl} USING json location '{table_location}' as SELECT * FROM JSON.`{storage_location}`"
         elif external_csv is not None:
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.CSV
