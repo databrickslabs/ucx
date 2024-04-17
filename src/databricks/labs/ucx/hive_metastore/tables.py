@@ -162,8 +162,10 @@ class Table:
     def sql_migrate_create_like(self, target_table_key):
         # Create table as a copy of the source table
         # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
-        return (f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} LIKE "
-                f"{escape_sql_identifier(self.key)};")
+        return (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} LIKE "
+            f"{escape_sql_identifier(self.key)};"
+        )
 
     def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:
