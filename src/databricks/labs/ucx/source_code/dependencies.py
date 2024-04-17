@@ -212,8 +212,9 @@ class DependencyResolver:
         self._advices: list[Advice] = []
 
     def resolve_object_info(self, object_info: ObjectInfo) -> ResolvedDependency | None:
-        assert object_info.object_type is not None
         assert object_info.path is not None
+        if object_info.object_type is None:
+            raise ValueError(f"Invalid ObjectInfo (missing 'object_type'): {object_info}")
         if object_info.object_type is ObjectType.NOTEBOOK:
             return WorkspaceNotebookDependency(self._workspace_loader, object_info.path)
         if object_info.object_type is ObjectType.FILE:
