@@ -1202,3 +1202,11 @@ def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
             ws.dbfs.delete(dst_path, recursive=True)
 
     yield from factory("make_dbfs_data_copy", create, remove)
+
+
+@pytest.fixture
+def make_mounted_location(make_random, env_or_skip):
+    return (
+        f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c',
+        f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}',
+    )

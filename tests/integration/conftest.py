@@ -650,3 +650,44 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
+
+
+@pytest.fixture
+def prepare_tables_for_migration(
+    ws, installation_ctx, make_catalog, make_random, make_dbfs_data_copy, env_or_skip
+) -> tuple[dict[str, TableInfo], SchemaInfo]:
+    # create external and managed tables to be migrated
+    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    tables: dict[str, TableInfo] = {
+        "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
+        "src_external_table": installation_ctx.make_table(
+            schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+        ),
+    }
+    src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
+    tables["src_view1"] = installation_ctx.make_table(
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        ctas=src_view1_text,
+        view=True,
+    )
+    src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
+    tables["src_view2"] = installation_ctx.make_table(
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        ctas=src_view2_text,
+        view=True,
+    )
+    # create destination catalog and schema
+    dst_catalog = make_catalog()
+    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
+    migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
+    installation_ctx.with_table_mapping_rules(migrate_rules)
+    if ws.config.is_azure:
+        installation_ctx.with_dummy_azure_resource_permission()
+    if ws.config.is_aws:
+        installation_ctx.with_dummy_aws_resource_permission()
+    installation_ctx.save_tables()
+    installation_ctx.save_mounts()
+    installation_ctx.with_dummy_grants_and_tacls()
+    return tables, dst_schema
