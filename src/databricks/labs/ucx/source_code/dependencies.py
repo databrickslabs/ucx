@@ -218,6 +218,8 @@ class DependencyResolver:
             return WorkspaceNotebookDependency(self._workspace_loader, object_info.path)
         if object_info.object_type is ObjectType.FILE:
             return WorkspaceFileDependency(self._workspace_loader, object_info.path)
+        if object_info.object_type in [ObjectType.LIBRARY, ObjectType.REPO, ObjectType.DASHBOARD, ObjectType.DIRECTORY]:
+            return None
         raise NotImplementedError(str(object_info.object_type))
 
     def resolve_dependency(self, dependency: Dependency) -> ResolvedDependency | None:
