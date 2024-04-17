@@ -217,7 +217,7 @@ class TablesMigrator:
         return self._migrate_acl(src_table, rule, grants)
 
     def _get_create_in_place_sql(self, src_table: Table, rule: Rule) -> str:
-        create_sql = str(next(self._backend.fetch(src_table.sql_show_create()))[0])
+        create_sql = str(next(self._backend.fetch(src_table.sql_show_create())).get("createtab_stmt"))
         statements = sqlglot.parse(create_sql, read='databricks')
         assert len(statements) == 1, 'Expected a single statement'
         create = statements[0]
