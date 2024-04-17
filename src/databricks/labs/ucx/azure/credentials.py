@@ -6,6 +6,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
+    AzureManagedIdentity,
     AzureServicePrincipal,
     Privilege,
     StorageCredentialInfo,
@@ -258,14 +259,33 @@ class ServicePrincipalMigration(SecretsMixin):
                     f"'{spn.permission_mapping.prefix}' with non-Allow network configuration"
                 )
 
-            self._storage_credential_manager.create_with_client_secret(spn)
-            execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
-
+            storage_credential_info = self._storage_credential_manager.create_with_client_secret(spn)
+            validation_results = self._storage_credential_manager.validate(
+                storage_credential_info,
+                spn.permission_mapping.prefix,
+            )
+            execution_result.append(validation_results)
         return execution_result
 
     def _create_access_connectors_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
-        self._resource_permissions.create_access_connectors_for_storage_accounts()
-        return []
+        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
+
+        execution_results = []
+        for access_connector in access_connectors:
+            storage_credential_info = self._ws.storage_credentials.create(
+                access_connector.name,
+                azure_managed_identity=AzureManagedIdentity(str(access_connector.id)),
+                comment="Created by ucx",
+                read_only=False,
+            )
+            storage_account_name = access_connector.name.removeprefix("ac-")
+            validation_results = self._storage_credential_manager.validate(
+                storage_credential_info,
+                f"abfss://{storage_account_name}.dfs.core.windows.net/",
+            )
+            execution_results.append(validation_results)
+
+        return execution_results
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         plan_confirmed = prompts.confirm(
