@@ -157,6 +157,9 @@ class Table:
             raise ValueError(msg)
         return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} DEEP CLONE {escape_sql_identifier(self.key)};"
 
+    def sql_show_create(self):
+        return f"SHOW CREATE {self.kind} {self.safe_sql_key};"
+
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
 
