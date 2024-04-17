@@ -216,18 +216,20 @@ class AWSResources:
         return s3_actions
 
     def _aws_role_trust_doc(self, external_id="0000"):
+        return self._get_json_for_cli(
+            {
+                "Version": "2012-10-17",
+                "Statement": [self._databricks_trust_statement(external_id)],
+            }
+        )
+
+    @staticmethod
+    def _databricks_trust_statement(external_id="0000"):
         return {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {
-                        "AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
-                    },
-                    "Action": "sts:AssumeRole",
-                    "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
-                }
-            ],
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},
+            "Action": "sts:AssumeRole",
+            "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
         }
 
     def _aws_s3_policy(self, s3_prefixes, account_id, role_name, kms_key=None):
@@ -285,7 +287,7 @@ class AWSResources:
         the AssumeRole condition will be modified later with the external ID captured from the UC credential.
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
-        return self._create_role(role_name, self._get_json_for_cli(self._aws_role_trust_doc()))
+        return self._create_role(role_name, self._aws_role_trust_doc())
 
     def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> str | None:
         """
@@ -299,27 +301,28 @@ class AWSResources:
             logger.error(f"Role {role_name} doesn't exist")
             return None
         policy_document = role.get("AssumeRolePolicyDocument")
-        if not policy_document:
-            logger.error(f"Role {role_name} doesn't have an AssumeRolePolicyDocument")
-            return None
-        for idx, statement in enumerate(policy_document["Statement"]):
-            effect = statement.get("Effect")
-            action = statement.get("Action")
-            principal = statement.get("Principal")
-            if not (effect and action and principal):
-                continue
-            if effect != "Allow":
-                continue
-            if action != "sts:AssumeRole":
-                continue
-            principal = principal.get("AWS")
-            if not principal:
-                continue
-            if not self._is_uc_principal(principal):
-                continue
-            policy_document["Statement"][idx] = self._aws_role_trust_doc(external_id)
+        if policy_document and policy_document.get("Statement"):
+            for idx, statement in enumerate(policy_document["Statement"]):
+                effect = statement.get("Effect")
+                action = statement.get("Action")
+                principal = statement.get("Principal")
+                if not (effect and action and principal):
+                    continue
+                if effect != "Allow":
+                    continue
+                if action != "sts:AssumeRole":
+                    continue
+                principal = principal.get("AWS")
+                if not principal:
+                    continue
+                if not self._is_uc_principal(principal):
+                    continue
+                policy_document["Statement"][idx] = self._databricks_trust_statement(external_id)
+            policy_document_json = self._get_json_for_cli(policy_document)
+        else:
+            policy_document_json = self._aws_role_trust_doc(external_id)
         update_role = self._run_json_command(
-            f"iam update-assume-role-policy --role-name {role_name} --policy-document {self._get_json_for_cli(policy_document)}"
+            f"iam update-assume-role-policy --role-name {role_name} " f"--policy-document {policy_document_json}"
         )
         if not update_role:
             return None
