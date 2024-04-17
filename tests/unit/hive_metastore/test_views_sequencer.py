@@ -127,7 +127,7 @@ def test_migrate_invalid_sql_tables_raises_value_error() -> None:
         batches = sequencer.sequence_batches()
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
-    assert "Circular view references are preventing migration:" in str(error)
+    assert "Circular dependency detected:" in str(error)
 
 
 def test_migrate_circular_vues_raises_value_error() -> None:
@@ -141,7 +141,7 @@ def test_migrate_circular_vues_raises_value_error() -> None:
         batches = sequencer.sequence_batches()
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
-    assert "Circular view references are preventing migration:" in str(error)
+    assert "Circular dependency detected:" in str(error)
 
 
 def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
