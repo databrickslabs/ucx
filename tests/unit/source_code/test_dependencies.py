@@ -177,7 +177,7 @@ def test_build_dependency_graph_ignores_builtin_dependencies(empty_index):
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.return_value = ObjectInfo(path="builtins.py.txt", object_type=ObjectType.FILE)
     sps = site_packages_mock()
-    whi = whitelist_mock()
+    whi = Whitelist()
     migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, whi, sps))
     object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
