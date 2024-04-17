@@ -387,4 +387,4 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
 
     with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx"):
         azure_resource_permission.create_access_connectors_for_storage_accounts()
-        assert any("STORAGE_BLOB_DATA_READER" in message for message in caplog.messages)
+        assert any("STORAGE_BLOB_DATA_CONTRIBUTOR" in message for message in caplog.messages)
