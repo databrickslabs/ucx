@@ -16,32 +16,29 @@ if typing.TYPE_CHECKING:
 
 
 class DependencyType(Enum):
-    NOTEBOOK = ObjectType.NOTEBOOK.value
-    FILE = ObjectType.FILE.value
+    WORKSPACE_NOTEBOOK = "WORKSPACE_NOTEBOOK"
+    WORKSPACE_FILE = "WORKSPACE_FILE"
+    LOCAL_NOTEBOOK = "LOCAL_NOTEBOOK"
+    LOCAL_FILE = "LOCAL_FILE"
     PACKAGE = "PACKAGE"
     PACKAGE_FILE = "PACKAGE_FILE"
+    UNRESOLVED = "UNRESOLVED"
 
     @property
     def object_type(self):
-        return ObjectType[self.value] or None
+        parts = self.value.split("_")
+        return ObjectType[parts[1]] if len(parts) > 1 else None
 
 
-class Dependency:
+class Dependency(abc.ABC):
 
-    @staticmethod
-    def from_object_info(object_info: ObjectInfo):
-        assert object_info.object_type is not None
-        assert object_info.path is not None
-        dependency_type = DependencyType[object_info.object_type.value]
-        return Dependency(dependency_type, object_info.path)
-
-    def __init__(self, dependency_type: DependencyType | None, path: str):
-        self._type = dependency_type
+    def __init__(self, path: str):
         self._path = path
 
     @property
-    def type(self) -> DependencyType | None:
-        return self._type
+    @abc.abstractmethod
+    def type(self) -> DependencyType:
+        raise NotImplementedError()
 
     @property
     def path(self) -> str:
@@ -51,7 +48,38 @@ class Dependency:
         return hash(self.path)
 
     def __eq__(self, other):
-        return isinstance(other, Dependency) and self.path == other.path
+        return isinstance(other, type(self)) and self.path == other.path
+
+
+class UnresolvedDependency(Dependency):
+
+    @property
+    def type(self) -> DependencyType:
+        return DependencyType.UNRESOLVED
+
+
+class ResolvedDependency(Dependency, abc.ABC):
+
+    def __init__(self, loader: DependencyLoader, path: str):
+        super().__init__(path)
+        self._loader = loader
+
+    def load(self) -> SourceContainer | None:
+        return self._loader.load_dependency(self)
+
+
+class WorkspaceNotebookDependency(ResolvedDependency):
+
+    @property
+    def type(self) -> DependencyType:
+        return DependencyType.WORKSPACE_NOTEBOOK
+
+
+class WorkspaceFileDependency(ResolvedDependency):
+
+    @property
+    def type(self) -> DependencyType:
+        return DependencyType.WORKSPACE_FILE
 
 
 class SourceContainer(abc.ABC):
@@ -66,24 +94,19 @@ class SourceContainer(abc.ABC):
         raise NotImplementedError()
 
 
-class DependencyLoader:
+class DependencyLoader(abc.ABC):
 
-    def __init__(self, ws: WorkspaceClient, site_packages: SitePackages):
+    @abc.abstractmethod
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        raise NotImplementedError()
+
+
+class WorkspaceLoader(DependencyLoader):
+
+    def __init__(self, ws: WorkspaceClient):
         self._ws = ws
-        self._site_packages = site_packages
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        # libraries have precedence over workspace objects
-        if dependency.type is DependencyType.PACKAGE_FILE:
-            # pylint: disable=import-outside-toplevel
-            # local import to avoid cyclic dependency
-            from databricks.labs.ucx.source_code.site_packages import PackageDependency
-
-            assert isinstance(dependency, PackageDependency)
-            return dependency.load()
-        site_package = self._site_packages[dependency.path]
-        if site_package is not None:
-            return site_package
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
@@ -134,14 +157,40 @@ class DependencyLoader:
             return f.read().decode("utf-8")
 
 
+class PackageLoader(DependencyLoader):
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        # libraries have precedence over workspace objects
+        if dependency.type is DependencyType.PACKAGE_FILE:
+            # pylint: disable=import-outside-toplevel
+            # local import to avoid cyclic dependency
+            from databricks.labs.ucx.source_code.site_packages import PackageDependency
+
+            assert isinstance(dependency, PackageDependency)
+            return dependency.load()
+        raise NotImplementedError(str(dependency.type))
+
+
 class DependencyResolver:
-    def __init__(self, whitelist: Whitelist | None = None):
+    def __init__(self, ws: WorkspaceClient | None = None, whitelist: Whitelist | None = None, site_packages: SitePackages | None = None):
+        assert ws is not None # TODO until we support local notebooks
+        self._workspace_loader = WorkspaceLoader(ws)
         self._whitelist = Whitelist() if whitelist is None else whitelist
+        self._site_packages = site_packages
         self._advices: list[Advice] = []
 
-    def resolve(self, dependency: Dependency) -> Dependency | None:
-        if dependency.type is DependencyType.NOTEBOOK:
-            return dependency
+    def resolve_object_info(self, object_info: ObjectInfo) -> ResolvedDependency | None:
+        assert object_info.object_type is not None
+        assert object_info.path is not None
+        if object_info.object_type is ObjectType.NOTEBOOK:
+            return WorkspaceNotebookDependency(self._workspace_loader, object_info.path)
+        if object_info.object_type is ObjectType.FILE:
+            return WorkspaceFileDependency(self._workspace_loader, object_info.path)
+        raise NotImplementedError(str(object_info.object_type))
+
+    def resolve_dependency(self, dependency: Dependency) -> ResolvedDependency | None:
+        if dependency.type is DependencyType.WORKSPACE_NOTEBOOK:
+            return typing.cast(ResolvedDependency, dependency)
         compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is not None:
@@ -157,7 +206,7 @@ class DependencyResolver:
                     )
                 )
             return None
-        return dependency
+        return typing.cast(ResolvedDependency, dependency)  # TODO
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
@@ -169,14 +218,16 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        loader: DependencyLoader,
         resolver: DependencyResolver | None = None,
     ):
         self._dependency = dependency
         self._parent = parent
-        self._loader = loader
         self._resolver = resolver or DependencyResolver()
         self._dependencies: dict[Dependency, DependencyGraph] = {}
+
+    @property
+    def resolver(self) -> DependencyResolver:
+        return self._resolver
 
     @property
     def dependency(self):
@@ -187,7 +238,7 @@ class DependencyGraph:
         return self._dependency.path
 
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
-        resolved = self._resolver.resolve(dependency)
+        resolved = self._resolver.resolve_dependency(dependency)
         if resolved is None:
             return None
         # already registered ?
@@ -196,9 +247,9 @@ class DependencyGraph:
             self._dependencies[resolved] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(resolved, self, self._loader, self._resolver)
+        child_graph = DependencyGraph(resolved, self, self._resolver)
         self._dependencies[resolved] = child_graph
-        container = self._loader.load_dependency(resolved)
+        container = resolved.load()
         if not container:
             return None
         container.build_dependency_graph(child_graph)

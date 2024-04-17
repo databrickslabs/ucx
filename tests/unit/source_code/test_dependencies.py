@@ -30,7 +30,7 @@ def test_build_dependency_graph_visits_notebook_notebook_dependencies(empty_inde
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     sps = site_packages_mock()
     ws.workspace.get_status.side_effect = get_status_side_effect
-    migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws, sps))
+    migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, sps))
     object_info = ObjectInfo(path="root3.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     migrator.build_dependency_graph(object_info)
     assert len(visited) == len(paths)

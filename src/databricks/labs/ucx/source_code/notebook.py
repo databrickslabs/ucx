@@ -8,7 +8,7 @@ from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language
+from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer, DependencyType
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
@@ -152,14 +152,17 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, graph: DependencyGraph):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for line in lines:
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command) :].strip()
-                parent.register_dependency(Dependency(DependencyType.NOTEBOOK, path.strip('"')))
+                path = line[start + len(command):]
+                path = path.strip().strip("'").strip('"')
+                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
+                dependency = graph.resolver.resolve_object_info(object_info)
+                graph.register_dependency(dependency)
                 return
         raise ValueError("Missing notebook path in %run command")
 

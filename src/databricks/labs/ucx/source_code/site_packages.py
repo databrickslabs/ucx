@@ -2,8 +2,15 @@ import ast
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyType, DependencyGraph, Dependency
+from databricks.labs.ucx.source_code.dependencies import (
+    SourceContainer,
+    DependencyType,
+    DependencyGraph,
+    Dependency,
+    UnresolvedDependency,
+)
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
@@ -59,14 +66,18 @@ class SitePackage(SourceContainer):
             module_path = f"{top_level}/{path}.py"
             if module_path in self._module_paths:
                 return graph.register_dependency(PackageDependency(self, module_path))
-        return graph.register_dependency(Dependency(None, path))
+        return graph.register_dependency(UnresolvedDependency(path))
 
 
 class PackageDependency(Dependency):
 
     def __init__(self, package: SitePackage, path: str):
-        super().__init__(DependencyType.PACKAGE_FILE, path)
+        super().__init__(path)
         self._package = package
+
+    @property
+    def type(self):
+        return DependencyType.PACKAGE_FILE
 
     def load(self) -> SourceContainer:
         return PackageFile(self._package, self.path)
@@ -97,7 +108,8 @@ class PackageFile(SourceContainer):
             assert isinstance(call, ast.Call)
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
-                dependency = Dependency(DependencyType.NOTEBOOK, path.value.strip("'").strip('"'))
+                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path.value.strip("'").strip('"'))
+                dependency = graph.resolver.resolve_object_info(object_info)
                 graph.register_dependency(dependency)
         names = PythonLinter.list_import_sources(linter)
         for name in names:
