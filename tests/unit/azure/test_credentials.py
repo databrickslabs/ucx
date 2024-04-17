@@ -34,8 +34,13 @@ from databricks.labs.ucx.azure.credentials import (
     ServicePrincipalMigrationInfo,
     StorageCredentialManager,
 )
-from databricks.labs.ucx.azure.resources import AzureResources
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.azure.resources import (
+    AzureResource,
+    AzureResources,
+    StorageAccount,
+    AccessConnector,
+)
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations
 from tests.unit import DEFAULT_CONFIG
 
 
@@ -89,9 +94,15 @@ def installation():
     )
 
 
-def side_effect_create_storage_credential(name, azure_service_principal, comment, read_only):
+def side_effect_create_storage_credential(
+    name, comment, read_only, azure_service_principal=None, azure_managed_identity=None
+):
     return StorageCredentialInfo(
-        name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
+        name=name,
+        comment=comment,
+        read_only=read_only,
+        azure_service_principal=azure_service_principal,
+        azure_managed_identity=azure_managed_identity,
     )
 
 
@@ -265,11 +276,36 @@ def sp_migration(installation, credential_manager):
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
-    # pylint: disable=mock-no-usage
-    azure_resources = create_autospec(AzureResources)
+
+    storage_account = StorageAccount(
+        id=AzureResource("/subscriptions/test/providers/Microsoft.Storage/storageAccount/labsazurethings"),
+        name="labsazurethings",
+        location="westeu",
+    )
+    azurerm = create_autospec(AzureResources)
+    azurerm.storage_accounts.return_value = [storage_account]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azurerm.create_or_update_access_connector.return_value = AccessConnector(
+        id=access_connector_id,
+        name=f"ac-{storage_account.name}",
+        location=storage_account.location,
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+
+    external_location = ExternalLocation(f"abfss://things@{storage_account.name}.dfs.core.windows.net/folder1", 1)
     external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [external_location]
+
+    arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
+
     sp_crawler = create_autospec(AzureServicePrincipalCrawler)
-    arp = AzureResourcePermissions(installation, ws, azure_resources, external_locations)
+    arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
     sp_crawler.snapshot.return_value = [
         AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
         AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1"),
@@ -434,3 +470,18 @@ def test_run_warning_non_allow_network_configuration(installation, sp_migration,
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):
         sp_migration.run(prompts)
         assert any(expected_message in message for message in caplog.messages)
+
+
+def test_create_access_connectors_for_storage_accounts(sp_migration):
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
+            "Please confirm to create an access connector for each storage account.": "Yes",
+        }
+    )
+
+    validation_results = sp_migration.run(prompts)
+
+    assert len(validation_results) == 1
+    assert validation_results[0].name.startswith("ac")
+    assert validation_results[0].failures is None
