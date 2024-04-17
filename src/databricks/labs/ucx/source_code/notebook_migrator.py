@@ -44,9 +44,10 @@ class NotebookMigrator:
     def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        notebook = self._loader.load_dependency(Dependency.from_object_info(object_info))
-        assert isinstance(notebook, Notebook)
-        return self._apply(notebook)
+        dependency = self._resolver.resolve_object_info(object_info)
+        container = dependency.load()
+        assert isinstance(container, Notebook)
+        return self._apply(container)
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False
