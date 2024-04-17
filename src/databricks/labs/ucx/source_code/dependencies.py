@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 if typing.TYPE_CHECKING:
-    from databricks.labs.ucx.source_code.site_packages import SitePackages
+    from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage, PackageFile
 
 
 class DependencyType(Enum):
@@ -82,6 +82,35 @@ class WorkspaceFileDependency(ResolvedDependency):
         return DependencyType.WORKSPACE_FILE
 
 
+class PackageDependency(ResolvedDependency):
+
+    def __init__(self, package: SitePackage):
+        # TODO check behavior with multi-top-level package
+        super().__init__(PackageLoader(), package.top_levels[0])
+        self._package = package
+
+    @property
+    def type(self):
+        return DependencyType.PACKAGE
+
+    def load(self) -> SourceContainer:
+        return self._package
+
+
+class PackageFileDependency(ResolvedDependency):
+
+    def __init__(self, package: SitePackage, path: str):
+        super().__init__(PackageLoader(), path)
+        self._package = package
+
+    @property
+    def type(self):
+        return DependencyType.PACKAGE_FILE
+
+    def load(self) -> SourceContainer:
+        return PackageFile(self._package, self.path)
+
+
 class SourceContainer(abc.ABC):
 
     @property
@@ -106,6 +135,9 @@ class WorkspaceLoader(DependencyLoader):
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
 
+    def get_object_info(self, path: str):
+        return self._ws.workspace.get_status(path)
+
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
@@ -117,7 +149,7 @@ class WorkspaceLoader(DependencyLoader):
         raise NotImplementedError(str(object_info.object_type))
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
-        object_info = self._ws.workspace.get_status(dependency.path)
+        object_info = self.get_object_info(dependency.path)
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         if object_info is None or object_info.object_type is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
@@ -189,8 +221,8 @@ class DependencyResolver:
         raise NotImplementedError(str(object_info.object_type))
 
     def resolve_dependency(self, dependency: Dependency) -> ResolvedDependency | None:
-        if dependency.type is DependencyType.WORKSPACE_NOTEBOOK:
-            return typing.cast(ResolvedDependency, dependency)
+        if isinstance(dependency, ResolvedDependency):
+            return dependency
         compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is not None:
@@ -206,7 +238,15 @@ class DependencyResolver:
                     )
                 )
             return None
-        return typing.cast(ResolvedDependency, dependency)  # TODO
+        site_package = self._site_packages[dependency.path]
+        if site_package is not None:
+            return PackageDependency(site_package)
+        if self._workspace_loader is not None:
+            object_info = self._workspace_loader.get_object_info(dependency.path)
+            if object_info is not None:
+                return self.resolve_object_info(object_info)
+        return None
+
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices

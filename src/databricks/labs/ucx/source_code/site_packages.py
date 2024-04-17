@@ -8,8 +8,7 @@ from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyType,
     DependencyGraph,
-    Dependency,
-    UnresolvedDependency,
+    UnresolvedDependency, PackageDependency, PackageFileDependency,
 )
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
@@ -54,7 +53,7 @@ class SitePackage(SourceContainer):
 
     def build_dependency_graph(self, graph: DependencyGraph) -> None:
         for module_path in self._module_paths:
-            graph.register_dependency(PackageDependency(self, module_path))
+            graph.register_dependency(PackageFileDependency(self, module_path))
 
     def load_module_source_code(self, path: str):
         source_path = Path(self._dist_info_path.parent, path)
@@ -65,22 +64,8 @@ class SitePackage(SourceContainer):
         for top_level in self._top_levels:
             module_path = f"{top_level}/{path}.py"
             if module_path in self._module_paths:
-                return graph.register_dependency(PackageDependency(self, module_path))
+                return graph.register_dependency(PackageFileDependency(self, module_path))
         return graph.register_dependency(UnresolvedDependency(path))
-
-
-class PackageDependency(Dependency):
-
-    def __init__(self, package: SitePackage, path: str):
-        super().__init__(path)
-        self._package = package
-
-    @property
-    def type(self):
-        return DependencyType.PACKAGE_FILE
-
-    def load(self) -> SourceContainer:
-        return PackageFile(self._package, self.path)
 
 
 class PackageFile(SourceContainer):

@@ -10,7 +10,8 @@ from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer, DependencyType
+from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer, DependencyType, \
+    UnresolvedDependency
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
@@ -71,19 +72,21 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, graph: DependencyGraph):
         linter = ASTLinter.parse(self._original_code)
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:
             assert isinstance(call, ast.Call)
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
-                dependency = Dependency(DependencyType.NOTEBOOK, path.value.strip("'").strip('"'))
-                parent.register_dependency(dependency)
+                path = path.value.strip().strip("'").strip('"')
+                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
+                dependency = graph.resolver.resolve_object_info(object_info)
+                graph.register_dependency(dependency)
         names = PythonLinter.list_import_sources(linter)
         for name in names:
-            dependency = Dependency(None, name)
-            parent.register_dependency(dependency)
+            dependency = UnresolvedDependency(name)
+            graph.register_dependency(dependency)
 
 
 class RCell(Cell):
@@ -183,7 +186,7 @@ class ShellCell(Cell):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
-        pass
+        pass # nothing to do
 
 
 class PipCell(Cell):

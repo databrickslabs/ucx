@@ -1,11 +1,13 @@
 from __future__ import annotations  # for type hints
 
+import abc
 import logging
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency, DependencyType
+from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency, DependencyType, \
+    UnresolvedDependency
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
@@ -14,17 +16,13 @@ from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinte
 logger = logging.getLogger(__name__)
 
 
-class SourceFile(SourceContainer):
+class SourceFile(SourceContainer, abc.ABC):
 
     def __init__(self, path: str, source: str, language: Language):
         self._path = path
         self._original_code = source
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
-
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.FILE
 
     def build_dependency_graph(self, graph: DependencyGraph) -> None:
         if self._language is not CellLanguage.PYTHON:
@@ -37,16 +35,21 @@ class SourceFile(SourceContainer):
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         import_names = PythonLinter.list_import_sources(linter)
         for import_name in import_names:
-            # we don't know yet the type of the dependency
-            graph.register_dependency(Dependency(None, import_name))
+            graph.register_dependency(UnresolvedDependency(import_name))
 
 
 class WorkspaceFile(SourceFile):
-    pass
+
+    @property
+    def dependency_type(self) -> DependencyType:
+        return DependencyType.WORKSPACE_FILE
 
 
 class LocalFile(SourceFile):
-    pass
+    @property
+    def dependency_type(self) -> DependencyType:
+        return DependencyType.LOCAL_FILE
+
 
 
 class LocalFileMigrator:
