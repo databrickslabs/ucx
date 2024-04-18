@@ -228,7 +228,7 @@ class TablesMigrator:
         return self._migrate_acl(src_table, rule, grants)
 
     def _get_create_in_place_sql(self, src_table: Table, rule: Rule) -> str:
-        create_sql = str(next(self._backend.fetch(src_table.sql_show_create())).get("createtab_stmt"))
+        create_sql = str(next(self._backend.fetch(src_table.sql_show_create()))["createtab_stmt"])
         statements = sqlglot.parse(create_sql, read='databricks')
         assert len(statements) == 1, 'Expected a single statement'
         create = statements[0]
@@ -248,13 +248,9 @@ class TablesMigrator:
         return create.sql('databricks')
 
     def _get_create_ctas_sql(self, src_table: Table, rule: Rule) -> str:
-        create_sql = self._get_create_in_place_sql(src_table, rule)
-        re_external = re.compile(r"EXTERNAL", re.IGNORECASE)
-        create_sql = re_external.sub("", create_sql)
-        re_location = re.compile(r"LOCATION[ ]+['\"].*['\"]", re.IGNORECASE)
-        create_sql = re_location.sub("", create_sql)
-        as_select = f" AS SELECT * FROM {escape_sql_identifier(src_table.key)}"
-        return f"{create_sql}{as_select}"
+        create_sql = (f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} "
+                      f"AS SELECT * FROM {src_table.safe_sql_key}")
+        return create_sql
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
         if grants is None:
