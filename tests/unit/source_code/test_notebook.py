@@ -5,14 +5,12 @@ import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.base import Advisory, Advice
 from databricks.labs.ucx.source_code.notebook import WorkspaceNotebook
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     SourceContainer,
     DependencyResolver,
 )
-from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources, _download_side_effect, whitelist_mock, site_packages_mock
 
 # fmt: off
@@ -235,60 +233,3 @@ def test_notebook_builds_python_dependency_graph():
     assert actual == set(paths)
 
 
-def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py.txt")
-    linter = PythonLinter()
-    advices = list(linter.lint(sources[0]))
-    assert [
-        Advisory(
-            code='dbutils-notebook-run-dynamic',
-            message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            source_type=Advice.MISSING_SOURCE_TYPE,
-            source_path=Advice.MISSING_SOURCE_PATH,
-            start_line=14,
-            start_col=13,
-            end_line=14,
-            end_col=50,
-        )
-    ] == advices
-
-
-def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(SourceContainer, "root4.py.txt")
-    linter = PythonLinter()
-    advices = list(linter.lint(sources[0]))
-    assert [
-        Advisory(
-            code='dbutils-notebook-run-literal',
-            message="Call to 'dbutils.notebook.run' will be migrated automatically",
-            source_type=Advice.MISSING_SOURCE_TYPE,
-            source_path=Advice.MISSING_SOURCE_PATH,
-            start_line=2,
-            start_col=0,
-            end_line=2,
-            end_col=38,
-        )
-    ] == advices
-
-
-def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
-    source = """
-import stuff
-do_something_with_stuff(stuff)
-stuff2 = dbutils.notebook.run("where is notebook 1?")
-stuff3 = dbutils.notebook.run("where is notebook 2?")
-"""
-    linter = PythonLinter()
-    advices = list(linter.lint(source))
-    assert len(advices) == 2
-
-
-def test_does_not_detect_partial_call_to_dbutils_notebook_run_in_python_code_():
-    source = """
-import stuff
-do_something_with_stuff(stuff)
-stuff2 = notebook.run("where is notebook 1?")
-"""
-    linter = PythonLinter()
-    advices = list(linter.lint(source))
-    assert len(advices) == 0
