@@ -25,6 +25,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     MigrationCount,
     Table,
     What,
+    HiveSerdeType,
 )
 from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewsMigrationSequencer,
@@ -235,23 +236,32 @@ class TablesMigrator:
             # TODO: Add sql_migrate_external_hiveserde_ctas here
             return False
 
+        # verify hive serde type
+        hiveserde_type = src_table.hiveserde_type(self._backend)
+        if hiveserde_type in [
+            HiveSerdeType.NOT_HIVESERDE,
+            HiveSerdeType.OTHER_HIVESERDE,
+            HiveSerdeType.INVALID_HIVESERDE_INFO,
+        ]:
+            logger.warning(f"{src_table.key} table can only be migrated using CTAS.")
+            return False
+        if hiveserde_type != hiveserde_in_place_migrate:
+            logger.info(
+                f"{src_table.key} is using {hiveserde_type.name} hiveserde. It won't be in-place migrated in this {hiveserde_in_place_migrate} dedicated task."
+            )
+            return False
+
+        # if the src table location is using mount, resolve the mount location so it will be used in the updated DDL
         dst_table_location = None
         if mounts and src_table.is_dbfs_mnt:
             dst_table_location = ExternalLocations.resolve_mount(src_table.location, mounts)
 
         table_migrate_sql = src_table.sql_migrate_external_hiveserde_in_place(
-            rule.catalog_name,
-            rule.dst_schema,
-            rule.dst_table,
-            self._backend,
-            hiveserde_in_place_migrate,
-            dst_table_location,
+            rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_type, dst_table_location
         )
         if not table_migrate_sql:
-            logger.info(
-                f"{src_table.key} hiveserde table cannot be in-place migrated in this {hiveserde_in_place_migrate} dedicated task. "
-                f"1. If this table uses in-place migration supported hiveserde, it will be migrated by other tasks in this in-place migration workflow. "
-                f"2. Otherwise this table will need to be migrated by the CTAS workflow."
+            logger.warning(
+                f"Failed to generate in-place migration DDL for {src_table.key}, skip the in-place migration. It can be migrated in CTAS workflow"
             )
             return False
 

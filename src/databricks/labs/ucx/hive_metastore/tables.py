@@ -9,6 +9,7 @@ from functools import partial
 import sqlglot
 from sqlglot.expressions import Table as SQLTable
 from sqlglot.expressions import LocationProperty
+from sqlglot.errors import ParseError
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -29,6 +30,15 @@ class What(Enum):
     VIEW = auto()
     DB_DATASET = auto()
     UNKNOWN = auto()
+
+
+class HiveSerdeType(Enum):
+    PARQUET = auto()
+    AVRO = auto()
+    ORC = auto()
+    OTHER_HIVESERDE = auto()
+    NOT_HIVESERDE = auto()
+    INVALID_HIVESERDE_INFO = auto()
 
 
 class AclMigrationWhat(Enum):
@@ -183,40 +193,63 @@ class Table:
             f"{escape_sql_identifier(self.key)};"
         )
 
+    def hiveserde_type(self, backend: SqlBackend) -> HiveSerdeType:
+        if self.table_format != "HIVE":
+            return HiveSerdeType.NOT_HIVESERDE
+        # Extract hive serde info, ideally this should be done by table crawler.
+        # But doing here to avoid breaking change to the `tables` table in the inventory schema.
+        describe = {}
+        for key, values, _ in backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(self.key)}"):
+            describe[key] = values
+        if not {"Serde Library", "InputFormat", "OutputFormat"} <= describe.keys():
+            return HiveSerdeType.INVALID_HIVESERDE_INFO
+        serde = describe["Serde Library"]
+        input_format = describe["InputFormat"]
+        output_format = describe["OutputFormat"]
+        if self._if_parquet_serde(serde, input_format, output_format):
+            return HiveSerdeType.PARQUET
+        if self._if_avro_serde(serde, input_format, output_format):
+            return HiveSerdeType.AVRO
+        if self._if_orc_serde(serde, input_format, output_format):
+            return HiveSerdeType.ORC
+        return HiveSerdeType.OTHER_HIVESERDE
+
+    def _if_parquet_serde(self, serde, input_format, output_format) -> bool:
+        return (
+            serde == "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+            and input_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+        )
+
+    def _if_avro_serde(self, serde, input_format, output_format) -> bool:
+        return (
+            serde == "org.apache.hadoop.hive.serde2.avro.AvroSerDe"
+            and input_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat"
+        )
+
+    def _if_orc_serde(self, serde, input_format, output_format) -> bool:
+        return (
+            serde == "org.apache.hadoop.hive.ql.io.orc.OrcSerde"
+            and input_format == "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
+        )
+
     def sql_migrate_external_hiveserde_in_place(
         self,
         catalog_name,
         dst_schema,
         dst_table,
         backend: SqlBackend,
-        hiveserde_in_place_migrate: str,
-        uc_table_location: str | None = None,
+        hiveserde_type: HiveSerdeType,
+        replace_table_location: str | None = None,
     ) -> str | None:
-        # extract hive serde info, ideally this should be done by table crawler.
-        # But doing here to avoid breaking change to the `tables` table in the inventory schema.
-        describe = {}
-        for key, values, _ in backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(self.key)}"):
-            describe[key] = values
-
-        if not {"Serde Library", "InputFormat", "OutputFormat"} <= describe.keys():
-            return None
-
-        # if "PARQUET", "AVRO", "ORC" hiveserde, just reuse the DDL from "SHOW CREATE TABLE..."
-        if (
-            self._if_parquet_serde(
-                hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
-            )
-            or self._if_avro_serde(
-                hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
-            )
-            or self._if_orc_serde(
-                hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
-            )
-        ):
-            return self._ddl_show_create_table(backend, catalog_name, dst_schema, dst_table, uc_table_location)
+        # "PARQUET", "AVRO", "ORC" can be migrated with "SHOW CREATE TABLE..." DDL
+        if hiveserde_type in [HiveSerdeType.PARQUET, HiveSerdeType.AVRO, HiveSerdeType.ORC]:
+            return self._ddl_show_create_table(backend, catalog_name, dst_schema, dst_table, replace_table_location)
 
         # "TEXTFILE" hiveserde needs extra handling on preparing the DDL
-        # TODO: add support for "TEXTFILE" hiveserde
+        # TODO: add support for "TEXTFILE" hiveserde, when the data can be parsed as Spark CSV datasource
 
         # "JSON", "CSV" hiveserde need extra handling on preparing the DDL
         # TODO: DBR does not bundle the jars for "JSON", "CSV" hiveserde, it's unlikely we see those tables.
@@ -224,50 +257,41 @@ class Table:
         #  we hold off the implementation for now until we see the real use case.
         return None
 
-    def _if_parquet_serde(self, hiveserde_in_place_migrate, serde, input_format, output_format) -> bool:
-        return (
-            hiveserde_in_place_migrate == "PARQUET"
-            and serde == "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
-            and input_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
-            and output_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-        )
-
-    def _if_avro_serde(self, hiveserde_in_place_migrate, serde, input_format, output_format) -> bool:
-        return (
-            hiveserde_in_place_migrate == "AVRO"
-            and serde == "org.apache.hadoop.hive.serde2.avro.AvroSerDe"
-            and input_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat"
-            and output_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat"
-        )
-
-    def _if_orc_serde(self, hiveserde_in_place_migrate, serde, input_format, output_format) -> bool:
-        return (
-            hiveserde_in_place_migrate == "ORC"
-            and serde == "org.apache.hadoop.hive.ql.io.orc.OrcSerde"
-            and input_format == "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat"
-            and output_format == "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
-        )
-
-    def _ddl_show_create_table(self, backend: SqlBackend, catalog_name, dst_schema, dst_table, replace_location) -> str:
+    def _ddl_show_create_table(
+        self, backend: SqlBackend, catalog_name, dst_schema, dst_table, replace_location
+    ) -> str | None:
         # get raw DDL from "SHOW CREATE TABLE..."
         createtab_stmt = next(backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(self.key)}"))["createtab_stmt"]
         # parse the DDL and replace the old table name with the new UC table name
-        new_statements = []
-        for statement in sqlglot.parse(createtab_stmt):
-            if not statement:
-                continue
-            for old_table in statement.find_all(SQLTable):
-                new_table = SQLTable(catalog=catalog_name, db=dst_schema, this=dst_table)
-                old_table.replace(new_table)
-            if replace_location:
-                # replace dbfs mnt in ddl if any
-                for mnt_loc in statement.find_all(LocationProperty):
-                    new_loc = LocationProperty(this=f"'{replace_location}'")
-                    mnt_loc.replace(new_loc)
-            new_sql = statement.sql('databricks')
-            new_statements.append(new_sql)
-        new_createtab_stmt = '; '.join(new_statements)
-        return new_createtab_stmt
+        try:
+            statements = sqlglot.parse(createtab_stmt)
+        except (ValueError, ParseError):
+            logger.exception(f"Exception when parsing 'SHOW CREATE TABLE' DDL for {self.key}")
+            return None
+
+        statement = statements[0]
+        if not statement:
+            logger.error(f"sqlglot parsed none statement from 'SHOW CREATE TABLE' DDL for {self.key}")
+            return None
+
+        src_table = statement.find(SQLTable)
+        if not src_table:
+            logger.error(f"sqlglot failed to extract table object from parsed DDL for {self.key}")
+            return None
+        new_table = SQLTable(catalog=catalog_name, db=dst_schema, this=dst_table)
+        src_table.replace(new_table)
+
+        if replace_location:
+            # replace dbfs mnt in ddl if any
+            mnt_loc = statement.find(LocationProperty)
+            if not mnt_loc:
+                logger.error(f"sqlglot failed to extract table location object from parsed DDL for {self.key}")
+                return None
+            new_loc = LocationProperty(this=f"'{replace_location}'")
+            mnt_loc.replace(new_loc)
+
+        new_sql = statement.sql('databricks')
+        return new_sql
 
     def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:

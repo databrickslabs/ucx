@@ -2,7 +2,7 @@ import pytest
 from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
-from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What
+from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler, What, HiveSerdeType
 
 
 def test_is_delta_true():
@@ -312,14 +312,11 @@ def test_is_partitioned_flag():
 
 
 @pytest.mark.parametrize(
-    'table, destination, hiveserde_in_place_migrate, mounts, describe, ddl, expected',
+    'table, mounts, describe, ddl, expected_hiveserde_type, expected_new_ddl',
     [
+        # valid parquet hiveserde test
         (
-            Table(
-                "hive_metastore", "schema", "test_parquet", "EXTERNAL", "HIVE", location="dbfs:/mnt/test_parquet/table1"
-            ),
-            ["uc_catalog", "uc_schema", "test_parquet"],
-            "PARQUET",
+            Table("hive_metastore", "schema", "table", "EXTERNAL", "HIVE", location="dbfs:/mnt/test_parquet/table1"),
             [
                 Mount("/mnt/test_parquet", "s3://databricks/test_parquet"),
                 Mount("/mnt/test_orc", "s3://databricks/test_orc"),
@@ -331,16 +328,19 @@ def test_is_partitioned_flag():
             ],
             MockBackend.rows("createtab_stmt")[
                 (
-                    "CREATE TABLE hive_metastore.schema.test_parquet (id INT, name STRING, age INT) USING PARQUET PARTITIONED BY (age) LOCATION 'dbfs:/mnt/test_parquet/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729041')"
+                    "CREATE TABLE hive_metastore.schema.table (id INT, name STRING, age INT) USING PARQUET PARTITIONED BY (age) LOCATION 'dbfs:/mnt/test_parquet/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729041')"
                 ),
             ],
-            "CREATE TABLE uc_catalog.uc_schema.test_parquet (id INT, name STRING, age INT) USING PARQUET PARTITIONED BY (age) LOCATION 's3://databricks/test_parquet/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729041')",
+            HiveSerdeType.PARQUET,
+            "CREATE TABLE uc_catalog.uc_schema.table (id INT, name STRING, age INT) USING PARQUET PARTITIONED BY (age) LOCATION 's3://databricks/test_parquet/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729041')",
         ),
+        # valid avro hiveserde test
         (
-            Table("hive_metastore", "schema", "test_avro", "EXTERNAL", "HIVE", location="s3://databricks/test_avro"),
-            ["uc_catalog", "uc_schema", "test_avro"],
-            "AVRO",
-            [],
+            Table("hive_metastore", "schema", "table", "EXTERNAL", "HIVE", location="s3://databricks/test_avro"),
+            [
+                Mount("/mnt/test_parquet", "s3://databricks/test_parquet"),
+                Mount("/mnt/test_orc", "s3://databricks/test_orc"),
+            ],
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "org.apache.hadoop.hive.serde2.avro.AvroSerDe", None),
                 ("InputFormat", "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat", None),
@@ -348,15 +348,15 @@ def test_is_partitioned_flag():
             ],
             MockBackend.rows("createtab_stmt")[
                 (
-                    'CREATE TABLE hive_metastore.schema.test_avro (id INT, name STRING, age INT) USING AVRO LOCATION \'s3://databricks/test_avro\' TBLPROPERTIES (\'avro.schema.literal\'=\'{"namespace": "org.apache.hive", "name": "first_schema", "type": "record", "fields": [{"name":"id", "type":"int"}, {"name":"name", "type":"string"}, {"name":"age", "type":"int"}]}\', \'transient_lastDdlTime\'=\'1712728956\')'
+                    'CREATE TABLE hive_metastore.schema.table (id INT, name STRING, age INT) USING AVRO LOCATION \'s3://databricks/test_avro\' TBLPROPERTIES (\'avro.schema.literal\'=\'{"namespace": "org.apache.hive", "name": "first_schema", "type": "record", "fields": [{"name":"id", "type":"int"}, {"name":"name", "type":"string"}, {"name":"age", "type":"int"}]}\', \'transient_lastDdlTime\'=\'1712728956\')'
                 ),
             ],
-            'CREATE TABLE uc_catalog.uc_schema.test_avro (id INT, name STRING, age INT) USING AVRO LOCATION \'s3://databricks/test_avro\' TBLPROPERTIES (\'avro.schema.literal\'=\'{"namespace": "org.apache.hive", "name": "first_schema", "type": "record", "fields": [{"name":"id", "type":"int"}, {"name":"name", "type":"string"}, {"name":"age", "type":"int"}]}\', \'transient_lastDdlTime\'=\'1712728956\')',
+            HiveSerdeType.AVRO,
+            'CREATE TABLE uc_catalog.uc_schema.table (id INT, name STRING, age INT) USING AVRO LOCATION \'s3://databricks/test_avro\' TBLPROPERTIES (\'avro.schema.literal\'=\'{"namespace": "org.apache.hive", "name": "first_schema", "type": "record", "fields": [{"name":"id", "type":"int"}, {"name":"name", "type":"string"}, {"name":"age", "type":"int"}]}\', \'transient_lastDdlTime\'=\'1712728956\')',
         ),
+        # valid orc hiveserde test
         (
-            Table("hive_metastore", "schema", "test_orc", "EXTERNAL", "HIVE", location="/dbfs/mnt/test_orc/table1"),
-            ["uc_catalog", "uc_schema", "test_orc"],
-            "ORC",
+            Table("hive_metastore", "schema", "table", "EXTERNAL", "HIVE", location="/dbfs/mnt/test_orc/table1"),
             [
                 Mount("/mnt/test_parquet", "s3://databricks/test_parquet"),
                 Mount("/mnt/test_orc", "s3://databricks/test_orc"),
@@ -368,38 +368,46 @@ def test_is_partitioned_flag():
             ],
             MockBackend.rows("createtab_stmt")[
                 (
-                    "CREATE TABLE hive_metastore.schema.test_orc (id INT, name STRING, age INT) USING ORC PARTITIONED BY (age) LOCATION '/dbfs/mnt/test_orc/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729616')"
+                    "CREATE TABLE hive_metastore.schema.table (id INT, name STRING, age INT) USING ORC PARTITIONED BY (age) LOCATION '/dbfs/mnt/test_orc/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729616')"
                 ),
             ],
-            "CREATE TABLE uc_catalog.uc_schema.test_orc (id INT, name STRING, age INT) USING ORC PARTITIONED BY (age) LOCATION 's3://databricks/test_orc/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729616')",
+            HiveSerdeType.ORC,
+            "CREATE TABLE uc_catalog.uc_schema.table (id INT, name STRING, age INT) USING ORC PARTITIONED BY (age) LOCATION 's3://databricks/test_orc/table1' TBLPROPERTIES ('transient_lastDdlTime'='1712729616')",
         ),
+        # un-supported hiveserde test, and no table location test
         (
-            Table("hive_metastore", "schema", "nosupport_serde", "EXTERNAL", "HIVE", location="dummy"),
-            ["uc_catalog", "uc_schema", "nosupport_serde"],
-            "RCFILE",
-            [],
+            Table("hive_metastore", "schema", "table", "EXTERNAL", "HIVE"),
+            [Mount("test", "test"),],
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "LazyBinaryColumnarSerDe", None),
                 ("InputFormat", "RCFileInputFormat", None),
                 ("OutputFormat", "RCFileOutputFormat", None),
             ],
             None,
+            HiveSerdeType.OTHER_HIVESERDE,
             None,
         ),
+        # invalid hiveserde info test
         (
-            Table("hive_metastore", "schema", "no_serde", "EXTERNAL", "HIVE", location="dummy"),
-            ["uc_catalog", "uc_schema", "no_serde"],
-            "RCFILE",
-            [],
+            Table("hive_metastore", "schema", "table", "EXTERNAL", "HIVE", location="dummy"),
+            None,
             MockBackend.rows("col_name", "data_type", "comment")[("dummy", "dummy", None),],
             None,
+            HiveSerdeType.INVALID_HIVESERDE_INFO,
+            None,
+        ),
+        # not hiveserde table test
+        (
+            Table("hive_metastore", "schema", "table", "EXTERNAL", "DELTA", location="dummy"),
+            None,
+            MockBackend.rows("col_name", "data_type", "comment")[("dummy", "dummy", None),],
+            None,
+            HiveSerdeType.NOT_HIVESERDE,
             None,
         ),
     ],
 )
-def test_in_place_migrate_hiveserde_sql(
-    table, destination, hiveserde_in_place_migrate, mounts, describe, ddl, expected
-):
+def test_in_place_migrate_hiveserde_sql(table, mounts, describe, ddl, expected_hiveserde_type, expected_new_ddl):
     sql_backend = MockBackend(
         rows={
             "DESCRIBE TABLE EXTENDED *": describe,
@@ -407,11 +415,66 @@ def test_in_place_migrate_hiveserde_sql(
         }
     )
     dst_table_location = None
-    if table.is_dbfs_mnt:
+    if mounts and table.is_dbfs_mnt:
         dst_table_location = ExternalLocations.resolve_mount(table.location, mounts)
 
+    hiveserde_type = table.hiveserde_type(sql_backend)
+    assert hiveserde_type == expected_hiveserde_type
+
     migrate_sql = table.sql_migrate_external_hiveserde_in_place(
-        destination[0], destination[1], destination[2], sql_backend, hiveserde_in_place_migrate, dst_table_location
+        "uc_catalog", "uc_schema", "table", sql_backend, hiveserde_type, dst_table_location
     )
-    assert table.what == What.EXTERNAL_HIVESERDE
-    assert migrate_sql == expected
+    assert migrate_sql == expected_new_ddl
+
+
+@pytest.mark.parametrize(
+    'ddl, expected_log',
+    [
+        # sqlglot raises sqlglot.errors.ParseError
+        (
+            MockBackend.rows("createtab_stmt")[("!@#"),],
+            "Exception when parsing 'SHOW CREATE TABLE' DDL for hive_metastore.schema.test_parquet",
+        ),
+        # sqlglot parse no statement
+        (
+            MockBackend.rows("createtab_stmt")[(""),],
+            "sqlglot parsed none statement from 'SHOW CREATE TABLE' DDL for hive_metastore.schema.test_parquet",
+        ),
+        # sqlglot parse no table
+        (
+            MockBackend.rows("createtab_stmt")[("invalid statement"),],
+            "sqlglot failed to extract table object from parsed DDL for hive_metastore.schema.test_parquet",
+        ),
+        # sqlglot parse no location
+        (
+            MockBackend.rows("createtab_stmt")[("create table test (id int, name string) using parquet"),],
+            "sqlglot failed to extract table location object from parsed DDL for hive_metastore.schema.test_parquet",
+        ),
+    ],
+)
+def test_in_place_migrate_hiveserde_sql_parsing_failure(caplog, ddl, expected_log):
+    table = Table(
+        "hive_metastore", "schema", "test_parquet", "EXTERNAL", "HIVE", location="dbfs:/mnt/test_parquet/table1"
+    )
+    sql_backend = MockBackend(
+        rows={
+            "DESCRIBE TABLE EXTENDED *": MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
+            ],
+            "SHOW CREATE TABLE *": ddl,
+        }
+    )
+
+    migrate_sql = table.sql_migrate_external_hiveserde_in_place(
+        "uc_catalog",
+        "uc_schema",
+        "test_parquet",
+        sql_backend,
+        HiveSerdeType.PARQUET,
+        replace_table_location="test_location",
+    )
+
+    assert migrate_sql is None
+    assert expected_log in caplog.text
