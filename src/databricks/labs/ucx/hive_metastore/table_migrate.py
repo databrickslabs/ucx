@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
@@ -10,7 +11,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
-
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.mapping import (
@@ -142,7 +143,7 @@ class TablesMigrator:
         if src_table.src.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
-            return self._migrate_table_create_like(src_table.src, src_table.rule, grants)
+            return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_NO_SYNC:
@@ -218,11 +219,8 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_table_create_like(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        if not src_table.is_format_supported_for_create_like:
-            logger.info(f"View {src_table.key} is not supported for migration")
-            return True
-        table_migrate_sql = src_table.sql_migrate_create_like(rule.as_uc_table_key)
+    def _migrate_table_create_ctas(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+        table_migrate_sql = self._get_create_ctas_sql(src_table, rule)
         logger.debug(f"Migrating table (Create Like) {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
@@ -248,6 +246,15 @@ class TablesMigrator:
         # safely replace CREATE with CREATE IF NOT EXISTS
         create.args['exists'] = True
         return create.sql('databricks')
+
+    def _get_create_ctas_sql(self, src_table: Table, rule: Rule) -> str:
+        create_sql = self._get_create_in_place_sql(src_table, rule)
+        re_external = re.compile(r"EXTERNAL", re.IGNORECASE)
+        create_sql = re_external.sub("", create_sql)
+        re_location = re.compile(r"LOCATION[ ]+['\"].*['\"]", re.IGNORECASE)
+        create_sql = re_location.sub("", create_sql)
+        as_select = f" AS SELECT * FROM {escape_sql_identifier(src_table.key)}"
+        return f"{create_sql}{as_select}"
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
         if grants is None:
