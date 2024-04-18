@@ -1,5 +1,6 @@
 from __future__ import annotations  # for type hints
 
+import abc
 import ast
 import logging
 from abc import ABC, abstractmethod
@@ -76,7 +77,7 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, graph: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         linter = ASTLinter.parse(self._original_code)
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:
@@ -85,16 +86,16 @@ class PythonCell(Cell):
             if isinstance(path, ast.Constant):
                 path = path.value.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = graph.resolver.resolve_object_info(object_info)
+                dependency = parent.resolver.resolve_object_info(object_info)
                 if dependency is not None:
-                    graph.register_dependency(dependency)
+                    parent.register_dependency(dependency)
                 else:
                     # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                     raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
         names = PythonLinter.list_import_sources(linter)
         for name in names:
             unresolved = UnresolvedDependency(name)
-            graph.register_dependency(unresolved)
+            parent.register_dependency(unresolved)
 
 
 class RCell(Cell):
@@ -163,7 +164,7 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, graph: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for line in lines:
@@ -172,9 +173,9 @@ class RunCell(Cell):
                 path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = graph.resolver.resolve_object_info(object_info)
+                dependency = parent.resolver.resolve_object_info(object_info)
                 if dependency is not None:
-                    graph.register_dependency(dependency)
+                    parent.register_dependency(dependency)
                 else:
                     # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                     raise ValueError(f"Invalid notebook path in %run command: {path}")
@@ -353,15 +354,15 @@ class CellLanguage(Enum):
         return "\n".join(lines)
 
 
-class Notebook(SourceContainer):
+class Notebook(SourceContainer, abc.ABC):
 
     @staticmethod
-    def parse(path: str, source: str, default_language: Language) -> Notebook:
+    def _parse(path: str, source: str, default_language: Language, ctor: type):
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
         if cells is None:
             raise ValueError(f"Could not parse Notebook: {path}")
-        return Notebook(path, source, default_language, cells, source.endswith('\n'))
+        return ctor(path, source, default_language, cells, source.endswith('\n'))
 
     def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
         self._path = path
@@ -371,8 +372,9 @@ class Notebook(SourceContainer):
         self._ends_with_lf = ends_with_lf
 
     @property
+    @abstractmethod
     def dependency_type(self) -> DependencyType:
-        return DependencyType.NOTEBOOK
+        raise NotImplementedError()
 
     @property
     def path(self) -> str:
@@ -403,6 +405,28 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
         for cell in self._cells:
-            cell.build_dependency_graph(graph)
+            cell.build_dependency_graph(parent)
+
+
+class WorkspaceNotebook(Notebook):
+
+    @classmethod
+    def parse(cls, path: str, source: str, default_language: Language) -> WorkspaceNotebook:
+        return cls._parse(path, source, default_language, cls)
+
+    @property
+    def dependency_type(self) -> DependencyType:
+        return DependencyType.WORKSPACE_NOTEBOOK
+
+
+class LocalNotebook(Notebook):
+
+    @classmethod
+    def parse(cls, path: str, source: str, default_language: Language) -> WorkspaceNotebook:
+        return cls._parse(path, source, default_language, cls)
+
+    @property
+    def dependency_type(self) -> DependencyType:
+        return DependencyType.LOCAL_NOTEBOOK

@@ -52,9 +52,9 @@ class SitePackage(SourceContainer):
     def dependency_type(self) -> DependencyType:
         return DependencyType.PACKAGE
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
         for module_path in self._module_paths:
-            graph.register_dependency(PackageFileDependency(self, module_path))
+            parent.register_dependency(PackageFileDependency(self, module_path))
 
     def load_module_source_code(self, path: str):
         source_path = Path(self._dist_info_path.parent, path)
@@ -84,7 +84,7 @@ class PackageFile(SourceContainer):
         if self._source_code is None:
             self._source_code = self._package.load_module_source_code(self._path)
 
-    def build_dependency_graph(self, graph: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph):
         self._load_source_code()
         assert self._source_code is not None
         linter = ASTLinter.parse(self._source_code)
@@ -96,15 +96,15 @@ class PackageFile(SourceContainer):
             if isinstance(path_arg, ast.Constant):
                 path = path_arg.value.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = graph.resolver.resolve_object_info(object_info)
+                dependency = parent.resolver.resolve_object_info(object_info)
                 if dependency is not None:
-                    graph.register_dependency(dependency)
+                    parent.register_dependency(dependency)
                 else:
                     # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                     raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
         names = PythonLinter.list_import_sources(linter)
         for name in names:
-            self._package.register_dependency(graph, name)
+            self._package.register_dependency(parent, name)
 
 
 class SitePackages:

@@ -108,6 +108,8 @@ class PackageFileDependency(ResolvedDependency):
         return DependencyType.PACKAGE_FILE
 
     def load(self) -> SourceContainer:
+        # local import to avoid cyclic dependency
+        # pylint: disable=import-outside-toplevel, cyclic-import
         from databricks.labs.ucx.source_code.site_packages import PackageFile
 
         return PackageFile(self._package, self.path)
@@ -121,7 +123,7 @@ class SourceContainer(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def build_dependency_graph(self, graph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
         raise NotImplementedError()
 
 
@@ -164,12 +166,12 @@ class WorkspaceLoader(DependencyLoader):
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid cyclic dependency
         # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.notebook import Notebook
+        from databricks.labs.ucx.source_code.notebook import WorkspaceNotebook
 
         assert object_info.path is not None
         assert object_info.language is not None
         source = self._load_source(object_info)
-        return Notebook.parse(object_info.path, source, object_info.language)
+        return WorkspaceNotebook.parse(object_info.path, source, object_info.language)
 
     def _load_file(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid cyclic dependency

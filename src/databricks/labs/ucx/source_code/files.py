@@ -28,18 +28,18 @@ class SourceFile(SourceContainer, abc.ABC):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
         linter = ASTLinter.parse(self._original_code)
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         notebook_paths = {PythonLinter.get_dbutils_notebook_run_path_arg(call) for call in run_notebook_calls}
         for path in notebook_paths:
-            graph.register_dependency(UnresolvedDependency(path))
+            parent.register_dependency(UnresolvedDependency(path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         import_names = PythonLinter.list_import_sources(linter)
         for import_name in import_names:
-            graph.register_dependency(UnresolvedDependency(import_name))
+            parent.register_dependency(UnresolvedDependency(import_name))
 
 
 class WorkspaceFile(SourceFile):

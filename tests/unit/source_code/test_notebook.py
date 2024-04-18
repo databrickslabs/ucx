@@ -5,7 +5,7 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.notebook import WorkspaceNotebook
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     SourceContainer,
@@ -75,7 +75,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = WorkspaceNotebook.parse(path, sources[0], source[1])
     assert notebook is not None
     languages = [cell.language.magic_name for cell in notebook.cells]
     assert languages == source[2]
@@ -95,7 +95,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = WorkspaceNotebook.parse(path, sources[0], source[1])
     assert notebook is not None
     new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
@@ -118,7 +118,7 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = WorkspaceNotebook.parse(path, sources[0], source[1])
     assert notebook is not None
     for cell in notebook.cells:
         assert cell.is_runnable()

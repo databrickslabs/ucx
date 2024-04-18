@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 
 from databricks.labs.ucx.source_code import languages
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.notebook import WorkspaceNotebook
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
 
@@ -53,7 +53,7 @@ SELECT * FROM delta.`/mnt/...` WHERE foo > 6
 MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """
 
-    notebook = Notebook.parse("", notebook_code, languages.Language.SQL)
+    notebook = WorkspaceNotebook.parse("", notebook_code, languages.Language.SQL)
     assert notebook is not None
     # Note that this is a place holder test, the actual implementation is not yet done
     # will obviously lint each cell in the notebook and raise an advisory if any reference
