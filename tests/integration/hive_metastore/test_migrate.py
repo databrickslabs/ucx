@@ -71,7 +71,7 @@ def test_migrate_dbfs_non_delta_tables(ws, sql_backend, runtime_ctx, make_catalo
     rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
 
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
