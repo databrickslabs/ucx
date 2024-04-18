@@ -6,10 +6,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
 from databricks.labs.ucx.source_code.dependencies import (
-    DependencyLoader,
     SourceContainer,
     DependencyResolver,
-    Dependency,
 )
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.site_packages import SitePackages

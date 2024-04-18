@@ -6,8 +6,12 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, Dependency, DependencyType, \
-    UnresolvedDependency
+from databricks.labs.ucx.source_code.dependencies import (
+    SourceContainer,
+    DependencyGraph,
+    DependencyType,
+    UnresolvedDependency,
+)
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
@@ -31,7 +35,7 @@ class SourceFile(SourceContainer, abc.ABC):
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         notebook_paths = {PythonLinter.get_dbutils_notebook_run_path_arg(call) for call in run_notebook_calls}
         for path in notebook_paths:
-            graph.register_dependency(Dependency(DependencyType.NOTEBOOK, path))
+            graph.register_dependency(UnresolvedDependency(path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         import_names = PythonLinter.list_import_sources(linter)
         for import_name in import_names:
@@ -49,7 +53,6 @@ class LocalFile(SourceFile):
     @property
     def dependency_type(self) -> DependencyType:
         return DependencyType.LOCAL_FILE
-
 
 
 class LocalFileMigrator:

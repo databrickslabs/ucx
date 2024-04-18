@@ -3,8 +3,10 @@ from unittest.mock import create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import DependencyLoader, DependencyResolver, \
-    WorkspaceNotebookDependency
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyResolver,
+    WorkspaceNotebookDependency,
+)
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator

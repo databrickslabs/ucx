@@ -5,7 +5,6 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
-    Dependency,
     DependencyResolver,
 )
 
@@ -19,7 +18,7 @@ class NotebookMigrator:
     ):
         self._ws = ws
         self._languages = languages
-        self._resolver = resolver
+        self._resolver = resolver or DependencyResolver(ws)
 
     def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
         if not object_info.path or not object_info.object_type:
@@ -27,6 +26,7 @@ class NotebookMigrator:
         if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
             raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
         dependency = self._resolver.resolve_object_info(object_info)
+        assert dependency is not None
         graph = DependencyGraph(dependency, None, self._resolver)
         container = dependency.load()
         if container is not None:
@@ -45,6 +45,7 @@ class NotebookMigrator:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
         dependency = self._resolver.resolve_object_info(object_info)
+        assert dependency is not None
         container = dependency.load()
         assert isinstance(container, Notebook)
         return self._apply(container)

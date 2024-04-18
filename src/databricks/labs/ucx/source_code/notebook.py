@@ -10,8 +10,12 @@ from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer, DependencyType, \
-    UnresolvedDependency
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyGraph,
+    SourceContainer,
+    DependencyType,
+    UnresolvedDependency,
+)
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
@@ -82,11 +86,15 @@ class PythonCell(Cell):
                 path = path.value.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
                 dependency = graph.resolver.resolve_object_info(object_info)
-                graph.register_dependency(dependency)
+                if dependency is not None:
+                    graph.register_dependency(dependency)
+                else:
+                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
         names = PythonLinter.list_import_sources(linter)
         for name in names:
-            dependency = UnresolvedDependency(name)
-            graph.register_dependency(dependency)
+            unresolved = UnresolvedDependency(name)
+            graph.register_dependency(unresolved)
 
 
 class RCell(Cell):
@@ -161,11 +169,15 @@ class RunCell(Cell):
         for line in lines:
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command):]
+                path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
                 dependency = graph.resolver.resolve_object_info(object_info)
-                graph.register_dependency(dependency)
+                if dependency is not None:
+                    graph.register_dependency(dependency)
+                else:
+                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                    raise ValueError(f"Invalid notebook path in %run command: {path}")
                 return
         raise ValueError("Missing notebook path in %run command")
 
@@ -186,7 +198,7 @@ class ShellCell(Cell):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
-        pass # nothing to do
+        pass  # nothing to do
 
 
 class PipCell(Cell):

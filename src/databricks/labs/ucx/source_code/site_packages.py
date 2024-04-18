@@ -8,7 +8,8 @@ from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyType,
     DependencyGraph,
-    UnresolvedDependency, PackageDependency, PackageFileDependency,
+    UnresolvedDependency,
+    PackageFileDependency,
 )
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
@@ -91,11 +92,16 @@ class PackageFile(SourceContainer):
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:
             assert isinstance(call, ast.Call)
-            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(path, ast.Constant):
-                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path.value.strip("'").strip('"'))
+            path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+            if isinstance(path_arg, ast.Constant):
+                path = path_arg.value.strip().strip("'").strip('"')
+                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
                 dependency = graph.resolver.resolve_object_info(object_info)
-                graph.register_dependency(dependency)
+                if dependency is not None:
+                    graph.register_dependency(dependency)
+                else:
+                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
         names = PythonLinter.list_import_sources(linter)
         for name in names:
             self._package.register_dependency(graph, name)

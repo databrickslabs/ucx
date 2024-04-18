@@ -6,10 +6,10 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources, _download_side_effect, site_packages_mock, whitelist_mock
+from tests.unit import _load_sources, _download_side_effect, site_packages_mock
 
 S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
 

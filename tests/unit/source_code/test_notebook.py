@@ -8,10 +8,8 @@ from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
-    DependencyLoader,
-    Dependency,
     SourceContainer,
-    DependencyType, DependencyResolver,
+    DependencyResolver,
 )
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources, _download_side_effect, whitelist_mock, site_packages_mock
@@ -131,9 +129,13 @@ def test_notebook_builds_leaf_dependency_graph():
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON)
+    ws.workspace.get_status.return_value = ObjectInfo(
+        object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
+    )
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
-    dependency = resolver.resolve_object_info(ObjectInfo(object_type= ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON))
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -152,7 +154,9 @@ def test_notebook_builds_depth1_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
-    dependency = resolver.resolve_object_info(ObjectInfo(object_type= ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON))
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -167,7 +171,9 @@ def test_notebook_builds_depth2_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
-    dependency = resolver.resolve_object_info(ObjectInfo(object_type= ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON))
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -183,7 +189,9 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
-    dependency = resolver.resolve_object_info(ObjectInfo(object_type= ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON))
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -199,7 +207,9 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
-    dependency = resolver.resolve_object_info(ObjectInfo(object_type= ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON))
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -214,7 +224,9 @@ def test_notebook_builds_python_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
-    dependency = resolver.resolve_object_info(ObjectInfo(object_type= ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON))
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)

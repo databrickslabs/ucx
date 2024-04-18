@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 if typing.TYPE_CHECKING:
-    from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage, PackageFile
+    from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
 
 
 class DependencyType(Enum):
@@ -109,6 +109,7 @@ class PackageFileDependency(ResolvedDependency):
 
     def load(self) -> SourceContainer:
         from databricks.labs.ucx.source_code.site_packages import PackageFile
+
         return PackageFile(self._package, self.path)
 
 
@@ -195,18 +196,19 @@ class PackageLoader(DependencyLoader):
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         # libraries have precedence over workspace objects
         if dependency.type is DependencyType.PACKAGE_FILE:
-            # pylint: disable=import-outside-toplevel
-            # local import to avoid cyclic dependency
-            from databricks.labs.ucx.source_code.site_packages import PackageDependency
-
             assert isinstance(dependency, PackageDependency)
             return dependency.load()
         raise NotImplementedError(str(dependency.type))
 
 
 class DependencyResolver:
-    def __init__(self, ws: WorkspaceClient | None = None, whitelist: Whitelist | None = None, site_packages: SitePackages | None = None):
-        assert ws is not None # TODO until we support local notebooks
+    def __init__(
+        self,
+        ws: WorkspaceClient | None = None,
+        whitelist: Whitelist | None = None,
+        site_packages: SitePackages | None = None,
+    ):
+        assert ws is not None  # TODO until we support local notebooks
         self._workspace_loader = WorkspaceLoader(ws)
         self._whitelist = Whitelist() if whitelist is None else whitelist
         self._site_packages = site_packages
@@ -242,7 +244,7 @@ class DependencyResolver:
                     )
                 )
             return None
-        site_package = self._site_packages[dependency.path]
+        site_package = None if self._site_packages is None else self._site_packages[dependency.path]
         if site_package is not None:
             return PackageDependency(site_package)
         if self._workspace_loader is not None:
@@ -250,7 +252,6 @@ class DependencyResolver:
             if object_info is not None:
                 return self.resolve_object_info(object_info)
         return None
-
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
