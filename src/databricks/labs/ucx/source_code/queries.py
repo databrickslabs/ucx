@@ -35,6 +35,8 @@ class FromTable(Linter, Fixer):
                 yield Deprecation(
                     code='table-migrate',
                     message=f"Table {table.db}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                     start_line=0,
                     start_col=0,

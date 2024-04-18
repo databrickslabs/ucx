@@ -40,6 +40,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=4,
             start_col=13,
             end_line=4,
@@ -62,6 +64,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=4,
             start_col=13,
             end_line=4,
@@ -107,6 +111,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=4,
             start_col=9,
             end_line=4,
@@ -166,6 +172,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=4,
             start_col=9,
             end_line=4,
@@ -187,6 +195,8 @@ for i in range(10):
         Advisory(
             code='table-migrate',
             message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=4,
             start_col=9,
             end_line=4,
@@ -208,6 +218,8 @@ for i in range(10):
         Advisory(
             code='table-migrate',
             message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=4,
             start_col=9,
             end_line=4,
@@ -228,6 +240,8 @@ for table in spark.listTables():
         Advisory(
             code='table-migrate',
             message="Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
+            location_type="<MISSING TYPE>",
+            location_path="<MISSING LOCATION>",
             start_line=3,
             start_col=13,
             end_line=3,

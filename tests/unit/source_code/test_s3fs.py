@@ -23,6 +23,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -36,6 +38,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -51,6 +55,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -65,6 +71,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -78,6 +86,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -91,6 +101,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message='Use of dependency s3fs.subpackage is deprecated',
+                    location_type="<MISSING TYPE>",
+                    location_path="<MISSING LOCATION>",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -122,6 +134,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
             Deprecation(
                 code='dependency-check',
                 message='Use of dependency s3fs is deprecated',
+                location_type="<MISSING TYPE>",
+                location_path="<MISSING LOCATION>",
                 start_line=0,
                 start_col=0,
                 end_line=0,
