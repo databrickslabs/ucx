@@ -384,6 +384,6 @@ def build_python_source_dependency_graph(
             else:
                 # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                 raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
-    names = PythonLinter.list_import_sources(linter)
-    for name in names:
-        register_dependency(name)
+    sources = PythonLinter.list_import_sources(linter)
+    for source in sources:
+        register_dependency(source[0])

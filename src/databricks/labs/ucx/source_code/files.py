@@ -1,7 +1,9 @@
 from __future__ import annotations  # for type hints
 
 import abc
+import ast
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
@@ -29,6 +31,21 @@ class SourceFile(SourceContainer, abc.ABC):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
+    def _advice_enricher(self, collector: Callable[[Advice], None], import_source: tuple[str, ast.AST]):
+        def enrich_advice(advice: Advice) -> None:
+            if advice.source_type == Advice.MISSING_SOURCE_TYPE:
+                node = import_source[1]
+                advice = advice.replace(
+                    source_type=self.dependency_type.value,
+                    source_path=self._path,
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
+            collector(advice)
+
+        return enrich_advice
 
     def build_dependency_graph(self, parent: DependencyGraph) -> None:
         if self._language is not CellLanguage.PYTHON:
@@ -39,21 +56,11 @@ class SourceFile(SourceContainer, abc.ABC):
         for path in notebook_paths:
             parent.register_dependency(UnresolvedDependency(path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        import_names = PythonLinter.list_import_sources(linter)
+        import_sources = PythonLinter.list_import_sources(linter)
         original_advice_collector = parent.advice_collector
-
-
-        def enrich_advice(advice: Advice) -> None:
-            if advice.source_type == Advice.MISSING_SOURCE_TYPE:
-                advice = advice.replace(source_type=self.dependency_type.value)
-            if advice.source_path == Advice.MISSING_SOURCE_PATH:
-                advice = advice.replace(source_path=self._path)
-            original_advice_collector(advice)
-
-
-        parent.advice_collector = enrich_advice
-        for import_name in import_names:
-            parent.register_dependency(UnresolvedDependency(import_name))
+        for import_source in import_sources:
+            parent.advice_collector = self._advice_enricher(original_advice_collector, import_source)
+            parent.register_dependency(UnresolvedDependency(import_source[0]))
         parent.advice_collector = original_advice_collector
 
 
@@ -73,11 +80,9 @@ class LocalFile(SourceFile):
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-
     def __init__(self, languages: Languages):
         self._languages = languages
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
@@ -85,7 +90,6 @@ class LocalFileMigrator:
                 self.apply(child_path)
             return True
         return self._apply_file_fix(path)
-
 
     def _apply_file_fix(self, path):
         """
