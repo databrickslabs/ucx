@@ -216,15 +216,15 @@ class DependencyResolver:
         if object_info.object_type is None:
             advice_collector(
                 Failure(
-                        code="dependency-check",
-                        message=f"Invalid ObjectInfo (missing 'object_type'): {object_info}",
-                        source_type=Advice.MISSING_SOURCE_TYPE,
-                        source_path=Advice.MISSING_SOURCE_PATH,
-                        start_line=0,
-                        start_col=0,
-                        end_line=0,
-                        end_col=0,
-                    )
+                    code="dependency-check",
+                    message=f"Invalid ObjectInfo (missing 'object_type'): {object_info}",
+                    source_type=Advice.MISSING_SOURCE_TYPE,
+                    source_path=Advice.MISSING_SOURCE_PATH,
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
+                )
             )
             return None
         if object_info.object_type is ObjectType.NOTEBOOK:
