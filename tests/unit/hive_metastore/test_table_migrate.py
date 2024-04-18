@@ -132,6 +132,52 @@ def test_non_sync_tables_should_produce_proper_queries(ws):
     ) in backend.queries
 
 
+def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
+    errors = {}
+    rows = {
+        "SHOW CREATE TABLE": [
+            {
+                "createtab_stmt": "CREATE EXTERNAL TABLE hive_metastore.db1_src.managed_dbfs "
+                "(foo STRING,bar STRING) USING PARQUET "
+                "LOCATION 's3://some_location/table'"
+            }
+        ]
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    udf_crawler = UdfsCrawler(backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    table_mapping = table_mapping_mock(["dbfs_parquet"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+    table_migrate.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
+
+    assert (
+        "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs "
+        "AS SELECT * FROM hive_metastore.db1_src.managed_dbfs" in backend.queries
+    )
+    assert (
+        "ALTER TABLE hive_metastore.db1_src.managed_dbfs "
+        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.managed_dbfs');"
+    ) in backend.queries
+    assert (
+        f"ALTER TABLE ucx_default.db1_dst.managed_dbfs "
+        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.managed_dbfs' , "
+        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
+    ) in backend.queries
+
+
 def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     errors = {}
     rows = {}

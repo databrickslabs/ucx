@@ -124,6 +124,14 @@ class Table:
         return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT", "AVRO"}
 
     @property
+    def is_format_supported_for_create_like(self) -> bool:
+        # Based on documentation
+        # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
+        if self.table_format is None:
+            return False
+        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "TEXT"}
+
+    @property
     def is_databricks_dataset(self) -> bool:
         if not self.location:
             return False
@@ -150,6 +158,14 @@ class Table:
 
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
+
+    def sql_migrate_create_like(self, target_table_key):
+        # Create table as a copy of the source table
+        # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
+        return (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} LIKE "
+            f"{escape_sql_identifier(self.key)};"
+        )
 
     def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:

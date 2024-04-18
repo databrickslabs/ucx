@@ -55,6 +55,34 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_dbfs_non_delta_tables(ws, sql_backend, runtime_ctx, make_catalog):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
+    src_managed_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name, non_delta=True, schema_name=src_schema.name
+    )
+
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    logger.info(f"dst_catalog={dst_catalog.name}, managed_table={src_managed_table.full_name}")
+
+    rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
+
+    target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
+    assert len(target_tables) == 1
+
+    target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_managed_table.name}").properties
+    assert target_table_properties["upgraded_from"] == src_managed_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_tables_with_cache_should_not_create_table(
     ws,
     sql_backend,
