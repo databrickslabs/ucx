@@ -243,6 +243,8 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
         Advisory(
             code='dbutils-notebook-run-dynamic',
             message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=14,
             start_col=13,
             end_line=14,
@@ -259,6 +261,8 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
         Advisory(
             code='dbutils-notebook-run-literal',
             message="Call to 'dbutils.notebook.run' will be migrated automatically",
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=2,
             start_col=0,
             end_line=2,

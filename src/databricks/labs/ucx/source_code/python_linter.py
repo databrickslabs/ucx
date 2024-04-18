@@ -193,6 +193,8 @@ class PythonLinter(Linter):
             return Advisory(
                 'dbutils-notebook-run-literal',
                 "Call to 'dbutils.notebook.run' will be migrated automatically",
+                Advice.MISSING_SOURCE_TYPE,
+                Advice.MISSING_SOURCE_PATH,
                 node.lineno,
                 node.col_offset,
                 node.end_lineno or 0,
@@ -201,6 +203,8 @@ class PythonLinter(Linter):
         return Advisory(
             'dbutils-notebook-run-dynamic',
             "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
+            Advice.MISSING_SOURCE_TYPE,
+            Advice.MISSING_SOURCE_PATH,
             node.lineno,
             node.col_offset,
             node.end_lineno or 0,

@@ -1,4 +1,4 @@
-from databricks.labs.ucx.source_code.base import Deprecation
+from databricks.labs.ucx.source_code.base import Deprecation, Advice
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -19,6 +19,8 @@ def test_migrated_tables_trigger_messages(migration_index):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=0,
             start_col=0,
             end_line=0,
@@ -27,6 +29,8 @@ def test_migrated_tables_trigger_messages(migration_index):
         Deprecation(
             code='table-migrate',
             message='Table other.matters is migrated to some.certain.issues in Unity Catalog',
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=0,
             start_col=0,
             end_line=0,

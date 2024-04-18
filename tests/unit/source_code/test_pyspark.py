@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advisory, Deprecation
+from databricks.labs.ucx.source_code.base import Advisory, Deprecation, Advice
 from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -40,6 +40,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=4,
             start_col=13,
             end_line=4,
@@ -62,6 +64,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=4,
             start_col=13,
             end_line=4,
@@ -107,6 +111,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=4,
             start_col=9,
             end_line=4,
@@ -166,6 +172,8 @@ for i in range(10):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=4,
             start_col=9,
             end_line=4,
@@ -187,6 +195,8 @@ for i in range(10):
         Advisory(
             code='table-migrate',
             message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=4,
             start_col=9,
             end_line=4,
@@ -208,6 +218,8 @@ for i in range(10):
         Advisory(
             code='table-migrate',
             message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=4,
             start_col=9,
             end_line=4,
@@ -228,6 +240,8 @@ for table in spark.listTables():
         Advisory(
             code='table-migrate',
             message="Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=3,
             start_col=13,
             end_line=3,

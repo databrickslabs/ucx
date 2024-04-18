@@ -241,6 +241,8 @@ class DependencyResolver:
                     Deprecation(
                         code="dependency-check",
                         message=f"Use of dependency {dependency.path} is deprecated",
+                        source_type=Advice.MISSING_SOURCE_TYPE,
+                        source_path=Advice.MISSING_SOURCE_PATH,
                         start_line=0,
                         start_col=0,
                         end_line=0,
