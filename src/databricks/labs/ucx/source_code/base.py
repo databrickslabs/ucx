@@ -94,6 +94,6 @@ class SequentialLinter(Linter):
     def __init__(self, linters: list[Linter]):
         self._linters = linters
 
-    def lint(self, code: str, schema: str | None = None) -> Iterable[Advice]:
+    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint(code)

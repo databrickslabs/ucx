@@ -220,7 +220,7 @@ class SparkSql(Linter, Fixer):
         # this is the same fixer, just in a different language context
         return self._from_table.name()
 
-    def lint(self, code: str, schema: str | None = None) -> Iterable[Advice]:
+    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]:
         tree = ast.parse(code)
         for node in ast.walk(tree):
             matcher = self._find_matcher(node)
@@ -229,7 +229,7 @@ class SparkSql(Linter, Fixer):
             assert isinstance(node, ast.Call)
             yield from matcher.lint(self._from_table, self._index, node)
 
-    def apply(self, code: str, schema: str | None = None) -> str:
+    def apply(self, code: str, _: str | None = None) -> str:
         tree = ast.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
         for node in ast.walk(tree):

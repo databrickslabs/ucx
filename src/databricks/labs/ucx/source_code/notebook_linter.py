@@ -22,8 +22,7 @@ class NotebookLinter(Linter):
         assert notebook is not None
         return cls(langs, notebook)
 
-
-    def lint(self, code:str|None = None, schema: str| None = None) -> Iterable[Advice]:
+    def lint(self, code: str | None = None, _: str | None = None) -> Iterable[Advice]:
         for cell in self._notebook.cells:
             if not self._languages.is_supported(cell.language.language):
                 continue

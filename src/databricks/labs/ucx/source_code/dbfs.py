@@ -72,7 +72,7 @@ class DBFSUsageLinter(Linter):
         """
         return 'dbfs-usage'
 
-    def lint(self, code: str, schema: str | None = None) -> Iterable[Advice]:
+    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]:
         """
         Lints the code looking for file system paths that are deprecated
         """
@@ -90,7 +90,7 @@ class FromDbfsFolder(Linter):
     def name() -> str:
         return 'dbfs-query'
 
-    def lint(self, code: str, schema: str | None = None) -> Iterable[Advice]:
+    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]:
         for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue
