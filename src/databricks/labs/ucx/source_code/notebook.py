@@ -4,12 +4,14 @@ import abc
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
+from collections.abc import Callable
 from enum import Enum
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 
+from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     SourceContainer,
@@ -153,6 +155,12 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
+    @staticmethod
+    def _collect_advice(advice: Advice, line: str, advice_collector: Callable[[Advice], None]):
+        if advice.start_line == -1:
+            advice = advice.replace(start_line=1, start_col=0, end_line=1, end_col=len(line))
+        advice_collector(advice)
+
     def build_dependency_graph(self, parent: DependencyGraph):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
@@ -162,12 +170,13 @@ class RunCell(Cell):
                 path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = parent.resolver.resolve_object_info(object_info, parent.advice_collector)
+                # pylint warning W0640 is a pylint bug (verified manually), see https://github.com/pylint-dev/pylint/issues/5263
+                # pylint: disable=cell-var-from-loop
+                dependency = parent.resolver.resolve_object_info(
+                    object_info, lambda advice: self._collect_advice(advice, line, parent.advice_collector)
+                )
                 if dependency is not None:
                     parent.register_dependency(dependency)
-                else:
-                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                    raise ValueError(f"Invalid notebook path in %run command: {path}")
                 return
         raise ValueError("Missing notebook path in %run command")
 
@@ -410,8 +419,17 @@ class Notebook(SourceContainer, abc.ABC):
         return '\n'.join(sources)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> None:
+        original_advice_collector = parent.advice_collector
+
+        def collect_advice(advice: Advice):
+            if advice.source_type == Advice.MISSING_SOURCE_TYPE:
+                advice = advice.replace(source_type=self.dependency_type.value, source_path=self._path)
+            original_advice_collector(advice)
+
+        parent.advice_collector = collect_advice
         for cell in self._cells:
             cell.build_dependency_graph(parent)
+        parent.advice_collector = original_advice_collector
 
 
 class WorkspaceNotebook(Notebook):

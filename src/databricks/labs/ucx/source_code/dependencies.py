@@ -213,6 +213,21 @@ class DependencyResolver:
         self, object_info: ObjectInfo, advice_collector: Callable[[Advice], None]
     ) -> ResolvedDependency | None:
         assert object_info.path is not None
+        resolved_info = self._workspace_loader.get_object_info(object_info.path)
+        if resolved_info is None:
+            advice_collector(
+                Failure(
+                    code="dependency-check",
+                    message=f"Object not found: {object_info.path}",
+                    source_type=Advice.MISSING_SOURCE_TYPE,
+                    source_path=Advice.MISSING_SOURCE_PATH,
+                    start_line=-1,
+                    start_col=-1,
+                    end_line=-1,
+                    end_col=-1,
+                )
+            )
+            return None
         if object_info.object_type is None:
             advice_collector(
                 Failure(
@@ -220,10 +235,10 @@ class DependencyResolver:
                     message=f"Invalid ObjectInfo (missing 'object_type'): {object_info}",
                     source_type=Advice.MISSING_SOURCE_TYPE,
                     source_path=Advice.MISSING_SOURCE_PATH,
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=0,
+                    start_line=-1,
+                    start_col=-1,
+                    end_line=-1,
+                    end_col=-1,
                 )
             )
             return None
@@ -250,10 +265,10 @@ class DependencyResolver:
                         message=f"Use of dependency {dependency.path} is deprecated",
                         source_type=Advice.MISSING_SOURCE_TYPE,
                         source_path=Advice.MISSING_SOURCE_PATH,
-                        start_line=0,
-                        start_col=0,
-                        end_line=0,
-                        end_col=0,
+                        start_line=-1,
+                        start_col=-1,
+                        end_line=-1,
+                        end_col=-1,
                     )
                 )
             return None
@@ -315,10 +330,22 @@ class DependencyGraph:
         child_graph = DependencyGraph(resolved, self, self._resolver, self._advice_collector)
         self._dependencies[resolved] = child_graph
         container = resolved.load()
-        if not container:
-            return None
-        container.build_dependency_graph(child_graph)
-        return child_graph
+        if container:
+            container.build_dependency_graph(child_graph)
+            return child_graph
+        self._advice_collector(
+            Failure(
+                'dependency-check',
+                f"Could not load {dependency.path}",
+                Advice.MISSING_SOURCE_TYPE,
+                Advice.MISSING_SOURCE_PATH,
+                0,
+                0,
+                0,
+                0,
+            )
+        )
+        return None
 
     def locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
         return self.locate_dependency_with_path(dependency.path)

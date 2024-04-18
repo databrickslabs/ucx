@@ -26,13 +26,14 @@ class NotebookMigrator:
 
     def build_dependency_graph(
         self, object_info: ObjectInfo, advice_collector: Callable[[Advice], None]
-    ) -> DependencyGraph:
+    ) -> DependencyGraph | None:
         if not object_info.path or not object_info.object_type:
             raise ValueError(f"Not a valid source of code: {object_info.path}")
         if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
             raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
         dependency = self._resolver.resolve_object_info(object_info, advice_collector)
-        assert dependency is not None
+        if dependency is None:
+            return None
         graph = DependencyGraph(dependency, None, self._resolver, advice_collector)
         container = dependency.load()
         if container is None:
@@ -48,8 +49,8 @@ class NotebookMigrator:
                     0,
                 )
             )
-        else:
-            container.build_dependency_graph(graph)
+            return None
+        container.build_dependency_graph(graph)
         return graph
 
     def revert(self, object_info: ObjectInfo):
