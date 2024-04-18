@@ -196,7 +196,7 @@ class TaskRunWarningRecorder:
                 continue
             error_messages.append(message)
         if len(error_messages) > 0:
-            raise InternalError(__version__+"\n".join(error_messages))
+            raise InternalError("\n".join(error_messages))
         return log_records
 
     @staticmethod
