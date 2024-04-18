@@ -205,10 +205,7 @@ def test_migrate_external_table_hiveserde_in_place(
 
     rules = [Rule.from_src_dst(table, dst_schema) for _, table in src_tables.items()]
     runtime_ctx.with_table_mapping_rules(rules)
-    if ws.config.is_azure:
-        runtime_ctx.with_dummy_azure_resource_permission()
-    if ws.config.is_aws:
-        runtime_ctx.with_dummy_aws_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
 
     if hiveserde_type == HiveSerdeType.PARQUET:
         src_table = next((table for key, table in src_tables.items() if key.startswith('parquet_serde_')), None)
