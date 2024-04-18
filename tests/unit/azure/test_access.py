@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import call, create_autospec
 
 import pytest
@@ -12,10 +13,12 @@ from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import (
+    AccessConnector,
     AzureResource,
     AzureResources,
     AzureRoleAssignment,
     Principal,
+    StorageAccount,
 )
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 
@@ -77,8 +80,16 @@ def test_save_spn_permissions_valid_azure_storage_account():
     storage_accounts = '/subscriptions/abc/providers/Microsoft.Storage/storageAccounts'
     containers = f'{storage_accounts}/storage1/blobServices/default/containers'
     azure_resources.storage_accounts.return_value = [
-        AzureResource(f'{storage_accounts}/storage1'),
-        AzureResource(f'{storage_accounts}/storage2'),
+        StorageAccount(
+            id=AzureResource(f'{storage_accounts}/storage1'),
+            name="storage1",
+            location="westeu",
+        ),
+        StorageAccount(
+            id=AzureResource(f'{storage_accounts}/storage2'),
+            name="storage2",
+            location="westeu",
+        ),
     ]
     azure_resources.containers.return_value = [
         AzureResource(f'{containers}/container1'),
@@ -276,3 +287,104 @@ def test_create_global_spn():
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
+
+
+def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(caplog):
+    """A warning should be logged when no storage account is present."""
+    w = create_autospec(WorkspaceClient)
+    backend = MockBackend()
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+
+    azure_resources = create_autospec(AzureResources)
+    azure_resources.storage_accounts.return_value = []
+
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+
+    azure_resource_permission.create_access_connectors_for_storage_accounts()
+    assert (
+        "There are no external table present with azure storage account. Please check if assessment job is run"
+        in caplog.messages
+    )
+
+
+def test_create_access_connectors_for_storage_accounts_one_access_connector():
+    """One access connector should be created for one storage account."""
+    w = create_autospec(WorkspaceClient)
+
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+    }
+    backend = MockBackend(rows=rows)
+
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+
+    azure_resources = create_autospec(AzureResources)
+    azure_resources.storage_accounts.return_value = [
+        StorageAccount(
+            id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
+            name="storage1",
+            location="westeu",
+        )
+    ]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azure_resources.create_or_update_access_connector.return_value = AccessConnector(
+        id=access_connector_id,
+        name="ac-test",
+        location="westeu",
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+
+    access_connectors = azure_resource_permission.create_access_connectors_for_storage_accounts()
+    assert len(access_connectors) == 1
+    assert access_connectors[0].name == "ac-test"
+
+
+def test_create_access_connectors_for_storage_accounts_log_permission_applied(caplog):
+    """Log that the permissions for the access connector are applied."""
+    w = create_autospec(WorkspaceClient)
+
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"]]
+    }
+    backend = MockBackend(rows=rows)
+
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+
+    azure_resources = create_autospec(AzureResources)
+    azure_resources.storage_accounts.return_value = [
+        StorageAccount(
+            id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
+            name="storage1",
+            location="westeu",
+        )
+    ]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azure_resources.create_or_update_access_connector.return_value = AccessConnector(
+        id=access_connector_id,
+        name="ac-test",
+        location="westeu",
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+
+    with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx"):
+        azure_resource_permission.create_access_connectors_for_storage_accounts()
+        assert any("STORAGE_BLOB_DATA_CONTRIBUTOR" in message for message in caplog.messages)

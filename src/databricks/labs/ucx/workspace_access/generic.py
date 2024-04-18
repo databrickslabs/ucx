@@ -24,7 +24,7 @@ from databricks.sdk.service import iam, ml
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
-from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
@@ -60,16 +60,28 @@ class Listing:
         since = datetime.datetime.now() - started
         logger.info(f"Listed {self._object_type} in {since}")
 
+    def __repr__(self):
+        return f"Listing({self._object_type} via {self._func.__qualname__})"
+
 
 class GenericPermissionsSupport(AclSupport):
     def __init__(
-        self, ws: WorkspaceClient, listings: list[Listing], verify_timeout: timedelta | None = timedelta(minutes=1)
+        self,
+        ws: WorkspaceClient,
+        listings: list[Listing],
+        verify_timeout: timedelta | None = timedelta(minutes=1),
+        include_object_permissions: list[str] | None = None,
     ):
         self._ws = ws
         self._listings = listings
         self._verify_timeout = verify_timeout
+        self._include_object_permissions = include_object_permissions
 
     def get_crawler_tasks(self):
+        if self._include_object_permissions:
+            for item in StaticListing(self._include_object_permissions, self.object_types()):
+                yield partial(self._crawler_task, item.object_type, item.object_id)
+            return
         for listing in self._listings:
             for info in listing:
                 yield partial(self._crawler_task, info.request_type, info.object_id)
@@ -298,6 +310,9 @@ class GenericPermissionsSupport(AclSupport):
                 )
         return acl_requests
 
+    def __repr__(self):
+        return f"GenericPermissionsSupport({self._listings})"
+
 
 class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
     def __init__(
@@ -374,6 +389,9 @@ class WorkspaceListing(Listing, CrawlerBase[WorkspaceObjectInfo]):
                 continue
             assert _object.object_id is not None
             yield GenericPermissionsInfo(str(_object.object_id), request_type)
+
+    def __repr__(self):
+        return f"WorkspaceListing(start_path={self._start_path})"
 
 
 def models_listing(ws: WorkspaceClient, num_threads: int):

@@ -11,7 +11,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler
-from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 
@@ -21,10 +21,12 @@ class TableAclSupport(AclSupport):
         grants_crawler: GrantsCrawler,
         sql_backend: SqlBackend,
         verify_timeout: timedelta | None = timedelta(minutes=1),
+        include_object_permissions: list[str] | None = None,
     ):
         self._grants_crawler = grants_crawler
         self._sql_backend = sql_backend
         self._verify_timeout = verify_timeout
+        self._include_object_permissions = include_object_permissions
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         # Table ACL permissions (grant/revoke and ownership) are not atomic. When granting the permissions,
@@ -44,9 +46,17 @@ class TableAclSupport(AclSupport):
         # * GRANT SELECT, MODIFY ON TABLE hive_metastore.db_a.table_a TO group_a
         # The exception is the "OWN" permission which must be set using a separate ALTER statement.
 
+        include_objects = set[tuple[str, str]]()
+        if self._include_object_permissions:
+            for item in StaticListing(self._include_object_permissions, self.object_types()):
+                include_objects.add((item.object_type, item.object_id))
+
         folded_actions = collections.defaultdict(set)
         for grant in self._grants_crawler.snapshot():
-            key = (grant.principal, grant.this_type_and_key())
+            type_and_key = grant.this_type_and_key()
+            if include_objects and type_and_key not in include_objects:
+                continue
+            key = (grant.principal, type_and_key)
             folded_actions[key].add(grant.action_type)
 
         def inner(object_type: str, object_id: str, grant: Grant) -> Permissions:
