@@ -6,18 +6,23 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial
 
+import sqlglot
+from sqlglot.expressions import Table as SQLTable
+
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
+from databricks.labs.ucx.hive_metastore.mapping import Rule
 
 logger = logging.getLogger(__name__)
 
 
 class What(Enum):
     EXTERNAL_SYNC = auto()
+    EXTERNAL_NO_SYNC_HIVESERDE = auto()
     EXTERNAL_NO_SYNC = auto()
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
@@ -150,6 +155,8 @@ class Table:
             return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
+        if self.kind == "TABLE" and self.table_format == "HIVE":
+            return What.EXTERNAL_NO_SYNC_HIVESERDE
         if self.kind == "TABLE":
             return What.EXTERNAL_NO_SYNC
         if self.kind == "VIEW":
@@ -166,6 +173,77 @@ class Table:
             f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} LIKE "
             f"{escape_sql_identifier(self.key)};"
         )
+
+    def sql_migrate_external_hiveserde_in_place(
+        self, rule: Rule, backend: SqlBackend, hiveserde_in_place_migrate: str
+    ) -> str | None:
+        # extract hive serde info
+        describe = {}
+        for key, values, _ in backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(self.key)}"):
+            describe[key] = values
+
+        # if "PARQUET", "AVRO", "ORC" hiveserde, just reuse the DDL from "SHOW CREATE TABLE..."
+        if (
+            self._if_parquet_serde(
+                hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
+            )
+            or self._if_avro_serde(
+                hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
+            )
+            or self._if_orc_serde(
+                hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
+            )
+        ):
+            return self._ddl_show_create_table(backend, rule)
+
+        # "TEXTFILE" hiveserde needs extra handling on preparing the DDL
+        # TODO: add support for "TEXTFILE" hiveserde
+
+        # "JSON", "CSV" hiveserde need extra handling on preparing the DDL
+        # TODO: DBR does not bundle the jars for "JSON", "CSV" hiveserde, it's unlikely we see those tables.
+        #  Although it's possible that users has the jars installed as cluster library and use those tables in Databricks,
+        #  we hold off the implementation for now until we see the real use case.
+        return None
+
+    def _if_parquet_serde(self, hiveserde_in_place_migrate, serde, input_format, output_format) -> bool:
+        return (
+            hiveserde_in_place_migrate == "PARQUET"
+            and serde == "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+            and input_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+        )
+
+    def _if_avro_serde(self, hiveserde_in_place_migrate, serde, input_format, output_format) -> bool:
+        return (
+            hiveserde_in_place_migrate == "AVRO"
+            and serde == "org.apache.hadoop.hive.serde2.avro.AvroSerDe"
+            and input_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat"
+        )
+
+    def _if_orc_serde(self, hiveserde_in_place_migrate, serde, input_format, output_format) -> bool:
+        return (
+            hiveserde_in_place_migrate == "ORC"
+            and serde == "org.apache.hadoop.hive.ql.io.orc.OrcSerde"
+            and input_format == "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
+        )
+
+    def _ddl_show_create_table(self, backend: SqlBackend, rule: Rule) -> str:
+        # get raw DDL from "SHOW CREATE TABLE..."
+        createtab_stmt = next(backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(self.key)}"))["createtab_stmt"]
+        # parse the DDL and replace the old table name with the new UC table name
+        new_statements = []
+        for statement in sqlglot.parse(createtab_stmt):
+            if not statement:
+                continue
+            for old_table in statement.find_all(SQLTable):
+                new_table = SQLTable(catalog=rule.catalog_name, db=rule.dst_schema, this=rule.dst_table)
+                old_table.replace(new_table)
+            new_sql = statement.sql('databricks')
+            new_statements.append(new_sql)
+        new_createtab_stmt = '; '.join(new_statements)
+        return new_createtab_stmt
 
     def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:
