@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import ast
 import typing
 from collections.abc import Callable, Iterable
 from enum import Enum
@@ -9,6 +10,7 @@ from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportForma
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 if typing.TYPE_CHECKING:
@@ -351,3 +353,25 @@ class DependencyGraph:
             if dependency.visit(visit_node):
                 return True
         return False
+
+
+def build_python_source_dependency_graph(
+    python_code: str, parent: DependencyGraph, register_dependency: Callable[[str], typing.Any]
+):
+    linter = ASTLinter.parse(python_code)
+    calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+    for call in calls:
+        assert isinstance(call, ast.Call)
+        path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+        if isinstance(path, ast.Constant):
+            path = path.value.strip().strip("'").strip('"')
+            object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
+            dependency = parent.resolver.resolve_object_info(object_info)
+            if dependency is not None:
+                parent.register_dependency(dependency)
+            else:
+                # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
+    names = PythonLinter.list_import_sources(linter)
+    for name in names:
+        register_dependency(name)

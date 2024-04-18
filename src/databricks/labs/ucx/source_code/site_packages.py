@@ -1,8 +1,6 @@
-import ast
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
@@ -10,8 +8,8 @@ from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     UnresolvedDependency,
     PackageFileDependency,
+    build_python_source_dependency_graph,
 )
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
 @dataclass
@@ -87,24 +85,9 @@ class PackageFile(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph):
         self._load_source_code()
         assert self._source_code is not None
-        linter = ASTLinter.parse(self._source_code)
-        # running a notebook from a site-package is highly unlikely but who knows...
-        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        for call in calls:
-            assert isinstance(call, ast.Call)
-            path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(path_arg, ast.Constant):
-                path = path_arg.value.strip().strip("'").strip('"')
-                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = parent.resolver.resolve_object_info(object_info)
-                if dependency is not None:
-                    parent.register_dependency(dependency)
-                else:
-                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
-        names = PythonLinter.list_import_sources(linter)
-        for name in names:
-            self._package.register_dependency(parent, name)
+        build_python_source_dependency_graph(
+            self._source_code, parent, lambda name: self._package.register_dependency(parent, name)
+        )
 
 
 class SitePackages:

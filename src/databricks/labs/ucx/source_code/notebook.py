@@ -1,7 +1,6 @@
 from __future__ import annotations  # for type hints
 
 import abc
-import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
@@ -16,8 +15,8 @@ from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyType,
     UnresolvedDependency,
+    build_python_source_dependency_graph,
 )
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 
 
 logger = logging.getLogger(__name__)
@@ -78,24 +77,9 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        linter = ASTLinter.parse(self._original_code)
-        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        for call in calls:
-            assert isinstance(call, ast.Call)
-            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(path, ast.Constant):
-                path = path.value.strip().strip("'").strip('"')
-                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = parent.resolver.resolve_object_info(object_info)
-                if dependency is not None:
-                    parent.register_dependency(dependency)
-                else:
-                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
-        names = PythonLinter.list_import_sources(linter)
-        for name in names:
-            unresolved = UnresolvedDependency(name)
-            parent.register_dependency(unresolved)
+        build_python_source_dependency_graph(
+            self._original_code, parent, lambda name: parent.register_dependency(UnresolvedDependency(name))
+        )
 
 
 class RCell(Cell):
