@@ -4,14 +4,24 @@ import ast
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from databricks.labs.ucx.source_code.python_ast_util import (
-    AstUtil,
-    Span,
-)
+
+from databricks.labs.ucx.source_code.python_linter import ASTLinter
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
 )
+
+
+@dataclass
+class Position:
+    line: int
+    character: int
+
+
+@dataclass
+class Range:
+    start: Position
+    end: Position
 
 
 @dataclass
@@ -27,40 +37,38 @@ class NoFormatPythonMatcher:
     format_arg_index: int | None = None
     format_arg_name: str | None = None
 
-    def get_advice_span(self, node: ast.AST) -> Span | None:
+    def get_advice_span(self, node: ast.AST) -> Range | None:
         # Check 1: retrieve full callchain:
-        callchain = AstUtil.extract_callchain(node)
+        callchain = ASTLinter(node).extract_callchain()
         if callchain is None:
             return None
 
         # Check 2: check presence of the table-creating method call:
-        call = AstUtil.extract_call_by_name(callchain, self.method_name)
+        call = ASTLinter(callchain).extract_call_by_name(self.method_name)
         if call is None:
             return None
-        call_args_count = AstUtil.args_count(call)
+        call_args_count = ASTLinter(call).args_count()
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
         # Check 3: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
         #   example: df.saveToTable("c.db.table", format="csv")
-        format_arg = AstUtil.get_arg(call, self.format_arg_index, self.format_arg_name)
-        if format_arg is not None and not AstUtil.is_none(format_arg):
+        format_arg = ASTLinter(call).get_arg(self.format_arg_index, self.format_arg_name)
+        if format_arg is not None and not ASTLinter(format_arg).is_none():
             # i.e., found an explicit "format" argument, and its value is not None.
             return None
         #   Option B. format specifier may be a separate ".format(...)" call in this callchain
         #   example: df.format("csv").saveToTable("c.db.table")
-        format_call = AstUtil.extract_call_by_name(callchain, "format")
+        format_call = ASTLinter(callchain).extract_call_by_name("format")
         if format_call is not None:
             # i.e., found an explicit ".format(...)" call in this chain.
             return None
 
-        # Finally: matched the need for advice, so return the corresponding source span:
-        return Span(
-            call.lineno,
-            call.col_offset,
-            call.end_lineno or 0,
-            call.end_col_offset or 0,
+        # Finally: matched the need for advice, so return the corresponding source range:
+        return Range(
+            Position(call.lineno, call.col_offset),
+            Position(call.end_lineno or 0, call.end_col_offset or 0),
         )
 
 
@@ -77,10 +85,10 @@ class NoFormatPythonLinter:
                 yield Advice(
                     code="table-migrate",
                     message="The default format changed in Databricks Runtime 8.0, from Parquet to Delta",
-                    start_line=span.start_line,
-                    start_col=span.start_col,
-                    end_line=span.end_line,
-                    end_col=span.end_col,
+                    start_line=span.start.line,
+                    start_col=span.start.character,
+                    end_line=span.end.line,
+                    end_col=span.end.character,
                 )
 
 
