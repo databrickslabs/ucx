@@ -478,6 +478,7 @@ class TestInstallationContext(TestRuntimeContext):
         self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
+        self._product_info = ProductInfo.for_testing(WorkspaceConfig)
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
@@ -561,7 +562,7 @@ class TestInstallationContext(TestRuntimeContext):
 
     @cached_property
     def product_info(self):
-        return ProductInfo.for_testing(WorkspaceConfig)
+        return self._product_info
 
     @cached_property
     def tasks(self):
@@ -647,21 +648,21 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_acc_group,
         make_user,
     )
-    yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
+    yield ctx.replace(workspace_client=ws,
+                      sql_backend=sql_backend,
+                      extend_prompts={r".*We have identified one or more cluster.*": "no",})
     ctx.workspace_installation.uninstall()
 
 
 @pytest.fixture
 def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_dbfs_data_copy, env_or_skip
+    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip
 ) -> tuple[dict[str, TableInfo], SchemaInfo]:
     # create external and managed tables to be migrated
     schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     tables: dict[str, TableInfo] = {
         "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
-        "src_external_table": installation_ctx.make_table(
-            schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-        ),
+        "src_external_table": installation_ctx.make_table(schema_name=schema.name, external_csv=make_mounted_location),
     }
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
     tables["src_view1"] = installation_ctx.make_table(
