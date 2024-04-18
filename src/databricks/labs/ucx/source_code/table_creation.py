@@ -16,18 +16,16 @@ from databricks.labs.ucx.source_code.base import (
 
 @dataclass
 class NoFormatPythonMatcher:
-    """ Matches Python AST nodes where tables are created with implicit format.
+    """Matches Python AST nodes where tables are created with implicit format.
     It performs only the matching, while linting / fixing are separated concerns.
     """
+
     method_name: str
     min_args: int
     max_args: int
     # some method_names accept 'format' as a direct (optional) argument:
-    format_arg_index: int = None
-    format_arg_name: str = None
-
-    def matches(self, node: ast.AST) -> bool:
-        return self.get_advice_span(node) is not None
+    format_arg_index: int | None = None
+    format_arg_name: str | None = None
 
     def get_advice_span(self, node: ast.AST) -> Span | None:
         # retrieve full callchain:
@@ -61,12 +59,10 @@ class NoFormatPythonMatcher:
 
 
 @dataclass
-class NoFormatPythonLinter(Linter):
-    """ Python linting for table-creation with implicit format """
-    _matchers: list[NoFormatPythonMatcher]
+class NoFormatPythonLinter:
+    """Python linting for table-creation with implicit format"""
 
-    def matches(self, node: ast.AST) -> bool:
-        return any(m.matches(node) for m in self._matchers)
+    _matchers: list[NoFormatPythonMatcher]
 
     def lint(self, node: ast.AST) -> Iterator[Advice]:
         for matcher in self._matchers:
@@ -82,22 +78,25 @@ class NoFormatPythonLinter(Linter):
                 )
 
 
-class DBRv8_0Linter(Linter):
-    """ Performs Python linting for backwards incompatible changes in DBR version 8.0.
+class DBRv8d0Linter(Linter):
+    """Performs Python linting for backwards incompatible changes in DBR version 8.0.
     Specifically, it yields advice for table-creation with implicit format.
     """
+
     # https://docs.databricks.com/en/archive/runtime-release-notes/8.0.html#delta-is-now-the-default-format-when-a-format-is-not-specified
 
     def __init__(self, dbr_version: tuple[int, int] | None):
         version_cutoff = (8, 0)
         self._skip_dbr = dbr_version is not None and dbr_version >= version_cutoff
 
-        self._linter = NoFormatPythonLinter([
-            NoFormatPythonMatcher("writeTo", 1, 1),
-            NoFormatPythonMatcher("table", 1, 1),
-            NoFormatPythonMatcher("insertInto", 1, 2),
-            NoFormatPythonMatcher("saveAsTable", 1, 4, 2, "format"),
-        ])
+        self._linter = NoFormatPythonLinter(
+            [
+                NoFormatPythonMatcher("writeTo", 1, 1),
+                NoFormatPythonMatcher("table", 1, 1),
+                NoFormatPythonMatcher("insertInto", 1, 2),
+                NoFormatPythonMatcher("saveAsTable", 1, 4, 2, "format"),
+            ]
+        )
 
     def lint(self, code: str) -> Iterable[Advice]:
         if self._skip_dbr:
