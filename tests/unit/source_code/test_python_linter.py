@@ -1,4 +1,5 @@
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+from databricks.labs.ucx.source_code.base import Location
+from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter, ImportSource
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
@@ -19,27 +20,47 @@ for i in z:
 
 def test_linter_returns_empty_list_of_imports():
     linter = ASTLinter.parse('')
-    assert [] == PythonLinter.list_import_sources(linter)
+    assert not PythonLinter.list_import_sources(linter)
 
 
 def test_linter_returns_import():
     linter = ASTLinter.parse('import x')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert [
+        ImportSource(
+            import_string="x",
+            location=Location(code="import", message="", start_line=1, start_col=0, end_line=1, end_col=8),
+        ),
+    ] == PythonLinter.list_import_sources(linter)
 
 
 def test_linter_returns_import_from():
     linter = ASTLinter.parse('from x import z')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert [
+        ImportSource(
+            import_string="x",
+            location=Location(code="import from", message="", start_line=1, start_col=0, end_line=1, end_col=15),
+        ),
+    ] == PythonLinter.list_import_sources(linter)
 
 
 def test_linter_returns_import_module():
     linter = ASTLinter.parse('importlib.import_module("x")')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert [
+        ImportSource(
+            import_string="x",
+            location=Location(code="import_module", message="", start_line=1, start_col=0, end_line=1, end_col=28),
+        ),
+    ] == PythonLinter.list_import_sources(linter)
 
 
 def test_linter_returns__import__():
     linter = ASTLinter.parse('importlib.__import__("x")')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert [
+        ImportSource(
+            import_string="x",
+            location=Location(code="__import__", message="", start_line=1, start_col=0, end_line=1, end_col=25),
+        ),
+    ] == PythonLinter.list_import_sources(linter)
 
 
 def test_linter_returns_appended_absolute_paths():
