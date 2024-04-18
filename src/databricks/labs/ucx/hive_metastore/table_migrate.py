@@ -4,9 +4,12 @@ from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
 
+import sqlglot
+from sqlglot import expressions
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
@@ -140,6 +143,8 @@ class TablesMigrator:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
+        if src_table.src.what == What.EXTERNAL_NO_SYNC:
+            return self._migrate_non_sync_table(src_table.src, src_table.rule, grants)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
@@ -202,6 +207,34 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
+
+    def _migrate_non_sync_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+        table_migrate_sql = self._get_create_in_place_sql(src_table, rule)
+        logger.debug(f"Migrating table (CTAS) {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_acl(src_table, rule, grants)
+
+    def _get_create_in_place_sql(self, src_table: Table, rule: Rule) -> str:
+        create_sql = str(next(self._backend.fetch(src_table.sql_show_create())).get("createtab_stmt"))
+        statements = sqlglot.parse(create_sql, read='databricks')
+        assert len(statements) == 1, 'Expected a single statement'
+        create = statements[0]
+        assert isinstance(create, expressions.Create), 'Expected a CREATE statement'
+        # safely replace current table name with the updated catalog
+        for table_name in create.find_all(expressions.Table):
+            if table_name.db == src_table.database and table_name.name == src_table.name:
+                # See https://github.com/tobymao/sqlglot/issues/3311
+                new_table_name = expressions.Table(
+                    catalog=rule.catalog_name,
+                    db=rule.dst_schema,
+                    this=rule.dst_table,
+                )
+                table_name.replace(new_table_name)
+        # safely replace CREATE with CREATE IF NOT EXISTS
+        create.args['exists'] = True
+        return create.sql('databricks')
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
         if grants is None:
