@@ -85,9 +85,9 @@ class PythonCell(Cell):
             if isinstance(path, ast.Constant):
                 dependency = Dependency(ObjectType.NOTEBOOK, path.value.strip("'").strip('"'))
                 parent.register_dependency(dependency)
-        names = PythonLinter.list_import_sources(linter)
-        for name in names:
-            dependency = Dependency(None, name)
+        imports = PythonLinter.list_import_sources(linter)
+        for import_dependency in imports:
+            dependency = Dependency(None, import_dependency.import_string, import_dependency)
             parent.register_dependency(dependency)
 
 
