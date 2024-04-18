@@ -504,3 +504,31 @@ def test_migrate_external_tables_with_principal_acl_aws(
             match = True
             break
     assert match
+
+
+def test_migrate_external_tables_with_spn_azure(
+        ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    ctx, table_full_name = prepared_principal_acl
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    ctx.with_dummy_azure_resource_permission()
+
+    table_migrate = ctx.tables_migrator
+
+    spn_with_mount_access = "5a11359f-ba1f-483f-8e00-0fe55ec003ed"
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        service_principal_name=spn_with_mount_access
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == spn_with_mount_access and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
