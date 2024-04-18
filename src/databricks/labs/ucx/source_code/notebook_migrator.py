@@ -3,12 +3,12 @@ from collections.abc import Callable
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.base import Advice, Failure
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
-    DependencyResolver,
+    DependencyResolver, DependencyType,
 )
 
 
@@ -34,7 +34,9 @@ class NotebookMigrator:
         assert dependency is not None
         graph = DependencyGraph(dependency, None, self._resolver, advice_collector)
         container = dependency.load()
-        if container is not None:
+        if container is None:
+            advice_collector(Failure('dependency-check', 'Could not locate Notebook', DependencyType.WORKSPACE_NOTEBOOK.value, object_info.path, 0, 0, 0, 0))
+        else:
             container.build_dependency_graph(graph)
         return graph
 

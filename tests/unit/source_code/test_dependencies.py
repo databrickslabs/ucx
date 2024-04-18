@@ -5,9 +5,10 @@ import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
+from databricks.labs.ucx.source_code.base import Advice, Failure
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
-    DependencyResolver,
+    DependencyResolver, DependencyType,
 )
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.site_packages import SitePackages
@@ -59,7 +60,7 @@ def test_build_dependency_graph_visits_notebook_file_dependencies(empty_index):
     assert len(visited) == len(paths)
 
 
-def test_build_dependency_graph_fails_with_unfound_dependency(empty_index):
+def test_build_dependency_graph_raises_advice_with_unfound_dependency(empty_index):
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
 
@@ -80,8 +81,9 @@ def test_build_dependency_graph_fails_with_unfound_dependency(empty_index):
     whi = whitelist_mock()
     migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, whi, sps))
     object_info = ObjectInfo(path="root1.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
-    with pytest.raises(ValueError):
-        migrator.build_dependency_graph(object_info, lambda advice: None)
+    advices: list[Advice] = []
+    migrator.build_dependency_graph(object_info, advices.append)
+    assert [ Failure('dependency-check', 'Could not locate Notebook', DependencyType.WORKSPACE_NOTEBOOK.value, object_info.path, 0, 0, 0, 0) ] == advices
 
 
 def test_build_dependency_graph_visits_file_dependencies(empty_index):
@@ -148,7 +150,7 @@ def test_build_dependency_graph_safely_visits_non_file_dependencies(empty_index)
     assert len(visited) == len(paths)
 
 
-def test_build_dependency_graph_throws_with_invalid_dependencies(empty_index):
+def test_build_dependency_graph_creates_advice_with_invalid_dependencies(empty_index):
     paths = ["root7.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
@@ -164,8 +166,10 @@ def test_build_dependency_graph_throws_with_invalid_dependencies(empty_index):
     whi = whitelist_mock()
     migrator = NotebookMigrator(ws, empty_index, DependencyResolver(ws, whi, sps))
     object_info = ObjectInfo(path="root7.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
-    with pytest.raises(ValueError):
-        migrator.build_dependency_graph(object_info, lambda advice: None)
+    advices: list[Advice] = []
+    migrator.build_dependency_graph(object_info, advices.append)
+    advice = advices[0].replace(message='failure')
+    assert Failure('dependency-check', 'failure', 'WORKSPACE_FILE', 'root7.py.txt', 1, 0, 1 ,19) == advice
 
 
 def test_build_dependency_graph_ignores_builtin_dependencies(empty_index):

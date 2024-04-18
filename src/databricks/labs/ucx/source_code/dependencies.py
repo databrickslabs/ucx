@@ -9,7 +9,7 @@ from enum import Enum
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.base import Advice, Deprecation, Failure
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
@@ -145,7 +145,10 @@ class WorkspaceLoader(DependencyLoader):
         return self._ws.workspace.get_status(path)
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        object_info = self._load_object(dependency)
+        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
+        object_info = self.get_object_info(dependency.path)
+        if object_info is None:
+            return None
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
         if object_info.object_type is ObjectType.FILE:
@@ -153,17 +156,6 @@ class WorkspaceLoader(DependencyLoader):
         if object_info.object_type in [ObjectType.LIBRARY, ObjectType.DIRECTORY, ObjectType.DASHBOARD, ObjectType.REPO]:
             return None
         raise NotImplementedError(str(object_info.object_type))
-
-    def _load_object(self, dependency: Dependency) -> ObjectInfo:
-        object_info = self.get_object_info(dependency.path)
-        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        if object_info is None or object_info.object_type is None:
-            raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if dependency.type is not None and dependency.type.object_type is not object_info.object_type:
-            raise ValueError(
-                f"Invalid object at '{dependency.path}', expected a {str(dependency.type)}, got a {str(object_info.object_type)}"
-            )
-        return object_info
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid cyclic dependency
@@ -222,7 +214,19 @@ class DependencyResolver:
     ) -> ResolvedDependency | None:
         assert object_info.path is not None
         if object_info.object_type is None:
-            raise ValueError(f"Invalid ObjectInfo (missing 'object_type'): {object_info}")
+            advice_collector(
+                Failure(
+                        code="dependency-check",
+                        message=f"Invalid ObjectInfo (missing 'object_type'): {object_info}",
+                        source_type=Advice.MISSING_SOURCE_TYPE,
+                        source_path=Advice.MISSING_SOURCE_PATH,
+                        start_line=0,
+                        start_col=0,
+                        end_line=0,
+                        end_col=0,
+                    )
+            )
+            return None
         if object_info.object_type is ObjectType.NOTEBOOK:
             return WorkspaceNotebookDependency(self._workspace_loader, object_info.path)
         if object_info.object_type is ObjectType.FILE:
