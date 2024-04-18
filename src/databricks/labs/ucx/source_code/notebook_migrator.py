@@ -53,6 +53,7 @@ class NotebookMigrator:
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False
+        schema: str | None = None
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
@@ -62,7 +63,7 @@ class NotebookMigrator:
                 continue
             if not self._languages.is_supported(cell.language.language):
                 continue
-            migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code)
+            migrated_code, schema = self._languages.apply_fixes(cell.language.language, cell.original_code, schema)
             if migrated_code != cell.original_code:
                 cell.migrated_code = migrated_code
                 changed = True

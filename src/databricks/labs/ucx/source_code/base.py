@@ -71,7 +71,11 @@ class Convention(Advice):
 
 class Linter:
     @abstractmethod
-    def lint(self, code: str) -> Iterable[Advice]: ...
+    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]: ...
+
+    @property
+    def schema(self):
+        return None
 
 
 class Fixer:
@@ -79,13 +83,17 @@ class Fixer:
     def name(self) -> str: ...
 
     @abstractmethod
-    def apply(self, code: str) -> str: ...
+    def apply(self, code: str, _: str | None = None) -> str: ...
+
+    @property
+    def schema(self):
+        return None
 
 
 class SequentialLinter(Linter):
     def __init__(self, linters: list[Linter]):
         self._linters = linters
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint(self, code: str, schema: str | None = None) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint(code)

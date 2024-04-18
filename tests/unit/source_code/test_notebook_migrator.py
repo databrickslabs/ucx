@@ -61,7 +61,7 @@ def test_apply_returns_false_when_no_fixes_applied():
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = notebook_code.encode("utf-8")
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
-    languages.apply_fixes.return_value = "# original code"  # cell code
+    languages.apply_fixes.return_value = "# original code", None  # cell code
     loader = create_autospec(DependencyLoader)
     loader.load_dependency.return_value = Notebook.parse('path', notebook_code, Language.R)
     migrator = NotebookMigrator(ws, languages, loader)
@@ -81,7 +81,7 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = original_code.encode("utf-8")
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
-    languages.apply_fixes.return_value = migrated_cell_code
+    languages.apply_fixes.return_value = migrated_cell_code, None
     loader = create_autospec(DependencyLoader)
     loader.load_dependency.return_value = Notebook.parse('path', original_code, Language.R)
     migrator = NotebookMigrator(ws, languages, loader)

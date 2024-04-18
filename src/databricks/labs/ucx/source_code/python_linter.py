@@ -232,7 +232,7 @@ class ASTLinter(Generic[T]):
 
 class PythonLinter(Linter):
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]:
         linter = ASTLinter.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(linter)
         return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]

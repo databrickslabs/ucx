@@ -42,7 +42,11 @@ class FromTable(Linter, Fixer):
     def schema(self):
         return self._schema
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint(self, code: str, schema: str | None = None) -> Iterable[Advice]:
+        # Allow the lint to override the schema because a previous lint of say a notebook cell
+        # may have set the schema.
+        if schema:
+            self._schema = schema
         for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue
@@ -80,7 +84,12 @@ class FromTable(Linter, Fixer):
             return table.catalog
         return 'hive_metastore'
 
-    def apply(self, code: str) -> str:
+    def apply(self, code: str, schema: str | None = None) -> str:
+        # Allow the apply to override the schema because a previous lint of say a notebook cell
+        # may have set the schema.If not set, then schema is not overwritten which does allow
+        # reuse potentially.
+        if schema:
+            self._schema = schema
         new_statements = []
         for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
