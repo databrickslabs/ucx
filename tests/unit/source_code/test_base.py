@@ -11,8 +11,8 @@ def test_message_initialization():
     message = Advice('code1', 'This is a message', "LOCAL_FILE", "some path", 1, 1, 2, 2)
     assert message.code == 'code1'
     assert message.message == 'This is a message'
-    assert message.location_type == 'LOCAL_FILE'
-    assert message.location_path == 'some path'
+    assert message.source_type == 'LOCAL_FILE'
+    assert message.source_path == 'some path'
     assert message.start_line == 1
     assert message.start_col == 1
     assert message.end_line == 2

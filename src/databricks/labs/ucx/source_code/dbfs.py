@@ -26,8 +26,8 @@ class DetectDbfsVisitor(ast.NodeVisitor):
                         Deprecation(
                             code='dbfs-usage',
                             message=f"Deprecated file system path in call to: {arg.s}",
-                            location_type=Advice.MISSING_TYPE,
-                            location_path=Advice.MISSING_PATH,
+                            source_type=Advice.MISSING_TYPE,
+                            source_path=Advice.MISSING_PATH,
                             start_line=arg.lineno,
                             start_col=arg.col_offset,
                             end_line=arg.lineno,
@@ -51,8 +51,8 @@ class DetectDbfsVisitor(ast.NodeVisitor):
                     Advisory(
                         code='dbfs-usage',
                         message=f"Possible deprecated file system path: {node.s}",
-                        location_type=Advice.MISSING_TYPE,
-                        location_path=Advice.MISSING_PATH,
+                        source_type=Advice.MISSING_TYPE,
+                        source_path=Advice.MISSING_PATH,
                         start_line=node.lineno,
                         start_col=node.col_offset,
                         end_line=node.lineno,
@@ -111,8 +111,8 @@ class FromDbfsFolder(Linter):
             yield Deprecation(
                 code='dbfs-query',
                 message=f"The use of DBFS is deprecated: {table.name}",
-                location_type=Advice.MISSING_TYPE,
-                location_path=Advice.MISSING_PATH,
+                source_type=Advice.MISSING_TYPE,
+                source_path=Advice.MISSING_PATH,
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,

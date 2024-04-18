@@ -21,8 +21,8 @@ class Advice:
 
     code: str
     message: str
-    location_type: str
-    location_path: str
+    source_type: str
+    source_path: str
     start_line: int
     start_col: int
     end_line: int
@@ -42,8 +42,8 @@ class Advice:
         return self.__class__(
             code=code if code is not None else self.code,
             message=message if message is not None else self.message,
-            location_type=location_type if location_type is not None else self.location_type,
-            location_path=location_type if location_path is not None else self.location_path,
+            location_type=location_type if location_type is not None else self.source_type,
+            location_path=location_type if location_path is not None else self.source_path,
             start_line=start_line if start_line is not None else self.start_line,
             start_col=start_col if start_col is not None else self.start_col,
             end_line=end_line if end_line is not None else self.end_line,

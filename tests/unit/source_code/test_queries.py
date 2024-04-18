@@ -19,8 +19,8 @@ def test_migrated_tables_trigger_messages(migration_index):
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            location_type=Advice.MISSING_TYPE,
-            location_path=Advice.MISSING_PATH,
+            source_type=Advice.MISSING_TYPE,
+            source_path=Advice.MISSING_PATH,
             start_line=0,
             start_col=0,
             end_line=0,
@@ -29,8 +29,8 @@ def test_migrated_tables_trigger_messages(migration_index):
         Deprecation(
             code='table-migrate',
             message='Table other.matters is migrated to some.certain.issues in Unity Catalog',
-            location_type=Advice.MISSING_TYPE,
-            location_path=Advice.MISSING_PATH,
+            source_type=Advice.MISSING_TYPE,
+            source_path=Advice.MISSING_PATH,
             start_line=0,
             start_col=0,
             end_line=0,
