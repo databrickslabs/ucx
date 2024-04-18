@@ -28,12 +28,12 @@ class NoFormatPythonMatcher:
     format_arg_name: str | None = None
 
     def get_advice_span(self, node: ast.AST) -> Span | None:
-        # retrieve full callchain:
+        # Check 1: retrieve full callchain:
         callchain = AstUtil.extract_callchain(node)
         if callchain is None:
             return None
 
-        # check presence of the table-creating method call:
+        # Check 2: check presence of the table-creating method call:
         call = AstUtil.extract_call_by_name(callchain, self.method_name)
         if call is None:
             return None
@@ -41,15 +41,21 @@ class NoFormatPythonMatcher:
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
-        # check presence of the format specifier:
+        # Check 3: check presence of the format specifier:
+        #   Option A: format specifier may be given as a direct parameter to the table-creating call
+        #   example: df.saveToTable("c.db.table", format="csv")
         format_arg = AstUtil.get_arg(call, self.format_arg_index, self.format_arg_name)
         if format_arg is not None and not AstUtil.is_none(format_arg):
+            # i.e., found an explicit "format" argument, and its value is not None.
             return None
+        #   Option B. format specifier may be a separate ".format(...)" call in this callchain
+        #   example: df.format("csv").saveToTable("c.db.table")
         format_call = AstUtil.extract_call_by_name(callchain, "format")
         if format_call is not None:
+            # i.e., found an explicit ".format(...)" call in this chain.
             return None
 
-        # matched need for issuing advice:
+        # Finally: matched the need for advice, so return the corresponding source span:
         return Span(
             call.lineno,
             call.col_offset,
@@ -58,11 +64,11 @@ class NoFormatPythonMatcher:
         )
 
 
-@dataclass
 class NoFormatPythonLinter:
     """Python linting for table-creation with implicit format"""
 
-    _matchers: list[NoFormatPythonMatcher]
+    def __init__(self, matchers: list[NoFormatPythonMatcher]):
+        self._matchers = matchers
 
     def lint(self, node: ast.AST) -> Iterator[Advice]:
         for matcher in self._matchers:

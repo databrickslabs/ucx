@@ -62,7 +62,7 @@ def test_get_arg(migration_index, param):
     call = get_statement_node(param["stmt"]).value
     act = AstUtil.get_arg(call, param["arg_index"], param["arg_name"])
     if param["expected"] is None:
-        assert param["expected"] is None
+        assert act is None
     else:
         assert isinstance(act, ast.Constant)
         assert act.value == param["expected"]
@@ -77,6 +77,7 @@ def test_get_arg(migration_index, param):
         {"stmt": "o.m1(3, 3)", "expected": 2},
         {"stmt": "o.m1(first=3, second=3)", "expected": 2},
         {"stmt": "o.m1(3, second=3)", "expected": 2},
+        {"stmt": "o.m1(3, *b, **c, second=3)", "expected": 4},
     ],
 )
 def test_args_count(migration_index, param):
