@@ -31,8 +31,6 @@ _SPARK_CONF = {
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
 
@@ -44,7 +42,8 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
     rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
 
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+
+    runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
@@ -63,8 +62,6 @@ def test_migrate_tables_with_cache_should_not_create_table(
     make_random,
     make_catalog,
 ):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
 
     dst_catalog = make_catalog()
@@ -101,7 +98,7 @@ def test_migrate_tables_with_cache_should_not_create_table(
         ),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
 
     # FIXME: flaky: databricks.sdk.errors.platform.NotFound: Catalog 'ucx_cjazg' does not exist.
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
@@ -121,12 +118,10 @@ def test_migrate_external_table(
     make_mounted_location,
     make_dbfs_data_copy,
 ):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
     # external table migration tests
-    existing_mounted_location, new_mounted_location = make_mounted_location()
+    existing_mounted_location, new_mounted_location = make_mounted_location
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
     dst_catalog = make_catalog()
@@ -135,7 +130,7 @@ def test_migrate_external_table(
     rules = [Rule.from_src_dst(src_external_table, dst_schema)]
 
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
@@ -155,8 +150,6 @@ def test_migrate_external_table(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=1))
 def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=existing_mounted_location)
@@ -173,7 +166,7 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip
         ),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert "SYNC command failed to migrate" in caplog.text
@@ -181,8 +174,6 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     src_view1 = runtime_ctx.make_table(
@@ -232,7 +223,7 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     ]
 
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.tables_migrator.index()
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
     runtime_ctx.migration_status_refresher.snapshot()
@@ -253,8 +244,6 @@ def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_revert_migrated_table(sql_backend, runtime_ctx, make_catalog):
-    if not runtime_ctx.workspace_client.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema1 = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_schema2 = runtime_ctx.make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema1.name)
@@ -270,7 +259,7 @@ def test_revert_migrated_table(sql_backend, runtime_ctx, make_catalog):
         Rule.from_src_dst(table_to_not_revert, dst_schema2),
     ]
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
 
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
 
@@ -323,8 +312,6 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
@@ -332,7 +319,7 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.with_table_mapping_rules([Rule.from_src_dst(table_to_skip, dst_schema)])
 
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
@@ -374,8 +361,6 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_user):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
     user = make_user()
@@ -397,7 +382,7 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
     rules = [Rule.from_src_dst(src_managed_table, dst_schema)]
     runtime_ctx.with_table_mapping_rules(rules)
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
 
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
@@ -434,11 +419,9 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_c
 def test_migrate_managed_tables_with_principal_acl_azure(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
 ):
-    if not ws.config.is_azure:
-        pytest.skip("temporary: only works in azure test env")
     ctx, table_full_name = prepared_principal_acl
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
-    ctx.with_dummy_azure_resource_permission()
+    ctx.with_dummy_resource_permission()
     table_migrate = ctx.tables_migrator
     user = make_user()
     make_cluster_permissions(
@@ -461,10 +444,8 @@ def test_migrate_managed_tables_with_principal_acl_azure(
 def test_migrate_managed_tables_with_principal_acl_aws(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
-    if not ws.config.is_aws:
-        pytest.skip("temporary: only works in azure test env")
     ctx, table_full_name = prepared_principal_acl
-    ctx.with_dummy_aws_resource_permission()
+    ctx.with_dummy_resource_permission()
     cluster = make_cluster(
         single_node=True,
         data_security_mode=DataSecurityMode.NONE,
