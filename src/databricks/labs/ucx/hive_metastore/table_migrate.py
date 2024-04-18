@@ -1,6 +1,5 @@
 import dataclasses
 import logging
-import re
 from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
@@ -236,7 +235,6 @@ class TablesMigrator:
         # safely replace current table name with the updated catalog
         for table_name in create.find_all(expressions.Table):
             if table_name.db == src_table.database and table_name.name == src_table.name:
-                # See https://github.com/tobymao/sqlglot/issues/3311
                 new_table_name = expressions.Table(
                     catalog=rule.catalog_name,
                     db=rule.dst_schema,
@@ -248,8 +246,10 @@ class TablesMigrator:
         return create.sql('databricks')
 
     def _get_create_ctas_sql(self, src_table: Table, rule: Rule) -> str:
-        create_sql = (f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} "
-                      f"AS SELECT * FROM {src_table.safe_sql_key}")
+        create_sql = (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} "
+            f"AS SELECT * FROM {src_table.safe_sql_key}"
+        )
         return create_sql
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
