@@ -5,7 +5,7 @@ import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.base import Advisory
+from databricks.labs.ucx.source_code.base import Advisory, Advice
 from databricks.labs.ucx.source_code.notebook import WorkspaceNotebook
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
