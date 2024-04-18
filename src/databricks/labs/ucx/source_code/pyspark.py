@@ -60,6 +60,8 @@ class QueryMatcher(Matcher):
             yield Advisory(
                 code='table-migrate',
                 message=f"Can't migrate '{node}' because its table name argument is not a constant",
+                source_type=Advice.MISSING_SOURCE_TYPE,
+                source_path=Advice.MISSING_SOURCE_PATH,
                 start_line=node.lineno,
                 start_col=node.col_offset,
                 end_line=node.end_lineno or 0,
@@ -84,8 +86,8 @@ class TableNameMatcher(Matcher):
                 yield Deprecation(
                     code='table-migrate',
                     message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
-                    source_type=Advice.MISSING_TYPE,
-                    source_path=Advice.MISSING_PATH,
+                    source_type=Advice.MISSING_SOURCE_TYPE,
+                    source_path=Advice.MISSING_SOURCE_PATH,
                     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                     start_line=node.lineno,
                     start_col=node.col_offset,
@@ -97,8 +99,8 @@ class TableNameMatcher(Matcher):
             yield Advisory(
                 code='table-migrate',
                 message=f"Can't migrate '{node.func.attr}' because its table name argument is not a constant",
-                source_type=Advice.MISSING_TYPE,
-                source_path=Advice.MISSING_PATH,
+                source_type=Advice.MISSING_SOURCE_TYPE,
+                source_path=Advice.MISSING_SOURCE_PATH,
                 start_line=node.lineno,
                 start_col=node.col_offset,
                 end_line=node.end_lineno or 0,
@@ -129,8 +131,8 @@ class ReturnValueMatcher(Matcher):
         yield Advisory(
             code='table-migrate',
             message=f"Call to '{node.func.attr}' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
-            source_type=Advice.MISSING_TYPE,
-            source_path=Advice.MISSING_PATH,
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=node.lineno,
             start_col=node.col_offset,
             end_line=node.end_lineno or 0,

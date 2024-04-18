@@ -16,8 +16,8 @@ from dataclasses import dataclass
 @dataclass
 class Advice:
 
-    MISSING_TYPE = "<MISSING_TYPE>"
-    MISSING_PATH = "<MISSING_PATH>"
+    MISSING_SOURCE_TYPE = "<MISSING_SOURCE_TYPE>"
+    MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
 
     code: str
     message: str
@@ -32,8 +32,8 @@ class Advice:
         self,
         code: str | None = None,
         message: str | None = None,
-        location_type: str | None = None,
-        location_path: str | None = None,
+        source_type: str | None = None,
+        source_path: str | None = None,
         start_line: int | None = None,
         start_col: int | None = None,
         end_line: int | None = None,
@@ -42,8 +42,8 @@ class Advice:
         return self.__class__(
             code=code if code is not None else self.code,
             message=message if message is not None else self.message,
-            location_type=location_type if location_type is not None else self.source_type,
-            location_path=location_type if location_path is not None else self.source_path,
+            source_type=source_type if source_type is not None else self.source_type,
+            source_path=source_path if source_path is not None else self.source_path,
             start_line=start_line if start_line is not None else self.start_line,
             start_col=start_col if start_col is not None else self.start_col,
             end_line=end_line if end_line is not None else self.end_line,

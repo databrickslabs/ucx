@@ -90,8 +90,8 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
         Deprecation(
             code='dbfs-query',
             message=f'The use of DBFS is deprecated: {table}',
-            source_type=Advice.MISSING_TYPE,
-            source_path=Advice.MISSING_PATH,
+            source_type=Advice.MISSING_SOURCE_TYPE,
+            source_path=Advice.MISSING_SOURCE_PATH,
             start_line=0,
             start_col=0,
             end_line=0,
