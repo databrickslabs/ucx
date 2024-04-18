@@ -294,6 +294,10 @@ class DependencyGraph:
     def advice_collector(self):
         return self._advice_collector
 
+    @advice_collector.setter
+    def advice_collector(self, value):
+        self._advice_collector = value
+
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
         resolved = self._resolver.resolve_dependency(dependency, self._advice_collector)
         if resolved is None:
@@ -304,7 +308,7 @@ class DependencyGraph:
             self._dependencies[resolved] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(resolved, self, self._resolver)
+        child_graph = DependencyGraph(resolved, self, self._resolver, self._advice_collector)
         self._dependencies[resolved] = child_graph
         container = resolved.load()
         if not container:

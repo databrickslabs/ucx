@@ -6,7 +6,7 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyResolver, DependencyType
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect, site_packages_mock
@@ -23,8 +23,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_type=Advice.MISSING_SOURCE_TYPE,
-                    source_path=Advice.MISSING_SOURCE_PATH,
+                    source_type=DependencyType.WORKSPACE_FILE.value,
+                    source_path="path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -38,8 +38,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_type=Advice.MISSING_SOURCE_TYPE,
-                    source_path=Advice.MISSING_SOURCE_PATH,
+                    source_type=DependencyType.WORKSPACE_FILE.value,
+                    source_path="path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -55,8 +55,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_type=Advice.MISSING_SOURCE_TYPE,
-                    source_path=Advice.MISSING_SOURCE_PATH,
+                    source_type=DependencyType.WORKSPACE_FILE.value,
+                    source_path="path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -71,8 +71,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_type=Advice.MISSING_SOURCE_TYPE,
-                    source_path=Advice.MISSING_SOURCE_PATH,
+                    source_type=DependencyType.WORKSPACE_FILE.value,
+                    source_path="path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -86,8 +86,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_type=Advice.MISSING_SOURCE_TYPE,
-                    source_path=Advice.MISSING_SOURCE_PATH,
+                    source_type=DependencyType.WORKSPACE_FILE.value,
+                    source_path="path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -101,8 +101,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 Deprecation(
                     code='dependency-check',
                     message='Use of dependency s3fs.subpackage is deprecated',
-                    source_type=Advice.MISSING_SOURCE_TYPE,
-                    source_path=Advice.MISSING_SOURCE_PATH,
+                    source_type=DependencyType.WORKSPACE_FILE.value,
+                    source_path="path",
                     start_line=0,
                     start_col=0,
                     end_line=0,
@@ -135,8 +135,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
             Deprecation(
                 code='dependency-check',
                 message='Use of dependency s3fs is deprecated',
-                source_type=Advice.MISSING_SOURCE_TYPE,
-                source_path=Advice.MISSING_SOURCE_PATH,
+                source_type=DependencyType.WORKSPACE_FILE.value,
+                source_path="leaf9",
                 start_line=0,
                 start_col=0,
                 end_line=0,

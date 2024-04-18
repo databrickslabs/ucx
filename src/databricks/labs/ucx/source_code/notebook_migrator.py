@@ -32,7 +32,7 @@ class NotebookMigrator:
             raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
         dependency = self._resolver.resolve_object_info(object_info, advice_collector)
         assert dependency is not None
-        graph = DependencyGraph(dependency, None, self._resolver)
+        graph = DependencyGraph(dependency, None, self._resolver, advice_collector)
         container = dependency.load()
         if container is not None:
             container.build_dependency_graph(graph)
