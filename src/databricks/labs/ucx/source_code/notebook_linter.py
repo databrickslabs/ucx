@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
 from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.notebook import Notebook, WorkspaceNotebook
 from databricks.labs.ucx.source_code.languages import Languages, Language
 
 
@@ -17,7 +17,7 @@ class NotebookLinter:
 
     @classmethod
     def from_source(cls, langs: Languages, source: str, default_language: Language) -> 'NotebookLinter':
-        notebook = Notebook.parse("", source, default_language)
+        notebook = WorkspaceNotebook.parse("", source, default_language)
         assert notebook is not None
         return cls(langs, notebook)
 
