@@ -217,7 +217,7 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
                     )
                 ]
             )
-        if self.is_aws:
+        if self.workspace_client.config.is_aws:
             self.with_aws_storage_permissions(
                 [
                     AWSRoleAction(
