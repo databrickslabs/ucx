@@ -478,7 +478,6 @@ class TestInstallationContext(TestRuntimeContext):
         self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
-        self._product_info = ProductInfo.for_testing(WorkspaceConfig)
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
@@ -562,7 +561,7 @@ class TestInstallationContext(TestRuntimeContext):
 
     @cached_property
     def product_info(self):
-        return self._product_info
+        return ProductInfo.for_testing(WorkspaceConfig)
 
     @cached_property
     def tasks(self):
@@ -648,13 +647,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_acc_group,
         make_user,
     )
-    yield ctx.replace(
-        workspace_client=ws,
-        sql_backend=sql_backend,
-        extend_prompts={
-            r".*We have identified one or more cluster.*": "no",
-        },
-    )
+    yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
 
 
