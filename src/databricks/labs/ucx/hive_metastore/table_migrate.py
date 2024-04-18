@@ -11,8 +11,9 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
-from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore import TablesCrawler, Mounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -45,6 +46,7 @@ class TablesMigrator:
         group_manager: GroupManager,
         migration_status_refresher: 'MigrationStatusRefresher',
         principal_grants: PrincipalACL,
+        mounts_crawler: Mounts
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -55,6 +57,7 @@ class TablesMigrator:
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
+        self._mounts_crawler = mounts_crawler
 
     def index(self):
         # TODO: remove this method
@@ -73,6 +76,7 @@ class TablesMigrator:
         all_migrated_groups = None if acl_strategy is None else self._group.snapshot()
         all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
         self._init_seen_tables()
+        mounts = self._mounts_crawler.snapshot()
         if what == What.VIEW:
             return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
         return self._migrate_tables(
@@ -81,7 +85,8 @@ class TablesMigrator:
             all_grants_to_migrate,
             all_migrated_groups,
             all_principal_grants,
-            hiveserde_in_place_migrate,
+            mounts,
+            hiveserde_in_place_migrate
         )
 
     def _migrate_tables(
@@ -91,6 +96,7 @@ class TablesMigrator:
         all_grants_to_migrate,
         all_migrated_groups,
         all_principal_grants,
+        mounts: Iterable[Mount],
         hiveserde_in_place_migrate: str | None = None,
     ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
@@ -100,7 +106,7 @@ class TablesMigrator:
             grants = self._compute_grants(
                 table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
             )
-            tasks.append(partial(self._migrate_table, table, grants, hiveserde_in_place_migrate))
+            tasks.append(partial(self._migrate_table, table, mounts, grants, hiveserde_in_place_migrate))
         Threads.strict("migrate tables", tasks)
         # the below is useful for testing
         return tasks
@@ -144,6 +150,7 @@ class TablesMigrator:
     def _migrate_table(
         self,
         src_table: TableToMigrate,
+        mounts: Iterable[Mount],
         grants: list[Grant] | None = None,
         hiveserde_in_place_migrate: str | None = None,
     ):
@@ -158,7 +165,7 @@ class TablesMigrator:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_HIVESERDE:
             return self._migrate_external_table_hiveserde(
-                src_table.src, src_table.rule, grants, hiveserde_in_place_migrate
+                src_table.src, src_table.rule, mounts, grants, hiveserde_in_place_migrate
             )
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
@@ -218,6 +225,7 @@ class TablesMigrator:
         self,
         src_table: Table,
         rule: Rule,
+        mounts: Iterable[Mount],
         grants: list[Grant] | None = None,
         hiveserde_in_place_migrate: str | None = None,
     ):
@@ -225,8 +233,12 @@ class TablesMigrator:
             # TODO: Add sql_migrate_external_hiveserde_ctas here
             return False
 
+        dst_table_location = None
+        if src_table.is_dbfs_mnt:
+            dst_table_location = ExternalLocations.resolve_mount(src_table.location, mounts)
+
         table_migrate_sql = src_table.sql_migrate_external_hiveserde_in_place(
-            rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_in_place_migrate
+            rule.catalog_name, rule.dst_schema, rule.dst_table, self._backend, hiveserde_in_place_migrate, dst_table_location
         )
         if not table_migrate_sql:
             logger.warning(

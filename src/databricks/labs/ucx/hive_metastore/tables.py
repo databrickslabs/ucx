@@ -8,6 +8,7 @@ from functools import partial
 
 import sqlglot
 from sqlglot.expressions import Table as SQLTable
+from sqlglot.expressions import LocationProperty
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -122,6 +123,15 @@ class Table:
         return False
 
     @property
+    def is_dbfs_mnt(self) -> bool:
+        if not self.location:
+            return False
+        for dbfs_mnt_prefix in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+            if self.location.startswith(dbfs_mnt_prefix):
+                return True
+        return False
+
+    @property
     def is_format_supported_for_sync(self) -> bool:
         if self.table_format is None:
             return False
@@ -174,7 +184,7 @@ class Table:
         )
 
     def sql_migrate_external_hiveserde_in_place(
-        self, catalog_name, dst_schema, dst_table, backend: SqlBackend, hiveserde_in_place_migrate: str
+        self, catalog_name, dst_schema, dst_table, backend: SqlBackend, hiveserde_in_place_migrate: str, uc_table_location: str | None=None
     ) -> str | None:
         # extract hive serde info, ideally this should be done by table crawler.
         # But doing here to avoid breaking change to the `tables` table in the inventory schema.
@@ -197,7 +207,7 @@ class Table:
                 hiveserde_in_place_migrate, describe["Serde Library"], describe["InputFormat"], describe["OutputFormat"]
             )
         ):
-            return self._ddl_show_create_table(backend, catalog_name, dst_schema, dst_table)
+            return self._ddl_show_create_table(backend, catalog_name, dst_schema, dst_table, uc_table_location)
 
         # "TEXTFILE" hiveserde needs extra handling on preparing the DDL
         # TODO: add support for "TEXTFILE" hiveserde
@@ -232,7 +242,7 @@ class Table:
             and output_format == "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
         )
 
-    def _ddl_show_create_table(self, backend: SqlBackend, catalog_name, dst_schema, dst_table) -> str:
+    def _ddl_show_create_table(self, backend: SqlBackend, catalog_name, dst_schema, dst_table, replace_location) -> str:
         # get raw DDL from "SHOW CREATE TABLE..."
         createtab_stmt = next(backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(self.key)}"))["createtab_stmt"]
         # parse the DDL and replace the old table name with the new UC table name
@@ -243,6 +253,11 @@ class Table:
             for old_table in statement.find_all(SQLTable):
                 new_table = SQLTable(catalog=catalog_name, db=dst_schema, this=dst_table)
                 old_table.replace(new_table)
+            if replace_location:
+                # replace dbfs mnt in ddl if any
+                for mnt_loc in statement.find_all(LocationProperty):
+                    new_loc = LocationProperty(this=f"'{replace_location}'")
+                    mnt_loc.replace(new_loc)
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)
         new_createtab_stmt = '; '.join(new_statements)
