@@ -91,7 +91,7 @@ class FromDbfsFolder(Linter):
         return 'dbfs-query'
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code, dialect='databricks'):
+        for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue
             for table in statement.find_all(Table):

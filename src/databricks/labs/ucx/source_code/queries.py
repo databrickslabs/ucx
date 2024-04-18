@@ -10,33 +10,58 @@ logger = logging.getLogger(__name__)
 
 
 class FromTable(Linter, Fixer):
-    def __init__(self, index: MigrationIndex, *, use_schema: str | None = None):
+    """Linter and Fixer for table migrations in SQL queries.
+
+    This class is responsible for identifying and fixing table migrations in
+    SQL queries.
+    """
+
+    def __init__(self, index: MigrationIndex, *, schema: str | None = None):
+        """
+        Initializes the FromTable class.
+
+        Args:
+            index: The migration index, which is a mapping of source tables to destination tables.
+            schema (str or None): The schema that the tables belong to by default, which defaults to `None`.
+
+        We need to be careful with the nomenclature here. For instance when parsing a table reference,
+        sqlglot uses `db` instead of `schema` to refer to the schema. The following table references
+        show how sqlglot represents them:::
+
+                catalog.schema.table    -> Table(catalog='catalog', db='schema', this='table')
+                schema.table                 -> Table(catalog='', db='schema', this='table')
+                table                               -> Table(catalog='', db='', this='table')
+        """
         self._index = index
-        self._use_schema = use_schema
+        self._schema = schema
 
     def name(self) -> str:
         return 'table-migrate'
 
     @property
     def schema(self):
-        return self._use_schema
+        return self._schema
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code, dialect='databricks'):
+        for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue
-            if isinstance(statement, Use):
-                table = statement.this
-                db_name = table.this.this
-                self._use_schema = db_name
-                continue
-
             for table in statement.find_all(Table):
-                src_db = table.db if table.db else self._use_schema
-                if not src_db:
+                if isinstance(statement, Use):
+                    # Sqlglot captures the database name in the Use statement as a Table, with
+                    # the schema  as the table name.
+                    self._schema = table.name
+                    continue
+
+                # we only migrate tables in the hive_metastore catalog
+                if self._catalog(table) != 'hive_metastore':
+                    continue
+                # Sqlglot uses db instead of schema, watch out for that
+                src_schema = table.db if table.db else self._schema
+                if not src_schema:
                     logger.error(f"Could not determine schema for table {table.name}")
                     continue
-                dst = self._index.get(src_db, table.name)
+                dst = self._index.get(src_schema, table.name)
                 if not dst:
                     continue
                 yield Deprecation(
@@ -49,10 +74,11 @@ class FromTable(Linter, Fixer):
                     end_col=1024,
                 )
 
-    def _catalog(self, table):
+    @staticmethod
+    def _catalog(table):
         if table.catalog:
             return table.catalog
-        return self._use_schema if self._use_schema else 'hive_metastore'
+        return 'hive_metastore'
 
     def apply(self, code: str) -> str:
         new_statements = []
@@ -61,27 +87,29 @@ class FromTable(Linter, Fixer):
                 continue
             if isinstance(statement, Use):
                 table = statement.this
-                db_name = table.this.this
-                self._use_schema = db_name
+                self._schema = table.name
                 new_statements.append(statement.sql('databricks'))
                 continue
             for old_table in self._dependent_tables(statement):
-                src_db = old_table.db if old_table.db else self._use_schema
-                if not src_db:
+                src_schema = old_table.db if old_table.db else self._schema
+                if not src_schema:
                     logger.error(f"Could not determine schema for table {old_table.name}")
                     continue
-                dst = self._index.get(src_db, old_table.name)
+                dst = self._index.get(src_schema, old_table.name)
                 if not dst:
                     continue
                 new_table = Table(catalog=dst.dst_catalog, db=dst.dst_schema, this=dst.dst_table)
                 old_table.replace(new_table)
             new_sql = statement.sql('databricks')
             new_statements.append(new_sql)
-        # TODO: Should the return preserve newlines?
         return '; '.join(new_statements)
 
-    def _dependent_tables(self, statement: Expression):
+    @classmethod
+    def _dependent_tables(cls, statement: Expression):
         dependencies = []
         for old_table in statement.find_all(Table):
+            catalog = cls._catalog(old_table)
+            if catalog != 'hive_metastore':
+                continue
             dependencies.append(old_table)
         return dependencies
