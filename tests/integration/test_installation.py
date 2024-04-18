@@ -2,7 +2,6 @@ import json
 import logging
 import os.path
 import sys
-import time
 from dataclasses import replace
 from datetime import timedelta
 
@@ -156,8 +155,6 @@ def test_job_cluster_policy(ws, installation_ctx):
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, installation_ctx):
-    timeout_in_seconds, seconds_inbetween_tries = 60, 5
-
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
@@ -169,18 +166,11 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
-    # It takes a moment to delete the group through the API
-    start_time = time.time()
-    while time.time() - start_time < timeout_in_seconds:
-        try:
-            ws.groups.get(ws_group_a.id)
-        except NotFound:
-            assert True, "Group removed"
-            break
-        else:
-            time.sleep(seconds_inbetween_tries)
-    else:
-        assert False, "Group not removed"
+    @retried(on=[NotFound], timeout=timedelta(seconds=60))
+    def wait():
+        ws.groups.get(ws_group_a.id)
+
+    wait()
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
