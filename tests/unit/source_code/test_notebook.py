@@ -133,7 +133,7 @@ def test_notebook_builds_leaf_dependency_graph():
     )
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
     dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON), lambda advice: None
     )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -154,7 +154,7 @@ def test_notebook_builds_depth1_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
     dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON), lambda advice: None
     )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -171,7 +171,7 @@ def test_notebook_builds_depth2_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
     dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON), lambda advice: None
     )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -189,7 +189,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
     dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON), lambda advice: None
     )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -207,7 +207,7 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
     dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON), lambda advice: None
     )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -224,12 +224,10 @@ def test_notebook_builds_python_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(ws, whitelist_mock(), site_packages_mock())
     dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON), lambda advice: None
     )
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
-
-

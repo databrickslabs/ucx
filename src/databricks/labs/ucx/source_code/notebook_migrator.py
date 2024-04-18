@@ -1,6 +1,9 @@
+from collections.abc import Callable
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
+from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
@@ -20,12 +23,14 @@ class NotebookMigrator:
         self._languages = languages
         self._resolver = resolver or DependencyResolver(ws)
 
-    def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
+    def build_dependency_graph(
+        self, object_info: ObjectInfo, advice_collector: Callable[[Advice], None]
+    ) -> DependencyGraph:
         if not object_info.path or not object_info.object_type:
             raise ValueError(f"Not a valid source of code: {object_info.path}")
         if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
             raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
-        dependency = self._resolver.resolve_object_info(object_info)
+        dependency = self._resolver.resolve_object_info(object_info, advice_collector)
         assert dependency is not None
         graph = DependencyGraph(dependency, None, self._resolver)
         container = dependency.load()
@@ -41,10 +46,10 @@ class NotebookMigrator:
             self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
         return True
 
-    def apply(self, object_info: ObjectInfo) -> bool:
+    def apply(self, object_info: ObjectInfo, advice_collector: Callable[[Advice], None]) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        dependency = self._resolver.resolve_object_info(object_info)
+        dependency = self._resolver.resolve_object_info(object_info, advice_collector)
         assert dependency is not None
         container = dependency.load()
         assert isinstance(container, Notebook)

@@ -123,8 +123,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     resolver = DependencyResolver(ws, whitelist, sps)
     migrator = NotebookMigrator(ws, empty_index, resolver)
     object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
-    migrator.build_dependency_graph(object_info)
-    advices = list(resolver.get_advices())
+    advices: list[Advice] = []
+    migrator.build_dependency_graph(object_info, advices.append)
     assert advices == expected
 
 
@@ -163,6 +163,6 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
     resolver = DependencyResolver(ws, whitelist, sps)
     migrator = NotebookMigrator(ws, empty_index, resolver)
     object_info = ObjectInfo(path="root9.py.txt", object_type=ObjectType.FILE)
-    migrator.build_dependency_graph(object_info)
-    advices = list(resolver.get_advices())
+    advices: list[Advice] = []
+    migrator.build_dependency_graph(object_info, advices.append)
     assert advices == expected

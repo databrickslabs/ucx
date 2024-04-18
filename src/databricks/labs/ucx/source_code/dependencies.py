@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import ast
 import typing
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from enum import Enum
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
@@ -216,9 +216,10 @@ class DependencyResolver:
         self._workspace_loader = WorkspaceLoader(ws)
         self._whitelist = Whitelist() if whitelist is None else whitelist
         self._site_packages = site_packages
-        self._advices: list[Advice] = []
 
-    def resolve_object_info(self, object_info: ObjectInfo) -> ResolvedDependency | None:
+    def resolve_object_info(
+        self, object_info: ObjectInfo, advice_collector: Callable[[Advice], None]
+    ) -> ResolvedDependency | None:
         assert object_info.path is not None
         if object_info.object_type is None:
             raise ValueError(f"Invalid ObjectInfo (missing 'object_type'): {object_info}")
@@ -230,14 +231,16 @@ class DependencyResolver:
             return None
         raise NotImplementedError(str(object_info.object_type))
 
-    def resolve_dependency(self, dependency: Dependency) -> ResolvedDependency | None:
+    def resolve_dependency(
+        self, dependency: Dependency, advice_collector: Callable[[Advice], None]
+    ) -> ResolvedDependency | None:
         if isinstance(dependency, ResolvedDependency):
             return dependency
         compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is not None:
             if compatibility == UCCompatibility.NONE:
-                self._advices.append(
+                advice_collector(
                     Deprecation(
                         code="dependency-check",
                         message=f"Use of dependency {dependency.path} is deprecated",
@@ -256,11 +259,8 @@ class DependencyResolver:
         if self._workspace_loader is not None:
             object_info = self._workspace_loader.get_object_info(dependency.path)
             if object_info is not None:
-                return self.resolve_object_info(object_info)
+                return self.resolve_object_info(object_info, advice_collector)
         return None
-
-    def get_advices(self) -> Iterable[Advice]:
-        yield from self._advices
 
 
 class DependencyGraph:
@@ -270,11 +270,13 @@ class DependencyGraph:
         dependency: Dependency,
         parent: DependencyGraph | None,
         resolver: DependencyResolver | None = None,
+        advice_collector: Callable[[Advice], None] = lambda advice: None,
     ):
         self._dependency = dependency
         self._parent = parent
         self._resolver = resolver or DependencyResolver()
         self._dependencies: dict[Dependency, DependencyGraph] = {}
+        self._advice_collector = advice_collector
 
     @property
     def resolver(self) -> DependencyResolver:
@@ -288,8 +290,12 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
+    @property
+    def advice_collector(self):
+        return self._advice_collector
+
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_dependency(dependency)
+        resolved = self._resolver.resolve_dependency(dependency, self._advice_collector)
         if resolved is None:
             return None
         # already registered ?
@@ -368,7 +374,7 @@ def build_python_source_dependency_graph(
         if isinstance(path, ast.Constant):
             path = path.value.strip().strip("'").strip('"')
             object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-            dependency = parent.resolver.resolve_object_info(object_info)
+            dependency = parent.resolver.resolve_object_info(object_info, parent.advice_collector)
             if dependency is not None:
                 parent.register_dependency(dependency)
             else:

@@ -20,7 +20,7 @@ def test_apply_invalid_object_fails():
     whi = whitelist_mock()
     migrator = NotebookMigrator(ws, languages, DependencyResolver(ws, whi, sps))
     object_info = ObjectInfo(language=Language.PYTHON)
-    assert not migrator.apply(object_info)
+    assert not migrator.apply(object_info, lambda advice: None)
 
 
 def test_revert_invalid_object_fails():
@@ -61,7 +61,7 @@ def test_apply_returns_false_when_language_not_supported():
     resolver.resolve_object_info.return_value = dependency
     migrator = NotebookMigrator(ws, languages, resolver)
     object_info = ObjectInfo(path='path', language=Language.R, object_type=ObjectType.NOTEBOOK)
-    result = migrator.apply(object_info)
+    result = migrator.apply(object_info, lambda advice: None)
     assert not result
 
 
@@ -80,7 +80,7 @@ def test_apply_returns_false_when_no_fixes_applied():
     resolver.resolve_object_info.return_value = dependency
     migrator = NotebookMigrator(ws, languages, resolver)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
-    assert not migrator.apply(object_info)
+    assert not migrator.apply(object_info, lambda advice: None)
 
 
 def test_apply_returns_true_and_changes_code_when_fixes_applied():
@@ -102,6 +102,6 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
     resolver.resolve_object_info.return_value = dependency
     migrator = NotebookMigrator(ws, languages, resolver)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
-    assert migrator.apply(object_info)
+    assert migrator.apply(object_info, lambda advice: None)
     ws.workspace.upload.assert_any_call('path.bak', original_code.encode("utf-8"))
     ws.workspace.upload.assert_any_call('path', migrated_code.encode("utf-8"))
