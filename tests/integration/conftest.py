@@ -648,9 +648,13 @@ def installation_ctx(  # pylint: disable=too-many-arguments
         make_acc_group,
         make_user,
     )
-    yield ctx.replace(workspace_client=ws,
-                      sql_backend=sql_backend,
-                      extend_prompts={r".*We have identified one or more cluster.*": "no",})
+    yield ctx.replace(
+        workspace_client=ws,
+        sql_backend=sql_backend,
+        extend_prompts={
+            r".*We have identified one or more cluster.*": "no",
+        },
+    )
     ctx.workspace_installation.uninstall()
 
 
