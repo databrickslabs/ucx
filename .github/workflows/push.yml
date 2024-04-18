@@ -60,8 +60,13 @@ jobs:
       - name: Install hatch
         run: pip install hatch==$HATCH_VERSION
 
-      - name: Verify linting
-        run: hatch run verify
+      - name: Reformat code
+        run: make fmt
+
+      - name: Fail on differences
+        run: |
+          # Exit with status code 1 if there are differences (i.e. unformatted files)
+          git diff --exit-code
 
   no-lint-disabled:
     runs-on: ubuntu-latest
