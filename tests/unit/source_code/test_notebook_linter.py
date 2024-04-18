@@ -2,7 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
@@ -35,8 +35,8 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: dbfs:/mnt/whatever',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=4,
                     start_col=0,
                     end_line=4,
@@ -45,8 +45,8 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/things/e/f/g',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=14,
                     start_col=23,
                     end_line=14,
@@ -90,8 +90,8 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/things/e/f/g',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=5,
                     start_col=23,
                     end_line=5,
@@ -100,8 +100,8 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: dbfs:/mnt/foo',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=8,
                     start_col=0,
                     end_line=8,
@@ -110,8 +110,8 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=20,
                     start_col=0,
                     end_line=20,
@@ -168,8 +168,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Advisory(
                     code='dbfs-usage',
                     message='Possible deprecated file system path: dbfs:/...',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=7,
                     start_col=7,
                     end_line=7,
@@ -178,8 +178,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Advisory(
                     code='dbfs-usage',
                     message='Possible deprecated file system path: /dbfs/mnt',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=8,
                     start_col=7,
                     end_line=8,
@@ -188,8 +188,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Advisory(
                     code='dbfs-usage',
                     message='Possible deprecated file system path: /mnt/',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=9,
                     start_col=7,
                     end_line=9,
@@ -198,8 +198,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Advisory(
                     code='dbfs-usage',
                     message='Possible deprecated file system path: dbfs:/...',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=10,
                     start_col=7,
                     end_line=10,
@@ -208,8 +208,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /dbfs/mnt/data',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=11,
                     start_col=10,
                     end_line=11,
@@ -218,8 +218,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /dbfs/mnt/data',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=13,
                     start_col=10,
                     end_line=13,
@@ -228,8 +228,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/foo/bar',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=15,
                     start_col=19,
                     end_line=15,
@@ -238,8 +238,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: dbfs:/mnt/foo/bar',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=16,
                     start_col=19,
                     end_line=16,
@@ -248,8 +248,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: dbfs://mnt/foo/bar',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=17,
                     start_col=19,
                     end_line=17,
@@ -258,8 +258,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: dbfs:/...',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=21,
                     start_col=0,
                     end_line=21,
@@ -268,8 +268,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: /mnt/...',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=26,
                     start_col=0,
                     end_line=26,
@@ -278,8 +278,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: /a/b/c',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=30,
                     start_col=0,
                     end_line=30,
@@ -288,8 +288,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: /...',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=34,
                     start_col=0,
                     end_line=34,
@@ -298,8 +298,8 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 Deprecation(
                     code='dbfs-query',
                     message='The use of DBFS is deprecated: /dbfs/...',
-                    location_type="<MISSING TYPE>",
-                    location_path="<MISSING LOCATION>",
+                    location_type=Advice.MISSING_TYPE,
+                    location_path=Advice.MISSING_PATH,
                     start_line=38,
                     start_col=0,
                     end_line=38,

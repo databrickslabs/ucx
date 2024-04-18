@@ -4,7 +4,7 @@ import re
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType
 
-from databricks.labs.ucx.source_code.base import Advisory
+from databricks.labs.ucx.source_code.base import Advisory, Advice
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
@@ -228,8 +228,8 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
         Advisory(
             code='dbutils-notebook-run-dynamic',
             message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            location_type="<MISSING TYPE>",
-            location_path="<MISSING LOCATION>",
+            location_type=Advice.MISSING_TYPE,
+            location_path=Advice.MISSING_PATH,
             start_line=14,
             start_col=13,
             end_line=14,
@@ -246,8 +246,8 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
         Advisory(
             code='dbutils-notebook-run-literal',
             message="Call to 'dbutils.notebook.run' will be migrated automatically",
-            location_type="<MISSING TYPE>",
-            location_path="<MISSING LOCATION>",
+            location_type=Advice.MISSING_TYPE,
+            location_path=Advice.MISSING_PATH,
             start_line=2,
             start_col=0,
             end_line=2,

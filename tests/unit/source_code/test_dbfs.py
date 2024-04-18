@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
 from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter, FromDbfsFolder
 
 
@@ -90,8 +90,8 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
         Deprecation(
             code='dbfs-query',
             message=f'The use of DBFS is deprecated: {table}',
-            location_type="<MISSING TYPE>",
-            location_path="<MISSING LOCATION>",
+            location_type=Advice.MISSING_TYPE,
+            location_path=Advice.MISSING_PATH,
             start_line=0,
             start_col=0,
             end_line=0,

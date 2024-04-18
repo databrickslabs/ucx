@@ -121,8 +121,8 @@ class DependencyResolver:
                     Deprecation(
                         code="dependency-check",
                         message=f"Use of dependency {dependency.path} is deprecated",
-                        location_type="<MISSING TYPE>",
-                        location_path="<MISSING LOCATION>",
+                        location_type=Advice.MISSING_TYPE,
+                        location_path=Advice.MISSING_PATH,
                         start_line=0,
                         start_col=0,
                         end_line=0,
