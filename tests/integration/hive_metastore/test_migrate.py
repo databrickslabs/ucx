@@ -144,14 +144,9 @@ def test_migrate_external_table(
     runtime_ctx,
     make_catalog,
     make_mounted_location,
-    make_dbfs_data_copy,
 ):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
-    # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
-    # external table migration tests
-    existing_mounted_location, new_mounted_location = make_mounted_location
-    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
-    src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=new_mounted_location)
+    src_external_table = runtime_ctx.make_table(schema_name=src_schema.name, external_csv=make_mounted_location)
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
     logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_external_table.full_name}")
@@ -426,12 +421,12 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
 
 
 @pytest.fixture
-def prepared_principal_acl(runtime_ctx, env_or_skip, make_dbfs_data_copy, make_catalog, make_schema):
+def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make_catalog, make_schema):
     src_schema = make_schema(catalog_name="hive_metastore")
     src_external_table = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name,
         schema_name=src_schema.name,
-        external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c',
+        external_csv=make_mounted_location,
     )
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
