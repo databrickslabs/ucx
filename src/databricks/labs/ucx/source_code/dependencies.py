@@ -275,10 +275,6 @@ class DependencyGraph:
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
-    def resolver(self) -> DependencyResolver:
-        return self._resolver
-
-    @property
     def dependency(self):
         return self._dependency
 
@@ -363,7 +359,7 @@ class DependencyGraph:
             if isinstance(path, ast.Constant):
                 path = path.value.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = self.resolver.resolve_object_info(object_info)
+                dependency = self._resolver.resolve_object_info(object_info)
                 if dependency is not None:
                     self.register_dependency(dependency)
                 else:
@@ -372,3 +368,6 @@ class DependencyGraph:
         names = PythonLinter.list_import_sources(linter)
         for name in names:
             register_dependency(name)
+
+    def resolve_object_info(self, object_info: ObjectInfo):
+        return self._resolver.resolve_object_info(object_info)

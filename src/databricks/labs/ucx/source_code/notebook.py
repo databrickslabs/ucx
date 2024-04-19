@@ -161,7 +161,7 @@ class RunCell(Cell):
                 path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
                 object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = parent.resolver.resolve_object_info(object_info)
+                dependency = parent.resolve_object_info(object_info)
                 if dependency is not None:
                     parent.register_dependency(dependency)
                 else:
