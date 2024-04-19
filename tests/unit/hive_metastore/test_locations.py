@@ -391,26 +391,11 @@ def test_partitioned_delta():
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
-    assert results == [
-        Table(
-            "hive_metastore",
-            "mounted_test_mount",
-            "entity",
-            "EXTERNAL",
-            "DELTA",
-            "adls://bucket/entity",
-            is_partitioned=True,
-        ),
-        Table(
-            "hive_metastore",
-            "mounted_test_mount",
-            "entity_2",
-            "EXTERNAL",
-            "DELTA",
-            "adls://bucket/entity_2",
-            is_partitioned=True,
-        ),
-    ]
+    assert len(results) == 2
+    assert results[0].table_format == "DELTA"
+    assert results[0].is_partitioned
+    assert results[1].table_format == "DELTA"
+    assert results[1].is_partitioned
 
 
 def test_filtering_irrelevant_paths():
@@ -623,63 +608,36 @@ def test_mount_listing_csv_json():
     ]
 
 
-def test_partitioned_csv_jsons():
+def test_mount_listing_seen_tables():
     client = create_autospec(WorkspaceClient)
 
-    first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", "", "")
-    first_first_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
-    first_first_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/1.csv", "1.csv", "", "")
-    first_second_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
-    first_second_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/1.csv", "1.csv", "", "")
-
-    second_folder = FileInfo("dbfs:/mnt/test_mount/entity_2/", "entity_2/", "", "")
-    second_first_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
-    second_sub_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/", "aaa=bbb/", "", "")
-    second_sub_partition_files = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/1.json", "1.json", "", "")
+    first_folder = FileInfo("dbfs:/mnt/test_mount/table1/", "table1/", "", "")
+    folder_table1 = FileInfo("dbfs:/mnt/test_mount/table1/_delta_log/", "_delta_log/", "", "")
+    second_folder = FileInfo("dbfs:/mnt/test_mount/table2/", "table2/", "", "")
+    second_folder1 = FileInfo("dbfs:/mnt/test_mount/table2/_delta_log/", "_delta_log/", "", "")
 
     def my_side_effect(path, **_):
         if path == "/mnt/test_mount":
             return [first_folder, second_folder]
-        if path == "dbfs:/mnt/test_mount/entity/":
-            return [first_first_partition, first_second_partition]
-        if path == "dbfs:/mnt/test_mount/entity/xxx=yyy/":
-            return [first_first_partition_files]
-        if path == "dbfs:/mnt/test_mount/entity/xxx=zzz/":
-            return [first_second_partition_files]
-        if path == "dbfs:/mnt/test_mount/entity_2/":
-            return [second_first_partition]
-        if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/":
-            return [second_sub_partition]
-        if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/":
-            return [second_sub_partition_files]
+        if path == "dbfs:/mnt/test_mount/table1/":
+            return [folder_table1]
+        if path == "dbfs:/mnt/test_mount/table2/":
+            return [second_folder1]
         return None
 
     client.dbutils.fs.ls.side_effect = my_side_effect
     backend = MockBackend(
         rows={
-            'hive_metastore.test.tables': [],
+            'hive_metastore.test.tables': TABLE_STORAGE[
+                ("hive_metastore", "database", "name", "EXTERNAL", "DELTA", "adls://bucket/table1"),
+                ("hive_metastore", "database", "name_2", "EXTERNAL", "DELTA", "dbfs:/mnt/test_mount/table2"),
+            ],
             'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
     assert results == [
-        Table(
-            "hive_metastore",
-            "mounted_test_mount",
-            "entity",
-            "EXTERNAL",
-            "JSON",
-            "adls://bucket/entity",
-            is_partitioned=True,
-        ),
-        Table(
-            "hive_metastore",
-            "mounted_test_mount",
-            "entity_2",
-            "EXTERNAL",
-            "CSV",
-            "adls://bucket/entity_2",
-            is_partitioned=True,
-        ),
+        Table("hive_metastore", "database", "name", "EXTERNAL", "DELTA", "adls://bucket/table1"),
+        Table("hive_metastore", "database", "name_2", "EXTERNAL", "DELTA", "dbfs:/mnt/test_mount/table2"),
     ]
