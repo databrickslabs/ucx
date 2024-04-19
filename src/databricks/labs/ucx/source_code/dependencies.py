@@ -77,6 +77,9 @@ class LocalLoader(DependencyLoader):
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         raise NotImplementedError()
 
+    def is_file(self, path: str) -> bool:
+        raise NotImplementedError()
+
 
 class WorkspaceLoader(DependencyLoader):
 
@@ -192,11 +195,13 @@ class DependencyResolver:
                     )
                 )
             return None
+        if self._local_loader.is_file(dependency.path):
+            return LocalFileDependency(self._local_loader, dependency.path)
         if self._workspace_loader is not None:
             object_info = self._workspace_loader.get_object_info(dependency.path)
             if object_info is not None:
                 return self.resolve_object_info(object_info)
-        return None
+        raise ValueError(f"Could not locate {dependency.path}")
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices

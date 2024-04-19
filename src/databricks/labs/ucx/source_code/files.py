@@ -5,7 +5,12 @@ from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyGraph, UnresolvedDependency
+from databricks.labs.ucx.source_code.dependencies import (
+    SourceContainer,
+    DependencyGraph,
+    UnresolvedDependency,
+    DependencyResolver,
+)
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
@@ -40,9 +45,19 @@ class LocalFile(SourceContainer):
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(self, languages: Languages):
+    def __init__(self, languages: Languages, resolver: DependencyResolver):
         self._languages = languages
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+        self._resolver = resolver
+
+    def build_dependency_graph(self, path: Path) -> DependencyGraph:
+        dependency = self._resolver.resolve_dependency(UnresolvedDependency(str(path)))
+        assert dependency is not None
+        graph = DependencyGraph(dependency, None, self._resolver)
+        container = dependency.load()
+        if container is not None:
+            container.build_dependency_graph(graph)
+        return graph
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
