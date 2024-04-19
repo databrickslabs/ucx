@@ -84,6 +84,20 @@ class WorkspaceFileDependency(ResolvedDependency):
         return DependencyType.WORKSPACE_FILE
 
 
+class LocalNotebookDependency(ResolvedDependency):
+
+    @property
+    def type(self) -> DependencyType:
+        return DependencyType.LOCAL_NOTEBOOK
+
+
+class LocalFileDependency(ResolvedDependency):
+
+    @property
+    def type(self) -> DependencyType:
+        return DependencyType.LOCAL_FILE
+
+
 class PackageDependency(ResolvedDependency):
 
     def __init__(self, package: SitePackage):
