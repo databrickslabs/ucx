@@ -40,7 +40,7 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute, jobs
-from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState, BaseRun
+from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from databricks.sdk.service.workspace import ObjectType
 
 import databricks
@@ -176,16 +176,13 @@ class DeployedWorkflows:
             )
         return latest_status
 
-    def validate_step(self, step: str, skip_tasks=None) -> bool:
-        if skip_tasks is None:
-            skip_tasks = []
+    def validate_step(self, step: str) -> bool:
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
-            if self._check_success_with_failures(run, skip_tasks):
+            if run.state and run.state.result_state == RunResultState.SUCCESS:
                 return True
-
         for run in current_runs:
             if (
                 run.run_id
@@ -197,24 +194,6 @@ class DeployedWorkflows:
                 run_new_state = self._ws.jobs.get_run(run_id=run.run_id).state
                 return run_new_state is not None and run_new_state.result_state == RunResultState.SUCCESS
         return False
-
-    @staticmethod
-    def _check_success_with_failures(run: BaseRun, skip_tasks):
-        """Check if the run is successful, or it is successful with expected tasks failed."""
-        if run.state is None:
-            return False
-        if run.state.result_state == RunResultState.SUCCESS:
-            return True
-        if run.state.result_state != RunResultState.SUCCESS_WITH_FAILURES:
-            return False
-        if run.tasks is None:
-            return False
-        for task in run.tasks:
-            if task.task_key in skip_tasks:
-                continue
-            if task.state and task.state.result_state != jobs.RunResultState.SUCCESS:
-                return False
-        return True
 
     def relay_logs(self, workflow: str | None = None):
         latest_run = None
