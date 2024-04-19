@@ -2,13 +2,18 @@ from unittest.mock import create_autospec
 import re
 
 import pytest
-from databricks.sdk.service.workspace import Language, ObjectType
+from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
+from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advisory
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyGraph,
+    SourceContainer,
+    DependencyResolver,
+)
 from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
-from tests.unit import _load_sources
+from tests.unit import _load_sources, _download_side_effect, whitelist_mock
 
 # fmt: off
 # the following samples are real samples from https://github.com/databricks-industry-solutions
@@ -120,40 +125,41 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
         assert cell.is_runnable()
 
 
-def mock_dependency_loader(paths: list[str], sources: list[str], languages: list[Language]) -> DependencyLoader:
-    def load_dependency_side_effect(*args):
-        dependency = args[0]
-        local_path = dependency.path[2:] if dependency.path.startswith('./') else dependency.path
-        index = paths.index(local_path)
-        if index < 0:
-            raise ValueError(f"Can't locate: {dependency.path}")
-        return Notebook.parse(paths[index], sources[index], languages[index])
-
-    loader = create_autospec(DependencyLoader)
-    loader.load_dependency.side_effect = load_dependency_side_effect
-    return loader
-
-
 def test_notebook_builds_leaf_dependency_graph():
     paths = ["leaf1.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.return_value = ObjectInfo(
+        object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
+    )
+    resolver = DependencyResolver(whitelist_mock(), ws)
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
+    graph = DependencyGraph(dependency, None, resolver)
+    container = dependency.load()
     container.build_dependency_graph(graph)
     assert graph.paths == {"leaf1.py.txt"}
 
 
+def get_status_side_effect(*args):
+    path = args[0]
+    return ObjectInfo(path=path, object_type=ObjectType.NOTEBOOK, language=Language.PYTHON)
+
+
 def test_notebook_builds_depth1_dependency_graph():
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.side_effect = get_status_side_effect
+    resolver = DependencyResolver(whitelist_mock(), ws)
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
+    graph = DependencyGraph(dependency, None, resolver)
+    container = dependency.load()
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
@@ -161,12 +167,16 @@ def test_notebook_builds_depth1_dependency_graph():
 
 def test_notebook_builds_depth2_dependency_graph():
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.side_effect = get_status_side_effect
+    resolver = DependencyResolver(whitelist_mock(), ws)
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
+    graph = DependencyGraph(dependency, None, resolver)
+    container = dependency.load()
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
@@ -174,21 +184,17 @@ def test_notebook_builds_depth2_dependency_graph():
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    old_load_dependency_side_effect = loader.load_dependency.side_effect
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    visited: list[str] = []
-
-    def load_dependency_side_effect(*args):
-        dep = args[0]
-        visited.append(dep.path)
-        return old_load_dependency_side_effect(*args)
-
-    loader.load_dependency.side_effect = load_dependency_side_effect
-    container = loader.load_dependency(dependency)
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    visited = {}
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
+    ws.workspace.get_status.side_effect = get_status_side_effect
+    resolver = DependencyResolver(whitelist_mock(), ws)
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
+    graph = DependencyGraph(dependency, None, resolver)
+    container = dependency.load()
     container.build_dependency_graph(graph)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
@@ -197,11 +203,16 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
 def test_notebook_builds_cyclical_dependency_graph():
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
     sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.side_effect = get_status_side_effect
+    resolver = DependencyResolver(whitelist_mock(), ws)
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
+    graph = DependencyGraph(dependency, None, resolver)
+    container = dependency.load()
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)
@@ -209,12 +220,16 @@ def test_notebook_builds_cyclical_dependency_graph():
 
 def test_notebook_builds_python_dependency_graph():
     paths = ["root4.py.txt", "leaf3.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.side_effect = get_status_side_effect
+    resolver = DependencyResolver(whitelist_mock(), ws)
+    dependency = resolver.resolve_object_info(
+        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
+    )
+    graph = DependencyGraph(dependency, None, resolver)
+    container = dependency.load()
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
     assert actual == set(paths)

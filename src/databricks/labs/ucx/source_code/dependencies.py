@@ -1,30 +1,22 @@
 from __future__ import annotations
 
 import abc
+import ast
+import typing
 from collections.abc import Callable, Iterable
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
-class Dependency:
+class Dependency(abc.ABC):
 
-    @staticmethod
-    def from_object_info(object_info: ObjectInfo):
-        assert object_info.object_type is not None
-        assert object_info.path is not None
-        return Dependency(object_info.object_type, object_info.path)
-
-    def __init__(self, object_type: ObjectType | None, path: str):
-        self._type = object_type
+    def __init__(self, path: str):
         self._path = path
-
-    @property
-    def type(self) -> ObjectType | None:
-        return self._type
 
     @property
     def path(self) -> str:
@@ -34,33 +26,77 @@ class Dependency:
         return hash(self.path)
 
     def __eq__(self, other):
-        return isinstance(other, Dependency) and self.path == other.path
+        return isinstance(other, type(self)) and self.path == other.path
+
+
+class UnresolvedDependency(Dependency):
+    pass
+
+
+class ResolvedDependency(Dependency, abc.ABC):
+
+    def __init__(self, loader: DependencyLoader, path: str):
+        super().__init__(path)
+        self._loader = loader
+
+    def load(self) -> SourceContainer | None:
+        return self._loader.load_dependency(self)
+
+
+class LocalFileDependency(ResolvedDependency):
+    pass
+
+
+class NotebookDependency(ResolvedDependency, abc.ABC):
+    pass
+
+
+class WorkspaceNotebookDependency(NotebookDependency):
+    pass
+
+
+class LocalNotebookDependency(NotebookDependency):
+    pass
 
 
 class SourceContainer(abc.ABC):
 
-    @property
     @abc.abstractmethod
-    def object_type(self) -> ObjectType:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def build_dependency_graph(self, graph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
         raise NotImplementedError()
 
 
-class DependencyLoader:
+class DependencyLoader(abc.ABC):
+
+    @abc.abstractmethod
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        raise NotImplementedError()
+
+
+class LocalLoader(DependencyLoader):
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        raise NotImplementedError()
+
+
+class WorkspaceLoader(DependencyLoader):
 
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
+
+    def get_object_info(self, path: str):
+        return self._ws.workspace.get_status(path)
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
-        if object_info.object_type is ObjectType.FILE:
-            return self._load_file(object_info)
-        if object_info.object_type in [ObjectType.LIBRARY, ObjectType.DIRECTORY, ObjectType.DASHBOARD, ObjectType.REPO]:
+        if object_info.object_type in [
+            ObjectType.FILE,
+            ObjectType.LIBRARY,
+            ObjectType.DIRECTORY,
+            ObjectType.DASHBOARD,
+            ObjectType.REPO,
+        ]:
             return None
         raise NotImplementedError(str(object_info.object_type))
 
@@ -69,9 +105,9 @@ class DependencyLoader:
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         if object_info is None or object_info.object_type is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if dependency.type is not None and object_info.object_type is not dependency.type:
+        if object_info.object_type not in [ObjectType.FILE, ObjectType.NOTEBOOK]:
             raise ValueError(
-                f"Invalid object at '{dependency.path}', expected a {str(dependency.type)}, got a {str(object_info.object_type)}"
+                f"Invalid object at '{dependency.path}', expected a {ObjectType.NOTEBOOK.name} or {ObjectType.FILE.name}, got a {str(object_info.object_type)}"
             )
         return object_info
 
@@ -88,7 +124,7 @@ class DependencyLoader:
     def _load_file(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid cyclic dependency
         # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.files import WorkspaceFile
+        from databricks.labs.ucx.source_code.files import LocalFile
 
         assert object_info.path is not None
         # TODO https://github.com/databrickslabs/ucx/issues/1363
@@ -96,7 +132,7 @@ class DependencyLoader:
         # which is safe since Python is the only language supported as of writing
         language = Language.PYTHON if object_info.language is None else object_info.language
         source = self._load_source(object_info)
-        return WorkspaceFile(object_info.path, source, language)
+        return LocalFile(object_info.path, source, language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
         if not object_info.path:
@@ -106,12 +142,37 @@ class DependencyLoader:
 
 
 class DependencyResolver:
-    def __init__(self, whitelist: Whitelist | None = None):
+    def __init__(
+        self,
+        whitelist: Whitelist,
+        ws: WorkspaceClient | None,
+    ):
+        assert ws is not None  # TODO until we support local notebooks
         self._whitelist = Whitelist() if whitelist is None else whitelist
+        self._local_loader = LocalLoader()
+        self._workspace_loader = WorkspaceLoader(ws)
         self._advices: list[Advice] = []
 
-    def resolve(self, dependency: Dependency) -> Dependency | None:
-        if dependency.type == ObjectType.NOTEBOOK:
+    def resolve_object_info(self, object_info: ObjectInfo) -> ResolvedDependency | None:
+        assert object_info.path is not None
+        if object_info.object_type is None:
+            raise ValueError(f"Invalid ObjectInfo (missing 'object_type'): {object_info}")
+        if object_info.object_type is ObjectType.NOTEBOOK:
+            return WorkspaceNotebookDependency(self._workspace_loader, object_info.path)
+        if object_info.object_type is ObjectType.FILE:
+            return LocalFileDependency(self._local_loader, object_info.path)
+        if object_info.object_type in [
+            ObjectType.FILE,
+            ObjectType.LIBRARY,
+            ObjectType.REPO,
+            ObjectType.DASHBOARD,
+            ObjectType.DIRECTORY,
+        ]:
+            return None
+        raise NotImplementedError(str(object_info.object_type))
+
+    def resolve_dependency(self, dependency: Dependency) -> ResolvedDependency | None:
+        if isinstance(dependency, ResolvedDependency):
             return dependency
         compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
@@ -128,7 +189,11 @@ class DependencyResolver:
                     )
                 )
             return None
-        return dependency
+        if self._workspace_loader is not None:
+            object_info = self._workspace_loader.get_object_info(dependency.path)
+            if object_info is not None:
+                return self.resolve_object_info(object_info)
+        return None
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
@@ -140,13 +205,11 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        loader: DependencyLoader,
-        resolver: DependencyResolver | None = None,
+        resolver: DependencyResolver,
     ):
         self._dependency = dependency
         self._parent = parent
-        self._loader = loader
-        self._resolver = resolver or DependencyResolver()
+        self._resolver = resolver
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
@@ -158,7 +221,7 @@ class DependencyGraph:
         return self._dependency.path
 
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
-        resolved = self._resolver.resolve(dependency)
+        resolved = self._resolver.resolve_dependency(dependency)
         if resolved is None:
             return None
         # already registered ?
@@ -167,18 +230,20 @@ class DependencyGraph:
             self._dependencies[resolved] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(resolved, self, self._loader, self._resolver)
+        child_graph = DependencyGraph(resolved, self, self._resolver)
         self._dependencies[resolved] = child_graph
-        container = self._loader.load_dependency(resolved)
+        container = resolved.load()
         if not container:
             return None
         container.build_dependency_graph(child_graph)
         return child_graph
 
     def locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
+        return self.locate_dependency_with_path(dependency.path)
+
+    def locate_dependency_with_path(self, path: str) -> DependencyGraph | None:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
-        path = dependency.path
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         path = path[2:] if path.startswith('./') else path
 
@@ -222,3 +287,25 @@ class DependencyGraph:
             if dependency.visit(visit_node):
                 return True
         return False
+
+    def build_graph_from_python_source(self, python_code: str, register_dependency: Callable[[str], typing.Any]):
+        linter = ASTLinter.parse(python_code)
+        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        for call in calls:
+            assert isinstance(call, ast.Call)
+            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+            if isinstance(path, ast.Constant):
+                path = path.value.strip().strip("'").strip('"')
+                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
+                dependency = self._resolver.resolve_object_info(object_info)
+                if dependency is not None:
+                    self.register_dependency(dependency)
+                else:
+                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
+        names = PythonLinter.list_import_sources(linter)
+        for name in names:
+            register_dependency(name)
+
+    def resolve_object_info(self, object_info: ObjectInfo):
+        return self._resolver.resolve_object_info(object_info)

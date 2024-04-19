@@ -5,8 +5,6 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
-    Dependency,
-    DependencyLoader,
     DependencyResolver,
 )
 
@@ -16,12 +14,10 @@ class NotebookMigrator:
         self,
         ws: WorkspaceClient,
         languages: Languages,
-        loader: DependencyLoader,
-        resolver: DependencyResolver | None = None,
+        resolver: DependencyResolver,
     ):
         self._ws = ws
         self._languages = languages
-        self._loader = loader
         self._resolver = resolver
 
     def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
@@ -29,9 +25,10 @@ class NotebookMigrator:
             raise ValueError(f"Not a valid source of code: {object_info.path}")
         if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
             raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
-        dependency = Dependency.from_object_info(object_info)
-        graph = DependencyGraph(dependency, None, self._loader, self._resolver)
-        container = self._loader.load_dependency(dependency)
+        dependency = self._resolver.resolve_object_info(object_info)
+        assert dependency is not None
+        graph = DependencyGraph(dependency, None, self._resolver)
+        container = dependency.load()
         if container is not None:
             container.build_dependency_graph(graph)
         return graph
@@ -47,9 +44,11 @@ class NotebookMigrator:
     def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        notebook = self._loader.load_dependency(Dependency.from_object_info(object_info))
-        assert isinstance(notebook, Notebook)
-        return self._apply(notebook)
+        dependency = self._resolver.resolve_object_info(object_info)
+        assert dependency is not None
+        container = dependency.load()
+        assert isinstance(container, Notebook)
+        return self._apply(container)
 
     def _apply(self, notebook: Notebook) -> bool:
         changed = False

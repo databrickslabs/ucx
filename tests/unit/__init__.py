@@ -17,6 +17,7 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.dependencies import SourceContainer
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -178,3 +179,9 @@ def table_mapping_mock(tables: list[str] | None = None):
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = _id_list(TableToMigrate, tables)
     return table_mapping
+
+
+def whitelist_mock():
+    wls = create_autospec(Whitelist)
+    wls.compatibility.return_value = None
+    return wls
