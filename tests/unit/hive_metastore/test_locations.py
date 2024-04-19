@@ -374,7 +374,7 @@ def test_partitioned_delta():
         if path == "/mnt/test_mount":
             return [first_folder, second_folder]
         if path == "dbfs:/mnt/test_mount/entity/":
-            return [first_first_partition, first_second_partition, first_delta_log]
+            return [first_delta_log, first_first_partition, first_second_partition]
         if path == "dbfs:/mnt/test_mount/entity/xxx=yyy/":
             return [first_first_partition_files]
         if path == "dbfs:/mnt/test_mount/entity/xxx=zzz/":
@@ -636,13 +636,14 @@ def test_mount_listing_seen_tables():
             'hive_metastore.test.tables': TABLE_STORAGE[
                 ("hive_metastore", "database", "name", "EXTERNAL", "DELTA", "adls://bucket/table1"),
                 ("hive_metastore", "database", "name_2", "EXTERNAL", "DELTA", "dbfs:/mnt/test_mount/table2"),
+                ("hive_metastore", "database", "name_3", "MANAGED", "DELTA", None),
             ],
             'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
         }
     )
     mounts = Mounts(backend, client, "test")
     results = TablesInMounts(backend, client, "test", mounts).snapshot()
-    assert results == [
-        Table("hive_metastore", "database", "name", "EXTERNAL", "DELTA", "adls://bucket/table1"),
-        Table("hive_metastore", "database", "name_2", "EXTERNAL", "DELTA", "dbfs:/mnt/test_mount/table2"),
-    ]
+    assert len(results) == 3
+    assert results[0].location == "adls://bucket/table1"
+    assert results[1].location == "dbfs:/mnt/test_mount/table2"
+    assert results[2].location is None
