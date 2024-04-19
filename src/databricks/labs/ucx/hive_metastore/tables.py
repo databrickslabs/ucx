@@ -261,19 +261,15 @@ class TablesCrawler(CrawlerBase):
                 table_rows = self._fetch(
                     f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
                 )
+                for _, table, _is_tmp in table_rows:
+                    tasks.append(partial(self._describe, catalog, database, table))
             except NotFound:
-                # TODO: https://github.com/databrickslabs/ucx/issues/406
                 # This make the integration test more robust as many test schemas are being created and deleted quickly.
                 # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend raises NotFound
-                logger.error(
-                    f"Schema {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)} is no longer existed"
-                )
+                logger.warning(f"Schema {catalog}.{database} no longer existed")
                 continue
-            for _, table, _is_tmp in table_rows:
-                tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
@@ -312,7 +308,10 @@ class TablesCrawler(CrawlerBase):
                 ),  # type: ignore[arg-type]
                 is_partitioned="# Partition Information" in describe,
             )
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
+            return None
         except Exception as e:  # pylint: disable=broad-exception-caught
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None

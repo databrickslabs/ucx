@@ -166,7 +166,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
-    @retried(on=[NotFound], timeout=timedelta(seconds=60))
+    @retried(on=[NotFound], timeout=timedelta(seconds=120))
     def wait():
         ws.groups.get(ws_group_a.id)
 

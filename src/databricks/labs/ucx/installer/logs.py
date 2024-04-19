@@ -192,7 +192,7 @@ class TaskRunWarningRecorder:
                 continue
             # This error comes up during testing, when ucx crawls tables & schemas created by other tests,
             # but couldn't fetch the grants later as they have already been dropped by those tests. Ignore them
-            errors_in_test = ["Couldn't fetch grants", "Couldn't find permission"]
+            errors_in_test = ["Couldn't fetch grants"]
             if any(error in message for error in errors_in_test) and self._is_testing():
                 continue
             error_messages.append(message)
