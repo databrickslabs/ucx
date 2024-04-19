@@ -93,21 +93,15 @@ class ClusterPolicyInstaller:
             "spark_version": self._policy_config(latest_lts_dbr),
             "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
         }
-        if instance_pool_id:
-            policy_definition["instance_pool_id"] = self._policy_config(instance_pool_id)
-            # 'node_type_id' cannot be supplied when an instance pool ID is provided
-            policy_definition.pop("node_type_id")
-            # 'availability' cannot be supplied when an instance pool ID is provided
-            policy_definition.pop("aws_attributes.availability", "")
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
+        # set the availability to on demand
         if self._ws.config.is_aws:
             if instance_profile:
                 policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-            if not instance_pool_id:
-                policy_definition["aws_attributes.availability"] = self._policy_config(
-                    compute.AwsAvailability.ON_DEMAND.value
-                )
+            policy_definition["aws_attributes.availability"] = self._policy_config(
+                compute.AwsAvailability.ON_DEMAND.value
+            )
         elif self._ws.config.is_azure:
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
@@ -116,6 +110,14 @@ class ClusterPolicyInstaller:
             policy_definition["gcp_attributes.availability"] = self._policy_config(
                 compute.GcpAvailability.ON_DEMAND_GCP.value
             )
+        if instance_pool_id:
+            policy_definition["instance_pool_id"] = self._policy_config(instance_pool_id)
+            # 'node_type_id' cannot be supplied when an instance pool ID is provided
+            policy_definition.pop("node_type_id")
+            # 'availability' cannot be supplied when an instance pool ID is provided
+            policy_definition.pop("aws_attributes.availability", "")
+            policy_definition.pop("azure_attributes.availability", "")
+            policy_definition.pop("gcp_attributes.availability", "")
         return json.dumps(policy_definition)
 
     @staticmethod
