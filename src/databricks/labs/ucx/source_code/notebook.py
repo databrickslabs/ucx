@@ -243,6 +243,8 @@ class CellLanguage(Enum):
 
     @classmethod
     def of_language(cls, language: Language) -> CellLanguage:
+        # TODO: Should this not raise a ValueError if the language is not found?
+        #  It also  causes a GeneratorExit exception to be raised. Maybe an explicit loop is better.
         return next((cl for cl in CellLanguage if cl.language == language))
 
     @classmethod

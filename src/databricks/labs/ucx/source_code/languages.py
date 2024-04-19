@@ -44,7 +44,7 @@ class Languages:
                 return fixer
         return None
 
-    def apply_fixes(self, language: Language, code: str, schema: str | None) -> tuple[str, str]:
+    def apply_fixes(self, language: Language, code: str, schema: str) -> tuple[str, str]:
         linter = self.linter(language)
         for advice in linter.lint(code, schema):
             fixer = self.fixer(language, advice.code)

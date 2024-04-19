@@ -2,7 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, DEFAULT_SCHEMA
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
@@ -279,7 +279,7 @@ def test_notebook_linter(lang, source, expected):
     langs = Languages(index)
     linter = NotebookLinter.from_source(langs, source, lang)
     assert linter is not None
-    gathered = list(linter.lint())
+    gathered = list(linter.lint("", DEFAULT_SCHEMA))
     assert gathered == expected
 
 
@@ -288,3 +288,60 @@ def test_notebook_linter_name():
     source = """-- Databricks notebook source"""
     linter = NotebookLinter.from_source(langs, source, languages.Language.SQL)
     assert linter.name() == "notebook-linter"
+
+
+@pytest.mark.parametrize(
+    "lang, source, expected",
+    [
+        (
+            languages.Language.SQL,
+            """-- Databricks notebook source
+-- MAGIC %md
+-- MAGIC #Test notebook for DBFS discovery in Notebooks
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that changes the DB
+
+USE different_db
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables
+
+SELECT * FROM  testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that changes the DB to one we migrate from
+
+USE old
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables
+
+SELECT * FROM  testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A Python cell that uses calls to change the USE
+-- MAGIC %python
+-- MAGIC # This is a Python cell that uses calls to change the USE...
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references DBFS
+
+SELECT * FROM old.testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables 
+
+MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
+    """,
+            "old",
+        ),
+    ],
+)
+@pytest.mark.skip(reason="WIP - index not yet configured for test")
+def test_notebook_linter_tracks_use(lang, source, expected):
+    langs = Languages(index)
+    linter = NotebookLinter.from_source(langs, source, lang)
+    assert linter is not None
+    advices = list(linter.lint("", DEFAULT_SCHEMA))
+    assert advices == expected

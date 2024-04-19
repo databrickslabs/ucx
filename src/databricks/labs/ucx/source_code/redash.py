@@ -2,6 +2,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query
 
 from databricks.labs.ucx.source_code.base import Fixer
+from databricks.labs.ucx.source_code.base import DEFAULT_SCHEMA
 
 
 class Redash:
@@ -12,7 +13,7 @@ class Redash:
     def fix(self, query: Query):
         assert query.id is not None
         assert query.query is not None
-        query.query = self._fixer.apply(query.query)
+        query.query = self._fixer.apply(query.query, DEFAULT_SCHEMA)
         self._ws.queries.update(
             query.id,
             data_source_id=query.data_source_id,

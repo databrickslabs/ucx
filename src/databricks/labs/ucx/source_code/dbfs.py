@@ -4,7 +4,7 @@ from collections.abc import Iterable
 import sqlglot
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
+from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation, DEFAULT_SCHEMA
 
 
 class DetectDbfsVisitor(ast.NodeVisitor):
@@ -65,6 +65,11 @@ class DBFSUsageLinter(Linter):
     def __init__(self):
         pass
 
+    @property
+    def schema(self):
+        # This is a linter that does not need to know the schema
+        return DEFAULT_SCHEMA
+
     @staticmethod
     def name() -> str:
         """
@@ -85,6 +90,11 @@ class DBFSUsageLinter(Linter):
 class FromDbfsFolder(Linter):
     def __init__(self):
         self._dbfs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/", "/dbfs/", "/"]
+
+    @property
+    def schema(self):
+        # This is a linter that does not need to know the schema
+        return None
 
     @staticmethod
     def name() -> str:

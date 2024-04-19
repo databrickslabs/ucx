@@ -239,19 +239,19 @@ class LspServer:
         with file.open('r', encoding='utf8') as f:
             return f.read(), language
 
-    def lint(self, file_uri: str):
+    def lint(self, file_uri: str, schema: str):
         code, language = self._read(file_uri)
         analyser = self._languages.linter(language)
-        diagnostics = [Diagnostic.from_advice(_) for _ in analyser.lint(code)]
+        diagnostics = [Diagnostic.from_advice(_) for _ in analyser.lint(code, schema)]
         return AnalyseResponse(diagnostics)
 
-    def quickfix(self, file_uri: str, code_range: Range, diagnostic_code: str):
+    def quickfix(self, file_uri: str, code_range: Range, diagnostic_code: str, schema: str):
         code, language = self._read(file_uri)
         fixer = self._languages.fixer(language, diagnostic_code)
         if not fixer:
             return QuickFixResponse(code_actions=[])
         fragment = code_range.fragment(code)
-        apply = fixer.apply(fragment)
+        apply = fixer.apply(fragment, schema)
         return QuickFixResponse(
             code_actions=[
                 CodeAction(

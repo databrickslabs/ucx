@@ -69,11 +69,17 @@ class Convention(Advice):
     """A suggestion for a better way to write the code."""
 
 
+# The default schema to use when the schema is not specified in a table reference
+# See: https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-qry-select-usedb.html
+DEFAULT_SCHEMA = 'default'
+
+
 class Linter:
     @abstractmethod
-    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]: ...
+    def lint(self, code: str, schema: str) -> Iterable[Advice]: ...
 
     @property
+    @abstractmethod
     def schema(self):
         return None
 
@@ -83,17 +89,26 @@ class Fixer:
     def name(self) -> str: ...
 
     @abstractmethod
-    def apply(self, code: str, _: str | None = None) -> str: ...
+    def apply(self, code: str, schema: str) -> str: ...
 
     @property
     def schema(self):
+        # this is a controller of child linters, it does not need to know the schema
+        # as it does not pass the output of one linter on to the others.
         return None
 
 
 class SequentialLinter(Linter):
     def __init__(self, linters: list[Linter]):
+        self._schema = DEFAULT_SCHEMA
         self._linters = linters
 
-    def lint(self, code: str, _: str | None = None) -> Iterable[Advice]:
+    @property
+    def schema(self):
+        return self._schema
+
+    def lint(self, code: str, schema: str) -> Iterable[Advice]:
+        # records the initial schema for the linters
+        self._schema = schema
         for linter in self._linters:
-            yield from linter.lint(code)
+            yield from linter.lint(code, schema)
