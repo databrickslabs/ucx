@@ -362,6 +362,9 @@ def test_table_migration_job(
     for job_cluster in ws.jobs.get(
         ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
     ).settings.job_clusters:
+        if job_cluster.job_cluster_key != "table_migration":
+            # don't assert on the cluster for parse logs task
+            continue
         assert job_cluster.new_cluster.autoscale.min_workers == 2
         assert job_cluster.new_cluster.autoscale.max_workers == 20
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
