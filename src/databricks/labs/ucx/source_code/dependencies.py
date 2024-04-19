@@ -4,7 +4,6 @@ import abc
 import ast
 import typing
 from collections.abc import Callable, Iterable
-from enum import Enum
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
@@ -17,30 +16,10 @@ if typing.TYPE_CHECKING:
     from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
 
 
-class DependencyType(Enum):
-    WORKSPACE_NOTEBOOK = "WORKSPACE_NOTEBOOK"
-    WORKSPACE_FILE = "WORKSPACE_FILE"
-    LOCAL_NOTEBOOK = "LOCAL_NOTEBOOK"
-    LOCAL_FILE = "LOCAL_FILE"
-    PACKAGE = "PACKAGE"
-    PACKAGE_FILE = "PACKAGE_FILE"
-    UNRESOLVED = "UNRESOLVED"
-
-    @property
-    def object_type(self):
-        parts = self.value.split("_")
-        return ObjectType[parts[1]] if len(parts) > 1 else None
-
-
 class Dependency(abc.ABC):
 
     def __init__(self, path: str):
         self._path = path
-
-    @property
-    @abc.abstractmethod
-    def type(self) -> DependencyType:
-        raise NotImplementedError()
 
     @property
     def path(self) -> str:
@@ -54,10 +33,7 @@ class Dependency(abc.ABC):
 
 
 class UnresolvedDependency(Dependency):
-
-    @property
-    def type(self) -> DependencyType:
-        return DependencyType.UNRESOLVED
+    pass
 
 
 class ResolvedDependency(Dependency, abc.ABC):
@@ -70,32 +46,36 @@ class ResolvedDependency(Dependency, abc.ABC):
         return self._loader.load_dependency(self)
 
 
-class WorkspaceNotebookDependency(ResolvedDependency):
-
-    @property
-    def type(self) -> DependencyType:
-        return DependencyType.WORKSPACE_NOTEBOOK
+class WorkspaceDependency(ResolvedDependency, abc.ABC):
+    pass
 
 
-class WorkspaceFileDependency(ResolvedDependency):
-
-    @property
-    def type(self) -> DependencyType:
-        return DependencyType.WORKSPACE_FILE
+class LocalDependency(ResolvedDependency, abc.ABC):
+    pass
 
 
-class LocalNotebookDependency(ResolvedDependency):
-
-    @property
-    def type(self) -> DependencyType:
-        return DependencyType.LOCAL_NOTEBOOK
+class NotebookDependency(ResolvedDependency, abc.ABC):
+    pass
 
 
-class LocalFileDependency(ResolvedDependency):
+class FileDependency(ResolvedDependency, abc.ABC):
+    pass
 
-    @property
-    def type(self) -> DependencyType:
-        return DependencyType.LOCAL_FILE
+
+class WorkspaceNotebookDependency(WorkspaceDependency, NotebookDependency):
+    pass
+
+
+class WorkspaceFileDependency(WorkspaceDependency, FileDependency):
+    pass
+
+
+class LocalNotebookDependency(LocalDependency, NotebookDependency):
+    pass
+
+
+class LocalFileDependency(LocalDependency, FileDependency):
+    pass
 
 
 class PackageDependency(ResolvedDependency):
@@ -105,23 +85,15 @@ class PackageDependency(ResolvedDependency):
         super().__init__(PackageLoader(), package.top_levels[0])
         self._package = package
 
-    @property
-    def type(self):
-        return DependencyType.PACKAGE
-
     def load(self) -> SourceContainer:
         return self._package
 
 
-class PackageFileDependency(ResolvedDependency):
+class PackageFileDependency(LocalDependency, FileDependency):
 
     def __init__(self, package: SitePackage, path: str):
         super().__init__(PackageLoader(), path)
         self._package = package
-
-    @property
-    def type(self):
-        return DependencyType.PACKAGE_FILE
 
     def load(self) -> SourceContainer:
         # local import to avoid cyclic dependency
@@ -132,11 +104,6 @@ class PackageFileDependency(ResolvedDependency):
 
 
 class SourceContainer(abc.ABC):
-
-    @property
-    @abc.abstractmethod
-    def dependency_type(self) -> DependencyType:
-        raise NotImplementedError()
 
     @abc.abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> None:
@@ -173,9 +140,13 @@ class WorkspaceLoader(DependencyLoader):
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         if object_info is None or object_info.object_type is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if dependency.type is not None and dependency.type.object_type is not object_info.object_type:
+        if isinstance(dependency, FileDependency) and object_info.object_type is not ObjectType.FILE:
             raise ValueError(
-                f"Invalid object at '{dependency.path}', expected a {str(dependency.type)}, got a {str(object_info.object_type)}"
+                f"Invalid object at '{dependency.path}', expected a {ObjectType.FILE.name}, got a {str(object_info.object_type)}"
+            )
+        if isinstance(dependency, NotebookDependency) and object_info.object_type is not ObjectType.NOTEBOOK:
+            raise ValueError(
+                f"Invalid object at '{dependency.path}', expected a {ObjectType.NOTEBOOK.name}, got a {str(object_info.object_type)}"
             )
         return object_info
 
@@ -213,10 +184,10 @@ class PackageLoader(DependencyLoader):
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         # libraries have precedence over workspace objects
-        if dependency.type is DependencyType.PACKAGE_FILE:
+        if isinstance(dependency, PackageFileDependency):
             assert isinstance(dependency, PackageDependency)
             return dependency.load()
-        raise NotImplementedError(str(dependency.type))
+        raise NotImplementedError(type(dependency))
 
 
 class DependencyResolver:

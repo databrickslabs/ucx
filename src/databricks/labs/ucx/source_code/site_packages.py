@@ -4,7 +4,6 @@ from pathlib import Path
 
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
-    DependencyType,
     DependencyGraph,
     UnresolvedDependency,
     PackageFileDependency,
@@ -45,10 +44,6 @@ class SitePackage(SourceContainer):
     def top_levels(self) -> list[str]:
         return self._top_levels
 
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.PACKAGE
-
     def build_dependency_graph(self, parent: DependencyGraph) -> None:
         for module_path in self._module_paths:
             parent.register_dependency(PackageFileDependency(self, module_path))
@@ -72,10 +67,6 @@ class PackageFile(SourceContainer):
         self._package = package
         self._path = path
         self._source_code: str | None = None
-
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.PACKAGE_FILE
 
     def _load_source_code(self):
         if self._source_code is None:

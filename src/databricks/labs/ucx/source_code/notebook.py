@@ -13,7 +13,6 @@ from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     SourceContainer,
-    DependencyType,
     UnresolvedDependency,
 )
 
@@ -375,11 +374,6 @@ class Notebook(SourceContainer, abc.ABC):
         self._ends_with_lf = ends_with_lf
 
     @property
-    @abstractmethod
-    def dependency_type(self) -> DependencyType:
-        raise NotImplementedError()
-
-    @property
     def path(self) -> str:
         return self._path
 
@@ -419,17 +413,9 @@ class WorkspaceNotebook(Notebook):
     def parse(cls, path: str, source: str, default_language: Language) -> WorkspaceNotebook:
         return cls._parse(path, source, default_language, cls)
 
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.WORKSPACE_NOTEBOOK
-
 
 class LocalNotebook(Notebook):
 
     @classmethod
     def parse(cls, path: str, source: str, default_language: Language) -> WorkspaceNotebook:
         return cls._parse(path, source, default_language, cls)
-
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.LOCAL_NOTEBOOK

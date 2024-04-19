@@ -9,7 +9,6 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyGraph,
-    DependencyType,
     UnresolvedDependency,
 )
 from databricks.labs.ucx.source_code.languages import Languages
@@ -43,16 +42,11 @@ class SourceFile(SourceContainer, abc.ABC):
 
 
 class WorkspaceFile(SourceFile):
-
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.WORKSPACE_FILE
+    pass
 
 
 class LocalFile(SourceFile):
-    @property
-    def dependency_type(self) -> DependencyType:
-        return DependencyType.LOCAL_FILE
+    pass
 
 
 class LocalFileMigrator:
