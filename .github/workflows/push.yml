@@ -41,6 +41,8 @@ jobs:
 
       - name: Publish test coverage
         uses: codecov/codecov-action@v4
+        with:
+          use_oidc: true
 
   fmt:
     runs-on: ubuntu-latest
