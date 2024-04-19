@@ -17,11 +17,6 @@ on:
 env:
   HATCH_VERSION: 1.9.4
 
-permissions:
-  id-token: write
-  contents: read
-  pull-requests: write
-
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -47,7 +42,7 @@ jobs:
       - name: Publish test coverage
         uses: codecov/codecov-action@v4
         with:
-          use_oidc: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   fmt:
     runs-on: ubuntu-latest
