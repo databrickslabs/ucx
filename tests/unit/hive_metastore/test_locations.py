@@ -364,7 +364,8 @@ def test_partitioned_delta():
 
     second_folder = FileInfo("dbfs:/mnt/test_mount/entity_2/", "entity_2/", "", "")
     second_first_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
-    second_first_partition_files = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/1.parquet", "1.parquet", "", "")
+    second_second_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/", "aaa=bbb/", "", "")
+    second_second_partition_files = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/1.parquet", "1.parquet", "", "")
     second_delta_log = FileInfo("dbfs:/mnt/test_mount/entity_2/_delta_log/", "_delta_log/", "", "")
 
     def my_side_effect(path, **_):
@@ -377,9 +378,11 @@ def test_partitioned_delta():
         if path == "dbfs:/mnt/test_mount/entity/xxx=zzz/":
             return [first_second_partition_files]
         if path == "dbfs:/mnt/test_mount/entity_2/":
-            return [second_delta_log, second_first_partition]
+            return [second_first_partition, second_delta_log]
         if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/":
-            return [second_first_partition_files]
+            return [second_second_partition]
+        if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/":
+            return [second_second_partition_files]
         return None
 
     client.dbutils.fs.ls.side_effect = my_side_effect
