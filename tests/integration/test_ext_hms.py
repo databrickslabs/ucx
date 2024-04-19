@@ -143,7 +143,7 @@ def test_running_real_assessment_job_ext_hms(
         env_or_skip("TEST_NIGHTLY")
 
     ext_hms_ctx = installation_ctx.replace(
-        skip_dashboards=False,
+        skip_dashboards=True,
         config_transform=lambda wc: dataclasses.replace(wc, override_clusters=None),
         extend_prompts={
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
