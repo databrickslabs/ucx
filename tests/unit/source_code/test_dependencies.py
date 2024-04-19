@@ -241,34 +241,72 @@ def test_file_build_dependency_graph_throws_with_invalid_dependencies():
 
 
 def test_notebook_build_dependency_graph_ignores_builtin_dependencies():
-    paths = ["builtins.py.txt"]
+    paths = ["python_builtins.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.return_value = ObjectInfo(path="builtins.py.txt", object_type=ObjectType.FILE)
+    ws.workspace.get_status.return_value = ObjectInfo(path="python_builtins.py.txt", object_type=ObjectType.FILE)
     languages = create_autospec(Languages)
     whi = Whitelist()
     loader = create_autospec(LocalLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     migrator = NotebookMigrator(ws, languages, DependencyResolver(whi, loader, ws))
-    object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
+    object_info = ObjectInfo(path="python_builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
     assert not graph.locate_dependency_with_path("os")
     assert not graph.locate_dependency_with_path("path")
 
 
+def test_file_build_dependency_graph_ignores_builtin_dependencies():
+    paths = ["python_builtins.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    languages = create_autospec(Languages)
+    whi = Whitelist()
+
+    def is_file_side_effect(*args):
+        filename = args[0]
+        return filename in paths
+
+    loader = create_autospec(LocalLoader)
+    loader.is_file.side_effect = is_file_side_effect
+    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    migrator = LocalFileMigrator(languages, DependencyResolver(whi, loader, None))
+    graph = migrator.build_dependency_graph(Path("python_builtins.py.txt"))
+    assert not graph.locate_dependency_with_path("os")
+    assert not graph.locate_dependency_with_path("path")
+
+
 def test_notebook_build_dependency_graph_ignores_known_dependencies():
-    paths = ["builtins.py.txt"]
+    paths = ["python_builtins.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
     languages = create_autospec(Languages)
     whitelist = Whitelist.parse(datas[0])
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.return_value = ObjectInfo(path="builtins.py.txt", object_type=ObjectType.FILE)
+    ws.workspace.get_status.return_value = ObjectInfo(path="python_builtins.py.txt", object_type=ObjectType.FILE)
     loader = create_autospec(LocalLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     migrator = NotebookMigrator(ws, languages, DependencyResolver(whitelist, loader, ws))
-    object_info = ObjectInfo(path="builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
+    object_info = ObjectInfo(path="python_builtins.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)
     graph = migrator.build_dependency_graph(object_info)
+    assert not graph.locate_dependency_with_path("databricks")
+
+
+def test_file_build_dependency_graph_ignores_known_dependencies():
+    paths = ["python_builtins.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
+    languages = create_autospec(Languages)
+    whitelist = Whitelist.parse(datas[0])
+
+    def is_file_side_effect(*args):
+        filename = args[0]
+        return filename in paths
+
+    loader = create_autospec(LocalLoader)
+    loader.is_file.side_effect = is_file_side_effect
+    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    migrator = LocalFileMigrator(languages, DependencyResolver(whitelist, loader, None))
+    graph = migrator.build_dependency_graph(Path("python_builtins.py.txt"))
     assert not graph.locate_dependency_with_path("databricks")
