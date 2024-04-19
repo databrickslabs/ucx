@@ -143,9 +143,7 @@ def test_notebook_builds_leaf_dependency_graph():
     graph = DependencyGraph(dependency, None, loader)
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
-    # Note that dependencies should not include itself as it leads to
-    # infinite walks.
-    assert graph.paths == set()
+    assert graph.paths == {"leaf1.py.txt"}
 
 
 def test_notebook_builds_depth1_dependency_graph():
@@ -158,7 +156,7 @@ def test_notebook_builds_depth1_dependency_graph():
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    assert actual == set(paths[1:])
+    assert actual == set(paths)
 
 
 def test_notebook_builds_depth2_dependency_graph():
@@ -171,9 +169,7 @@ def test_notebook_builds_depth2_dependency_graph():
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    # Note that dependencies should not include itself as it leads to
-    # infinite walks.
-    assert actual == set(paths[1:])
+    assert actual == set(paths)
 
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates():
@@ -221,9 +217,7 @@ def test_notebook_builds_python_dependency_graph():
     container = loader.load_dependency(dependency)
     container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    # Note that dependencies should not include itself as it leads to
-    # infinite walks.
-    assert actual == set(paths[1:])
+    assert actual == set(paths)
 
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():

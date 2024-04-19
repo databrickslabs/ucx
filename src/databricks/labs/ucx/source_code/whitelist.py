@@ -72,13 +72,6 @@ class PipPackage(KnownPackage):
         return UCCompatibility.NONE
 
 
-@dataclass
-class IncompatiblePackage(KnownPackage):
-
-    def compatibility_of(self, name: str) -> UCCompatibility:
-        return UCCompatibility.NONE
-
-
 class Whitelist:
     @classmethod
     def parse(cls, data: str):
@@ -98,7 +91,6 @@ class Whitelist:
             PythonBuiltinPackage(Identifier(**{"name": name, "version": python_version}), name)
             for name in sys.stdlib_module_names
         ]
-        known_packages.extend(IncompatiblePackage(Identifier(**{"name": name}), name) for name in ("s3fs",))
         if pips is not None:
             known_packages.extend(pips)
         self._known_packages: dict[str, list[KnownPackage]] = {}

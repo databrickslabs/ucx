@@ -13,3 +13,17 @@ packages:
     compatibility: full
     failures:
       - some failure 1
+---
+identifier:
+  name: s3fs
+  # all versions are incompatible
+top_level: s3fs
+packages:
+  - name: s3fs
+    compatibility: none
+    failures:
+      - the use of s3fs is deprecated
+  - name: s3fs.core
+    compatibility: none
+    failures:
+      - deprecated
