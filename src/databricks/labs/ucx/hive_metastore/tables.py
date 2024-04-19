@@ -81,6 +81,9 @@ class Table:
     def __hash__(self):
         return hash(self.key)
 
+    def __eq__(self, other):
+        return isinstance(other, Table) and self.key == other.key
+
     @property
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
