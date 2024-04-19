@@ -56,6 +56,8 @@ def test_migrate_managed_tables(ws, sql_backend, runtime_ctx, make_catalog):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_dbfs_non_delta_tables(ws, sql_backend, runtime_ctx, make_catalog):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(
         catalog_name=src_schema.catalog_name, non_delta=True, schema_name=src_schema.name
