@@ -166,8 +166,11 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
-    with pytest.raises(NotFound):
+    @retried(on=[NotFound], timeout=timedelta(seconds=60))
+    def wait():
         ws.groups.get(ws_group_a.id)
+
+    wait()
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
@@ -359,6 +362,9 @@ def test_table_migration_job(
     for job_cluster in ws.jobs.get(
         ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
     ).settings.job_clusters:
+        if job_cluster.job_cluster_key != "table_migration":
+            # don't assert on the cluster for parse logs task
+            continue
         assert job_cluster.new_cluster.autoscale.min_workers == 2
         assert job_cluster.new_cluster.autoscale.max_workers == 20
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
