@@ -17,6 +17,9 @@ on:
 env:
   HATCH_VERSION: 1.9.4
 
+permissions:
+  id-token: write
+
 jobs:
   ci:
     runs-on: ubuntu-latest
