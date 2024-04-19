@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 from unittest.mock import create_autospec
+from typing import BinaryIO
 
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
@@ -15,7 +16,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.dependencies import SourceContainer
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -88,7 +89,7 @@ _FOLDERS = {
     Policy: 'assessment/policies',
     TableToMigrate: 'hive_metastore/tables',
     EndpointConfPair: 'assessment/warehouses',
-    Notebook: 'source_code/notebooks',
+    SourceContainer: 'source_code/samples',
 }
 
 
@@ -129,6 +130,22 @@ def _pipeline(pipeline_id: str):
 def _secret_not_found(secret_scope, _):
     msg = f"Secret Scope {secret_scope} does not exist!"
     raise NotFound(msg)
+
+
+# can't remove **kwargs because it receives format=xxx
+# pylint: disable=unused-argument
+def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *args, **kwargs):
+    filename = args[0]
+    if filename.startswith('./'):
+        filename = filename[2:]
+    visited[filename] = True
+    if filename.find(".py") < 0:
+        filename = filename + ".py"
+    if filename.find(".txt") < 0:
+        filename = filename + ".txt"
+    result = create_autospec(BinaryIO)
+    result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
+    return result
 
 
 def workspace_client_mock(

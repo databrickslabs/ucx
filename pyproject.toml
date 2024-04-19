@@ -45,9 +45,10 @@ classifiers = [
 ]
 
 dependencies = ["databricks-sdk==0.24.0",
-                "databricks-labs-lsql~=0.3.0",
+                "databricks-labs-lsql>=0.3,<0.5",
                 "databricks-labs-blueprint~=0.4.3",
-                "PyYAML>=6.0.0,<7.0.0"]
+                "PyYAML>=6.0.0,<7.0.0",
+                "sqlglot>=23.9,<23.11"]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
@@ -66,6 +67,7 @@ dependencies = [
     "mypy~=1.9.0",
     "pylint~=3.1.0",
     "pylint-pytest==2.0.0a0",
+    "databricks-labs-pylint~=0.1.0",
     "pytest~=8.1.0",
     "pytest-cov~=4.1.0",
     "pytest-mock~=3.14.0",
@@ -211,7 +213,7 @@ ignore-patterns = ["^\\.#"]
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-init-hook='import sys; sys.path.append("tests/pylint")'
+#init-hook=''
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use, and will cap the count on Windows to
@@ -226,7 +228,7 @@ limit-inference-results = 100
 # List of plugins (as comma separated values of python module names) to load,
 # usually to register additional checkers.
 load-plugins = [
-    "testing",
+    "databricks.labs.pylint.mocking",
     "pylint_pytest",
     "pylint.extensions.bad_builtin",
     "pylint.extensions.broad_try_clause",
@@ -285,7 +287,7 @@ attr-naming-style = "snake_case"
 # Regular expression matching correct attribute names. Overrides attr-naming-
 # style. If left empty, attribute names will be checked with the set naming
 # style.
-attr-rgx = "[a-z_][a-z0-9_]{2,}$"
+attr-rgx = "[a-z_][a-z0-9_]{1,}$"
 
 # Bad variable names which should always be refused, separated by a comma.
 bad-names = ["foo", "bar", "baz", "toto", "tutu", "tata"]
@@ -300,7 +302,7 @@ class-attribute-naming-style = "any"
 # Regular expression matching correct class attribute names. Overrides class-
 # attribute-naming-style. If left empty, class attribute names will be checked
 # with the set naming style.
-class-attribute-rgx = "([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$"
+class-attribute-rgx = "([A-Za-z_][A-Za-z0-9_]{1,30}|(__.*__))$"
 
 # Naming style matching correct class constant names.
 class-const-naming-style = "UPPER_CASE"

@@ -20,6 +20,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
     AzureACL,
     GrantsCrawler,
     PrincipalACL,
+    AwsACL,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.table_migrate import (
@@ -103,6 +104,10 @@ class GlobalContext(abc.ABC):
         return self.connect_config.is_aws
 
     @cached_property
+    def is_gcp(self) -> bool:
+        return not self.is_aws and not self.is_azure
+
+    @cached_property
     def inventory_database(self) -> str:
         return self.config.inventory_database
 
@@ -135,7 +140,11 @@ class GlobalContext(abc.ABC):
             generic.Listing(generic.feature_tables_root_page, "object_id", "feature-tables"),
             self.workspace_listing,
         ]
-        return generic.GenericPermissionsSupport(self.workspace_client, acl_listing)
+        return generic.GenericPermissionsSupport(
+            self.workspace_client,
+            acl_listing,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def redash_permissions_support(self):
@@ -144,19 +153,28 @@ class GlobalContext(abc.ABC):
             redash.Listing(self.workspace_client.dashboards.list, sql.ObjectTypePlural.DASHBOARDS),
             redash.Listing(self.workspace_client.queries.list, sql.ObjectTypePlural.QUERIES),
         ]
-        return redash.RedashPermissionsSupport(self.workspace_client, acl_listing)
+        return redash.RedashPermissionsSupport(
+            self.workspace_client,
+            acl_listing,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def scim_entitlements_support(self):
-        return ScimSupport(self.workspace_client)
+        return ScimSupport(self.workspace_client, include_object_permissions=self.config.include_object_permissions)
 
     @cached_property
     def secret_scope_acl_support(self):
+        # Secret ACLs are not used much in tests, so skipping include_object_permissions
         return SecretScopesSupport(self.workspace_client)
 
     @cached_property
     def legacy_table_acl_support(self):
-        return TableAclSupport(self.grants_crawler, self.sql_backend)
+        return TableAclSupport(
+            self.grants_crawler,
+            self.sql_backend,
+            include_object_permissions=self.config.include_object_permissions,
+        )
 
     @cached_property
     def permission_manager(self):
@@ -238,17 +256,33 @@ class GlobalContext(abc.ABC):
         )
 
     @cached_property
+    def aws_acl(self):
+        return AwsACL(
+            self.workspace_client,
+            self.sql_backend,
+            self.installation,
+        )
+
+    @cached_property
+    def principal_locations(self):
+        eligible_locations = {}
+        if self.is_azure:
+            eligible_locations = self.azure_acl.get_eligible_locations_principals()
+        if self.is_aws:
+            eligible_locations = self.aws_acl.get_eligible_locations_principals()
+        if self.is_gcp:
+            raise NotImplementedError("Not implemented for GCP.")
+        return eligible_locations
+
+    @cached_property
     def principal_acl(self):
-        if not self.is_azure:
-            raise NotImplementedError("Azure only for now")
-        eligible = self.azure_acl.get_eligible_locations_principals()
         return PrincipalACL(
             self.workspace_client,
             self.sql_backend,
             self.installation,
             self.tables_crawler,
             self.mounts_crawler,
-            eligible,
+            self.principal_locations,
         )
 
     @cached_property

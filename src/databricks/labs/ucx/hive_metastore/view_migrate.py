@@ -1,33 +1,66 @@
+import logging
 from collections.abc import Collection
 from dataclasses import dataclass
+from functools import cached_property
+
+import sqlglot
+from sqlglot import ParseError, expressions
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
 from databricks.labs.ucx.source_code.queries import FromTable
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ViewToMigrate(TableToMigrate):
-    _table_dependencies: list[TableView] | None = None
-
     def __post_init__(self):
         if self.src.view_text is None:
             raise RuntimeError("Should never get there! A view must have 'view_text'!")
 
-    @property
+    @cached_property
     def dependencies(self) -> list[TableView]:
-        if self._table_dependencies is None:
-            self._table_dependencies = self._compute_dependencies()
-        # assert self._table_dependencies is not None
-        return self._table_dependencies
+        return list(self._view_dependencies())
 
-    def _compute_dependencies(self):
-        return list(FromTable.view_dependencies(self.src.view_text, use_schema=self.src.database))
+    def _view_dependencies(self):
+        try:
+            statements = sqlglot.parse(self.src.view_text, read='databricks')
+        except ParseError as e:
+            raise ValueError(f"Could not analyze view SQL: {self.src.view_text}") from e
+        if len(statements) != 1 or statements[0] is None:
+            raise ValueError(f"Could not analyze view SQL: {self.src.view_text}")
+        statement = statements[0]
+        for old_table in statement.find_all(expressions.Table):
+            if old_table.catalog and old_table.catalog != 'hive_metastore':
+                continue
+            src_db = old_table.db if old_table.db else self.src.database
+            if not src_db:
+                logger.error(f"Could not determine schema for table {old_table.name}")
+                continue
+            yield TableView("hive_metastore", src_db, old_table.name)
 
-    @staticmethod
-    def get_view_updated_text(src: str, index: MigrationIndex, schema: str):
-        from_table = FromTable(index, use_schema=schema)
-        return from_table.apply(src)
+    def sql_migrate_view(self, index: MigrationIndex) -> str:
+        from_table = FromTable(index, use_schema=self.src.database)
+        assert self.src.view_text is not None, 'Expected a view text'
+        migrated_select = from_table.apply(self.src.view_text)
+        statements = sqlglot.parse(migrated_select, read='databricks')
+        assert len(statements) == 1, 'Expected a single statement'
+        create = statements[0]
+        assert isinstance(create, expressions.Create), 'Expected a CREATE statement'
+        # safely replace current table name with the updated catalog
+        for table_name in create.find_all(expressions.Table):
+            if table_name.db == self.src.database and table_name.name == self.src.name:
+                # See https://github.com/tobymao/sqlglot/issues/3311
+                new_view_name = expressions.Table(
+                    catalog=self.rule.catalog_name,
+                    db=self.rule.dst_schema,
+                    this=self.rule.dst_table,
+                )
+                table_name.replace(new_view_name)
+        # safely replace CREATE with CREATE IF NOT EXISTS
+        create.args['exists'] = True
+        return create.sql('databricks')
 
     def __hash__(self):
         return hash(self.src)

@@ -14,6 +14,7 @@ from typing import BinaryIO
 
 import pytest
 from databricks.labs.lsql.backends import StatementExecutionBackend
+from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.core import DatabricksError
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -945,11 +946,16 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
         )
         return schema_info
 
-    yield from factory(
-        "schema",
-        create,
-        lambda schema_info: sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE"),
-    )
+    def remove(schema_info: SchemaInfo):
+        try:
+            sql_backend.execute(f"DROP SCHEMA IF EXISTS {schema_info.full_name} CASCADE")
+        except RuntimeError as e:
+            if "SCHEMA_NOT_FOUND" in str(e):
+                logger.warning("Schema was already dropped while executing the test", exc_info=e)
+            else:
+                raise e
+
+    yield from factory("schema", create, remove)
 
 
 @pytest.fixture
@@ -988,10 +994,14 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             # temporary (if not view)
             ddl = f"{ddl} AS {ctas}"
         elif non_delta:
-            table_type = TableType.MANAGED  # pylint: disable=redefined-variable-type
+            table_type = TableType.EXTERNAL  # pylint: disable=redefined-variable-type
             data_source_format = DataSourceFormat.JSON
-            storage_location = "dbfs:/databricks-datasets/iot-stream/data-device"
-            ddl = f"{ddl} USING json LOCATION '{storage_location}'"
+            storage_location = f"dbfs:/tmp/ucx_test_{make_random(4)}"
+            # Modified, otherwise it will identify the table as a DB Dataset
+            ddl = (
+                f"{ddl} USING json location '{storage_location}' as SELECT * FROM "
+                f"JSON.`dbfs:/databricks-datasets/iot-stream/data-device`"
+            )
         elif external_csv is not None:
             table_type = TableType.EXTERNAL
             data_source_format = DataSourceFormat.CSV
@@ -1185,12 +1195,31 @@ def make_feature_table(ws, make_random):
 
 
 @pytest.fixture
-def make_dbfs_data_copy(ws):
+def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
     def create(*, src_path: str, dst_path: str):
-        ws.dbfs.copy(src_path, dst_path, recursive=True)
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.copy(src_path, dst_path, recursive=True)
         return dst_path
 
     def remove(dst_path: str):
-        ws.dbfs.delete(dst_path, recursive=True)
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{dst_path}', recurse=True)")
+        else:
+            ws.dbfs.delete(dst_path, recursive=True)
 
     yield from factory("make_dbfs_data_copy", create, remove)
+
+
+@pytest.fixture
+def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
+    # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
+    # external table migration tests
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    return new_mounted_location

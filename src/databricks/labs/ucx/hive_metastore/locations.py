@@ -381,15 +381,24 @@ class TablesInMounts(CrawlerBase[Table]):
                 continue
 
             root_path = os.path.dirname(root_dir)
-            if self._path_is_delta(delta_log_folders, root_path):
-                if self._is_partitioned(file_info.name):
-                    logger.debug(f"Found partitioned delta {root_path}")
-                    delta_log_folders[root_path] = TableInMount(format="DELTA", is_partitioned=True)
-                    continue
-                logger.debug(f"Path {file_info.path} was identified as Delta, skipping")
+            previous_entry = delta_log_folders.get(root_path)
+            if previous_entry:
+                # Happens when first folder was _delta_log and next folders are partitioned folder
+                if (
+                    previous_entry.format == "DELTA"
+                    and self._is_partitioned(file_info.name)
+                    and not previous_entry.is_partitioned
+                ):
+                    delta_log_folders[root_path] = TableInMount(format=previous_entry.format, is_partitioned=True)
                 continue
 
-            table_in_mount = self._assess_path(file_info, delta_log_folders, root_path)
+            if self._is_partitioned(file_info.name):
+                table_in_mount = self._find_partition_file_format(file_info.path)
+                if table_in_mount:
+                    delta_log_folders[root_path] = table_in_mount
+                continue
+
+            table_in_mount = self._assess_path(file_info)
             if table_in_mount:
                 delta_log_folders[root_path] = table_in_mount
             else:
@@ -397,19 +406,21 @@ class TablesInMounts(CrawlerBase[Table]):
 
         return delta_log_folders
 
-    def _assess_path(
-        self, file_info: FileInfo, delta_log_folders: dict[str, Table], root_path: str
-    ) -> TableInMount | None:
-        # Depends of execution runtime, with SDK, dbutils.fs.list returns _delta_log, a cluster will return _delta_log/
-        if file_info.name in {"_delta_log/", "_delta_log"}:
-            logger.debug(f"Found delta table {root_path}")
-            if not delta_log_folders.get(root_path):
-                return TableInMount(format="DELTA", is_partitioned=False)
-            if delta_log_folders[root_path].is_partitioned:
-                return TableInMount(format="DELTA", is_partitioned=True)
-        if self._is_partitioned(file_info.name):
-            logger.debug(f"Found partitioned parquet {file_info.path}")
-            return TableInMount(format="PARQUET", is_partitioned=True)
+    def _find_partition_file_format(self, root_dir: str) -> TableInMount | None:
+        logger.info(f"Listing {root_dir}")
+        file_infos = self._dbutils.fs.ls(root_dir)
+        for file_info in file_infos:
+            path_extension = self._assess_path(file_info)
+            if path_extension:
+                return TableInMount(format=path_extension.format, is_partitioned=True)
+            if self._is_partitioned(file_info.name):
+                return self._find_partition_file_format(file_info.path)
+        return None
+
+    def _assess_path(self, file_info: FileInfo) -> TableInMount | None:
+        if file_info.name == "_delta_log/":
+            logger.debug(f"Found delta table {file_info.path}")
+            return TableInMount(format="DELTA", is_partitioned=False)
         if self._is_csv(file_info.name):
             logger.debug(f"Found csv {file_info.path}")
             return TableInMount(format="CSV", is_partitioned=False)
@@ -420,9 +431,6 @@ class TablesInMounts(CrawlerBase[Table]):
             logger.debug(f"Found parquet {file_info.path}")
             return TableInMount(format="PARQUET", is_partitioned=False)
         return None
-
-    def _path_is_delta(self, delta_log_folders, path: str) -> bool:
-        return delta_log_folders.get(path) and delta_log_folders.get(path).format == "DELTA"
 
     def _is_partitioned(self, file_name: str) -> bool:
         return '=' in file_name

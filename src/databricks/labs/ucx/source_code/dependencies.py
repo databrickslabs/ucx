@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import abc
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
+
+from databricks.labs.ucx.source_code.base import Advice, Deprecation
+from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
 class Dependency:
@@ -88,6 +91,9 @@ class DependencyLoader:
         from databricks.labs.ucx.source_code.files import WorkspaceFile
 
         assert object_info.path is not None
+        # TODO https://github.com/databrickslabs/ucx/issues/1363
+        # the below assumes that the dependency was discovered whilst processing a Python notebook or cell
+        # which is safe since Python is the only language supported as of writing
         language = Language.PYTHON if object_info.language is None else object_info.language
         source = self._load_source(object_info)
         return WorkspaceFile(object_info.path, source, language)
@@ -99,12 +105,48 @@ class DependencyLoader:
             return f.read().decode("utf-8")
 
 
+class DependencyResolver:
+    def __init__(self, whitelist: Whitelist | None = None):
+        self._whitelist = Whitelist() if whitelist is None else whitelist
+        self._advices: list[Advice] = []
+
+    def resolve(self, dependency: Dependency) -> Dependency | None:
+        if dependency.type == ObjectType.NOTEBOOK:
+            return dependency
+        compatibility = self._whitelist.compatibility(dependency.path)
+        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        if compatibility is not None:
+            if compatibility == UCCompatibility.NONE:
+                self._advices.append(
+                    Deprecation(
+                        code="dependency-check",
+                        message=f"Use of dependency {dependency.path} is deprecated",
+                        start_line=0,
+                        start_col=0,
+                        end_line=0,
+                        end_col=0,
+                    )
+                )
+            return None
+        return dependency
+
+    def get_advices(self) -> Iterable[Advice]:
+        yield from self._advices
+
+
 class DependencyGraph:
 
-    def __init__(self, dependency: Dependency, parent: DependencyGraph | None, loader: DependencyLoader):
+    def __init__(
+        self,
+        dependency: Dependency,
+        parent: DependencyGraph | None,
+        loader: DependencyLoader,
+        resolver: DependencyResolver | None = None,
+    ):
         self._dependency = dependency
         self._parent = parent
         self._loader = loader
+        self._resolver = resolver or DependencyResolver()
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
@@ -116,15 +158,18 @@ class DependencyGraph:
         return self._dependency.path
 
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
+        resolved = self._resolver.resolve(dependency)
+        if resolved is None:
+            return None
         # already registered ?
-        child_graph = self.locate_dependency(dependency)
+        child_graph = self.locate_dependency(resolved)
         if child_graph is not None:
-            self._dependencies[dependency] = child_graph
+            self._dependencies[resolved] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(dependency, self, self._loader)
-        self._dependencies[dependency] = child_graph
-        container = self._loader.load_dependency(dependency)
+        child_graph = DependencyGraph(resolved, self, self._loader, self._resolver)
+        self._dependencies[resolved] = child_graph
+        container = self._loader.load_dependency(resolved)
         if not container:
             return None
         container.build_dependency_graph(child_graph)

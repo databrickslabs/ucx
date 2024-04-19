@@ -4,6 +4,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
 
+import sqlglot
+from sqlglot import expressions
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -145,10 +147,14 @@ class TablesMigrator:
             return True
         if src_table.src.what == What.DBFS_ROOT_DELTA:
             return self._migrate_dbfs_root_table(src_table.src, src_table.rule, grants)
+        if src_table.src.what == What.DBFS_ROOT_NON_DELTA:
+            return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.TABLE_IN_MOUNT:
             return self._migrate_table_in_mount(src_table.src, src_table.rule, grants)
+        if src_table.src.what == What.EXTERNAL_NO_SYNC:
+            return self._migrate_non_sync_table(src_table.src, src_table.rule, grants)
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
@@ -161,7 +167,7 @@ class TablesMigrator:
             logger.info(f"View {src_view.src.key} already migrated to {src_view.rule.as_uc_table_key}")
             return True
         if self._view_can_be_migrated(src_view):
-            return self._migrate_view_table(src_view.src, src_view.rule, grants)
+            return self._migrate_view_table(src_view, grants)
         logger.info(f"View {src_view.src.key} is not supported for migration")
         return True
 
@@ -172,6 +178,22 @@ class TablesMigrator:
                 logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
+
+    def _migrate_view_table(self, src_view: ViewToMigrate, grants: list[Grant] | None = None):
+        view_migrate_sql = self._sql_migrate_view(src_view)
+        logger.debug(f"Migrating view {src_view.src.key} to using SQL query: {view_migrate_sql}")
+        self._backend.execute(view_migrate_sql)
+        self._backend.execute(src_view.src.sql_alter_to(src_view.rule.as_uc_table_key))
+        self._backend.execute(src_view.src.sql_alter_from(src_view.rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_acl(src_view.src, src_view.rule, grants)
+
+    def _sql_migrate_view(self, src_view: ViewToMigrate) -> str:
+        # We have to fetch create statement this way because of columns in:
+        # CREATE VIEW x.y (col1, col2) AS SELECT * FROM w.t
+        create_statement = self._backend.fetch(f"SHOW CREATE TABLE {src_view.src.safe_sql_key}")
+        src_view.src.view_text = next(iter(create_statement))["createtab_stmt"]
+        migration_index = self._migration_status_refresher.index()
+        return src_view.sql_migrate_view(migration_index)
 
     def _migrate_external_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
@@ -207,21 +229,47 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_table_in_mount_alter_from(rule.as_uc_table_key))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_view_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        table_migrate_sql = self._get_view_update_sql(src_table, rule)
-        logger.debug(f"Migrating view {src_table.key} to using SQL query: {table_migrate_sql}")
+    def _migrate_non_sync_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+        table_migrate_sql = self._get_create_in_place_sql(src_table, rule)
+        logger.debug(f"Migrating table (No Sync) {src_table.key} to using SQL query: {table_migrate_sql}")
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _get_view_update_sql(self, src_table: Table, rule: Rule) -> str:
-        if not src_table.view_text:
-            raise ValueError(f"Table{src_table.key} is not a view.")
-        new_view_text = ViewToMigrate.get_view_updated_text(
-            src_table.view_text, self._migration_status_refresher.index(), src_table.database
+    def _migrate_table_create_ctas(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+        table_migrate_sql = self._get_create_ctas_sql(src_table, rule)
+        logger.debug(f"Migrating table (Create Like) {src_table.key} to using SQL query: {table_migrate_sql}")
+        self._backend.execute(table_migrate_sql)
+        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        return self._migrate_acl(src_table, rule, grants)
+
+    def _get_create_in_place_sql(self, src_table: Table, rule: Rule) -> str:
+        create_sql = str(next(self._backend.fetch(src_table.sql_show_create()))["createtab_stmt"])
+        statements = sqlglot.parse(create_sql, read='databricks')
+        assert len(statements) == 1, 'Expected a single statement'
+        create = statements[0]
+        assert isinstance(create, expressions.Create), 'Expected a CREATE statement'
+        # safely replace current table name with the updated catalog
+        for table_name in create.find_all(expressions.Table):
+            if table_name.db == src_table.database and table_name.name == src_table.name:
+                new_table_name = expressions.Table(
+                    catalog=rule.catalog_name,
+                    db=rule.dst_schema,
+                    this=rule.dst_table,
+                )
+                table_name.replace(new_table_name)
+        # safely replace CREATE with CREATE IF NOT EXISTS
+        create.args['exists'] = True
+        return create.sql('databricks')
+
+    def _get_create_ctas_sql(self, src_table: Table, rule: Rule) -> str:
+        create_sql = (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} "
+            f"AS SELECT * FROM {src_table.safe_sql_key}"
         )
-        return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(rule.as_uc_table_key)} AS {new_view_text};"
+        return create_sql
 
     def _migrate_acl(self, src: Table, rule: Rule, grants: list[Grant] | None):
         if grants is None:

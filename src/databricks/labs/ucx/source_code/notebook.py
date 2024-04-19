@@ -28,9 +28,14 @@ COMMENT_PI = 'COMMENT'
 
 class Cell(ABC):
 
-    def __init__(self, source: str):
+    def __init__(self, source: str, original_offset: int = 0):
+        self._original_offset = original_offset
         self._original_code = source
         self._migrated_code = source
+
+    @property
+    def original_offset(self) -> int:
+        return self._original_offset
 
     @property
     def original_code(self):
@@ -167,12 +172,46 @@ class RunCell(Cell):
         pass
 
 
+class ShellCell(Cell):
+
+    @property
+    def language(self):
+        return CellLanguage.SHELL
+
+    def is_runnable(self) -> bool:
+        return True  # TODO
+
+    def build_dependency_graph(self, parent: DependencyGraph):
+        pass  # nothing to do
+
+    def migrate_notebook_path(self):
+        pass
+
+
+class PipCell(Cell):
+
+    @property
+    def language(self):
+        return CellLanguage.PIP
+
+    def is_runnable(self) -> bool:
+        return True  # TODO
+
+    def build_dependency_graph(self, parent: DependencyGraph):
+        pass  # nothing to do
+
+    def migrate_notebook_path(self):
+        pass
+
+
 class CellLanguage(Enum):
     # long magic_names must come first to avoid shorter ones being matched
     PYTHON = Language.PYTHON, 'python', '#', True, PythonCell
     SCALA = Language.SCALA, 'scala', '//', True, ScalaCell
     SQL = Language.SQL, 'sql', '--', True, SQLCell
     RUN = None, 'run', '', False, RunCell
+    PIP = None, 'pip', '', False, PipCell
+    SHELL = None, 'sh', '', False, ShellCell
     # see https://spec.commonmark.org/0.31.2/#html-comment
     MARKDOWN = None, 'md', "<!--->", False, MarkdownCell
     R = Language.R, 'r', '#', True, RCell
@@ -226,8 +265,8 @@ class CellLanguage(Enum):
             return None
         return None
 
-    def new_cell(self, source: str) -> Cell:
-        return self._new_cell(source)
+    def new_cell(self, source: str, original_offset: int) -> Cell:
+        return self._new_cell(source, original_offset)
 
     def extract_cells(self, source: str) -> list[Cell] | None:
         lines = source.split('\n')
@@ -235,10 +274,12 @@ class CellLanguage(Enum):
         if not lines[0].startswith(header):
             raise ValueError("Not a Databricks notebook source!")
 
-        def make_cell(cell_lines: list[str]):
+        def make_cell(cell_lines: list[str], start: int):
             # trim leading blank lines
             while len(cell_lines) > 0 and len(cell_lines[0]) == 0:
                 cell_lines.pop(0)
+                start += 1
+
             # trim trailing blank lines
             while len(cell_lines) > 0 and len(cell_lines[-1]) == 0:
                 cell_lines.pop(-1)
@@ -246,40 +287,53 @@ class CellLanguage(Enum):
             if cell_language is None:
                 cell_language = self
             else:
-                self._remove_magic_wrapper(cell_lines, cell_language)
+                cell_lines = self._remove_magic_wrapper(cell_lines, cell_language)
+
             cell_source = '\n'.join(cell_lines)
-            return cell_language.new_cell(cell_source)
+            cell = cell_language.new_cell(cell_source, start)
+            return cell
 
         cells = []
         cell_lines: list[str] = []
         separator = f"{self.comment_prefix} {CELL_SEPARATOR}"
+
+        next_cell_pos = 1
         for i in range(1, len(lines)):
             line = lines[i].strip()
             if line.startswith(separator):
-                cell = make_cell(cell_lines)
+                cell = make_cell(cell_lines, next_cell_pos)
                 cells.append(cell)
                 cell_lines = []
+                next_cell_pos = i
             else:
                 cell_lines.append(lines[i])
+
         if len(cell_lines) > 0:
-            cell = make_cell(cell_lines)
+            cell = make_cell(cell_lines, next_cell_pos)
             cells.append(cell)
 
         return cells
 
-    def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage):
+    def _process_line(self, line: str, prefix: str, lang_prefix: str, cell_language: CellLanguage) -> list[str]:
+        if line.startswith(prefix):
+            line = line[len(prefix) :]
+            if cell_language.requires_isolated_pi and line.startswith(lang_prefix):
+                new_line = line[len(lang_prefix) :].strip()
+                if new_line:
+                    return [f"{cell_language.comment_prefix} {LANGUAGE_PI}", new_line.strip()]
+                return [f"{cell_language.comment_prefix} {LANGUAGE_PI}"]
+            return [line]
+        if line.startswith(self.comment_prefix):
+            return [f"{cell_language.comment_prefix} {COMMENT_PI}{line}"]
+        return [line]
+
+    def _remove_magic_wrapper(self, lines: list[str], cell_language: CellLanguage) -> list[str]:
         prefix = f"{self.comment_prefix} {MAGIC_PREFIX} "
-        prefix_len = len(prefix)
-        for i, line in enumerate(lines):
-            if line.startswith(prefix):
-                line = line[prefix_len:]
-                if cell_language.requires_isolated_pi and line.startswith(LANGUAGE_PREFIX):
-                    line = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
-                lines[i] = line
-                continue
-            if line.startswith(self.comment_prefix):
-                line = f"{cell_language.comment_prefix} {COMMENT_PI}{line}"
-                lines[i] = line
+        lang_prefix = f"{LANGUAGE_PREFIX}{cell_language.magic_name}"
+        new_lines = []
+        for line in lines:
+            new_lines.extend(self._process_line(line, prefix, lang_prefix, cell_language))
+        return new_lines
 
     def wrap_with_magic(self, code: str, cell_language: CellLanguage) -> str:
         language_pi_prefix = f"{cell_language.comment_prefix} {LANGUAGE_PI}"
