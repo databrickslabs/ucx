@@ -91,28 +91,16 @@ class WorkspaceLoader(DependencyLoader):
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         object_info = self._load_object(dependency)
-        if object_info.object_type is ObjectType.NOTEBOOK:
-            return self._load_notebook(object_info)
-        if object_info.object_type is ObjectType.FILE:
-            return self._load_file(object_info)
-        if object_info.object_type in [
-            ObjectType.FILE,
-            ObjectType.LIBRARY,
-            ObjectType.DIRECTORY,
-            ObjectType.DASHBOARD,
-            ObjectType.REPO,
-        ]:
-            return None
-        raise NotImplementedError(str(object_info.object_type))
+        return self._load_notebook(object_info)
 
     def _load_object(self, dependency: Dependency) -> ObjectInfo:
         object_info = self._ws.workspace.get_status(dependency.path)
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         if object_info is None or object_info.object_type is None:
             raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if object_info.object_type not in [ObjectType.FILE, ObjectType.NOTEBOOK]:
+        if object_info.object_type is not ObjectType.NOTEBOOK:
             raise ValueError(
-                f"Invalid object at '{dependency.path}', expected a {ObjectType.NOTEBOOK.name} or {ObjectType.FILE.name}, got a {str(object_info.object_type)}"
+                f"Invalid object at '{dependency.path}', expected a {ObjectType.NOTEBOOK.name}, got a {str(object_info.object_type)}"
             )
         return object_info
 
@@ -125,19 +113,6 @@ class WorkspaceLoader(DependencyLoader):
         assert object_info.language is not None
         source = self._load_source(object_info)
         return Notebook.parse(object_info.path, source, object_info.language)
-
-    def _load_file(self, object_info: ObjectInfo) -> SourceContainer:
-        # local import to avoid cyclic dependency
-        # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.files import LocalFile
-
-        assert object_info.path is not None
-        # TODO https://github.com/databrickslabs/ucx/issues/1363
-        # the below assumes that the dependency was discovered whilst processing a Python notebook or cell
-        # which is safe since Python is the only language supported as of writing
-        language = Language.PYTHON if object_info.language is None else object_info.language
-        source = self._load_source(object_info)
-        return LocalFile(object_info.path, source, language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
         if not object_info.path:
