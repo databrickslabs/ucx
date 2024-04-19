@@ -97,14 +97,17 @@ class ClusterPolicyInstaller:
             policy_definition["instance_pool_id"] = self._policy_config(instance_pool_id)
             # 'node_type_id' cannot be supplied when an instance pool ID is provided
             policy_definition.pop("node_type_id")
+            # 'availability' cannot be supplied when an instance pool ID is provided
+            policy_definition.pop("aws_attributes.availability", "")
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
         if self._ws.config.is_aws:
             if instance_profile:
                 policy_definition["aws_attributes.instance_profile_arn"] = self._policy_config(instance_profile)
-            policy_definition["aws_attributes.availability"] = self._policy_config(
-                compute.AwsAvailability.ON_DEMAND.value
-            )
+            if not instance_pool_id:
+                policy_definition["aws_attributes.availability"] = self._policy_config(
+                    compute.AwsAvailability.ON_DEMAND.value
+                )
         elif self._ws.config.is_azure:
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
