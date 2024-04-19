@@ -621,3 +621,65 @@ def test_mount_listing_csv_json():
             "adls://bucket/entity",
         ),
     ]
+
+
+def test_partitioned_csv_jsons():
+    client = create_autospec(WorkspaceClient)
+
+    first_folder = FileInfo("dbfs:/mnt/test_mount/entity/", "entity/", "", "")
+    first_first_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/", "xxx=yyy/", "", "")
+    first_first_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=yyy/1.csv", "1.csv", "", "")
+    first_second_partition = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/", "xxx=zzz/", "", "")
+    first_second_partition_files = FileInfo("dbfs:/mnt/test_mount/entity/xxx=zzz/1.csv", "1.csv", "", "")
+
+    second_folder = FileInfo("dbfs:/mnt/test_mount/entity_2/", "entity_2/", "", "")
+    second_first_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
+    second_sub_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/", "aaa=bbb/", "", "")
+    second_sub_partition_files = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/1.json", "1.json", "", "")
+
+    def my_side_effect(path, **_):
+        if path == "/mnt/test_mount":
+            return [first_folder, second_folder]
+        if path == "dbfs:/mnt/test_mount/entity/":
+            return [first_first_partition, first_second_partition]
+        if path == "dbfs:/mnt/test_mount/entity/xxx=yyy/":
+            return [first_first_partition_files]
+        if path == "dbfs:/mnt/test_mount/entity/xxx=zzz/":
+            return [first_second_partition_files]
+        if path == "dbfs:/mnt/test_mount/entity_2/":
+            return [second_first_partition]
+        if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/":
+            return [second_sub_partition]
+        if path == "dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/":
+            return [second_sub_partition_files]
+        return None
+
+    client.dbutils.fs.ls.side_effect = my_side_effect
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [],
+            'test.mounts': MOUNT_STORAGE[("/mnt/test_mount", "adls://bucket/")],
+        }
+    )
+    mounts = Mounts(backend, client, "test")
+    results = TablesInMounts(backend, client, "test", mounts).snapshot()
+    assert results == [
+        Table(
+            "hive_metastore",
+            "mounted_test_mount",
+            "entity",
+            "EXTERNAL",
+            "JSON",
+            "adls://bucket/entity",
+            is_partitioned=True,
+        ),
+        Table(
+            "hive_metastore",
+            "mounted_test_mount",
+            "entity_2",
+            "EXTERNAL",
+            "CSV",
+            "adls://bucket/entity_2",
+            is_partitioned=True,
+        ),
+    ]

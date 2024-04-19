@@ -202,33 +202,32 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
         # TODO: add methods to pre-populate the following:
         self._spn_infos = []
 
-    def with_dummy_azure_resource_permission(self):
+    def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
-        self.with_azure_storage_permissions(
-            [
-                StoragePermissionMapping(
-                    prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
-                    client_id='dummy_application_id',
-                    principal='principal_1',
-                    privilege='WRITE_FILES',
-                    type='Application',
-                    directory_id='directory_id_ss1',
-                )
-            ]
-        )
-
-    def with_dummy_aws_resource_permission(self):
-        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
-        self.with_aws_storage_permissions(
-            [
-                AWSRoleAction(
-                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-                    's3',
-                    'WRITE_FILES',
-                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
-                )
-            ]
-        )
+        if self.workspace_client.config.is_azure:
+            self.with_azure_storage_permissions(
+                [
+                    StoragePermissionMapping(
+                        prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
+                        client_id='dummy_application_id',
+                        principal='principal_1',
+                        privilege='WRITE_FILES',
+                        type='Application',
+                        directory_id='directory_id_ss1',
+                    )
+                ]
+            )
+        if self.workspace_client.config.is_aws:
+            self.with_aws_storage_permissions(
+                [
+                    AWSRoleAction(
+                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
+                        's3',
+                        'WRITE_FILES',
+                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                    )
+                ]
+            )
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
@@ -654,15 +653,13 @@ def installation_ctx(  # pylint: disable=too-many-arguments
 
 @pytest.fixture
 def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_dbfs_data_copy, env_or_skip
+    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip
 ) -> tuple[dict[str, TableInfo], SchemaInfo]:
     # create external and managed tables to be migrated
     schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
     tables: dict[str, TableInfo] = {
         "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
-        "src_external_table": installation_ctx.make_table(
-            schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-        ),
+        "src_external_table": installation_ctx.make_table(schema_name=schema.name, external_csv=make_mounted_location),
     }
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
     tables["src_view1"] = installation_ctx.make_table(
@@ -683,10 +680,7 @@ def prepare_tables_for_migration(
     dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
     migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
     installation_ctx.with_table_mapping_rules(migrate_rules)
-    if ws.config.is_azure:
-        installation_ctx.with_dummy_azure_resource_permission()
-    if ws.config.is_aws:
-        installation_ctx.with_dummy_aws_resource_permission()
+    installation_ctx.with_dummy_resource_permission()
     installation_ctx.save_tables()
     installation_ctx.save_mounts()
     installation_ctx.with_dummy_grants_and_tacls()
