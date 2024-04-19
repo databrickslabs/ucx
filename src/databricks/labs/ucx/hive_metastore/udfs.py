@@ -89,7 +89,7 @@ class UdfsCrawler(CrawlerBase):
                 yield partial(self._describe, catalog, database, udf_name)
         except NotFound:
             # This make the integration test more robust as many test schemas are being created and deleted quickly.
-            logger.error(f"Schema {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)} no longer existed")
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
         except Unknown as err:
             logger.error(f"Problem with {database}: {err}")
 

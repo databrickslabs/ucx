@@ -8,7 +8,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist
+from databricks.sdk.errors import ResourceDoesNotExist, NotFound
 from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.compute import ClusterSource, DataSecurityMode
 
@@ -330,8 +330,11 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 )
                 grants.append(grant)
             return grants
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
+            return []
         except Exception as e:  # pylint: disable=broad-exception-caught
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []
 
