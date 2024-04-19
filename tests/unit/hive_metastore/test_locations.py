@@ -365,7 +365,9 @@ def test_partitioned_delta():
     second_folder = FileInfo("dbfs:/mnt/test_mount/entity_2/", "entity_2/", "", "")
     second_first_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/", "xxx=yyy/", "", "")
     second_second_partition = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/", "aaa=bbb/", "", "")
-    second_second_partition_files = FileInfo("dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/1.parquet", "1.parquet", "", "")
+    second_second_partition_files = FileInfo(
+        "dbfs:/mnt/test_mount/entity_2/xxx=yyy/aaa=bbb/1.parquet", "1.parquet", "", ""
+    )
     second_delta_log = FileInfo("dbfs:/mnt/test_mount/entity_2/_delta_log/", "_delta_log/", "", "")
 
     def my_side_effect(path, **_):
