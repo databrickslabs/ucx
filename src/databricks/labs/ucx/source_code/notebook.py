@@ -81,7 +81,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        parent.build_python_source_dependency_graph(
+        parent.build_graph_from_python_source(
             self._original_code, lambda name: parent.register_dependency(UnresolvedDependency(name))
         )
 

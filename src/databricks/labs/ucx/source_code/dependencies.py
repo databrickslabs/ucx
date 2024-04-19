@@ -354,7 +354,7 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_python_source_dependency_graph(self, python_code: str, register_dependency: Callable[[str], typing.Any]):
+    def build_graph_from_python_source(self, python_code: str, register_dependency: Callable[[str], typing.Any]):
         linter = ASTLinter.parse(python_code)
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:

@@ -84,7 +84,7 @@ class PackageFile(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph):
         self._load_source_code()
         assert self._source_code is not None
-        parent.build_python_source_dependency_graph(
+        parent.build_graph_from_python_source(
             self._source_code, lambda name: self._package.register_dependency(parent, name)
         )
 
