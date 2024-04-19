@@ -176,13 +176,28 @@ class DeployedWorkflows:
             )
         return latest_status
 
-    def validate_step(self, step: str) -> bool:
+    def validate_step(self, step: str, skip_tasks=None) -> bool:
+        if skip_tasks is None:
+            skip_tasks = []
         job_id = int(self._install_state.jobs[step])
         logger.debug(f"Validating {step} workflow: {self._ws.config.host}#job/{job_id}")
         current_runs = list(self._ws.jobs.list_runs(completed_only=False, job_id=job_id))
         for run in current_runs:
+            # successful run
             if run.state and run.state.result_state == RunResultState.SUCCESS:
                 return True
+            # failed run
+            if run.state and run.state.result_state != RunResultState.SUCCESS_WITH_FAILURES:
+                continue
+            # success with failures, check if the failed tasks are in the skip list
+            if run.tasks is None:
+                continue
+            for task in run.tasks:
+                if task.task_key in skip_tasks:
+                    continue
+                if task.state and task.state.result_state != jobs.RunResultState.SUCCESS:
+                    return False
+            return True
         for run in current_runs:
             if (
                 run.run_id
