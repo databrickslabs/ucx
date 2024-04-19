@@ -193,14 +193,14 @@ class PackageLoader(DependencyLoader):
 class DependencyResolver:
     def __init__(
         self,
-        ws: WorkspaceClient | None = None,
-        whitelist: Whitelist | None = None,
-        site_packages: SitePackages | None = None,
+        whitelist: Whitelist,
+        site_packages: SitePackages,
+        ws: WorkspaceClient | None,
     ):
         assert ws is not None  # TODO until we support local notebooks
-        self._workspace_loader = WorkspaceLoader(ws)
         self._whitelist = Whitelist() if whitelist is None else whitelist
         self._site_packages = site_packages
+        self._workspace_loader = WorkspaceLoader(ws)
         self._advices: list[Advice] = []
 
     def resolve_object_info(self, object_info: ObjectInfo) -> ResolvedDependency | None:

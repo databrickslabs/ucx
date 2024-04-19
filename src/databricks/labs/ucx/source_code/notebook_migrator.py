@@ -14,11 +14,11 @@ class NotebookMigrator:
         self,
         ws: WorkspaceClient,
         languages: Languages,
-        resolver: DependencyResolver | None = None,
+        resolver: DependencyResolver,
     ):
         self._ws = ws
         self._languages = languages
-        self._resolver = resolver or DependencyResolver(ws)
+        self._resolver = resolver
 
     def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
         if not object_info.path or not object_info.object_type:
