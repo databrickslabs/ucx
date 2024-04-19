@@ -90,6 +90,8 @@ class WorkspaceLoader(DependencyLoader):
         object_info = self._load_object(dependency)
         if object_info.object_type is ObjectType.NOTEBOOK:
             return self._load_notebook(object_info)
+        if object_info.object_type is ObjectType.FILE:
+            return self._load_file(object_info)
         if object_info.object_type in [
             ObjectType.FILE,
             ObjectType.LIBRARY,
@@ -145,15 +147,16 @@ class DependencyResolver:
     def __init__(
         self,
         whitelist: Whitelist,
+        local_loader: LocalLoader,
         ws: WorkspaceClient | None,
     ):
-        assert ws is not None  # TODO until we support local notebooks
         self._whitelist = Whitelist() if whitelist is None else whitelist
-        self._local_loader = LocalLoader()
-        self._workspace_loader = WorkspaceLoader(ws)
+        self._local_loader = local_loader
+        self._workspace_loader = None if ws is None else WorkspaceLoader(ws)
         self._advices: list[Advice] = []
 
     def resolve_object_info(self, object_info: ObjectInfo) -> ResolvedDependency | None:
+        assert self._workspace_loader is not None
         assert object_info.path is not None
         if object_info.object_type is None:
             raise ValueError(f"Invalid ObjectInfo (missing 'object_type'): {object_info}")

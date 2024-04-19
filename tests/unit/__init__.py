@@ -13,10 +13,11 @@ from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob, BaseRun
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
+from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, Language
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.dependencies import SourceContainer
+from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
@@ -140,13 +141,34 @@ def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *ar
     if filename.startswith('./'):
         filename = filename[2:]
     visited[filename] = True
+    source = sources.get(filename, None)
     if filename.find(".py") < 0:
         filename = filename + ".py"
     if filename.find(".txt") < 0:
         filename = filename + ".txt"
     result = create_autospec(BinaryIO)
-    result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
+    if source is None:
+        source = sources.get(filename)
+    assert source is not None
+    result.__enter__.return_value.read.return_value = source.encode("utf-8")
     return result
+
+
+def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, bool], *args):
+    dependency = args[0]
+    filename = dependency.path
+    if filename.startswith('./'):
+        filename = filename[2:]
+    visited[filename] = True
+    source = sources.get(filename, None)
+    if filename.find(".py") < 0:
+        filename = filename + ".py"
+    if filename.find(".txt") < 0:
+        filename = filename + ".txt"
+    if source is None:
+        source = sources.get(filename)
+    assert source is not None
+    return LocalFile(filename, source, Language.PYTHON)
 
 
 def workspace_client_mock(

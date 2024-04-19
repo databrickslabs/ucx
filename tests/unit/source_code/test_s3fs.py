@@ -6,10 +6,11 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyResolver, LocalLoader
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources, _download_side_effect
+from tests.unit import _load_sources, _download_side_effect, _load_dependency_side_effect
+
 
 S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
 
@@ -107,7 +108,10 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
     ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
-    resolver = DependencyResolver(whitelist, ws)
+    sources = {"path": source}
+    loader = create_autospec(LocalLoader)
+    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    resolver = DependencyResolver(whitelist, loader, ws)
     migrator = NotebookMigrator(ws, empty_index, resolver)
     object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
@@ -144,7 +148,9 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    resolver = DependencyResolver(whitelist, ws)
+    loader = create_autospec(LocalLoader)
+    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    resolver = DependencyResolver(whitelist, loader, ws)
     migrator = NotebookMigrator(ws, empty_index, resolver)
     object_info = ObjectInfo(path="root9.py.txt", object_type=ObjectType.FILE)
     migrator.build_dependency_graph(object_info)
