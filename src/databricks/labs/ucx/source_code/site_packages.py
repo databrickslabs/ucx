@@ -8,7 +8,6 @@ from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     UnresolvedDependency,
     PackageFileDependency,
-    build_python_source_dependency_graph,
 )
 
 
@@ -85,8 +84,8 @@ class PackageFile(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph):
         self._load_source_code()
         assert self._source_code is not None
-        build_python_source_dependency_graph(
-            self._source_code, parent, lambda name: self._package.register_dependency(parent, name)
+        parent.build_python_source_dependency_graph(
+            self._source_code, lambda name: self._package.register_dependency(parent, name)
         )
 
 

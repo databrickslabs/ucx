@@ -15,7 +15,6 @@ from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyType,
     UnresolvedDependency,
-    build_python_source_dependency_graph,
 )
 
 
@@ -82,8 +81,8 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        build_python_source_dependency_graph(
-            self._original_code, parent, lambda name: parent.register_dependency(UnresolvedDependency(name))
+        parent.build_python_source_dependency_graph(
+            self._original_code, lambda name: parent.register_dependency(UnresolvedDependency(name))
         )
 
 

@@ -267,11 +267,11 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        resolver: DependencyResolver | None = None,
+        resolver: DependencyResolver,
     ):
         self._dependency = dependency
         self._parent = parent
-        self._resolver = resolver or DependencyResolver()
+        self._resolver = resolver
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
@@ -354,24 +354,21 @@ class DependencyGraph:
                 return True
         return False
 
-
-def build_python_source_dependency_graph(
-    python_code: str, parent: DependencyGraph, register_dependency: Callable[[str], typing.Any]
-):
-    linter = ASTLinter.parse(python_code)
-    calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-    for call in calls:
-        assert isinstance(call, ast.Call)
-        path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-        if isinstance(path, ast.Constant):
-            path = path.value.strip().strip("'").strip('"')
-            object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-            dependency = parent.resolver.resolve_object_info(object_info)
-            if dependency is not None:
-                parent.register_dependency(dependency)
-            else:
-                # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
-    names = PythonLinter.list_import_sources(linter)
-    for name in names:
-        register_dependency(name)
+    def build_python_source_dependency_graph(self, python_code: str, register_dependency: Callable[[str], typing.Any]):
+        linter = ASTLinter.parse(python_code)
+        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        for call in calls:
+            assert isinstance(call, ast.Call)
+            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+            if isinstance(path, ast.Constant):
+                path = path.value.strip().strip("'").strip('"')
+                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
+                dependency = self.resolver.resolve_object_info(object_info)
+                if dependency is not None:
+                    self.register_dependency(dependency)
+                else:
+                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
+        names = PythonLinter.list_import_sources(linter)
+        for name in names:
+            register_dependency(name)
