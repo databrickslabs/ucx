@@ -17,7 +17,9 @@ from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration, Sto
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import GlobalContext
+from databricks.labs.ucx.source_code.dependencies import DependencyResolver, LocalLoader
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,8 @@ class WorkspaceContext(CliContext):
 
     @cached_property
     def local_file_migrator(self):
-        return LocalFileMigrator(self.languages)
+        # TODO https://github.com/databrickslabs/ucx/issues/1466
+        return LocalFileMigrator(self.languages, DependencyResolver(Whitelist(), LocalLoader(), self.workspace_client))
 
     @cached_property
     def cluster_access(self):
