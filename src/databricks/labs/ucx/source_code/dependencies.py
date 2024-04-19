@@ -5,7 +5,7 @@ import ast
 import typing
 from collections.abc import Callable, Iterable
 
-from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
+from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
