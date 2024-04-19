@@ -1,24 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+import abc
 from collections.abc import Callable, Iterable
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.python_linter import ImportSource
+from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
-
-
-class AbstractVisitor(ABC):
-    @abstractmethod
-    def process(self, graph) -> bool | None:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def get_advices(self) -> Iterable[Advice]:
-        raise NotImplementedError()
 
 
 class Dependency:
@@ -29,20 +18,9 @@ class Dependency:
         assert object_info.path is not None
         return Dependency(object_info.object_type, object_info.path)
 
-    def __init__(self, object_type: ObjectType | None, path: str, source: ImportSource | None = None):
+    def __init__(self, object_type: ObjectType | None, path: str):
         self._type = object_type
         self._path = path
-        self._source = source
-        self._compatibility: UCCompatibility | None = None
-
-    @property
-    def compatibility(self) -> UCCompatibility | None:
-        return self._compatibility
-
-    # cannot do this in construction as the resolver must decide the compatibility
-    @compatibility.setter
-    def compatibility(self, value: UCCompatibility):
-        self._compatibility = value
 
     @property
     def type(self) -> ObjectType | None:
@@ -52,10 +30,6 @@ class Dependency:
     def path(self) -> str:
         return self._path
 
-    @property
-    def source(self) -> ImportSource | None:
-        return self._source
-
     def __hash__(self):
         return hash(self.path)
 
@@ -63,14 +37,14 @@ class Dependency:
         return isinstance(other, Dependency) and self.path == other.path
 
 
-class SourceContainer(ABC):
+class SourceContainer(abc.ABC):
 
     @property
-    @abstractmethod
+    @abc.abstractmethod
     def object_type(self) -> ObjectType:
         raise NotImplementedError()
 
-    @abstractmethod
+    @abc.abstractmethod
     def build_dependency_graph(self, graph) -> None:
         raise NotImplementedError()
 
@@ -134,16 +108,30 @@ class DependencyLoader:
 class DependencyResolver:
     def __init__(self, whitelist: Whitelist | None = None):
         self._whitelist = Whitelist() if whitelist is None else whitelist
-
-    def compatibility(self, dependency: Dependency) -> UCCompatibility | None:
-        return self._whitelist.compatibility(dependency.path)
+        self._advices: list[Advice] = []
 
     def resolve(self, dependency: Dependency) -> Dependency | None:
         if dependency.type == ObjectType.NOTEBOOK:
             return dependency
-        dependency.compatibility = self.compatibility(dependency)
+        compatibility = self._whitelist.compatibility(dependency.path)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        if compatibility is not None:
+            if compatibility == UCCompatibility.NONE:
+                self._advices.append(
+                    Deprecation(
+                        code="dependency-check",
+                        message=f"Use of dependency {dependency.path} is deprecated",
+                        start_line=0,
+                        start_col=0,
+                        end_line=0,
+                        end_col=0,
+                    )
+                )
+            return None
         return dependency
+
+    def get_advices(self) -> Iterable[Advice]:
+        yield from self._advices
 
 
 class DependencyGraph:
@@ -160,7 +148,6 @@ class DependencyGraph:
         self._loader = loader
         self._resolver = resolver or DependencyResolver()
         self._dependencies: dict[Dependency, DependencyGraph] = {}
-        self._processors: list[AbstractVisitor] = []
 
     @property
     def dependency(self):
@@ -170,33 +157,19 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_processors(self, *processors: AbstractVisitor):
-        """Register processors to be run on the graph via the process method"""
-        if not processors:
-            raise ValueError("At least one processor must be provided")
-        self._processors.extend(processors)
-
     def register_dependency(self, dependency: Dependency) -> DependencyGraph | None:
         resolved = self._resolver.resolve(dependency)
         if resolved is None:
             return None
-
         # already registered ?
         child_graph = self.locate_dependency(resolved)
         if child_graph is not None:
             self._dependencies[resolved] = child_graph
             return child_graph
-
         # nay, create the child graph and populate it
         child_graph = DependencyGraph(resolved, self, self._loader, self._resolver)
         self._dependencies[resolved] = child_graph
-        if resolved.compatibility:
-            # We do not descend into dependencies that are already known in some
-            # way as they will be linted or migrated.
-            return None
-
         container = self._loader.load_dependency(resolved)
-
         if not container:
             return None
         container.build_dependency_graph(child_graph)
@@ -231,29 +204,15 @@ class DependencyGraph:
         def add_to_dependencies(graph: DependencyGraph) -> bool:
             if graph.dependency in dependencies:
                 return True
-
             dependencies.add(graph.dependency)
             return False
 
-        # Do not add self as a dependency on itself
-        self.visit_children(add_to_dependencies)
-
+        self.visit(add_to_dependencies)
         return dependencies
 
     @property
     def paths(self) -> set[str]:
         return {d.path for d in self.dependencies}
-
-    @property
-    def dependency_count(self) -> int:
-        return len(self._dependencies)
-
-    def visit_children(self, visit_node: Callable[[DependencyGraph], bool | None]) -> bool | None:
-        """Use when it is important not to visit the root node"""
-        for dependency in self._dependencies.values():
-            if dependency.visit(visit_node):
-                return True
-        return False
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None]) -> bool | None:
@@ -263,23 +222,3 @@ class DependencyGraph:
             if dependency.visit(visit_node):
                 return True
         return False
-
-    def walk(self, visitor: AbstractVisitor) -> bool | None:
-        """
-        Process the graph with the given visitor, used by linters or any other processing
-        system after the graph is constructed
-        """
-        if visitor.process(self):
-            return True
-        for dependency in self._dependencies.values():
-            if dependency.walk(visitor):
-                return True
-        return False
-
-    def process(self) -> Iterable[Advice]:
-        for processor in self._processors:
-            self.walk(processor)
-            yield from processor.get_advices()
-
-    def compatibility(self, dependency: Dependency) -> UCCompatibility | None:
-        return self._resolver.compatibility(dependency)

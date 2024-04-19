@@ -35,10 +35,10 @@ class SourceFile(SourceContainer):
         for path in notebook_paths:
             graph.register_dependency(Dependency(ObjectType.NOTEBOOK, path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        imports = PythonLinter.list_import_sources(linter)
-        for import_source in imports:
+        import_names = PythonLinter.list_import_sources(linter)
+        for import_name in import_names:
             # we don't know yet if it's a file or a library
-            graph.register_dependency(Dependency(None, import_source.import_string, import_source))
+            graph.register_dependency(Dependency(None, import_name))
 
 
 class WorkspaceFile(SourceFile):

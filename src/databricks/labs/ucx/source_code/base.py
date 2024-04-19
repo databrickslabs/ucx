@@ -52,9 +52,6 @@ class Advice:
     def as_convention(self) -> 'Convention':
         return Convention(**self.__dict__)
 
-    def as_location(self) -> 'Location':
-        return Location(**self.__dict__)
-
 
 class Advisory(Advice):
     """A warning that does not prevent the code from running."""
@@ -70,10 +67,6 @@ class Deprecation(Advisory):
 
 class Convention(Advice):
     """A suggestion for a better way to write the code."""
-
-
-class Location(Advice):
-    """A location in the code, which is not yet an advice"""
 
 
 class Linter:
