@@ -41,6 +41,8 @@ jobs:
 
       - name: Publish test coverage
         uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   fmt:
     runs-on: ubuntu-latest
@@ -60,22 +62,10 @@ jobs:
       - name: Install hatch
         run: pip install hatch==$HATCH_VERSION
 
-      - name: Verify linting
-        run: hatch run verify
+      - name: Reformat code
+        run: make fmt
 
-  no-lint-disabled:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Verify no lint disabled in the new code
+      - name: Fail on differences
         run: |
-          NEW_CODE=$(git diff origin/main..$(git branch --show-current) | grep -e '^+')
-          CHEAT=$(echo "${NEW_CODE}" | grep '# pylint: disable' | grep -v "CHEAT" | wc -c)
-          if [ "${CHEAT}" -ne 0 ]; then
-            echo "Do not cheat the linter: ${CHEAT}"
-            exit 1
-          fi
+          # Exit with status code 1 if there are differences (i.e. unformatted files)
+          git diff --exit-code

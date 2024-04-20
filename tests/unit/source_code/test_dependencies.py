@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 from databricks.labs.ucx.source_code.dependencies import DependencyLoader, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources
+from tests.unit import _load_sources, _download_side_effect
 
 
 def test_build_dependency_graph_visits_notebook_notebook_dependencies(empty_index):
@@ -16,23 +16,13 @@ def test_build_dependency_graph_visits_notebook_notebook_dependencies(empty_inde
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         return ObjectInfo(path=path, language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
+
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws))
     object_info = ObjectInfo(path="root3.run.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
@@ -45,21 +35,6 @@ def test_build_dependency_graph_visits_notebook_file_dependencies(empty_index):
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         return (
@@ -69,7 +44,7 @@ def test_build_dependency_graph_visits_notebook_file_dependencies(empty_index):
         )
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws))
     object_info = ObjectInfo(path="root8.py.txt", language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
@@ -105,27 +80,12 @@ def test_build_dependency_graph_visits_file_dependencies(empty_index):
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         return ObjectInfo(path=path, object_type=ObjectType.FILE)
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws))
     object_info = ObjectInfo(path="root5.py.txt", object_type=ObjectType.FILE)
@@ -138,27 +98,12 @@ def test_build_dependency_graph_visits_recursive_file_dependencies(empty_index):
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         return ObjectInfo(path=path, object_type=ObjectType.FILE)
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws))
     object_info = ObjectInfo(path="root6.py.txt", object_type=ObjectType.FILE)
@@ -171,21 +116,6 @@ def test_build_dependency_graph_safely_visits_non_file_dependencies(empty_index)
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         return (
@@ -195,7 +125,7 @@ def test_build_dependency_graph_safely_visits_non_file_dependencies(empty_index)
         )
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws))
     object_info = ObjectInfo(path="root7.py.txt", object_type=ObjectType.FILE)
@@ -208,27 +138,12 @@ def test_build_dependency_graph_throws_with_invalid_dependencies(empty_index):
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         return ObjectInfo(path=path) if path == "some_library" else ObjectInfo(path=path, object_type=ObjectType.FILE)
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     migrator = NotebookMigrator(ws, empty_index, DependencyLoader(ws))
     object_info = ObjectInfo(path="root7.py.txt", language=Language.PYTHON, object_type=ObjectType.FILE)

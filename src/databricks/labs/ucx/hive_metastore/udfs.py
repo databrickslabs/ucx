@@ -5,7 +5,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.errors import Unknown
+from databricks.sdk.errors import Unknown, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -87,6 +87,9 @@ class UdfsCrawler(CrawlerBase):
                     continue
                 udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
                 yield partial(self._describe, catalog, database, udf_name)
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
         except Unknown as err:
             logger.error(f"Problem with {database}: {err}")
 

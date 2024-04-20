@@ -2,29 +2,23 @@ import json
 import logging
 from collections import defaultdict
 
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-from ..conftest import StaticTablesCrawler, StaticUdfsCrawler
 from . import apply_tasks
 
 logger = logging.getLogger(__name__)
 
 
-def test_grants_with_permission_migration_api(
-    ws, migrated_group, inventory_schema, make_schema, make_table, sql_backend
-):
-    schema_a = make_schema()
-    table_a = make_table(schema_name=schema_a.name)
+def test_grants_with_permission_migration_api(runtime_ctx, ws, migrated_group, sql_backend):
+    schema_a = runtime_ctx.make_schema()
+    table_a = runtime_ctx.make_table(schema_name=schema_a.name)
     sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{migrated_group.name_in_workspace}`")
     sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{migrated_group.name_in_workspace}`")
     sql_backend.execute(f"GRANT SELECT ON TABLE {table_a.full_name} TO `{migrated_group.name_in_workspace}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [table_a])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     original_table_grants = {"a": grants.for_table_info(table_a)}
     assert {"SELECT"} == original_table_grants["a"][migrated_group.name_in_workspace]
@@ -41,13 +35,11 @@ def test_grants_with_permission_migration_api(
     assert {"USAGE", "OWN"} == new_schema_grants["a"][migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func_migration_api(ws, sql_backend, inventory_schema, migrated_group):
+def test_permission_for_files_anonymous_func_migration_api(ws, sql_backend, runtime_ctx, migrated_group):
     sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{migrated_group.name_in_workspace}`")
     sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{migrated_group.name_in_workspace}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     MigrationState([migrated_group]).apply_to_groups_with_different_names(ws)
 
@@ -68,18 +60,16 @@ def test_permission_for_files_anonymous_func_migration_api(ws, sql_backend, inve
     assert anonymous_function_actual[migrated_group.name_in_account] == "SELECT"
 
 
-def test_permission_for_udfs_migration_api(ws, sql_backend, inventory_schema, make_schema, make_udf, migrated_group):
-    schema = make_schema()
-    udf_a = make_udf(schema_name=schema.name)
-    udf_b = make_udf(schema_name=schema.name)
+def test_permission_for_udfs_migration_api(ws, sql_backend, runtime_ctx, migrated_group):
+    schema = runtime_ctx.make_schema()
+    udf_a = runtime_ctx.make_udf(schema_name=schema.name)
+    udf_b = runtime_ctx.make_udf(schema_name=schema.name)
 
     sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{migrated_group.name_in_workspace}`")
     sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{migrated_group.name_in_workspace}`")
     sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{migrated_group.name_in_workspace}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [udf_a, udf_b])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     all_initial_grants = set()
     for grant in grants.snapshot():
@@ -102,7 +92,7 @@ def test_permission_for_udfs_migration_api(ws, sql_backend, inventory_schema, ma
     assert {"READ_METADATA"} == actual_udf_b_grants[migrated_group.name_in_account]
 
 
-def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make_group):
+def test_permission_for_files_anonymous_func(sql_backend, runtime_ctx, make_group):
     old = make_group()
     new = make_group()
     logger.debug(f"old={old.display_name}, new={new.display_name}")
@@ -110,9 +100,7 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     sql_backend.execute(f"GRANT READ_METADATA ON ANY FILE TO `{old.display_name}`")
     sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{old.display_name}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     tacl_support = TableAclSupport(grants, sql_backend)
     apply_tasks(tacl_support, [MigratedGroup.partial_info(old, new)])
@@ -136,19 +124,17 @@ def test_permission_for_files_anonymous_func(sql_backend, inventory_schema, make
     assert anonymous_function_actual[old.display_name] == anonymous_function_actual[new.display_name]
 
 
-def test_hms2hms_owner_permissions(
-    sql_backend, inventory_schema, make_schema, make_table, make_group_pair
-):  # pylint: disable=too-many-locals
+def test_hms2hms_owner_permissions(sql_backend, runtime_ctx, make_group_pair):
     first = make_group_pair()
     second = make_group_pair()
     third = make_group_pair()
 
-    schema_a = make_schema()
-    schema_b = make_schema()
-    schema_c = make_schema()
-    table_a = make_table(schema_name=schema_a.name)
-    table_b = make_table(schema_name=schema_b.name)
-    table_c = make_table(schema_name=schema_b.name, external=True)
+    schema_a = runtime_ctx.make_schema()
+    schema_b = runtime_ctx.make_schema()
+    schema_c = runtime_ctx.make_schema()
+    table_a = runtime_ctx.make_table(schema_name=schema_a.name)
+    table_b = runtime_ctx.make_table(schema_name=schema_b.name)
+    table_c = runtime_ctx.make_table(schema_name=schema_b.name, external=True)
 
     sql_backend.execute(f"GRANT USAGE ON SCHEMA {schema_a.name} TO `{first.name_in_workspace}`")
     sql_backend.execute(f"ALTER SCHEMA {schema_a.name} OWNER TO `{first.name_in_workspace}`")
@@ -164,9 +150,7 @@ def test_hms2hms_owner_permissions(
     sql_backend.execute(f"ALTER TABLE {table_b.full_name} OWNER TO `{second.name_in_workspace}`")
     sql_backend.execute(f"GRANT SELECT, MODIFY ON TABLE {table_c.full_name} TO `{third.name_in_workspace}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [table_a, table_b, table_c])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     original_table_grants = {
         "a": grants.for_table_info(table_a),
@@ -219,19 +203,17 @@ def test_hms2hms_owner_permissions(
     }, second.name_in_account
 
 
-def test_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_udf, make_group_pair):
+def test_permission_for_udfs(sql_backend, runtime_ctx, make_group_pair):
     group = make_group_pair()
-    schema = make_schema()
-    udf_a = make_udf(schema_name=schema.name)
-    udf_b = make_udf(schema_name=schema.name)
+    schema = runtime_ctx.make_schema()
+    udf_a = runtime_ctx.make_udf(schema_name=schema.name)
+    udf_b = runtime_ctx.make_udf(schema_name=schema.name)
 
     sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.name_in_workspace}`")
     sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.name_in_workspace}`")
     sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [udf_a, udf_b])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     all_initial_grants = set()
     for grant in grants.snapshot():
@@ -255,9 +237,9 @@ def test_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_ud
     assert {"READ_METADATA"} == actual_udf_b_grants[group.name_in_account]
 
 
-def test_verify_permission_for_udfs(sql_backend, inventory_schema, make_schema, make_udf, make_group):
+def test_verify_permission_for_udfs(sql_backend, runtime_ctx, make_group):
     group = make_group()
-    schema = make_schema()
+    schema = runtime_ctx.make_schema()
 
     sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.name} TO `{group.display_name}`")
 
@@ -274,9 +256,7 @@ def test_verify_permission_for_udfs(sql_backend, inventory_schema, make_schema, 
         ),
     )
 
-    tables = StaticTablesCrawler(sql_backend, inventory_schema, [])
-    udfs = StaticUdfsCrawler(sql_backend, inventory_schema, [])
-    grants = GrantsCrawler(tables, udfs)
+    grants = runtime_ctx.grants_crawler
 
     tacl_support = TableAclSupport(grants, sql_backend)
     task = tacl_support.get_verify_task(item)

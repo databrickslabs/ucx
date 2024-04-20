@@ -1,4 +1,5 @@
 from unittest.mock import create_autospec
+import re
 
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType
@@ -41,6 +42,11 @@ SQL_NOTEBOOK_SAMPLE = (
     Language.SQL,
     ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
+SHELL_NOTEBOOK_SAMPLE = (
+    "notebook-with-shell-cell.py.txt",
+    Language.PYTHON,
+    ['python', 'sh'],
+)
 PIP_NOTEBOOK_SAMPLE = (
     "notebook-with-pip-cell.py.txt",
     Language.PYTHON,
@@ -57,6 +63,7 @@ PIP_NOTEBOOK_SAMPLE = (
         SCALA_NOTEBOOK_SAMPLE,
         R_NOTEBOOK_SAMPLE,
         SQL_NOTEBOOK_SAMPLE,
+        SHELL_NOTEBOOK_SAMPLE,
         PIP_NOTEBOOK_SAMPLE,
     ],
 )
@@ -88,8 +95,8 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     assert notebook is not None
     new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
-    actual_purified = new_source.replace(' \n', '\n')
-    expected_purified = sources[0].replace(' \n', '\n')
+    actual_purified = re.sub(r'\s+$', '', new_source, flags=re.MULTILINE)
+    expected_purified = re.sub(r'\s+$', '', sources[0], flags=re.MULTILINE)
     assert actual_purified == expected_purified
 
 

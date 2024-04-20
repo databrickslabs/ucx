@@ -56,7 +56,7 @@ class NotebookMigrator:
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
-                # TODO migration data ?
+                # TODO migration data, see https://github.com/databrickslabs/ucx/issues/1327
                 if cell.migrate_notebook_path():
                     changed = True
                 continue

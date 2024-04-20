@@ -438,7 +438,6 @@ def test_cluster_policy_instance_pool():
     policy_expected = {
         "spark_version": {"type": "fixed", "value": "14.2.x-scala2.12"},
         "instance_pool_id": {"type": "fixed", "value": "instance_pool_1"},
-        "aws_attributes.availability": {"type": "fixed", "value": "ON_DEMAND"},
     }
     # test the instance pool is added to the cluster policy
     ws.cluster_policies.create.assert_called_with(

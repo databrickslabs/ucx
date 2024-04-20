@@ -42,7 +42,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
 
     assert len(all_tables) == 5
     assert all_tables[non_delta.full_name].table_format == "JSON"
-    assert all_tables[non_delta.full_name].what == What.DB_DATASET
+    assert all_tables[non_delta.full_name].what == What.DBFS_ROOT_NON_DELTA
     assert all_tables[managed_table.full_name].object_type == "MANAGED"
     assert all_tables[managed_table.full_name].what == What.DBFS_ROOT_DELTA
     assert all_tables[tmp_table.full_name].object_type == "MANAGED"

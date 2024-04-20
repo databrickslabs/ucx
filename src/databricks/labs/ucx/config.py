@@ -59,6 +59,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # List of workspace ids ucx is installed on, only applied to account-level installation
     installed_workspace_ids: list[int] | None = None
 
+    # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
+    include_object_permissions: list[str] | None = None
+
     def replace_inventory_variable(self, text: str) -> str:
         return text.replace("$inventory", f"hive_metastore.{self.inventory_database}")
 

@@ -1,0 +1,18 @@
+{
+  "src": {
+    "catalog": "hive_metastore",
+    "database": "db1_src",
+    "name": "managed_dbfs",
+    "object_type": "MANAGED",
+    "table_format": "PARQUET",
+    "location": "dbfs:/some_location"
+  },
+  "rule": {
+    "workspace_name": "workspace",
+    "catalog_name": "ucx_default",
+    "src_schema": "db1_src",
+    "dst_schema": "db1_dst",
+    "src_table": "managed_dbfs",
+    "dst_table": "managed_dbfs"
+  }
+}

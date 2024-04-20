@@ -98,3 +98,7 @@ def test_table_fixture(make_table):
     logger.info(f'Created new tmp table in new schema: {make_table(ctas="SELECT 2+2 AS four")}')
     logger.info(f'Created new view in new schema: {make_table(view=True, ctas="SELECT 2+2 AS four")}')
     logger.info(f'Created table with properties: {make_table(tbl_properties={"test": "tableproperty"})}')
+
+
+def test_dbfs_fixture(make_mounted_location):
+    logger.info(f"Created new dbfs data copy:{make_mounted_location}")
