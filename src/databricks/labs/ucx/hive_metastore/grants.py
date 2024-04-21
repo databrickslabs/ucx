@@ -531,8 +531,8 @@ class PrincipalACL:
                 continue
             cluster_usage = self._get_grants(locations, principals, tables, mounts)
             grants.update(cluster_usage)
-            catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
-            grants.update(catalog_grants)
+            # catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
+            # grants.update(catalog_grants)
 
         return list(grants)
 
@@ -559,7 +559,7 @@ class PrincipalACL:
     def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
         databases = {table.database for table in tables}
         return [
-            Grant(principal, "USE", "hive_metastore", database) for database in databases for principal in principals
+            Grant(principal, "USAGE", "hive_metastore", database) for database in databases for principal in principals
         ]
 
     def _get_grants(

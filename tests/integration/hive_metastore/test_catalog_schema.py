@@ -24,7 +24,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
     ctx, _, schema_name, catalog_name = prepared_principal_acl
-    catalog_schema = ctx.catalog_schema
+
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     user = make_user()
     make_cluster_permissions(
@@ -32,6 +32,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
+    catalog_schema = ctx.catalog_schema
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     catalog_schema.create_all_catalogs_schemas(mock_prompts, [AclMigrationWhat.PRINCIPAL])
 
@@ -48,7 +49,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
     ctx, _, schema_name, catalog_name = prepared_principal_acl
-    catalog_schema = ctx.catalog_schema
+
     cluster = make_cluster(
         single_node=True,
         data_security_mode=DataSecurityMode.NONE,
@@ -60,6 +61,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user.user_name,
     )
+    catalog_schema = ctx.catalog_schema
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     catalog_schema.create_all_catalogs_schemas(mock_prompts, [AclMigrationWhat.PRINCIPAL])
 
