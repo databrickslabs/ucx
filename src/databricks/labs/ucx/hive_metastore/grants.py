@@ -166,6 +166,7 @@ class Grant:
             ("DATABASE", "OWN"): self._set_owner_sql,
             ("DATABASE", "READ_METADATA"): self._uc_action("BROWSE"),
             ("CATALOG", "OWN"): self._set_owner_sql,
+            ("CATALOG", "USAGE"): self._uc_action("USE CATALOG"),
         }
         make_query = hive_to_uc.get((object_type, self.action_type), None)
         if make_query is None:

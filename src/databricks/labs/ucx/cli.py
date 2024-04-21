@@ -12,6 +12,7 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -325,7 +326,7 @@ def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, *
 def create_catalogs_schemas(w: WorkspaceClient, prompts: Prompts):
     """Create UC catalogs and schemas based on the destinations created from create_table_mapping command."""
     ctx = WorkspaceContext(w)
-    ctx.catalog_schema.create_all_catalogs_schemas(prompts)
+    ctx.catalog_schema.create_all_catalogs_schemas(prompts, [AclMigrationWhat.PRINCIPAL])
 
 
 @ucx.command

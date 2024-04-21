@@ -3,48 +3,38 @@ from pathlib import PurePath
 import dataclasses
 
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import StatementExecutionBackend, SqlBackend
-from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
-from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
-from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, Mounts
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, AzureACL, Grant
+from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat
 
 logger = logging.getLogger(__name__)
 
 
 class CatalogSchema:
-    def __init__(self, ws: WorkspaceClient, table_mapping: TableMapping, principal_grants: PrincipalACL, sql_backend: SqlBackend):
+    def __init__(
+        self, ws: WorkspaceClient, table_mapping: TableMapping, principal_grants: PrincipalACL, sql_backend: SqlBackend
+    ):
         self._ws = ws
         self._table_mapping = table_mapping
         self._external_locations = self._ws.external_locations.list()
         self._principal_grants = principal_grants
         self._backend = sql_backend
 
-    def create_all_catalogs_schemas(self, prompts: Prompts):
+    def create_all_catalogs_schemas(self, prompts: Prompts, acl_strategy: list[AclMigrationWhat] | None = None):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
             self._create_catalog_validate(candidate_catalog, prompts)
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 self._create_schema(candidate_catalog, candidate_schema)
-        self._update_principal_acl()
-
-
-    def _get_catalog_schema_grants(self):
-        catalog_grants: set[Grant] = set()
-        src_trg_schema_mapping = self._get_src_database_target_mapping()
-        grants = self._principal_grants.get_interactive_cluster_grants()
-        database_grants = [grant for grant in grants if grant.table is None or grant.view is None]
-        new_grants = [dataclasses.replace(db_grant, database=src_trg_schema_mapping[db_grant.database]['target_schema'],catalog=src_trg_schema_mapping[db_grant.database]['target_catalog']) for db_grant in database_grants]
-        for grant in new_grants:
-            catalog_grants.add(dataclasses.replace(grant, database=""))
-        new_grants.extend(catalog_grants)
-        return new_grants
+        if acl_strategy is None:
+            acl_strategy = []
+        if AclMigrationWhat.PRINCIPAL in acl_strategy:
+            self._update_principal_acl()
 
     def _update_principal_acl(self):
         grants = self._get_catalog_schema_grants()
@@ -56,6 +46,41 @@ class CatalogSchema:
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
 
+    def _get_catalog_schema_grants(self):
+        catalog_grants: set[Grant] = set()
+        new_grants = []
+        src_trg_schema_mapping = self._get_database_source_target_mapping()
+        grants = self._principal_grants.get_interactive_cluster_grants()
+        # filter on grants to only get database level grants
+        database_grants = [grant for grant in grants if grant.table is None and grant.view is None]
+        for db_grant in database_grants:
+            new_grants.append(
+                dataclasses.replace(
+                    db_grant,
+                    # replace source database with taget UC database
+                    database=src_trg_schema_mapping[db_grant.database]['target_schema'],
+                    # replace hive_metastore with target UC catalog
+                    catalog=src_trg_schema_mapping[db_grant.database]['target_catalog'],
+                )
+            )
+        for grant in new_grants:
+            catalog_grants.add(dataclasses.replace(grant, database=None))
+        new_grants.extend(catalog_grants)
+        return new_grants
+
+    def _get_database_source_target_mapping(self) -> dict[str, dict]:
+        """generate a dictionary of source database in hive_metastore and its
+        mapping of target UC catalog and schema from the table mappings."""
+        src_trg_schema_mapping: dict[str, dict] = {}
+        table_mappings = self._table_mapping.load()
+        for mappings in table_mappings:
+            if mappings.src_schema not in src_trg_schema_mapping:
+                src_trg_schema_mapping[mappings.src_schema] = {
+                    'target_catalog': mappings.catalog_name,
+                    'target_schema': mappings.dst_schema,
+                }
+                continue
+        return src_trg_schema_mapping
 
     def _create_catalog_validate(self, catalog, prompts: Prompts):
         logger.info(f"Creating UC catalog: {catalog}")
@@ -103,16 +128,6 @@ class CatalogSchema:
                 continue
             target_schemas[target_catalog].add(target_schema)
         return target_catalogs, target_schemas
-
-    def _get_src_database_target_mapping(self) -> dict[str, dict]:
-        """generate a list of catalogs and schema to be created from table mappings."""
-        src_trg_schema_mapping: dict[str, dict] = {}
-        table_mappings = self._table_mapping.load()
-        for mappings in table_mappings:
-            if mappings.src_schema not in src_trg_schema_mapping:
-                src_trg_schema_mapping[mappings.src_schema] = {'target_catalog':mappings.catalog_name, 'target_schema': mappings.dst_schema}
-                continue
-        return src_trg_schema_mapping
 
     def _get_missing_catalogs_schemas(self) -> tuple[set[str], dict[str, set[str]]]:
         """prepare a list of catalogs and schema to be created"""
