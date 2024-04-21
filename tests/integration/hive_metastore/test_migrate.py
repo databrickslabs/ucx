@@ -445,7 +445,7 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_tables_with_principal_acl_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_group
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
@@ -456,10 +456,12 @@ def test_migrate_external_tables_with_principal_acl_azure(
 
     user_with_cluster_access = make_user()
     user_without_cluster_access = make_user()
+    group_with_cluster_access = make_group()
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
         user_name=user_with_cluster_access.user_name,
+        group_name=group_with_cluster_access.display_name,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
@@ -467,6 +469,13 @@ def test_migrate_external_tables_with_principal_acl_azure(
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user_with_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == group_with_cluster_access.display_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
@@ -507,7 +516,7 @@ def test_migrate_external_tables_with_principal_acl_aws(
 
 
 def test_migrate_external_tables_with_spn_azure(
-        ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
@@ -521,7 +530,7 @@ def test_migrate_external_tables_with_spn_azure(
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
-        service_principal_name=spn_with_mount_access
+        service_principal_name=spn_with_mount_access,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
