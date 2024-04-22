@@ -153,6 +153,7 @@ class ExternalLocationsMigration:
         return supported_urls
 
     def run(self):
+        # TODO add ACL logic
         # list missing external locations in UC
         _, missing_locations = self._hms_locations.match_table_external_locations()
         # Extract the location URLs from the missing locations
