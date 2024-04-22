@@ -140,11 +140,6 @@ def test_safe_get_permissions_when_error_non_retriable():
     result = sup.load_as_dict("clusters", "test")
     assert not result
 
-    # TODO uncomment after ES-892977 is fixed. The code now is retried.
-    # ws.permissions.get.side_effect = DatabricksError(error_code="SOMETHING_UNEXPECTED")
-    # with pytest.raises(DatabricksError):
-    #     sup._safe_get_permissions("clusters", "test")
-
 
 def test_safe_get_permissions_when_error_retriable():
     ws = create_autospec(WorkspaceClient)

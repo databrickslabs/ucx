@@ -5,8 +5,8 @@ import os
 import re
 import time
 import webbrowser
-from collections.abc import Callable
 from datetime import timedelta
+from functools import cached_property
 from typing import Any
 
 import databricks.sdk.errors
@@ -19,7 +19,6 @@ from databricks.labs.blueprint.upgrades import Upgrades
 from databricks.labs.blueprint.wheels import (
     ProductInfo,
     Version,
-    WheelsV2,
     find_project_root,
 )
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
@@ -40,7 +39,7 @@ from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.cli_command import AccountContext
+from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -112,68 +111,72 @@ def extract_major_minor(version_string):
     return None
 
 
-class WorkspaceInstaller:
+class WorkspaceInstaller(WorkspaceContext):
+
     def __init__(
         self,
-        prompts: Prompts,
-        installation: Installation,
         ws: WorkspaceClient,
-        product_info: ProductInfo,
         environ: dict[str, str] | None = None,
         tasks: list[Task] | None = None,
     ):
+        super().__init__(ws)
         if not environ:
             environ = dict(os.environ.items())
+        self._force_install = environ.get("UCX_FORCE_INSTALL")
         if "DATABRICKS_RUNTIME_VERSION" in environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
-        self._ws = ws
-        self._installation = installation
-        self._prompts = prompts
-        self._policy_installer = ClusterPolicyInstaller(installation, ws, prompts)
-        self._product_info = product_info
-        self._force_install = environ.get("UCX_FORCE_INSTALL")
-        self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
+
+        self._is_account_install = self._force_install == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
+
+    @cached_property
+    def upgrades(self):
+        return Upgrades(self.product_info, self.installation)
+
+    @cached_property
+    def policy_installer(self):
+        return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
+
+    @cached_property
+    def installation(self):
+        try:
+            return self.product_info.current_installation(self.workspace_client)
+        except NotFound:
+            if self._force_install == "user":
+                return Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
+            return Installation.assume_global(self.workspace_client, self.product_info.product_name())
 
     def run(
         self,
         default_config: WorkspaceConfig | None = None,
         verify_timeout=timedelta(minutes=2),
-        sql_backend_factory: Callable[[WorkspaceConfig], SqlBackend] | None = None,
-        wheel_builder_factory: Callable[[], WheelsV2] | None = None,
         config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
-        logger.info(f"Installing UCX v{self._product_info.version()}")
+        logger.info(f"Installing UCX v{self.product_info.version()}")
         if config is None:
             config = self.configure(default_config)
-        if not sql_backend_factory:
-            sql_backend_factory = self._new_sql_backend
-        if not wheel_builder_factory:
-            wheel_builder_factory = self._new_wheel_builder
-        wheels = wheel_builder_factory()
-        install_state = InstallState.from_installation(self._installation)
         if self._is_testing():
             return config
         workflows_deployment = WorkflowsDeployment(
             config,
-            self._installation,
-            install_state,
-            self._ws,
-            wheels,
-            self._product_info,
+            self.installation,
+            self.install_state,
+            self.workspace_client,
+            self.wheels,
+            self.product_info,
             verify_timeout,
             self._tasks,
         )
         workspace_installation = WorkspaceInstallation(
             config,
-            self._installation,
-            install_state,
-            sql_backend_factory(config),
-            self._ws,
+            self.installation,
+            self.install_state,
+            self.sql_backend,
+            self.workspace_client,
             workflows_deployment,
-            self._prompts,
-            self._product_info,
+            self.prompts,
+            self.product_info,
         )
         try:
             workspace_installation.run()
@@ -184,21 +187,21 @@ class WorkspaceInstaller:
         return config
 
     def _is_testing(self):
-        return self._product_info.product_name() != "ucx"
+        return self.product_info.product_name() != "ucx"
 
     def _prompt_for_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
-        inventory_database = self._prompts.question(
+        inventory_database = self.prompts.question(
             "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
         )
-        log_level = self._prompts.question("Log level", default="INFO").upper()
-        num_threads = int(self._prompts.question("Number of threads", default="8", valid_number=True))
-        configure_groups = ConfigureGroups(self._prompts)
+        log_level = self.prompts.question("Log level", default="INFO").upper()
+        num_threads = int(self.prompts.question("Number of threads", default="8", valid_number=True))
+        configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
         # Check if terraform is being used
-        is_terraform_used = self._prompts.confirm("Do you use Terraform to deploy your infrastructure?")
+        is_terraform_used = self.prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         include_databases = self._select_databases()
-        trigger_job = self._prompts.confirm("Do you want to trigger assessment job after installation?")
+        trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         return WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -216,45 +219,41 @@ class WorkspaceInstaller:
 
     def _compare_remote_local_versions(self):
         try:
-            local_version = self._product_info.released_version()
-            remote_version = self._installation.load(Version).version
+            local_version = self.product_info.released_version()
+            remote_version = self.installation.load(Version).version
             if extract_major_minor(remote_version) == extract_major_minor(local_version):
-                logger.info(f"UCX v{self._product_info.version()} is already installed on this workspace")
+                logger.info(f"UCX v{self.product_info.version()} is already installed on this workspace")
                 msg = "Do you want to update the existing installation?"
-                if not self._prompts.confirm(msg):
+                if not self.prompts.confirm(msg):
                     raise RuntimeWarning(
                         "UCX workspace remote and local install versions are same and no override is requested. Exiting..."
                     )
         except NotFound as err:
             logger.warning(f"UCX workspace remote version not found: {err}")
 
-    def _new_wheel_builder(self):
-        return WheelsV2(self._installation, self._product_info)
-
-    def _new_sql_backend(self, config: WorkspaceConfig) -> SqlBackend:
-        return StatementExecutionBackend(self._ws, config.warehouse_id)
-
     def _confirm_force_install(self) -> bool:
         if not self._force_install:
             return False
         msg = "[ADVANCED] UCX is already installed on this workspace. Do you want to create a new installation?"
-        if not self._prompts.confirm(msg):
+        if not self.prompts.confirm(msg):
             raise RuntimeWarning("UCX is already installed, but no confirmation")
-        if not self._installation.is_global() and self._force_install == "global":
+        if not self.installation.is_global() and self._force_install == "global":
             # TODO:
             # Logic for forced global over user install
             # Migration logic will go here
             # verify complains without full path, asks to raise NotImplementedError builtin
             raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
-        if self._installation.is_global() and self._force_install == "user":
+        if self.installation.is_global() and self._force_install == "user":
             # Logic for forced user install over global install
-            self._installation = Installation.assume_user_home(self._ws, self._product_info.product_name())
+            self.replace(
+                installation=Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
+            )
             return True
         return False
 
     def configure(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
         try:
-            config = self._installation.load(WorkspaceConfig)
+            config = self.installation.load(WorkspaceConfig)
             self._compare_remote_local_versions()
             if self._confirm_force_install():
                 return self._configure_new_installation(default_config)
@@ -269,27 +268,25 @@ class WorkspaceInstaller:
         Persist the list of workspaces where UCX is successfully installed in the config
         """
         try:
-            config = self._installation.load(WorkspaceConfig)
+            config = self.installation.load(WorkspaceConfig)
             new_config = dataclasses.replace(config, **changes)
-            self._installation.save(new_config)
+            self.installation.save(new_config)
         except (PermissionDenied, NotFound, ValueError):
-            logger.warning(f"Failed to replace config for {self._ws.config.host}")
+            logger.warning(f"Failed to replace config for {self.workspace_client.config.host}")
 
     def _apply_upgrades(self):
         try:
-            upgrades = Upgrades(self._product_info, self._installation)
-            upgrades.apply(self._ws)
+            self.upgrades.apply(self.workspace_client)
         except (InvalidParameterValue, NotFound) as err:
             logger.warning(f"Installed version is too old: {err}")
 
     def _configure_new_installation(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
         if default_config is None:
             default_config = self._prompt_for_new_installation()
-        HiveMetastoreLineageEnabler(self._ws).apply(self._prompts, self._is_account_install)
+        HiveMetastoreLineageEnabler(self.workspace_client).apply(self.prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
         warehouse_id = self._configure_warehouse()
-
-        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self._policy_installer.create(
+        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self.policy_installer.create(
             default_config.inventory_database
         )
 
@@ -306,11 +303,11 @@ class WorkspaceInstaller:
             policy_id=policy_id,
             instance_pool_id=instance_pool_id,
         )
-        self._installation.save(config)
+        self.installation.save(config)
         if self._is_account_install:
             return config
-        ws_file_url = self._installation.workspace_link(config.__file__)
-        if self._prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
+        ws_file_url = self.installation.workspace_link(config.__file__)
+        if self.prompts.confirm(f"Open config file in the browser and continue installing? {ws_file_url}"):
             webbrowser.open(ws_file_url)
         return config
 
@@ -318,26 +315,26 @@ class WorkspaceInstaller:
         # parallelism will not be needed if backlog is fixed in https://databricks.atlassian.net/browse/ES-975874
         if self._is_account_install:
             return 1, 10, spark_conf_dict
-        parallelism = self._prompts.question(
+        parallelism = self.prompts.question(
             "Parallelism for migrating dbfs root delta tables with deep clone", default="200", valid_number=True
         )
         if int(parallelism) > 200:
             spark_conf_dict.update({'spark.sql.sources.parallelPartitionDiscovery.parallelism': parallelism})
         # mix max workers for auto-scale migration job cluster
         min_workers = int(
-            self._prompts.question(
+            self.prompts.question(
                 "Min workers for auto-scale job cluster for table migration", default="1", valid_number=True
             )
         )
         max_workers = int(
-            self._prompts.question(
+            self.prompts.question(
                 "Max workers for auto-scale job cluster for table migration", default="10", valid_number=True
             )
         )
         return min_workers, max_workers, spark_conf_dict
 
     def _select_databases(self):
-        selected_databases = self._prompts.question(
+        selected_databases = self.prompts.question(
             "Comma-separated list of databases to migrate. If not specified, we'll use all "
             "databases in hive_metastore",
             default="<ALL>",
@@ -352,17 +349,17 @@ class WorkspaceInstaller:
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
             f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
-            for _ in self._ws.warehouses.list()
+            for _ in self.workspace_client.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
         if self._is_account_install:
             warehouse_id = "create_new"
         else:
-            warehouse_id = self._prompts.choice_from_dict(
+            warehouse_id = self.prompts.choice_from_dict(
                 "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
             )
         if warehouse_id == "create_new":
-            new_warehouse = self._ws.warehouses.create(
+            new_warehouse = self.workspace_client.warehouses.create(
                 name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
@@ -374,7 +371,7 @@ class WorkspaceInstaller:
 
     def _check_inventory_database_exists(self, inventory_database: str):
         logger.info("Fetching installations...")
-        for installation in Installation.existing(self._ws, self._product_info.product_name()):
+        for installation in Installation.existing(self.workspace_client, self.product_info.product_name()):
             try:
                 config = installation.load(WorkspaceConfig)
                 if config.inventory_database == inventory_database:
@@ -614,19 +611,13 @@ class AccountInstaller(AccountContext):
                 accessible_workspaces.append(workspace)
         return accessible_workspaces
 
-    def _get_installer(self, app: ProductInfo, workspace: Workspace) -> WorkspaceInstaller:
+    def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
-        try:
-            current = app.current_installation(workspace_client)
-        except NotFound:
-            current = Installation.assume_global(workspace_client, app.product_name())
-        return WorkspaceInstaller(self.prompts, current, workspace_client, app)
+        return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
 
-    def install_on_account(self, app: ProductInfo | None = None):
+    def install_on_account(self):
         ctx = AccountContext(self._get_safe_account_client())
-        if app is None:
-            app = ProductInfo.from_class(WorkspaceConfig)
         default_config = None
         confirmed = False
         accessible_workspaces = self._get_accessible_workspaces()
@@ -639,7 +630,7 @@ class AccountInstaller(AccountContext):
 
         for workspace in accessible_workspaces:
             logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
-            installer = self._get_installer(app, workspace)
+            installer = self._get_installer(workspace)
             if not confirmed:
                 default_config = None
             try:
@@ -656,24 +647,11 @@ class AccountInstaller(AccountContext):
 
         installed_workspace_ids = [w.workspace_id for w in installed_workspaces if w.workspace_id is not None]
         for workspace in installed_workspaces:
-            installer = self._get_installer(app, workspace)
+            installer = self._get_installer(workspace)
             installer.replace_config(installed_workspace_ids=installed_workspace_ids)
 
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
-
-
-def install_on_workspace(app: ProductInfo | None = None):
-    if app is None:
-        app = ProductInfo.from_class(WorkspaceConfig)
-    prompts = Prompts()
-    workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-    try:
-        current = app.current_installation(workspace_client)
-    except NotFound:
-        current = Installation.assume_global(workspace_client, app.product_name())
-    installer = WorkspaceInstaller(prompts, current, workspace_client, app)
-    installer.run()
 
 
 if __name__ == "__main__":
@@ -685,4 +663,5 @@ if __name__ == "__main__":
         account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
         account_installer.install_on_account()
     else:
-        install_on_workspace()
+        workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
+        workspace_installer.run()
