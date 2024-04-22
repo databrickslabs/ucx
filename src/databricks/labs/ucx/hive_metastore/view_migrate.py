@@ -111,7 +111,7 @@ class ViewsMigrationSequencer:
         result: set[ViewToMigrate] = set()
         for view in views:
             view_deps = set(view.dependencies)
-            self.check_circular_dependency(view, views)
+            self._check_circular_dependency(view, views)
             if len(view_deps) == 0:
                 result.add(view)
             else:
@@ -131,28 +131,26 @@ class ViewsMigrationSequencer:
             raise ValueError(f"Invalid table references are preventing migration: {views}")
         return result
 
-    def check_circular_dependency(self, initial_view, views):
+    def _check_circular_dependency(self, initial_view, views):
         queue = []
         queue.extend(dep for dep in initial_view.dependencies)
-        print(queue)
         while queue:
             current_view = self._get_view_instance(queue.pop(0).key, views)
-            if current_view:
-                if current_view == initial_view:
-                    raise ValueError(
-                        f"Circular dependency detected between {initial_view.src.name} and {current_view.src.name} "
-                    )
-                queue.extend(dep for dep in current_view.dependencies)
+            if not current_view:
+                continue
+            if current_view == initial_view:
+                raise ValueError(
+                    f"Circular dependency detected between {initial_view.src.name} and {current_view.src.name} "
+                )
+            queue.extend(dep for dep in current_view.dependencies)
 
     def _get_view_instance(self, key: str, views: set[ViewToMigrate]) -> ViewToMigrate | None:
         # This method acts as a mapper between TableView and ViewToMigrate. We check if the key passed matches with
         # any of the views in the list of views. This means the circular dependency will be identified only
         # if the dependencies are present in the list of views passed to _next_batch() or the _result_view_list
         # ToDo: see if a mapper between TableView and ViewToMigrate can be implemented
-        instance = None
         all_views = list(views) + self._result_view_list
         for view in all_views:
             if view.src.key == key:
-                instance = view
-                break
-        return instance
+                return view
+        return None
