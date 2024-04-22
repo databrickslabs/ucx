@@ -6,7 +6,6 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
 from databricks.sdk.service import settings
-from databricks.sdk.service.catalog import MetastoreInfo
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
 
@@ -85,7 +84,7 @@ class AccountWorkspaces:
             logger.info(f"Group {group_name} created in the account")
 
     def _try_create_account_groups(
-            self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
+        self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
     ) -> Group | None:
         try:
             if group_name in acc_groups:
@@ -118,7 +117,7 @@ class AccountWorkspaces:
         return valid_workspace_ids
 
     def _add_members_to_acc_group(
-            self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
+        self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
     ):
         for chunk in self._chunks(valid_group.members, 20):
             logger.debug(f"Adding {len(chunk)} members to acc group {group_name}")
@@ -131,7 +130,7 @@ class AccountWorkspaces:
     def _chunks(self, lst, chunk_size):
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(lst), chunk_size):
-            yield lst[i: i + chunk_size]
+            yield lst[i : i + chunk_size]
 
     def _get_valid_workspaces_groups(self, prompts: Prompts, workspace_ids: list[int]) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
@@ -161,9 +160,9 @@ class AccountWorkspaces:
                     logger.info(f"Workspace group {group_name} already found, ignoring")
                     continue
                 if prompts.confirm(
-                        f"Group {group_name} does not have the same amount of members "
-                        f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
-                        f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
+                    f"Group {group_name} does not have the same amount of members "
+                    f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
+                    f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
                 ):
                     all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
                     continue
@@ -264,8 +263,8 @@ class WorkspaceInfo:
 
 class AccountMetastores:
     def __init__(
-            self,
-            account_client: AccountClient,
+        self,
+        account_client: AccountClient,
     ):
         self._ac = account_client
 
@@ -278,9 +277,14 @@ class AccountMetastores:
         for metastore in self._get_all_metastores(location).keys():
             logger.info(metastore)
 
-    def assign_metastore(self, prompts: Prompts, workspace_id: str, metastore_id: str | None = None,
-                         default_catalog: str | None = None):
-        workspace_id = int(workspace_id)
+    def assign_metastore(
+        self,
+        prompts: Prompts,
+        str_workspace_id: str,
+        metastore_id: str | None = None,
+        default_catalog: str | None = None,
+    ):
+        workspace_id = int(str_workspace_id)
         if not metastore_id:
             # search for all matching metastores
             matching_metastores = self._get_all_metastores(self._get_region(workspace_id))
@@ -306,10 +310,10 @@ class AccountMetastores:
         return str(workspace.location)
 
     def _get_all_metastores(self, location: str | None = None) -> dict[str, str]:
-        output = {}
+        output = dict[str, str]()
         for metastore in self._ac.metastores.list():
             if location is None or metastore.region == location:
-                output[f"{metastore.name} - {metastore.metastore_id}"] = metastore.metastore_id
+                output[f"{metastore.name} - {metastore.metastore_id}"] = str(metastore.metastore_id)
         return output
 
     def _set_default_catalog(self, workspace_id: int, default_catalog: str):
@@ -317,9 +321,10 @@ class AccountMetastores:
         default_namespace = self._ac.get_workspace_client(workspace).settings.default_namespace
         # needs to get the etag first, before patching the setting
         current = default_namespace.get()
-        default_namespace.update(allow_missing=True,
-                                 field_mask="namespace.value",
-                                 setting=settings.DefaultNamespaceSetting(
-                                     etag=current.etag,
-                                     namespace=settings.StringMessage(default_catalog))
-                                 )
+        default_namespace.update(
+            allow_missing=True,
+            field_mask="namespace.value",
+            setting=settings.DefaultNamespaceSetting(
+                etag=current.etag, namespace=settings.StringMessage(default_catalog)
+            ),
+        )

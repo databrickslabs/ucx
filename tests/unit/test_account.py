@@ -9,16 +9,21 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.config import Config
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service import iam
+from databricks.sdk.service.catalog import MetastoreInfo
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
 
-from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo, AccountMetastores
 
 
-def test_sync_workspace_info():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+@pytest.fixture
+def acc_client():
+    acc = create_autospec(AccountClient)
+    acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+    return acc
 
+
+def test_sync_workspace_info(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
@@ -66,10 +71,7 @@ def test_manual_workspace_info():
     ws.workspace.upload.assert_called()
 
 
-def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
     ]
@@ -114,10 +116,7 @@ def test_create_acc_groups_should_create_acc_group_if_no_group_found_in_account(
     )
 
 
-def test_create_acc_groups_should_throw_exception():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_throw_exception(acc_client):
     acc_client.workspaces.list.return_value = []
 
     ws = create_autospec(WorkspaceClient)
@@ -135,10 +134,7 @@ def test_create_acc_groups_should_throw_exception():
         account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
 
-def test_create_acc_groups_should_filter_system_groups():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_filter_system_groups(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
     ]
@@ -165,10 +161,7 @@ def test_create_acc_groups_should_filter_system_groups():
     acc_client.groups.create.assert_not_called()
 
 
-def test_create_acc_groups_should_filter_account_groups_in_workspace():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_filter_account_groups_in_workspace(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
     ]
@@ -191,10 +184,7 @@ def test_create_acc_groups_should_filter_account_groups_in_workspace():
     acc_client.groups.create.assert_not_called()
 
 
-def test_create_acc_groups_should_create_acc_group_with_appropriate_members():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_create_acc_group_with_appropriate_members(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
     ]
@@ -299,10 +289,7 @@ def test_create_acc_groups_should_create_acc_group_with_appropriate_members():
     )
 
 
-def test_create_acc_groups_should_not_create_group_if_exists_in_account():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_not_create_group_if_exists_in_account(acc_client):
     group = Group(
         id="12",
         display_name="de",
@@ -329,10 +316,7 @@ def test_create_acc_groups_should_not_create_group_if_exists_in_account():
     acc_client.groups.create.assert_not_called()
 
 
-def test_create_acc_groups_should_create_groups_accross_workspaces():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_create_groups_accross_workspaces(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
@@ -369,10 +353,7 @@ def test_create_acc_groups_should_create_groups_accross_workspaces():
     acc_client.groups.create.assert_any_call(display_name="security_grp")
 
 
-def test_create_acc_groups_should_filter_groups_accross_workspaces():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_filter_groups_accross_workspaces(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
@@ -422,10 +403,7 @@ def test_create_acc_groups_should_filter_groups_accross_workspaces():
     )
 
 
-def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_but_not_same_members():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_but_not_same_members(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="ws1", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="ws2", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
@@ -476,10 +454,7 @@ def test_create_acc_groups_should_create_acc_group_if_exist_in_other_workspaces_
     acc_client.groups.create.assert_any_call(display_name="ws2_de")
 
 
-def test_acc_ws_get_should_not_throw():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_acc_ws_get_should_not_throw(acc_client):
     group = Group(
         id="12",
         display_name="de",
@@ -506,10 +481,7 @@ def test_acc_ws_get_should_not_throw():
     acc_client.groups.create.assert_not_called()
 
 
-def test_create_acc_groups_should_not_throw_if_acc_grp_exists():
-    acc_client = create_autospec(AccountClient)
-    acc_client.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-
+def test_create_acc_groups_should_not_throw_if_acc_grp_exists(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")
     ]
@@ -532,3 +504,48 @@ def test_create_acc_groups_should_not_throw_if_acc_grp_exists():
 
     acc_client.groups.create.assert_called_with(display_name="de")
     acc_client.groups.patch.assert_not_called()
+
+
+def test_show_all_metastores(acc_client, caplog):
+    caplog.set_level("INFO")
+    acc_client.metastores.list.return_value = [
+        MetastoreInfo(name="metastore_usw", metastore_id="123", region="us-west-2"),
+        MetastoreInfo(name="metastore_use", metastore_id="124", region="us-east-2"),
+        MetastoreInfo(name="metastore_usc", metastore_id="125", region="us-central-1"),
+    ]
+    acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-west-2")
+    account_metastores = AccountMetastores(acc_client)
+    # no workspace id, should return all metastores
+    account_metastores.show_all_metastores()
+    assert "metastore_usw - 123" in caplog.messages
+    assert "metastore_use - 124" in caplog.messages
+    assert "metastore_usc - 125" in caplog.messages
+    caplog.clear()
+    # should only return usw metastore
+    account_metastores.show_all_metastores("123456")
+    assert "metastore_usw - 123" in caplog.messages
+    # switch cloud, should only return use metastore
+    caplog.clear()
+    acc_client.config = Config(host="https://accounts.azuredatabricks.net", account_id="123", token="123")
+    acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, location="us-east-2")
+    account_metastores.show_all_metastores("123456")
+    assert "metastore_use - 124" in caplog.messages
+
+
+def test_assign_metastore(acc_client):
+    acc_client.metastores.list.return_value = [
+        MetastoreInfo(name="metastore_usw_1", metastore_id="123", region="us-west-2"),
+        MetastoreInfo(name="metastore_usw_2", metastore_id="124", region="us-west-2"),
+        MetastoreInfo(name="metastore_usw_3", metastore_id="125", region="us-west-2"),
+        MetastoreInfo(name="metastore_use_3", metastore_id="126", region="us-east-2"),
+    ]
+    acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-west-2")
+    account_metastores = AccountMetastores(acc_client)
+    # multiple metastores, need to choose one
+    prompts = MockPrompts({"Multiple metastores found, please select one*": "0"})
+    account_metastores.assign_metastore(prompts, "123456")
+    acc_client.metastore_assignments.create.assert_called_with(123456, "123")
+    # only one metastore, should assign directly
+    acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-east-2")
+    account_metastores.assign_metastore(MockPrompts({}), "123456")
+    acc_client.metastore_assignments.create.assert_called_with(123456, "126")
