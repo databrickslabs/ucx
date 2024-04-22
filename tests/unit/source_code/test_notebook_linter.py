@@ -3,7 +3,6 @@ import pytest
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
 from databricks.labs.ucx.source_code.base import Deprecation, Advisory
-from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
 index = MigrationIndex([])
@@ -276,17 +275,15 @@ def test_notebook_linter(lang, source, expected):
     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
     # Hence SQL statement advice offsets can be wrong because of comments and statements
     # over multiple lines.
-    langs = Languages(index)
-    linter = NotebookLinter.from_source(langs, source, lang)
+    linter = NotebookLinter.from_source(index, source, lang)
     assert linter is not None
     gathered = list(linter.lint(""))
     assert gathered == expected
 
 
 def test_notebook_linter_name():
-    langs = Languages(index)
     source = """-- Databricks notebook source"""
-    linter = NotebookLinter.from_source(langs, source, languages.Language.SQL)
+    linter = NotebookLinter.from_source(index, source, languages.Language.SQL)
     assert linter.name() == "notebook-linter"
 
 
@@ -297,7 +294,7 @@ def test_notebook_linter_name():
             languages.Language.SQL,
             """-- Databricks notebook source
 -- MAGIC %md
--- MAGIC #Test notebook for DBFS discovery in Notebooks
+-- MAGIC #Test notebook for Use tracking in Notebooks
 
 -- COMMAND ----------
 -- DBTITLE 1,A SQL cell that changes the DB
@@ -407,11 +404,74 @@ MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MA
                 ),
             ],
         ),
+        (
+            languages.Language.PYTHON,
+            """# Databricks notebook source
+--- MAGIC %md
+-- MAGIC #Test notebook for Use tracking in Notebooks
+
+# COMMAND ----------
+
+display(spark.table('people')) # we are looking at default.people table
+
+# COMMAND ----------
+
+# MAGIC %sql USE something
+
+# COMMAND ----------
+
+display(spark.table('persons')) # we are looking at something.persons table
+
+# COMMAND ----------
+
+spark.sql('USE whatever')
+
+# COMMAND ----------
+
+display(spark.table('kittens')) # we are looking at whatever.kittens table
+
+# COMMAND ----------
+
+spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table.""",
+            [
+                Deprecation(
+                    code='table-migrate',
+                    message='Table people is migrated to cata4.nondefault.newpeople ' 'in Unity Catalog',
+                    start_line=6,
+                    start_col=8,
+                    end_line=6,
+                    end_col=29,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table persons is migrated to cata4.newsomething.persons ' 'in Unity Catalog',
+                    start_line=14,
+                    start_col=8,
+                    end_line=14,
+                    end_col=30,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table kittens is migrated to cata4.felines.toms in Unity ' 'Catalog',
+                    start_line=22,
+                    start_col=8,
+                    end_line=22,
+                    end_col=30,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table numbers is migrated to cata4.counting.numbers in ' 'Unity Catalog',
+                    start_line=26,
+                    start_col=0,
+                    end_line=26,
+                    end_col=38,
+                ),
+            ],
+        ),
     ],
 )
 def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected):
-    langs = Languages(extended_test_index)
-    linter = NotebookLinter.from_source(langs, source, lang)
+    linter = NotebookLinter.from_source(extended_test_index, source, lang)
     assert linter is not None
     advices = list(linter.lint(""))
     assert advices == expected

@@ -32,5 +32,11 @@ def extended_test_index():
             MigrationStatus('default', 'testtable', dst_catalog='cata', dst_schema='nondefault', dst_table='table'),
             MigrationStatus('different_db', 'testtable', dst_catalog='cata2', dst_schema='newspace', dst_table='table'),
             MigrationStatus('old', 'testtable', dst_catalog='cata3', dst_schema='newspace', dst_table='table'),
+            MigrationStatus('default', 'people', dst_catalog='cata4', dst_schema='nondefault', dst_table='newpeople'),
+            MigrationStatus(
+                'something', 'persons', dst_catalog='cata4', dst_schema='newsomething', dst_table='persons'
+            ),
+            MigrationStatus('whatever', 'kittens', dst_catalog='cata4', dst_schema='felines', dst_table='toms'),
+            MigrationStatus('whatever', 'numbers', dst_catalog='cata4', dst_schema='counting', dst_table='numbers'),
         ]
     )
