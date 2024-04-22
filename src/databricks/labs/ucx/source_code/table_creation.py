@@ -53,13 +53,13 @@ class NoFormatPythonMatcher:
 
         # Check 3: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
-        #   example: df.saveToTable("c.db.table", format="csv")
+        #   >>> df.saveToTable("c.db.table", format="csv")
         format_arg = ASTLinter(call).get_arg(self.format_arg_index, self.format_arg_name)
         if format_arg is not None and not ASTLinter(format_arg).is_none():
             # i.e., found an explicit "format" argument, and its value is not None.
             return None
         #   Option B. format specifier may be a separate ".format(...)" call in this callchain
-        #   example: df.format("csv").saveToTable("c.db.table")
+        #   >>> df.format("csv").saveToTable("c.db.table")
         format_call = ASTLinter(callchain).extract_call_by_name("format")
         if format_call is not None:
             # i.e., found an explicit ".format(...)" call in this chain.

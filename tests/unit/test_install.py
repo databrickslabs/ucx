@@ -806,7 +806,6 @@ def test_remove_secret_scope(ws, caplog):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
-    # ws.secrets.delete_scope.side_effect = NotFound()
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
