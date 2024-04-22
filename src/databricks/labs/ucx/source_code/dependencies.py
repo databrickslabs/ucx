@@ -105,11 +105,11 @@ class DependencyResolver:
         self,
         whitelist: Whitelist,
         local_loader: LocalLoader,
-        ws: WorkspaceClient | None,
+        workspace_loader: WorkspaceLoader | None,
     ):
         self._whitelist = Whitelist() if whitelist is None else whitelist
         self._local_loader = local_loader
-        self._workspace_loader = None if ws is None else WorkspaceLoader(ws)
+        self._workspace_loader = workspace_loader
         self._advices: list[Advice] = []
 
     def resolve_notebook(self, path: Path) -> Dependency | None:

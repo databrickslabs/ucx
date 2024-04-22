@@ -11,6 +11,7 @@ from databricks.labs.ucx.source_code.dependencies import (
     DependencyResolver,
     LocalLoader,
     DependencyGraphBuilder,
+    WorkspaceLoader,
 )
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect, whitelist_mock, _load_dependency_side_effect
@@ -31,7 +32,7 @@ def test_dependency_graph_builder_visits_notebook_notebook_dependencies():
     whi = whitelist_mock()
     loader = create_autospec(LocalLoader)
     loader.is_notebook.return_value = False
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
+    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, WorkspaceLoader(ws)))
     builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
     assert len(visited) == len(paths)
 
@@ -88,7 +89,7 @@ def test_dependency_graph_builder_fails_with_unfound_dependency():
     whi = whitelist_mock()
     loader = create_autospec(LocalLoader)
     loader.is_notebook.return_value = False
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
+    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, WorkspaceLoader(ws)))
     with pytest.raises(ValueError):
         builder.build_notebook_dependency_graph(Path("root1.run.py.txt"))
 
