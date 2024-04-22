@@ -199,9 +199,9 @@ class DependencyGraph:
         return child_graph
 
     def _locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
-        return self.locate_dependency_with_path(dependency.path)
+        return self.locate_dependency(dependency.path)
 
-    def locate_dependency_with_path(self, path: Path) -> DependencyGraph | None:
+    def locate_dependency(self, path: Path) -> DependencyGraph | None:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
         # TODO https://github.com/databrickslabs/ucx/issues/1287

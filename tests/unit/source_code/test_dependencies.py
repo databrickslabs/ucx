@@ -165,8 +165,8 @@ def test_dependency_graph_builder_ignores_builtin_dependencies():
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
-    assert not graph.locate_dependency_with_path("os")
-    assert not graph.locate_dependency_with_path("path")
+    assert not graph.locate_dependency("os")
+    assert not graph.locate_dependency("path")
 
 
 def test_dependency_graph_builder_ignores_known_dependencies():
@@ -184,4 +184,4 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     builder = DependencyGraphBuilder(DependencyResolver(whitelist, loader, None))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
-    assert not graph.locate_dependency_with_path("databricks")
+    assert not graph.locate_dependency("databricks")
