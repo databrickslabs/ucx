@@ -4,8 +4,6 @@ from collections import defaultdict
 from collections.abc import Iterable
 from functools import partial
 
-import sqlglot
-from sqlglot import expressions
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -262,14 +260,6 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_non_sync_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        table_migrate_sql = self._get_create_in_place_sql(src_table, rule)
-        logger.debug(f"Migrating table (No Sync) {src_table.key} to using SQL query: {table_migrate_sql}")
-        self._backend.execute(table_migrate_sql)
-        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grants)
-
     def _migrate_table_create_ctas(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         table_migrate_sql = self._get_create_ctas_sql(src_table, rule)
         logger.debug(f"Migrating table (Create Like) {src_table.key} to using SQL query: {table_migrate_sql}")
@@ -277,25 +267,6 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
-
-    def _get_create_in_place_sql(self, src_table: Table, rule: Rule) -> str:
-        create_sql = str(next(self._backend.fetch(src_table.sql_show_create()))["createtab_stmt"])
-        statements = sqlglot.parse(create_sql, read='databricks')
-        assert len(statements) == 1, 'Expected a single statement'
-        create = statements[0]
-        assert isinstance(create, expressions.Create), 'Expected a CREATE statement'
-        # safely replace current table name with the updated catalog
-        for table_name in create.find_all(expressions.Table):
-            if table_name.db == src_table.database and table_name.name == src_table.name:
-                new_table_name = expressions.Table(
-                    catalog=rule.catalog_name,
-                    db=rule.dst_schema,
-                    this=rule.dst_table,
-                )
-                table_name.replace(new_table_name)
-        # safely replace CREATE with CREATE IF NOT EXISTS
-        create.args['exists'] = True
-        return create.sql('databricks')
 
     def _get_create_ctas_sql(self, src_table: Table, rule: Rule) -> str:
         create_sql = (

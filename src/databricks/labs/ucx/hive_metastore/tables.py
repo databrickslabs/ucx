@@ -261,7 +261,7 @@ class Table:
         self, backend: SqlBackend, catalog_name, dst_schema, dst_table, replace_location
     ) -> str | None:
         # get raw DDL from "SHOW CREATE TABLE..."
-        createtab_stmt = next(backend.fetch(f"SHOW CREATE TABLE {escape_sql_identifier(self.key)}"))["createtab_stmt"]
+        createtab_stmt = next(backend.fetch(self.sql_show_create()))["createtab_stmt"]
         # parse the DDL and replace the old table name with the new UC table name
         try:
             statements = sqlglot.parse(createtab_stmt)
