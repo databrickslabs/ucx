@@ -28,6 +28,7 @@ from databricks.labs.ucx.hive_metastore.table_migrate import (
     TablesMigrator,
 )
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
+from databricks.labs.ucx.hive_metastore.tables import HiveSerdeType
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
@@ -227,6 +228,51 @@ class GlobalContext(abc.ABC):
             self.group_manager,
             self.migration_status_refresher,
             self.principal_acl,
+        )
+
+    @cached_property
+    def table_migrator_hiveserde_parquet(self):
+        return TablesMigrator(
+            self.tables_crawler,
+            self.grants_crawler,
+            self.workspace_client,
+            self.sql_backend,
+            self.table_mapping,
+            self.group_manager,
+            self.migration_status_refresher,
+            self.principal_acl,
+            hiveserde_in_place_migrate=HiveSerdeType.PARQUET,
+            mounts_crawler=self.mounts_crawler,
+        )
+
+    @cached_property
+    def table_migrator_hiveserde_orc(self):
+        return TablesMigrator(
+            self.tables_crawler,
+            self.grants_crawler,
+            self.workspace_client,
+            self.sql_backend,
+            self.table_mapping,
+            self.group_manager,
+            self.migration_status_refresher,
+            self.principal_acl,
+            hiveserde_in_place_migrate=HiveSerdeType.ORC,
+            mounts_crawler=self.mounts_crawler,
+        )
+
+    @cached_property
+    def table_migrator_hiveserde_avro(self):
+        return TablesMigrator(
+            self.tables_crawler,
+            self.grants_crawler,
+            self.workspace_client,
+            self.sql_backend,
+            self.table_mapping,
+            self.group_manager,
+            self.migration_status_refresher,
+            self.principal_acl,
+            hiveserde_in_place_migrate=HiveSerdeType.AVRO,
+            mounts_crawler=self.mounts_crawler,
         )
 
     @cached_property

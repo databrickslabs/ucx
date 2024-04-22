@@ -9,7 +9,7 @@ from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, 
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What, HiveSerdeType
 from . import get_azure_spark_conf
 
 
@@ -181,6 +181,80 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip
     runtime_ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert "SYNC command failed to migrate" in caplog.text
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@pytest.mark.parametrize(
+    'hiveserde_type',
+    [
+        HiveSerdeType.PARQUET,
+        HiveSerdeType.ORC,
+        HiveSerdeType.AVRO,
+    ],
+)
+def test_migrate_external_table_hiveserde_in_place_azure(
+    ws, env_or_skip, runtime_ctx, sql_backend, make_random, make_storage_dir, make_catalog, hiveserde_type
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    random = make_random(4).lower()
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
+    # prepare external table location
+    table_base_dir = make_storage_dir(path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}')
+    # prepare external table to be migrated
+    if hiveserde_type == HiveSerdeType.PARQUET:
+        table_name = f"parquet_serde_{random}"
+        ddl = f"CREATE TABLE hive_metastore.{src_schema.name}.{table_name} (id INT, region STRING) PARTITIONED BY (region) STORED AS PARQUETFILE LOCATION '{table_base_dir}/{table_name}'"
+        src_table = runtime_ctx.make_table(schema_name=src_schema.name, name=table_name, override_ddl=ddl)
+    elif hiveserde_type == HiveSerdeType.ORC:
+        table_name = f"orc_serde_{random}"
+        ddl = f"CREATE TABLE hive_metastore.{src_schema.name}.{table_name} (id INT, region STRING) PARTITIONED BY (region) STORED AS ORC LOCATION '{table_base_dir}/{table_name}'"
+        src_table = runtime_ctx.make_table(schema_name=src_schema.name, name=table_name, override_ddl=ddl)
+    elif hiveserde_type == HiveSerdeType.AVRO:
+        table_name = f"avro_serde_{random}"
+        ddl = f"""CREATE TABLE hive_metastore.{src_schema.name}.{table_name} (id INT, region STRING) 
+                    ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
+                    STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
+                              OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
+                    TBLPROPERTIES ('avro.schema.literal'='{{
+                        "namespace": "org.apache.hive", 
+                        "name": "first_schema", 
+                        "type": "record",
+                        "fields": [
+                            {{ "name":"id", "type":"int" }},
+                            {{ "name":"region", "type":"string" }}
+                        ] }}') 
+                    LOCATION '{table_base_dir}/{table_name}'
+                """
+        src_table = runtime_ctx.make_table(schema_name=src_schema.name, name=table_name, override_ddl=ddl)
+    sql_backend.execute(f"INSERT INTO {src_table.full_name} VALUES (1, 'us')")
+    # prepare target catalog and schema
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    logger.info(f"dst_catalog={dst_catalog.name}, external_table={src_table.full_name}")
+    rules = [Rule.from_src_dst(src_table, dst_schema)]
+
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_azure_resource_permission()
+
+    # migrate table
+    if hiveserde_type == HiveSerdeType.PARQUET:
+        runtime_ctx.table_migrator_hiveserde_parquet.migrate_tables(what=What.EXTERNAL_HIVESERDE)
+    elif hiveserde_type == HiveSerdeType.ORC:
+        runtime_ctx.table_migrator_hiveserde_orc.migrate_tables(what=What.EXTERNAL_HIVESERDE)
+    elif hiveserde_type == HiveSerdeType.AVRO:
+        runtime_ctx.table_migrator_hiveserde_avro.migrate_tables(what=What.EXTERNAL_HIVESERDE)
+
+    # assert results
+    try:
+        target_table_properties = ws.tables.get(f"{dst_catalog.name}.{dst_schema.name}.{table_name}").properties
+        row = next(sql_backend.fetch(f"SELECT * FROM {dst_catalog.name}.{dst_schema.name}.{table_name}"))
+    except NotFound:
+        assert False, f"{table_name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+    assert target_table_properties["upgraded_from"] == src_table.full_name
+    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+    assert row["id"] == 1
+    assert row["region"] == "us"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
