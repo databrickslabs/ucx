@@ -127,10 +127,8 @@ class WorkspaceInstaller(WorkspaceContext):
             installation = self.product_info.current_installation(self.workspace_client)
         except NotFound:
             if self._force_install == "user":
-                installation = Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
-            else:
-                installation = Installation.assume_global(self.workspace_client, self.product_info.product_name())
-        return installation
+                return Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
+            return Installation.assume_global(self.workspace_client, self.product_info.product_name())
 
     def __init__(
         self,
