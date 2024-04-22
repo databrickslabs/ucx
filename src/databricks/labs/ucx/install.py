@@ -125,15 +125,15 @@ class WorkspaceInstaller(WorkspaceContext):
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
         try:
-            current = self.product_info.current_installation(ws)
+            installation = self.product_info.current_installation(ws)
         except NotFound:
             if self._force_install == "user":
-                current = Installation.assume_user_home(ws, self.product_info.product_name())
+                installation = Installation.assume_user_home(ws, self.product_info.product_name())
             else:
-                current = Installation.assume_global(ws, self.product_info.product_name())
-        self.replace(installation=current)
+                installation = Installation.assume_global(ws, self.product_info.product_name())
+        self.replace(installation=installation)
 
-        self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
+        self._is_account_install = self._force_install == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
 
     def run(
