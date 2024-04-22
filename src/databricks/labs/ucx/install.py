@@ -6,6 +6,7 @@ import re
 import time
 import webbrowser
 from datetime import timedelta
+from functools import cached_property
 from typing import Any
 
 import databricks.sdk.errors
@@ -111,6 +112,26 @@ def extract_major_minor(version_string):
 
 
 class WorkspaceInstaller(WorkspaceContext):
+
+    @cached_property
+    def upgrades(self):
+        return Upgrades(self.product_info, self.installation)
+
+    @cached_property
+    def policy_installer(self):
+        return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
+
+    @cached_property
+    def installation(self):
+        try:
+            installation = self.product_info.current_installation(self.workspace_client)
+        except NotFound:
+            if self._force_install == "user":
+                installation = Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
+            else:
+                installation = Installation.assume_global(self.workspace_client, self.product_info.product_name())
+        return installation
+
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -124,14 +145,6 @@ class WorkspaceInstaller(WorkspaceContext):
         if "DATABRICKS_RUNTIME_VERSION" in environ:
             msg = "WorkspaceInstaller is not supposed to be executed in Databricks Runtime"
             raise SystemExit(msg)
-        try:
-            installation = self.product_info.current_installation(ws)
-        except NotFound:
-            if self._force_install == "user":
-                installation = Installation.assume_user_home(ws, self.product_info.product_name())
-            else:
-                installation = Installation.assume_global(ws, self.product_info.product_name())
-        self.replace(installation=installation)
 
         self._is_account_install = self._force_install == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
@@ -145,13 +158,12 @@ class WorkspaceInstaller(WorkspaceContext):
         logger.info(f"Installing UCX v{self.product_info.version()}")
         if config is None:
             config = self.configure(default_config)
-        install_state = InstallState.from_installation(self.installation)
         if self._is_testing():
             return config
         workflows_deployment = WorkflowsDeployment(
             config,
             self.installation,
-            install_state,
+            self.install_state,
             self._ws,
             self.wheels,
             self.product_info,
@@ -161,7 +173,7 @@ class WorkspaceInstaller(WorkspaceContext):
         workspace_installation = WorkspaceInstallation(
             config,
             self.installation,
-            install_state,
+            self.install_state,
             self.sql_backend,
             self._ws,
             workflows_deployment,
@@ -264,8 +276,7 @@ class WorkspaceInstaller(WorkspaceContext):
 
     def _apply_upgrades(self):
         try:
-            upgrades = Upgrades(self.product_info, self.installation)
-            upgrades.apply(self._ws)
+            self.upgrades.apply(self._ws)
         except (InvalidParameterValue, NotFound) as err:
             logger.warning(f"Installed version is too old: {err}")
 
@@ -275,8 +286,7 @@ class WorkspaceInstaller(WorkspaceContext):
         HiveMetastoreLineageEnabler(self._ws).apply(self.prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
         warehouse_id = self._configure_warehouse()
-        policy_installer = ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
-        policy_id, instance_profile, spark_conf_dict, instance_pool_id = policy_installer.create(
+        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self.policy_installer.create(
             default_config.inventory_database
         )
 
@@ -386,7 +396,7 @@ class WorkspaceInstallation(InstallationMixin):
         skip_dashboards=False,
     ):
         self._config = config
-        self.installation = installation
+        self._installation = installation
         self._install_state = install_state
         self._ws = ws
         self._sql_backend = sql_backend
@@ -438,7 +448,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     @property
     def folder(self):
-        return self.installation.install_folder()
+        return self._installation.install_folder()
 
     def run(self):
         logger.info(f"Installing UCX v{self.product_info.version()}")
@@ -478,7 +488,7 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws,
             state=self._install_state,
             local_folder=local_query_files,
-            remote_folder=f"{self.installation.install_folder()}/queries",
+            remote_folder=f"{self._installation.install_folder()}/queries",
             name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
             query_text_callback=self._config.replace_inventory_variable,
@@ -494,16 +504,16 @@ class WorkspaceInstallation(InstallationMixin):
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
         logger.info(f"Deleting UCX v{self.product_info.version()} from {self._ws.config.host}")
         try:
-            self.installation.files()
+            self._installation.files()
         except NotFound:
-            logger.error(f"Check if {self.installation.install_folder()} is present")
+            logger.error(f"Check if {self._installation.install_folder()} is present")
             return
         self._remove_database()
         self._remove_jobs()
         self._remove_warehouse()
         self._remove_policies()
         self._remove_secret_scope()
-        self.installation.remove()
+        self._installation.remove()
         logger.info("UnInstalling UCX complete")
 
     def _remove_database(self):
@@ -606,7 +616,7 @@ class AccountInstaller(AccountContext):
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
         return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
 
-    def install_on_account(self):
+    def run(self):
         ctx = AccountContext(self._get_safe_account_client())
         default_config = None
         confirmed = False
@@ -651,7 +661,7 @@ if __name__ == "__main__":
     force_install = env.get("UCX_FORCE_INSTALL")
     if force_install == "account":
         account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
-        account_installer.install_on_account()
+        account_installer.run()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
         workspace_installer.run()

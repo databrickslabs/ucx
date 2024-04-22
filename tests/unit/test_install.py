@@ -1735,6 +1735,6 @@ def test_account_installer(ws):
         ),
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.install_on_account()
+    account_installer.run()
     # should have 4 uploaded call, 2 for config.yml, 2 for workspace.json
     assert ws.workspace.upload.call_count == 4
