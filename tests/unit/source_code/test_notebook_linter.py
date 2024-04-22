@@ -2,7 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory, DEFAULT_SCHEMA
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
@@ -279,7 +279,7 @@ def test_notebook_linter(lang, source, expected):
     langs = Languages(index)
     linter = NotebookLinter.from_source(langs, source, lang)
     assert linter is not None
-    gathered = list(linter.lint("", DEFAULT_SCHEMA))
+    gathered = list(linter.lint(""))
     assert gathered == expected
 
 
@@ -320,9 +320,21 @@ USE old
 SELECT * FROM  testtable LIMIT 10
 
 -- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables
+
+SELECT * FROM  stuff LIMIT 10
+
+-- COMMAND ----------
 -- DBTITLE 1,A Python cell that uses calls to change the USE
 -- MAGIC %python
 -- MAGIC # This is a Python cell that uses calls to change the USE...
+
+spark.sql("use different_db")
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references DBFS
+
+SELECT * FROM testtable LIMIT 10
 
 -- COMMAND ----------
 -- DBTITLE 1,A SQL cell that references DBFS
@@ -330,18 +342,76 @@ SELECT * FROM  testtable LIMIT 10
 SELECT * FROM old.testtable LIMIT 10
 
 -- COMMAND ----------
+-- DBTITLE 1,A SQL cell that changes the DB to the default
+
+USE default
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references DBFS
+
+SELECT * FROM testtable LIMIT 10
+
+-- COMMAND ----------
 -- DBTITLE 1,A SQL cell that references tables 
 
 MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """,
-            "old",
+            [
+                Deprecation(
+                    code='table-migrate',
+                    message='Table different_db.testtable is migrated to cata2.newspace.table in Unity Catalog',
+                    start_line=9,
+                    start_col=0,
+                    end_line=9,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table old.testtable is migrated to cata3.newspace.table in Unity Catalog',
+                    start_line=19,
+                    start_col=0,
+                    end_line=19,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table old.stuff is migrated to brand.new.things in Unity Catalog',
+                    start_line=24,
+                    start_col=0,
+                    end_line=24,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table different_db.testtable is migrated to ' 'cata2.newspace.table in Unity Catalog',
+                    start_line=36,
+                    start_col=0,
+                    end_line=36,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table old.testtable is migrated to cata3.newspace.table in Unity Catalog',
+                    start_line=41,
+                    start_col=0,
+                    end_line=41,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table default.testtable is migrated to cata.nondefault.table in Unity Catalog',
+                    start_line=51,
+                    start_col=0,
+                    end_line=51,
+                    end_col=1024,
+                ),
+            ],
         ),
     ],
 )
-@pytest.mark.skip(reason="WIP - index not yet configured for test")
-def test_notebook_linter_tracks_use(lang, source, expected):
-    langs = Languages(index)
+def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected):
+    langs = Languages(extended_test_index)
     linter = NotebookLinter.from_source(langs, source, lang)
     assert linter is not None
-    advices = list(linter.lint("", DEFAULT_SCHEMA))
+    advices = list(linter.lint(""))
     assert advices == expected

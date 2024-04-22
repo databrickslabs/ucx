@@ -10,7 +10,6 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     Fixer,
     Linter,
-    DEFAULT_SCHEMA,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -29,11 +28,11 @@ class Matcher(ABC):
         return self._get_table_arg(node) is not None
 
     @abstractmethod
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         raise NotImplementedError()
 
     @abstractmethod
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         raise NotImplementedError()
 
     def _get_table_arg(self, node: ast.Call):
@@ -47,10 +46,10 @@ class Matcher(ABC):
 @dataclass
 class QueryMatcher(Matcher):
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if isinstance(table_arg, ast.Constant):
-            for advice in from_table.lint(table_arg.value, schema):
+            for advice in from_table.lint(table_arg.value):
                 yield advice.replace(
                     start_line=node.lineno,
                     start_col=node.col_offset,
@@ -67,21 +66,20 @@ class QueryMatcher(Matcher):
                 end_col=node.end_col_offset or 0,
             )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
-        new_query = from_table.apply(table_arg.value, schema)
+        new_query = from_table.apply(table_arg.value)
         table_arg.value = new_query
 
 
 @dataclass
 class TableNameMatcher(Matcher):
-    _schema: str | None = None
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if isinstance(table_arg, ast.Constant):
-            dst = self._find_dest(index, table_arg.value, schema)
+            dst = self._find_dest(index, table_arg.value, from_table.schema)
             if dst is not None:
                 yield Deprecation(
                     code='table-migrate',
@@ -103,10 +101,10 @@ class TableNameMatcher(Matcher):
                 end_col=node.end_col_offset or 0,
             )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
-        dst = self._find_dest(index, table_arg.value, schema)
+        dst = self._find_dest(index, table_arg.value, from_table.schema)
         if dst is not None:
             table_arg.value = dst.destination()
 
@@ -125,7 +123,7 @@ class ReturnValueMatcher(Matcher):
     def matches(self, node: ast.AST):
         return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
         yield Advisory(
             code='table-migrate',
@@ -136,7 +134,7 @@ class ReturnValueMatcher(Matcher):
             end_col=node.end_col_offset or 0,
         )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call, schema: str) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         raise NotImplementedError("Should never get there!")
 
 
@@ -220,27 +218,21 @@ class SparkSql(Linter, Fixer):
     def __init__(self, from_table: FromTable, index: MigrationIndex):
         self._from_table = from_table
         self._index = index
-        self._schema: str = DEFAULT_SCHEMA
-
-    @property
-    def schema(self):
-        return self._schema
 
     def name(self) -> str:
         # this is the same fixer, just in a different language context
         return self._from_table.name()
 
-    def lint(self, code: str, schema: str) -> Iterable[Advice]:
-        self._schema = schema
+    def lint(self, code: str) -> Iterable[Advice]:
         tree = ast.parse(code)
         for node in ast.walk(tree):
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
             assert isinstance(node, ast.Call)
-            yield from matcher.lint(self._from_table, self._index, node, schema)
+            yield from matcher.lint(self._from_table, self._index, node)
 
-    def apply(self, code: str, schema: str) -> str:
+    def apply(self, code: str) -> str:
         tree = ast.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
         for node in ast.walk(tree):
@@ -248,7 +240,7 @@ class SparkSql(Linter, Fixer):
             if matcher is None:
                 continue
             assert isinstance(node, ast.Call)
-            matcher.apply(self._from_table, self._index, node, schema)
+            matcher.apply(self._from_table, self._index, node)
         return ast.unparse(tree)
 
     def _find_matcher(self, node: ast.AST):

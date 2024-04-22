@@ -41,7 +41,7 @@ class ViewToMigrate(TableToMigrate):
             yield TableView("hive_metastore", src_db, old_table.name)
 
     def sql_migrate_view(self, index: MigrationIndex) -> str:
-        from_table = FromTable(index, schema=self.src.database)
+        from_table = FromTable(index)
         assert self.src.view_text is not None, 'Expected a view text'
         migrated_select = from_table.apply(self.src.view_text)
         statements = sqlglot.parse(migrated_select, read='databricks')

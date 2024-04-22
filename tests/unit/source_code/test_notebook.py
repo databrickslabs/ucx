@@ -4,7 +4,7 @@ import re
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType
 
-from databricks.labs.ucx.source_code.base import Advisory, DEFAULT_SCHEMA
+from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
@@ -40,7 +40,8 @@ R_NOTEBOOK_SAMPLE = (
 SQL_NOTEBOOK_SAMPLE = (
     "chf-pqi-scoring.sql.txt",
     Language.SQL,
-    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
+    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql',
+     'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
 SHELL_NOTEBOOK_SAMPLE = (
     "notebook-with-shell-cell.py.txt",
@@ -223,7 +224,7 @@ def test_notebook_builds_python_dependency_graph():
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py.txt")
     linter = PythonLinter()
-    advices = list(linter.lint(sources[0], DEFAULT_SCHEMA))
+    advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
             code='dbutils-notebook-run-dynamic',
@@ -239,7 +240,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(SourceContainer, "root4.py.txt")
     linter = PythonLinter()
-    advices = list(linter.lint(sources[0], DEFAULT_SCHEMA))
+    advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
             code='dbutils-notebook-run-literal',
@@ -260,7 +261,7 @@ stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
     linter = PythonLinter()
-    advices = list(linter.lint(source, DEFAULT_SCHEMA))
+    advices = list(linter.lint(source))
     assert len(advices) == 2
 
 
@@ -271,5 +272,5 @@ do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
     linter = PythonLinter()
-    advices = list(linter.lint(source, DEFAULT_SCHEMA))
+    advices = list(linter.lint(source))
     assert len(advices) == 0

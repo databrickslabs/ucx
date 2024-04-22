@@ -239,8 +239,7 @@ class PythonLinter(Linter):
         # It is not generally useful to know the schema of the last cell that was linted, except for testing purposes.
         return self._schema
 
-    def lint(self, code: str, schema: str) -> Iterable[Advice]:
-        self._schema = schema
+    def lint(self, code: str) -> Iterable[Advice]:
         linter = ASTLinter.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(linter)
         return [self._convert_dbutils_notebook_run_to_advice(node) for node in nodes]

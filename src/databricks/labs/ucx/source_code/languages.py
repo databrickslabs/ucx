@@ -1,7 +1,7 @@
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter
+from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter, CurrentSessionState
 from databricks.labs.ucx.source_code.pyspark import SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter, FromDbfsFolder
@@ -11,7 +11,8 @@ from databricks.labs.ucx.source_code.table_creation import DBRv8d0Linter
 class Languages:
     def __init__(self, index: MigrationIndex):
         self._index = index
-        from_table = FromTable(index)
+        session_state = CurrentSessionState()
+        from_table = FromTable(index, session_state=session_state)
         dbfs_from_folder = FromDbfsFolder()
         self._linters = {
             Language.PYTHON: SequentialLinter(
@@ -44,10 +45,10 @@ class Languages:
                 return fixer
         return None
 
-    def apply_fixes(self, language: Language, code: str, schema: str) -> tuple[str, str]:
+    def apply_fixes(self, language: Language, code: str) -> str:
         linter = self.linter(language)
-        for advice in linter.lint(code, schema):
+        for advice in linter.lint(code):
             fixer = self.fixer(language, advice.code)
             if fixer:
-                code = fixer.apply(code, schema)
-        return code, linter.schema
+                code = fixer.apply(code)
+        return code

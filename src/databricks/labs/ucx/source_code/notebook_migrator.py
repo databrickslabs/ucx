@@ -1,7 +1,6 @@
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.base import DEFAULT_SCHEMA
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
@@ -24,12 +23,6 @@ class NotebookMigrator:
         self._languages = languages
         self._loader = loader
         self._resolver = resolver
-        self._schema = DEFAULT_SCHEMA
-
-    @property
-    def schema(self):
-        # It is not generally useful to know the schema of the last cell that was migrated, except for testing purposes.
-        return self._schema
 
     def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
         if not object_info.path or not object_info.object_type:
@@ -51,16 +44,15 @@ class NotebookMigrator:
             self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
         return True
 
-    def apply(self, object_info: ObjectInfo, schema: str) -> bool:
+    def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
         notebook = self._loader.load_dependency(Dependency.from_object_info(object_info))
         assert isinstance(notebook, Notebook)
-        return self._apply(notebook, schema)
+        return self._apply(notebook)
 
-    def _apply(self, notebook: Notebook, schema: str) -> bool:
+    def _apply(self, notebook: Notebook) -> bool:
         changed = False
-        self._schema = schema
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
             if isinstance(cell, RunCell):
@@ -70,9 +62,7 @@ class NotebookMigrator:
                 continue
             if not self._languages.is_supported(cell.language.language):
                 continue
-            migrated_code, self._schema = self._languages.apply_fixes(
-                cell.language.language, cell.original_code, self._schema
-            )
+            migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code)
             if migrated_code != cell.original_code:
                 cell.migrated_code = migrated_code
                 changed = True
