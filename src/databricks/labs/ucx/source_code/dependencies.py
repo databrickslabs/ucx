@@ -183,16 +183,16 @@ class DependencyGraph:
             return None
         return self.register_dependency(resolved)
 
-    def register_dependency(self, resolved: Dependency):
+    def register_dependency(self, dependency: Dependency):
         # already registered ?
-        child_graph = self._locate_dependency(resolved)
+        child_graph = self._locate_dependency(dependency)
         if child_graph is not None:
-            self._dependencies[resolved] = child_graph
+            self._dependencies[dependency] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(resolved, self, self._resolver)
-        self._dependencies[resolved] = child_graph
-        container = resolved.load()
+        child_graph = DependencyGraph(dependency, self, self._resolver)
+        self._dependencies[dependency] = child_graph
+        container = dependency.load()
         if not container:
             return None
         container.build_dependency_graph(child_graph)
