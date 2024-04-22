@@ -73,6 +73,11 @@
     "db": "db1",
     "table": "v11",
     "view_text": "select * from db1.v10"
+  },
+  {
+    "db": "db1",
+    "table": "v12",
+    "view_text": "select * from db1.v11"
   }
 
 
