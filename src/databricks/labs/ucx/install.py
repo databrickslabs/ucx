@@ -24,7 +24,14 @@ from databricks.labs.blueprint.wheels import (
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.errors import AlreadyExists, BadRequest, InvalidParameterValue, NotFound, PermissionDenied
+from databricks.sdk.errors import (
+    AlreadyExists,
+    BadRequest,
+    InvalidParameterValue,
+    NotFound,
+    PermissionDenied,
+    ResourceDoesNotExist,
+)
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -137,6 +144,16 @@ def _configure_warehouse(ws: WorkspaceClient, prompts: Prompts, is_account_insta
         )
         warehouse_id = new_warehouse.id
     return warehouse_id
+
+
+def _replace_config(installation: Installation, **changes):
+    """
+    Persist the list of workspaces where UCX is successfully installed in the config
+    """
+    config = installation.load(WorkspaceConfig)
+    new_config = dataclasses.replace(config, **changes)
+    installation.save(new_config)
+    return new_config
 
 
 class WorkspaceInstaller:
@@ -510,6 +527,7 @@ class WorkspaceInstallation(InstallationMixin):
         except NotFound:
             logger.error(f"Check if {self._installation.install_folder()} is present")
             return
+        self._validate_config()
         self._remove_database()
         self._remove_jobs()
         self._remove_warehouse()
@@ -571,6 +589,14 @@ class WorkspaceInstallation(InstallationMixin):
         self._ws.jobs.run_now(job_id)
         if self._prompts.confirm(f"Open {step} Job url that just triggered ? {job_url}"):
             webbrowser.open(job_url)
+
+    def _validate_config(self):
+        try:
+            self._ws.warehouses.get(self._config.warehouse_id)
+        except ResourceDoesNotExist:
+            logger.critical(f"warehouse does not exists anymore {self._config.warehouse_id}")
+            warehouse_id = _configure_warehouse(self._ws, self._prompts)
+            self._config = _replace_config(self._installation, warehouse_id=warehouse_id)
 
 
 class AccountInstaller(AccountContext):
