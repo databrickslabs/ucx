@@ -47,15 +47,7 @@ class LocalFileDependency(ResolvedDependency):
     pass
 
 
-class NotebookDependency(ResolvedDependency, abc.ABC):
-    pass
-
-
-class WorkspaceNotebookDependency(NotebookDependency):
-    pass
-
-
-class LocalNotebookDependency(NotebookDependency):
+class NotebookDependency(ResolvedDependency):
     pass
 
 
