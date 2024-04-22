@@ -111,8 +111,35 @@ def extract_major_minor(version_string):
     return None
 
 
-class WorkspaceInstaller(WorkspaceContext):
+def _configure_warehouse(ws: WorkspaceClient, prompts: Prompts, is_account_install: bool = False) -> str:
+    """Configure the warehouse."""
+    def warehouse_type(_):
+        return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
+    pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
+        f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
+        for _ in ws.warehouses.list()
+        if _.warehouse_type == EndpointInfoWarehouseType.PRO
+    }
+    if is_account_install:
+        warehouse_id = "create_new"
+    else:
+        warehouse_id = prompts.choice_from_dict(
+            "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
+        )
+    if warehouse_id == "create_new":
+        new_warehouse = ws.warehouses.create(
+            name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
+            spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
+            warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
+            cluster_size="Small",
+            max_num_clusters=1,
+        )
+        warehouse_id = new_warehouse.id
+    return warehouse_id
+
+
+class WorkspaceInstaller:
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -285,8 +312,9 @@ class WorkspaceInstaller(WorkspaceContext):
             default_config = self._prompt_for_new_installation()
         HiveMetastoreLineageEnabler(self.workspace_client).apply(self.prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
-        warehouse_id = self._configure_warehouse()
-        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self.policy_installer.create(
+        warehouse_id = _configure_warehouse(self._ws, self._prompts, is_account_install=self._is_account_install)
+
+        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self._policy_installer.create(
             default_config.inventory_database
         )
 
@@ -342,32 +370,6 @@ class WorkspaceInstaller(WorkspaceContext):
         if selected_databases != "<ALL>":
             return [x.strip() for x in selected_databases.split(",")]
         return None
-
-    def _configure_warehouse(self) -> str:
-        def warehouse_type(_):
-            return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
-
-        pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
-            f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
-            for _ in self.workspace_client.warehouses.list()
-            if _.warehouse_type == EndpointInfoWarehouseType.PRO
-        }
-        if self._is_account_install:
-            warehouse_id = "create_new"
-        else:
-            warehouse_id = self.prompts.choice_from_dict(
-                "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
-            )
-        if warehouse_id == "create_new":
-            new_warehouse = self.workspace_client.warehouses.create(
-                name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
-                spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
-                warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
-                cluster_size="Small",
-                max_num_clusters=1,
-            )
-            warehouse_id = new_warehouse.id
-        return warehouse_id
 
     def _check_inventory_database_exists(self, inventory_database: str):
         logger.info("Fetching installations...")
