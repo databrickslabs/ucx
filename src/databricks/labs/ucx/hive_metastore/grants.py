@@ -532,7 +532,6 @@ class PrincipalACL:
             grants.update(cluster_usage)
             catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
             grants.update(catalog_grants)
-
         return list(grants)
 
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
