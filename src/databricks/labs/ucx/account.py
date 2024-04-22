@@ -7,6 +7,7 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
+from databricks.sdk.service.settings import DefaultNamespaceSetting, StringMessage
 
 logger = logging.getLogger(__name__)
 
@@ -258,3 +259,67 @@ class WorkspaceInfo:
         for installation in Installation.existing(self._ws, 'ucx'):
             installation.save(workspaces, filename=AccountWorkspaces.SYNC_FILE_NAME)
         logger.info("Synchronised workspace id mapping for installations on current workspace")
+
+
+class AccountMetastores:
+    def __init__(
+        self,
+        account_client: AccountClient,
+    ):
+        self._ac = account_client
+
+    def show_all_metastores(self, workspace_id: str | None = None):
+        location = None
+        if workspace_id:
+            logger.info(f"Workspace ID: {workspace_id}")
+            location = self._get_region(int(workspace_id))
+        logger.info("Matching metastores are:")
+        for metastore in self._get_all_metastores(location).keys():
+            logger.info(metastore)
+
+    def assign_metastore(
+        self,
+        prompts: Prompts,
+        str_workspace_id: str,
+        metastore_id: str | None = None,
+        default_catalog: str | None = None,
+    ):
+        workspace_id = int(str_workspace_id)
+        if not metastore_id:
+            # search for all matching metastores
+            matching_metastores = self._get_all_metastores(self._get_region(workspace_id))
+            if len(matching_metastores) == 0:
+                raise ValueError(f"No matching metastore found for workspace {workspace_id}")
+            # if there are multiple matches, prompt users to select one
+            if len(matching_metastores) > 1:
+                prompts.choice_from_dict("Multiple metastores found, please select one:", matching_metastores)
+            metastore_id = list(matching_metastores.values())[0]
+        if metastore_id is not None:
+            self._ac.metastore_assignments.create(workspace_id, metastore_id)
+        # set the default catalog using the default_namespace setting API
+        if default_catalog is not None:
+            self._set_default_catalog(workspace_id, default_catalog)
+
+    def _get_region(self, workspace_id: int) -> str:
+        workspace = self._ac.workspaces.get(workspace_id)
+        if self._ac.config.is_aws:
+            return str(workspace.aws_region)
+        return str(workspace.location)
+
+    def _get_all_metastores(self, location: str | None = None) -> dict[str, str]:
+        output = dict[str, str]()
+        for metastore in self._ac.metastores.list():
+            if location is None or metastore.region == location:
+                output[f"{metastore.name} - {metastore.metastore_id}"] = str(metastore.metastore_id)
+        return output
+
+    def _set_default_catalog(self, workspace_id: int, default_catalog: str):
+        workspace = self._ac.workspaces.get(int(workspace_id))
+        default_namespace = self._ac.get_workspace_client(workspace).settings.default_namespace
+        # needs to get the etag first, before patching the setting
+        current = default_namespace.get()
+        default_namespace.update(
+            allow_missing=True,
+            field_mask="namespace.value",
+            setting=DefaultNamespaceSetting(etag=current.etag, namespace=StringMessage(default_catalog)),
+        )
