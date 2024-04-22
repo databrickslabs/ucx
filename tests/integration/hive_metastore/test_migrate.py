@@ -522,7 +522,7 @@ def test_migrate_external_tables_with_spn_azure(
         pytest.skip("temporary: only works in azure test env")
     ctx, table_full_name = prepared_principal_acl
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
-    ctx.with_dummy_azure_resource_permission()
+    ctx.with_dummy_resource_permission()
 
     table_migrate = ctx.tables_migrator
 
