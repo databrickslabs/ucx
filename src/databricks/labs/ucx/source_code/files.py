@@ -35,8 +35,7 @@ class LocalFile(SourceContainer):
         for path in notebook_paths:
             parent.register_notebook(Path(path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        import_names = PythonLinter.list_import_sources(linter)
-        for import_name in import_names:
+        for import_name in PythonLinter.list_import_sources(linter):
             parent.register_import(import_name)
 
 
