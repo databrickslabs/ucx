@@ -392,7 +392,7 @@ def assign_metastore(
     """Assign metastore to a workspace"""
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = AccountContext(a)
-    ctx.account_metastores.assign_metastore(workspace_id, metastore_id, default_catalog)
+    ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
 
 
 if __name__ == "__main__":

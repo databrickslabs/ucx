@@ -17,13 +17,6 @@ from databricks.sdk.service.settings import DefaultNamespaceSetting, StringMessa
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo, AccountMetastores
 
 
-@pytest.fixture
-def acc_client():
-    acc = create_autospec(AccountClient)
-    acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
-    return acc
-
-
 def test_sync_workspace_info(acc_client):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
