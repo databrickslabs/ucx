@@ -175,7 +175,7 @@ class WorkspaceInstaller(WorkspaceContext):
             self.installation,
             self.install_state,
             self.sql_backend,
-            self._ws,
+            self.workspace_client,
             workflows_deployment,
             self.prompts,
             self.product_info,
@@ -247,7 +247,9 @@ class WorkspaceInstaller(WorkspaceContext):
             raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
         if self.installation.is_global() and self._force_install == "user":
             # Logic for forced user install over global install
-            self.replace(installation=Installation.assume_user_home(self._ws, self.product_info.product_name()))
+            self.replace(
+                installation=Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
+            )
             return True
         return False
 
@@ -272,18 +274,18 @@ class WorkspaceInstaller(WorkspaceContext):
             new_config = dataclasses.replace(config, **changes)
             self.installation.save(new_config)
         except (PermissionDenied, NotFound, ValueError):
-            logger.warning(f"Failed to replace config for {self._ws.config.host}")
+            logger.warning(f"Failed to replace config for {self.workspace_client.config.host}")
 
     def _apply_upgrades(self):
         try:
-            self.upgrades.apply(self._ws)
+            self.upgrades.apply(self.workspace_client)
         except (InvalidParameterValue, NotFound) as err:
             logger.warning(f"Installed version is too old: {err}")
 
     def _configure_new_installation(self, default_config: WorkspaceConfig | None = None) -> WorkspaceConfig:
         if default_config is None:
             default_config = self._prompt_for_new_installation()
-        HiveMetastoreLineageEnabler(self._ws).apply(self.prompts, self._is_account_install)
+        HiveMetastoreLineageEnabler(self.workspace_client).apply(self.prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
         warehouse_id = self._configure_warehouse()
         policy_id, instance_profile, spark_conf_dict, instance_pool_id = self.policy_installer.create(
@@ -349,7 +351,7 @@ class WorkspaceInstaller(WorkspaceContext):
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
             f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
-            for _ in self._ws.warehouses.list()
+            for _ in self.workspace_client.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
         if self._is_account_install:
@@ -359,7 +361,7 @@ class WorkspaceInstaller(WorkspaceContext):
                 "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
             )
         if warehouse_id == "create_new":
-            new_warehouse = self._ws.warehouses.create(
+            new_warehouse = self.workspace_client.warehouses.create(
                 name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
@@ -371,7 +373,7 @@ class WorkspaceInstaller(WorkspaceContext):
 
     def _check_inventory_database_exists(self, inventory_database: str):
         logger.info("Fetching installations...")
-        for installation in Installation.existing(self._ws, self.product_info.product_name()):
+        for installation in Installation.existing(self.workspace_client, self.product_info.product_name()):
             try:
                 config = installation.load(WorkspaceConfig)
                 if config.inventory_database == inventory_database:
