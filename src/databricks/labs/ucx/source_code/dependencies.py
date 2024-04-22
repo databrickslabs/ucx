@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import ast
-import typing
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -186,7 +185,7 @@ class DependencyGraph:
 
     def register_dependency(self, resolved: Dependency):
         # already registered ?
-        child_graph = self.locate_dependency(resolved)
+        child_graph = self._locate_dependency(resolved)
         if child_graph is not None:
             self._dependencies[resolved] = child_graph
             return child_graph
@@ -199,21 +198,22 @@ class DependencyGraph:
         container.build_dependency_graph(child_graph)
         return child_graph
 
-    def locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
-        return self.locate_dependency_with_path(str(dependency.path))
+    def _locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
+        return self.locate_dependency_with_path(dependency.path)
 
-    def locate_dependency_with_path(self, path: str) -> DependencyGraph | None:
+    def locate_dependency_with_path(self, path: Path) -> DependencyGraph | None:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        path = path[2:] if path.startswith('./') else path
+        path_str = str(path)
+        path_str = path_str[2:] if path_str.startswith('./') else path_str
 
         def check_registered_dependency(graph):
             # TODO https://github.com/databrickslabs/ucx/issues/1287
             graph_path = str(graph.path)
             if graph_path.startswith('./'):
                 graph_path = graph_path[2:]
-            if graph_path == path:
+            if graph_path == path_str:
                 found.append(graph)
                 return True
             return False
@@ -251,7 +251,7 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str, register_import: Callable[[str], typing.Any]):
+    def build_graph_from_python_source(self, python_code: str):
         linter = ASTLinter.parse(python_code)
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:
@@ -263,9 +263,11 @@ class DependencyGraph:
                 if dependency is None:
                     # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                     raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
-        names = PythonLinter.list_import_sources(linter)
-        for name in names:
-            register_import(name)
+            else:
+                # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                pass
+        for name in PythonLinter.list_import_sources(linter):
+            self.register_import(name)
 
 
 class DependencyGraphBuilder:

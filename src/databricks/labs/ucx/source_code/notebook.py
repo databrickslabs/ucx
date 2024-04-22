@@ -79,7 +79,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        parent.build_graph_from_python_source(self._original_code, parent.register_import)
+        parent.build_graph_from_python_source(self._original_code)
 
 
 class RCell(Cell):
