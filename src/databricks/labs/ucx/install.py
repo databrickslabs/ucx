@@ -164,7 +164,7 @@ class WorkspaceInstaller(WorkspaceContext):
             config,
             self.installation,
             self.install_state,
-            self._ws,
+            self.workspace_client,
             self.wheels,
             self.product_info,
             verify_timeout,
