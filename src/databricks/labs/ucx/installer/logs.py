@@ -190,10 +190,19 @@ class TaskRunWarningRecorder:
             # Ignore the prompt to troubleshoot, which is the error
             if 'databricks workspace export /' in message:
                 continue
+            # This error comes up during testing, when ucx crawls tables & schemas created by other tests,
+            # but couldn't fetch the grants later as they have already been dropped by those tests. Ignore them
+            errors_in_test = ["Couldn't fetch grants"]
+            if any(error in message for error in errors_in_test) and self._is_testing():
+                continue
             error_messages.append(message)
         if len(error_messages) > 0:
             raise InternalError("\n".join(error_messages))
         return log_records
+
+    @staticmethod
+    def _is_testing():
+        return "+" in __version__
 
 
 class TaskLogger(contextlib.AbstractContextManager):

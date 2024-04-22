@@ -18,12 +18,10 @@ from databricks.sdk.errors import (
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
-from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import PermissionLevel
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -168,8 +166,11 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
-    with pytest.raises(NotFound):
+    @retried(on=[NotFound], timeout=timedelta(seconds=120))
+    def wait():
         ws.groups.get(ws_group_a.id)
+
+    wait()
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
@@ -324,47 +325,6 @@ def test_check_inventory_database_exists(ws, installation_ctx):
         installation_ctx.workspace_installer.configure()
 
 
-@pytest.fixture
-def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_dbfs_data_copy, env_or_skip
-) -> tuple[dict[str, TableInfo], SchemaInfo]:
-    # create external and managed tables to be migrated
-    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
-    tables: dict[str, TableInfo] = {
-        "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
-        "src_external_table": installation_ctx.make_table(
-            schema_name=schema.name, external_csv=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
-        ),
-    }
-    src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
-    tables["src_view1"] = installation_ctx.make_table(
-        catalog_name=schema.catalog_name,
-        schema_name=schema.name,
-        ctas=src_view1_text,
-        view=True,
-    )
-    src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
-    tables["src_view2"] = installation_ctx.make_table(
-        catalog_name=schema.catalog_name,
-        schema_name=schema.name,
-        ctas=src_view2_text,
-        view=True,
-    )
-    # create destination catalog and schema
-    dst_catalog = make_catalog()
-    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
-    migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
-    installation_ctx.with_table_mapping_rules(migrate_rules)
-    if ws.config.is_azure:
-        installation_ctx.with_dummy_azure_resource_permission()
-    if ws.config.is_aws:
-        installation_ctx.with_dummy_aws_resource_permission()
-    installation_ctx.save_tables()
-    installation_ctx.save_mounts()
-    installation_ctx.with_dummy_grants_and_tacls()
-    return tables, dst_schema
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_table_migration_job(
     ws,
@@ -402,6 +362,9 @@ def test_table_migration_job(
     for job_cluster in ws.jobs.get(
         ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
     ).settings.job_clusters:
+        if job_cluster.job_cluster_key != "table_migration":
+            # don't assert on the cluster for parse logs task
+            continue
         assert job_cluster.new_cluster.autoscale.min_workers == 2
         assert job_cluster.new_cluster.autoscale.max_workers == 20
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"

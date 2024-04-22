@@ -227,27 +227,48 @@ class ServicePrincipalMigration(SecretsMixin):
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
-
+    def _migrate_service_principals(
+        self, include_names: set[str] | None = None
+    ) -> list[StorageCredentialValidationResult]:
         sp_list_with_secret = self._generate_migration_list(include_names)
-
-        plan_confirmed = prompts.confirm(
-            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
-        )
-        if plan_confirmed is not True:
-            return []
 
         execution_result = []
         for spn in sp_list_with_secret:
             self._storage_credential_manager.create_with_client_secret(spn)
             execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
+        return execution_result
 
-        if execution_result:
-            results_file = self.save(execution_result)
+    def _create_access_connectors_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
+        self._resource_permissions.create_access_connectors_for_storage_accounts()
+        return []
+
+    def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
+        plan_confirmed = prompts.confirm(
+            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
+        )
+        if plan_confirmed:
+            sp_results = self._migrate_service_principals(include_names)
+        else:
+            sp_results = []
+
+        plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
+        if plan_confirmed:
+            ac_results = self._create_access_connectors_for_storage_accounts()
+        else:
+            ac_results = []
+
+        execution_results = sp_results + ac_results
+        if execution_results:
+            results_file = self.save(execution_results)
             logger.info(
-                f"Completed migration from Azure Service Principal to UC Storage credentials"
+                "Completed migration from Azure Service Principal to UC Storage credentials "
+                "and creation of Databricks Access Connectors for storage accounts "
                 f"Please check {results_file} for validation results"
             )
         else:
-            logger.info("No Azure Service Principal migrated to UC Storage credentials")
-        return execution_result
+            logger.info(
+                "No Azure Service Principal migrated to UC Storage credentials "
+                "nor Databricks Access Connectors created for storage accounts"
+            )
+
+        return execution_results

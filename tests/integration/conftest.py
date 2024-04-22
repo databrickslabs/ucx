@@ -3,7 +3,6 @@ import functools
 import collections
 import os
 import logging
-import warnings
 from dataclasses import replace
 from functools import partial, cached_property
 from datetime import timedelta
@@ -20,7 +19,6 @@ from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -29,6 +27,7 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -144,21 +143,6 @@ class StaticTablesCrawler(TablesCrawler):
         return self._tables
 
 
-class StaticTableMapping(TableMapping):
-    def __init__(self, workspace_client: WorkspaceClient, sb: SqlBackend, rules: list[Rule]):
-        # TODO: remove this class, it creates difficulties when used together with Permission mapping
-        warnings.warn("switch to using runtime_ctx fixture", DeprecationWarning)
-        installation = Installation(workspace_client, 'ucx')
-        super().__init__(installation, workspace_client, sb)
-        self._rules = rules
-
-    def load(self):
-        return self._rules
-
-    def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
-        raise RuntimeWarning("not available")
-
-
 class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
     def __init__(self, spn_infos: list[AzureServicePrincipalInfo], *args):
         super().__init__(*args)
@@ -201,33 +185,32 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
         # TODO: add methods to pre-populate the following:
         self._spn_infos = []
 
-    def with_dummy_azure_resource_permission(self):
+    def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
-        self.with_azure_storage_permissions(
-            [
-                StoragePermissionMapping(
-                    prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
-                    client_id='dummy_application_id',
-                    principal='principal_1',
-                    privilege='WRITE_FILES',
-                    type='Application',
-                    directory_id='directory_id_ss1',
-                )
-            ]
-        )
-
-    def with_dummy_aws_resource_permission(self):
-        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
-        self.with_aws_storage_permissions(
-            [
-                AWSRoleAction(
-                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-                    's3',
-                    'WRITE_FILES',
-                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
-                )
-            ]
-        )
+        if self.workspace_client.config.is_azure:
+            self.with_azure_storage_permissions(
+                [
+                    StoragePermissionMapping(
+                        prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
+                        client_id='dummy_application_id',
+                        principal='principal_1',
+                        privilege='WRITE_FILES',
+                        type='Application',
+                        directory_id='directory_id_ss1',
+                    )
+                ]
+            )
+        if self.workspace_client.config.is_aws:
+            self.with_aws_storage_permissions(
+                [
+                    AWSRoleAction(
+                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
+                        's3',
+                        'WRITE_FILES',
+                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                    )
+                ]
+            )
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
@@ -437,6 +420,29 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
+class LocalAzureCliTest(WorkspaceContext):
+    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
+        super().__init__(_ws, {})
+        self._env_or_skip = env_or_skip_fixture
+
+    @cached_property
+    def azure_cli_authenticated(self):
+        if not self.is_azure:
+            pytest.skip("Azure only")
+        if self.connect_config.auth_type != "azure-cli":
+            pytest.skip("Local test only")
+        return True
+
+    @cached_property
+    def azure_subscription_id(self):
+        return self._env_or_skip("TEST_SUBSCRIPTION_ID")
+
+
+@pytest.fixture
+def az_cli_ctx(ws, env_or_skip):
+    return LocalAzureCliTest(ws, env_or_skip)
+
+
 class TestInstallationContext(TestRuntimeContext):
     def __init__(
         self,
@@ -626,3 +632,39 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
+
+
+@pytest.fixture
+def prepare_tables_for_migration(
+    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip
+) -> tuple[dict[str, TableInfo], SchemaInfo]:
+    # create external and managed tables to be migrated
+    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+    tables: dict[str, TableInfo] = {
+        "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
+        "src_external_table": installation_ctx.make_table(schema_name=schema.name, external_csv=make_mounted_location),
+    }
+    src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
+    tables["src_view1"] = installation_ctx.make_table(
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        ctas=src_view1_text,
+        view=True,
+    )
+    src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
+    tables["src_view2"] = installation_ctx.make_table(
+        catalog_name=schema.catalog_name,
+        schema_name=schema.name,
+        ctas=src_view2_text,
+        view=True,
+    )
+    # create destination catalog and schema
+    dst_catalog = make_catalog()
+    dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
+    migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
+    installation_ctx.with_table_mapping_rules(migrate_rules)
+    installation_ctx.with_dummy_resource_permission()
+    installation_ctx.save_tables()
+    installation_ctx.save_mounts()
+    installation_ctx.with_dummy_grants_and_tacls()
+    return tables, dst_schema

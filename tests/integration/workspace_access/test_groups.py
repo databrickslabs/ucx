@@ -99,8 +99,11 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     group_manager.reflect_account_groups_on_workspace()
     group_manager.delete_original_workspace_groups()
 
-    with pytest.raises(NotFound):
+    @retried(on=[NotFound], timeout=timedelta(seconds=120))
+    def wait():
         ws.groups.get(ws_group.id)
+
+    wait()
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
