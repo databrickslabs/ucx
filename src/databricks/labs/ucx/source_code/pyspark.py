@@ -79,7 +79,7 @@ class TableNameMatcher(Matcher):
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if isinstance(table_arg, ast.Constant):
-            dst = self._find_dest(index, table_arg.value)
+            dst = self._find_dest(index, table_arg.value, from_table.schema)
             if dst is not None:
                 yield Deprecation(
                     code='table-migrate',
@@ -104,13 +104,16 @@ class TableNameMatcher(Matcher):
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
-        dst = self._find_dest(index, table_arg.value)
+        dst = self._find_dest(index, table_arg.value, from_table.schema)
         if dst is not None:
             table_arg.value = dst.destination()
 
     @staticmethod
-    def _find_dest(index: MigrationIndex, value: str):
+    def _find_dest(index: MigrationIndex, value: str, schema: str):
         parts = value.split(".")
+        # Ensure that unqualified table references use the current schema
+        if len(parts) == 1:
+            return index.get(schema, parts[0])
         return None if len(parts) != 2 else index.get(parts[0], parts[1])
 
 

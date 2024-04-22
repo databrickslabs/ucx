@@ -40,7 +40,8 @@ R_NOTEBOOK_SAMPLE = (
 SQL_NOTEBOOK_SAMPLE = (
     "chf-pqi-scoring.sql.txt",
     Language.SQL,
-    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
+    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql',
+     'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
 SHELL_NOTEBOOK_SAMPLE = (
     "notebook-with-shell-cell.py.txt",
