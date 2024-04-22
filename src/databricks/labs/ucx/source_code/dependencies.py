@@ -16,7 +16,8 @@ from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 class Dependency(abc.ABC):
 
-    def __init__(self, path: Path):
+    def __init__(self, loader: DependencyLoader, path: Path):
+        self._loader = loader
         self._path = path
 
     @property
@@ -29,27 +30,8 @@ class Dependency(abc.ABC):
     def __eq__(self, other):
         return isinstance(other, type(self)) and self.path == other.path
 
-
-class UnresolvedDependency(Dependency):
-    pass
-
-
-class ResolvedDependency(Dependency, abc.ABC):
-
-    def __init__(self, loader: DependencyLoader, path: Path):
-        super().__init__(path)
-        self._loader = loader
-
     def load(self) -> SourceContainer | None:
         return self._loader.load_dependency(self)
-
-
-class LocalFileDependency(ResolvedDependency):
-    pass
-
-
-class NotebookDependency(ResolvedDependency):
-    pass
 
 
 class SourceContainer(abc.ABC):
@@ -131,21 +113,21 @@ class DependencyResolver:
         self._workspace_loader = None if ws is None else WorkspaceLoader(ws)
         self._advices: list[Advice] = []
 
-    def resolve_notebook(self, path: Path) -> NotebookDependency | None:
+    def resolve_notebook(self, path: Path) -> Dependency | None:
         if self._local_loader.is_notebook(path):
-            return NotebookDependency(self._local_loader, path)
+            return Dependency(self._local_loader, path)
         if self._workspace_loader is not None and self._workspace_loader.is_notebook(path):
-            return NotebookDependency(self._workspace_loader, path)
+            return Dependency(self._workspace_loader, path)
         return None
 
-    def resolve_local_file(self, path: Path) -> ResolvedDependency | None:
+    def resolve_local_file(self, path: Path) -> Dependency | None:
         if self._local_loader.is_notebook(path):
-            return NotebookDependency(self._local_loader, path)
+            return Dependency(self._local_loader, path)
         if self._local_loader.is_file(path):
-            return LocalFileDependency(self._local_loader, path)
+            return Dependency(self._local_loader, path)
         return None
 
-    def resolve_import(self, name: str) -> LocalFileDependency | None:
+    def resolve_import(self, name: str) -> Dependency | None:
         compatibility = self._whitelist.compatibility(name)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is not None:
@@ -162,7 +144,7 @@ class DependencyResolver:
                 )
             return None
         if self._local_loader.is_file(Path(name)):
-            return LocalFileDependency(self._local_loader, Path(name))
+            return Dependency(self._local_loader, Path(name))
         raise ValueError(f"Could not locate {name}")
 
     def get_advices(self) -> Iterable[Advice]:
@@ -202,7 +184,7 @@ class DependencyGraph:
             return None
         return self.register_dependency(resolved)
 
-    def register_dependency(self, resolved: ResolvedDependency):
+    def register_dependency(self, resolved: Dependency):
         # already registered ?
         child_graph = self.locate_dependency(resolved)
         if child_graph is not None:
