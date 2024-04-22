@@ -1756,7 +1756,6 @@ def test_global_workspace_installer(mock_ws):
         mock_ws,
         {'UCX_FORCE_INSTALL': 'global'},
     )
-    workspace_installer.replace(product_info=ProductInfo.for_testing(WorkspaceConfig))
     # installation folder should start with /Applications
     assert workspace_installer.install_state.install_folder().startswith("/Applications")
 
