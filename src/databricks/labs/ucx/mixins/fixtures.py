@@ -972,7 +972,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
-        override_ddl: str | None = None,
+        hiveserde_ddl: str | None = None,
+        storage_override: str | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1023,8 +1024,11 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
-        if override_ddl:
-            ddl = override_ddl
+        if hiveserde_ddl:
+            ddl = hiveserde_ddl
+            data_source_format = None
+            table_type = TableType.EXTERNAL
+            storage_location = storage_override
 
         sql_backend.execute(ddl)
         table_info = TableInfo(

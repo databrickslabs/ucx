@@ -174,7 +174,7 @@ class Table:
             return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
-        if self.kind == "TABLE" and self.table_format == "HIVE":
+        if self.kind == "TABLE" and self.table_format.upper() == "HIVE":
             return What.EXTERNAL_HIVESERDE
         if self.kind == "TABLE":
             return What.EXTERNAL_NO_SYNC

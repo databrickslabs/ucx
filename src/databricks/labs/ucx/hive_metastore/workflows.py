@@ -37,6 +37,47 @@ class TableMigration(Workflow):
         ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
+class MigrateHiveSerdeTablesInPlace(Workflow):
+    def __init__(self):
+        super().__init__('migrate-external-hiveserde-tables-in-place-experimental')
+
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    def migrate_parquet_serde_in_place(self, ctx: RuntimeContext):
+        """This workflow task migrates ParquetHiveSerDe tables in place from the Hive Metastore to the Unity Catalog."""
+        ctx.table_migrator_hiveserde_parquet.migrate_tables(
+            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL]
+        )
+
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    def migrate_orc_serde_in_place(self, ctx: RuntimeContext):
+        """This workflow task migrates OrcSerde tables in place from the Hive Metastore to the Unity Catalog."""
+        ctx.table_migrator_hiveserde_orc.migrate_tables(
+            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL]
+        )
+
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    def migrate_avro_serde_in_place(self, ctx: RuntimeContext):
+        """This workflow task migrates AvroSerDe tables in place from the Hive Metastore to the Unity Catalog."""
+        ctx.table_migrator_hiveserde_avro.migrate_tables(
+            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL]
+        )
+
+    @job_task(
+        job_cluster="table_migration",
+        depends_on=[
+            Assessment.crawl_tables,
+            migrate_parquet_serde_in_place,
+            migrate_orc_serde_in_place,
+            migrate_avro_serde_in_place,
+        ],
+    )
+    def migrate_views(self, ctx: RuntimeContext):
+        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
+        It is dependent on the migration of the tables.
+        """
+        ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+
 class MigrateTablesInMounts(Workflow):
     def __init__(self):
         super().__init__('migrate-tables-in-mounts-experimental')

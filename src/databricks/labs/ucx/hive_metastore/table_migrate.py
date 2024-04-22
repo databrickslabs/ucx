@@ -102,6 +102,8 @@ class TablesMigrator:
             )
             tasks.append(partial(self._migrate_table, table, grants, mounts))
         Threads.strict("migrate tables", tasks)
+        if not tasks:
+            logger.info(f"No tables found to migrate with type {what.name}")
         # the below is useful for testing
         return tasks
 
