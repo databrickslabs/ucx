@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Linter, DEFAULT_SCHEMA
+from databricks.labs.ucx.source_code.base import Advice, Linter
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.languages import Languages, Language
 
@@ -15,7 +15,6 @@ class NotebookLinter(Linter):
     def __init__(self, langs: Languages, notebook: Notebook):
         self._languages: Languages = langs
         self._notebook: Notebook = notebook
-        self._schema: str = DEFAULT_SCHEMA
 
     @classmethod
     def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
