@@ -1,12 +1,12 @@
 from collections.abc import Iterable
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Linter
+from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.languages import Languages, Language
 
 
-class NotebookLinter(Linter):
+class NotebookLinter:
     """
     Parses a Databricks notebook and then applies available linters
     to the code cells according to the language of the cell.
@@ -23,7 +23,7 @@ class NotebookLinter(Linter):
         assert notebook is not None
         return cls(langs, notebook)
 
-    def lint(self, _: str) -> Iterable[Advice]:
+    def lint(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
             if not self._languages.is_supported(cell.language.language):
                 continue

@@ -277,7 +277,7 @@ def test_notebook_linter(lang, source, expected):
     # over multiple lines.
     linter = NotebookLinter.from_source(index, source, lang)
     assert linter is not None
-    gathered = list(linter.lint(""))
+    gathered = list(linter.lint())
     assert gathered == expected
 
 
@@ -473,5 +473,5 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
 def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected):
     linter = NotebookLinter.from_source(extended_test_index, source, lang)
     assert linter is not None
-    advices = list(linter.lint(""))
+    advices = list(linter.lint())
     assert advices == expected
