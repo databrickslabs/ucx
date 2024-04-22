@@ -45,7 +45,9 @@ def test_apply_returns_false_when_language_not_supported():
 """
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = notebook_code.encode("utf-8")
-    ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path="path")
+    ws.workspace.get_status.return_value = ObjectInfo(
+        object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path="path"
+    )
     languages = create_autospec(Languages)
     languages.is_supported.return_value = False
     dependency = create_autospec(Dependency)
@@ -62,7 +64,9 @@ def test_apply_returns_false_when_no_fixes_applied():
 """
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = notebook_code.encode("utf-8")
-    ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path="path")
+    ws.workspace.get_status.return_value = ObjectInfo(
+        object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path="path"
+    )
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
     languages.apply_fixes.return_value = "# original code"  # cell code
@@ -83,7 +87,9 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
 """
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = original_code.encode("utf-8")
-    ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path="path")
+    ws.workspace.get_status.return_value = ObjectInfo(
+        object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path="path"
+    )
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
     languages.apply_fixes.return_value = migrated_cell_code
