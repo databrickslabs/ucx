@@ -6,7 +6,8 @@ from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectTyp
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
-    DependencyResolver,
+    WorkspaceLoader,
+    Dependency,
 )
 
 
@@ -15,11 +16,9 @@ class NotebookMigrator:
         self,
         ws: WorkspaceClient,
         languages: Languages,
-        resolver: DependencyResolver,
     ):
         self._ws = ws
         self._languages = languages
-        self._resolver = resolver
 
     def revert(self, object_info: ObjectInfo):
         if not object_info.path:
@@ -32,8 +31,7 @@ class NotebookMigrator:
     def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        dependency = self._resolver.resolve_notebook(Path(object_info.path))
-        assert dependency is not None
+        dependency = Dependency(WorkspaceLoader(self._ws), Path(object_info.path))
         container = dependency.load()
         assert isinstance(container, Notebook)
         return self._apply(container)
