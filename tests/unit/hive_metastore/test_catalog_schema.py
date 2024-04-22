@@ -11,7 +11,6 @@ from databricks.sdk.service.catalog import CatalogInfo, ExternalLocationInfo, Sc
 from databricks.labs.ucx.hive_metastore.catalog_schema import CatalogSchema
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat
 
 
 def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
@@ -109,7 +108,9 @@ def test_catalog_schema_acl():
     backend = MockBackend()
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
     catalog_schema = prepare_test(ws, backend)
-    catalog_schema.create_all_catalogs_schemas(mock_prompts, [AclMigrationWhat.PRINCIPAL])
+    catalog_schema.create_all_catalogs_schemas(
+        mock_prompts,
+    )
     queries = [
         'GRANT USE SCHEMA ON DATABASE catalog1.schema3 TO `user1`',
         'GRANT USE SCHEMA ON DATABASE catalog2.schema2 TO `user1`',

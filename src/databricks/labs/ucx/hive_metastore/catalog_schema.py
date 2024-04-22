@@ -9,7 +9,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat
 
 logger = logging.getLogger(__name__)
 
@@ -24,17 +23,14 @@ class CatalogSchema:
         self._principal_grants = principal_grants
         self._backend = sql_backend
 
-    def create_all_catalogs_schemas(self, prompts: Prompts, acl_strategy: list[AclMigrationWhat] | None = None):
+    def create_all_catalogs_schemas(self, prompts: Prompts):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
         for candidate_catalog in candidate_catalogs:
             self._create_catalog_validate(candidate_catalog, prompts)
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 self._create_schema(candidate_catalog, candidate_schema)
-        if acl_strategy is None:
-            acl_strategy = []
-        if AclMigrationWhat.PRINCIPAL in acl_strategy:
-            self._update_principal_acl()
+        self._update_principal_acl()
 
     def _update_principal_acl(self):
         grants = self._get_catalog_schema_grants()

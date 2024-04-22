@@ -10,7 +10,6 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat
 from . import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ def test_create_catalog_schema_with_principal_acl_azure(
     )
     catalog_schema = ctx.catalog_schema
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
-    catalog_schema.create_all_catalogs_schemas(mock_prompts, [AclMigrationWhat.PRINCIPAL])
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
     catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name)
@@ -63,7 +62,7 @@ def test_create_catalog_schema_with_principal_acl_aws(
     )
     catalog_schema = ctx.catalog_schema
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": ""})
-    catalog_schema.create_all_catalogs_schemas(mock_prompts, [AclMigrationWhat.PRINCIPAL])
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
 
     schema_grants = ws.grants.get(SecurableType.SCHEMA, schema_name)
     catalog_grants = ws.grants.get(SecurableType.CATALOG, catalog_name)
