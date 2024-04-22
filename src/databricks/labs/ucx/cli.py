@@ -386,11 +386,13 @@ def show_all_metastores(a: AccountClient, workspace_id: str | None = None):
 
 
 @ucx.command
-def assign_metastore(a: AccountClient, workspace_id: str, metastore_id: str | None = None):
+def assign_metastore(a: AccountClient, workspace_id: str,
+                     metastore_id: str | None = None,
+                     default_catalog: str | None = None):
     """Assign metastore to a workspace"""
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = AccountContext(a)
-    ctx.account_metastores.assign_metastore(int(workspace_id), metastore_id)
+    ctx.account_metastores.assign_metastore(workspace_id, metastore_id, default_catalog)
 
 
 if __name__ == "__main__":
