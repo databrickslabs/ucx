@@ -30,7 +30,6 @@ from databricks.labs.ucx.hive_metastore.tables import (
     Table,
     TablesCrawler,
     What,
-    HiveSerdeType,
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -67,6 +66,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
@@ -116,6 +116,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
@@ -155,6 +156,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
@@ -182,6 +184,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
@@ -216,6 +219,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
@@ -226,7 +230,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     [
         # test migrate parquet hiveserde table in place
         (
-            HiveSerdeType.PARQUET,
+            True,
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
                 ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
@@ -242,27 +246,15 @@ def test_migrate_external_table_failed_sync(ws, caplog):
         ),
         # test unsupported hiveserde type
         (
-            HiveSerdeType.PARQUET,
+            True,
             MockBackend.rows("col_name", "data_type", "comment")[("dummy", "dummy", None)],
             MockBackend.rows("createtab_stmt")[("dummy"),],
             False,
             "hive_metastore.db1_src.external_src table can only be migrated using CTAS.",
         ),
-        # test PARQUET hiveserde table in ORC migration task
-        (
-            HiveSerdeType.ORC,
-            MockBackend.rows("col_name", "data_type", "comment")[
-                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
-                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
-                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
-            ],
-            None,
-            False,
-            "hive_metastore.db1_src.external_src is using PARQUET hiveserde. It won't be in-place migrated in this HiveSerdeType.ORC dedicated task.",
-        ),
         # test None table_migrate_sql returned
         (
-            HiveSerdeType.PARQUET,
+            True,
             MockBackend.rows("col_name", "data_type", "comment")[
                 ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
                 ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
@@ -274,7 +266,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
         ),
         # test not in place migration
         (
-            None,
+            False,
             None,
             None,
             False,
@@ -311,10 +303,9 @@ def test_migrate_external_hiveserde_table_in_place(
         migration_status_refresher,
         principal_grants,
         hiveserde_in_place_migrate=hiveserde_in_place_migrate,
-        mounts_crawler=mount_crawler,
     )
 
-    table_migrate.migrate_tables(what=What.EXTERNAL_HIVESERDE)
+    table_migrate.migrate_tables(what=What.EXTERNAL_HIVESERDE, mounts_crawler=mount_crawler)
     if migrated:
         assert expected_value in backend.queries
     else:
@@ -362,6 +353,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
@@ -389,6 +381,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.UNKNOWN)
 
@@ -426,6 +419,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
@@ -470,6 +464,7 @@ def test_migrate_view_with_columns(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.VIEW)
 
@@ -576,6 +571,7 @@ def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     return table_migrate
 
@@ -647,6 +643,7 @@ def test_no_migrated_tables(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrate.revert_migrated_tables("test_schema1", "test_table1")
@@ -689,6 +686,7 @@ def test_empty_revert_report(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert not table_migrate.print_revert_report(delete_managed=False)
@@ -718,6 +716,7 @@ def test_is_upgraded(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert table_migrate.is_migrated("schema1", "table1")
@@ -931,6 +930,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
@@ -990,6 +990,7 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.PRINCIPAL])
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
@@ -1061,6 +1062,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
         group_manager,
         migration_status_refresher,
         principal_grants,
+        hiveserde_in_place_migrate=False,
     )
     tasks = table_migrate.migrate_tables(what=What.VIEW)
     table_keys = [task.args[0].src.key for task in tasks]

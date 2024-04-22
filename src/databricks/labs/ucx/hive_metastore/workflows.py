@@ -42,34 +42,15 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         super().__init__('migrate-external-hiveserde-tables-in-place-experimental')
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
-    def migrate_parquet_serde_in_place(self, ctx: RuntimeContext):
-        """This workflow task migrates ParquetHiveSerDe tables in place from the Hive Metastore to the Unity Catalog."""
-        ctx.table_migrator_hiveserde_parquet.migrate_tables(
-            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL]
-        )
-
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
-    def migrate_orc_serde_in_place(self, ctx: RuntimeContext):
-        """This workflow task migrates OrcSerde tables in place from the Hive Metastore to the Unity Catalog."""
-        ctx.table_migrator_hiveserde_orc.migrate_tables(
-            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL]
-        )
-
-    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
-    def migrate_avro_serde_in_place(self, ctx: RuntimeContext):
-        """This workflow task migrates AvroSerDe tables in place from the Hive Metastore to the Unity Catalog."""
-        ctx.table_migrator_hiveserde_avro.migrate_tables(
-            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL]
+    def migrate_hive_serde_in_place(self, ctx: RuntimeContext):
+        """This workflow task migrates ParquetHiveSerDe, OrcSerde, AvroSerDe tables in place from the Hive Metastore to the Unity Catalog."""
+        ctx.table_migrator_hiveserde_in_place.migrate_tables(
+            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL], mounts_crawler=ctx.mounts_crawler
         )
 
     @job_task(
         job_cluster="table_migration",
-        depends_on=[
-            Assessment.crawl_tables,
-            migrate_parquet_serde_in_place,
-            migrate_orc_serde_in_place,
-            migrate_avro_serde_in_place,
-        ],
+        depends_on=[Assessment.crawl_tables, migrate_hive_serde_in_place],
     )
     def migrate_views(self, ctx: RuntimeContext):
         """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.

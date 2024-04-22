@@ -9,13 +9,10 @@ from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, 
 from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
-from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What, HiveSerdeType
-from . import get_azure_spark_conf
+from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
 
-from ..conftest import (
-    StaticTableMapping,
-    prepare_hiveserde_tables,
-)
+from . import get_azure_spark_conf
+from ..conftest import prepare_hiveserde_tables
 
 
 logger = logging.getLogger(__name__)
@@ -189,9 +186,8 @@ def test_migrate_external_table_failed_sync(ws, caplog, runtime_ctx, env_or_skip
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-@pytest.mark.parametrize('hiveserde_type', [HiveSerdeType.PARQUET, HiveSerdeType.ORC, HiveSerdeType.AVRO])
 def test_migrate_external_table_hiveserde_in_place(
-    ws, sql_backend, hiveserde_type, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+    ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
 ):
     random = make_random(4).lower()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
@@ -199,6 +195,8 @@ def test_migrate_external_table_hiveserde_in_place(
     table_base_dir = make_storage_dir(path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}')
     # prepare source tables
     src_tables = prepare_hiveserde_tables(runtime_ctx, random, src_schema, table_base_dir)
+    for src_table in src_tables.values():
+        sql_backend.execute(f"INSERT INTO {src_table.full_name} VALUES (1, 'us')")
     # prepare target catalog and schema
     dst_catalog = make_catalog()
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
@@ -207,32 +205,21 @@ def test_migrate_external_table_hiveserde_in_place(
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    if hiveserde_type == HiveSerdeType.PARQUET:
-        src_table = next((table for key, table in src_tables.items() if key.startswith('parquet_serde_')), None)
-        assert src_table is not None, "prepare_hiveserde_tables failed to create parquet serde table for migration test"
-        sql_backend.execute(f"INSERT INTO {src_table.full_name} VALUES (1, 'us')")
-        runtime_ctx.table_migrator_hiveserde_parquet.migrate_tables(what=What.EXTERNAL_HIVESERDE)
-    elif hiveserde_type == HiveSerdeType.ORC:
-        src_table = next((table for key, table in src_tables.items() if key.startswith('orc_serde_')), None)
-        assert src_table is not None, "prepare_hiveserde_tables failed to create orc serde table for migration test"
-        sql_backend.execute(f"INSERT INTO {src_table.full_name} VALUES (1, 'us')")
-        runtime_ctx.table_migrator_hiveserde_orc.migrate_tables(what=What.EXTERNAL_HIVESERDE)
-    elif hiveserde_type == HiveSerdeType.AVRO:
-        src_table = next((table for key, table in src_tables.items() if key.startswith('avro_serde_')), None)
-        assert src_table is not None, "prepare_hiveserde_tables failed to create avro serde table for migration test"
-        sql_backend.execute(f"INSERT INTO {src_table.full_name} VALUES (1, 'us')")
-        runtime_ctx.table_migrator_hiveserde_avro.migrate_tables(what=What.EXTERNAL_HIVESERDE)
+    runtime_ctx.table_migrator_hiveserde_in_place.migrate_tables(
+        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler
+    )
 
     # assert results
-    try:
-        target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_table.name}").properties
-        row = next(sql_backend.fetch(f"SELECT * FROM {dst_schema.full_name}.{src_table.name}"))
-    except NotFound:
-        assert False, f"{src_table.name} not found in {dst_schema.full_name}"
-    assert target_table_properties["upgraded_from"] == src_table.full_name
-    assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
-    assert row["id"] == 1
-    assert row["region"] == "us"
+    for src_table in src_tables.values():
+        try:
+            target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_table.name}").properties
+            row = next(sql_backend.fetch(f"SELECT * FROM {dst_schema.full_name}.{src_table.name}"))
+        except NotFound:
+            assert False, f"{src_table.name} not found in {dst_schema.full_name}"
+        assert target_table_properties["upgraded_from"] == src_table.full_name
+        assert target_table_properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+        assert row["id"] == 1
+        assert row["region"] == "us"
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

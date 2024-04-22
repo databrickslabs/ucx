@@ -45,8 +45,7 @@ class TablesMigrator:
         group_manager: GroupManager,
         migration_status_refresher: 'MigrationStatusRefresher',
         principal_grants: PrincipalACL,
-        hiveserde_in_place_migrate: HiveSerdeType | None = None,
-        mounts_crawler: Mounts | None = None,
+        hiveserde_in_place_migrate: bool = False,
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -58,13 +57,14 @@ class TablesMigrator:
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
         self._hiveserde_in_place_migrate = hiveserde_in_place_migrate
-        self._mounts_crawler = mounts_crawler
 
     def index(self):
         # TODO: remove this method
         return self._migration_status_refresher.index()
 
-    def migrate_tables(self, what: What, acl_strategy: list[AclMigrationWhat] | None = None):
+    def migrate_tables(
+        self, what: What, acl_strategy: list[AclMigrationWhat] | None = None, mounts_crawler: Mounts | None = None
+    ):
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
             return None
@@ -74,8 +74,8 @@ class TablesMigrator:
         self._init_seen_tables()
         # mounts will be used to replace the mnt based table location in the DDL for hiveserde table in-place migration
         mounts = None
-        if self._mounts_crawler:
-            mounts = self._mounts_crawler.snapshot()
+        if mounts_crawler:
+            mounts = mounts_crawler.snapshot()
         if what == What.VIEW:
             return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
         return self._migrate_tables(
@@ -224,11 +224,6 @@ class TablesMigrator:
             HiveSerdeType.INVALID_HIVESERDE_INFO,
         ]:
             logger.warning(f"{src_table.key} table can only be migrated using CTAS.")
-            return False
-        if hiveserde_type != self._hiveserde_in_place_migrate:
-            logger.info(
-                f"{src_table.key} is using {hiveserde_type.name} hiveserde. It won't be in-place migrated in this {self._hiveserde_in_place_migrate} dedicated task."
-            )
             return False
 
         # if the src table location is using mount, resolve the mount location so it will be used in the updated DDL
