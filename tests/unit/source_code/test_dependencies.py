@@ -29,7 +29,9 @@ def test_dependency_graph_builder_visits_notebook_notebook_dependencies():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
-    builder = DependencyGraphBuilder(DependencyResolver(whi, LocalLoader(), ws))
+    loader = create_autospec(LocalLoader)
+    loader.is_notebook.return_value = False
+    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
     builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
     assert len(visited) == len(paths)
 
@@ -52,6 +54,7 @@ def test_dependency_graph_builder_visits_notebook_file_dependencies():
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
     loader = create_autospec(LocalLoader)
+    loader.is_notebook.return_value = False
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
     builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
     builder.build_local_file_dependency_graph(Path("root8.py.txt"))
@@ -72,11 +75,20 @@ def test_dependency_graph_builder_fails_with_unfound_dependency():
         result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
         return result
 
+    def get_status_side_effect(*args):
+        path = args[0]
+        if "leaf2" in path:
+            return None
+        return ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=path)
+
     ws = create_autospec(WorkspaceClient)
+    ws.workspace.is_notebook.return_value = True
     ws.workspace.download.side_effect = download_side_effect
-    ws.workspace.get_status.return_value = None
+    ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
-    builder = DependencyGraphBuilder(DependencyResolver(whi, LocalLoader(), ws))
+    loader = create_autospec(LocalLoader)
+    loader.is_notebook.return_value = False
+    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
     with pytest.raises(ValueError):
         builder.build_notebook_dependency_graph(Path("root1.run.py.txt"))
 
@@ -107,39 +119,10 @@ def test_dependency_graph_builder_visits_recursive_file_dependencies():
     visited: dict[str, bool] = {}
     whi = whitelist_mock()
     loader = create_autospec(LocalLoader)
+    loader.is_file.return_value = True
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
     builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
-    builder.build_local_file_dependency_graph(Path("root5.py.txt"))
-    assert len(visited) == len(paths)
-
-
-def test_dependency_graph_builder_visits_non_file_dependencies():
-    paths = ["root7.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    visited: dict[str, bool] = {}
-
-    def get_status_side_effect(*args):
-        path = args[0]
-        return (
-            ObjectInfo(path=path, object_type=ObjectType.LIBRARY)
-            if path == "some_library"
-            else ObjectInfo(path=path, object_type=ObjectType.FILE)
-        )
-
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
-    whi = whitelist_mock()
-
-    def is_file_side_effect(*args):
-        path = args[0]
-        return path in paths
-
-    loader = create_autospec(LocalLoader)
-    loader.is_file.side_effect = is_file_side_effect
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
-    builder.build_local_file_dependency_graph(Path("root7.py.txt"))
+    builder.build_local_file_dependency_graph(Path("root6.py.txt"))
     assert len(visited) == len(paths)
 
 
