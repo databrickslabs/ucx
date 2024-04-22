@@ -8,6 +8,7 @@ from sqlglot import ParseError, expressions
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, TableView
 from databricks.labs.ucx.hive_metastore.mapping import TableToMigrate
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class ViewToMigrate(TableToMigrate):
             yield TableView("hive_metastore", src_db, old_table.name)
 
     def sql_migrate_view(self, index: MigrationIndex) -> str:
-        from_table = FromTable(index)
+        from_table = FromTable(index, CurrentSessionState(self.src.database))
         assert self.src.view_text is not None, 'Expected a view text'
         migrated_select = from_table.apply(self.src.view_text)
         statements = sqlglot.parse(migrated_select, read='databricks')

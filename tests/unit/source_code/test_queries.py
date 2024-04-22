@@ -3,7 +3,7 @@ from databricks.labs.ucx.source_code.queries import FromTable
 
 
 def test_not_migrated_tables_trigger_nothing(empty_index):
-    ftf = FromTable(empty_index)
+    ftf = FromTable(empty_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
 
@@ -11,7 +11,7 @@ def test_not_migrated_tables_trigger_nothing(empty_index):
 
 
 def test_migrated_tables_trigger_messages(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
 
@@ -36,7 +36,7 @@ def test_migrated_tables_trigger_messages(migration_index):
 
 
 def test_fully_migrated_queries_match(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
     new_query = "SELECT * FROM brand.new.stuff LEFT JOIN some.certain.issues USING (x) WHERE state > 1 LIMIT 10"

@@ -4,7 +4,7 @@ import logging
 import sqlglot
 from sqlglot.expressions import Table, Expression, Use
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState, DEFAULT_SCHEMA
+from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class FromTable(Linter, Fixer):
     SQL queries.
     """
 
-    def __init__(self, index: MigrationIndex, *, session_state: CurrentSessionState | None = None):
+    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState):
         """
         Initializes the FromTable class.
 
@@ -50,7 +50,7 @@ class FromTable(Linter, Fixer):
                 if isinstance(statement, Use):
                     # Sqlglot captures the database name in the Use statement as a Table, with
                     # the schema  as the table name.
-                    self._session_state.schema = table.name if table.name else DEFAULT_SCHEMA
+                    self._session_state.schema = table.name
                     continue
 
                 # we only migrate tables in the hive_metastore catalog
@@ -87,7 +87,7 @@ class FromTable(Linter, Fixer):
                 continue
             if isinstance(statement, Use):
                 table = statement.this
-                self._session_state.schema = table.name if table.name else DEFAULT_SCHEMA
+                self._session_state.schema = table.name
                 new_statements.append(statement.sql('databricks'))
                 continue
             for old_table in self._dependent_tables(statement):

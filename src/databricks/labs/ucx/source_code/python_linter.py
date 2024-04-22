@@ -6,7 +6,7 @@ import logging
 from collections.abc import Iterable
 from typing import TypeVar, Generic
 
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory, DEFAULT_SCHEMA
+from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
 
 logger = logging.getLogger(__name__)
 
@@ -230,14 +230,6 @@ class ASTLinter(Generic[T]):
 
 
 class PythonLinter(Linter):
-
-    def __init__(self):
-        self._schema = DEFAULT_SCHEMA
-
-    @property
-    def schema(self):
-        # It is not generally useful to know the schema of the last cell that was linted, except for testing purposes.
-        return self._schema
 
     def lint(self, code: str) -> Iterable[Advice]:
         linter = ASTLinter.parse(code)
