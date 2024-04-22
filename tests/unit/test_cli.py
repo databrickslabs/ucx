@@ -39,7 +39,9 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    logs, show_all_metastores, assign_metastore,
+    logs,
+    show_all_metastores,
+    assign_metastore,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
@@ -60,7 +62,7 @@ def ws():
         ),
         '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
-                                               "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
+        "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
         "/Users/foo/.ucx/mapping.csv": "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\ntest,test,test,test,test,test",
         "/Users/foo/.ucx/logs/run-123-1/foo.log-123": """18:59:17 INFO [databricks.labs.ucx] {MainThread} Something is logged
@@ -235,8 +237,8 @@ def test_move_no_schema(ws, caplog):
     move(ws, prompts, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
-            'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
-            in caplog.messages
+        'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
+        in caplog.messages
     )
 
 
@@ -263,8 +265,8 @@ def test_alias_no_schema(ws, caplog):
     alias(ws, "SrcCat", "", "*", "TgtCat", "")
 
     assert (
-            'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
-            in caplog.messages
+        'Please enter from_schema, to_schema and from_table (enter * for migrating all tables) details.'
+        in caplog.messages
     )
 
 

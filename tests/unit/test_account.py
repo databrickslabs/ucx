@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.config import Config
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service import iam
