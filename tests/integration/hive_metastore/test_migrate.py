@@ -444,8 +444,8 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_migrate_managed_tables_with_principal_acl_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+def test_migrate_external_tables_with_principal_acl_azure(
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_ucx_group
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
@@ -453,25 +453,41 @@ def test_migrate_managed_tables_with_principal_acl_azure(
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     ctx.with_dummy_resource_permission()
     table_migrate = ctx.tables_migrator
-    user = make_user()
+
+    user_with_cluster_access = make_user()
+    user_without_cluster_access = make_user()
+    group_with_cluster_access, _ = make_ucx_group()
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
-        user_name=user.user_name,
+        user_name=user_with_cluster_access.user_name,
+        group_name=group_with_cluster_access.display_name,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
     for _ in target_table_grants.privilege_assignments:
-        if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+        if _.principal == user_with_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
 
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == group_with_cluster_access.display_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == user_without_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            assert False, "User without cluster access should not have access to the table"
+    assert True
+
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_principal_acl_aws(
+def test_migrate_external_tables_with_principal_acl_aws(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
     ctx, table_full_name = prepared_principal_acl
@@ -494,6 +510,34 @@ def test_migrate_managed_tables_with_principal_acl_aws(
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+
+def test_migrate_external_tables_with_spn_azure(
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    ctx, table_full_name = prepared_principal_acl
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    ctx.with_dummy_resource_permission()
+
+    table_migrate = ctx.tables_migrator
+
+    spn_with_mount_access = "5a11359f-ba1f-483f-8e00-0fe55ec003ed"
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        service_principal_name=spn_with_mount_access,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == spn_with_mount_access and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
