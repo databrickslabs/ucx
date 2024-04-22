@@ -506,12 +506,9 @@ class TestInstallationContext(TestRuntimeContext):
     @cached_property
     def workspace_installer(self):
         return WorkspaceInstaller(
-            self.prompts,
-            self.installation,
             self.workspace_client,
-            self.product_info,
             self.environ,
-        )
+        ).replace(prompts=self.prompts, installation=self.installation, product_info=self.product_info)
 
     @cached_property
     def config_transform(self) -> Callable[[WorkspaceConfig], WorkspaceConfig]:
