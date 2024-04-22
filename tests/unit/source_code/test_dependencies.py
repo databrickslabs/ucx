@@ -38,7 +38,7 @@ def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
 
 
 def test_dependency_graph_builder_visits_local_notebook_dependencies():
-    paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
+    paths = ["root4.py.txt", "leaf3.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
     whi = whitelist_mock()
@@ -47,7 +47,7 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
     loader.is_notebook.return_value = True
     loader.is_file.return_value = True
     builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
-    builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
+    builder.build_notebook_dependency_graph(Path("root4.py.txt"))
     assert len(visited) == len(paths)
 
 
