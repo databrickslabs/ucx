@@ -73,9 +73,9 @@ class TablesMigrator:
         all_principal_grants = None if acl_strategy is None else self._principal_grants.get_interactive_cluster_grants()
         self._init_seen_tables()
         # mounts will be used to replace the mnt based table location in the DDL for hiveserde table in-place migration
-        mounts = None
+        mounts: list[Mount] = []
         if mounts_crawler:
-            mounts = mounts_crawler.snapshot()
+            mounts = list(mounts_crawler.snapshot())
         if what == What.VIEW:
             return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
         return self._migrate_tables(
@@ -89,7 +89,7 @@ class TablesMigrator:
         all_grants_to_migrate,
         all_migrated_groups,
         all_principal_grants,
-        mounts: Iterable[Mount] | None = None,
+        mounts: list[Mount],
     ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
@@ -141,9 +141,7 @@ class TablesMigrator:
             grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
         return grants
 
-    def _migrate_table(
-        self, src_table: TableToMigrate, grants: list[Grant] | None = None, mounts: Iterable[Mount] | None = None
-    ):
+    def _migrate_table(self, src_table: TableToMigrate, grants: list[Grant], mounts: list[Mount]):
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
@@ -209,9 +207,7 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_external_table_hiveserde(
-        self, src_table: Table, rule: Rule, grants: list[Grant] | None = None, mounts: Iterable[Mount] | None = None
-    ):
+    def _migrate_external_table_hiveserde(self, src_table: Table, rule: Rule, grants: list[Grant], mounts: list[Mount]):
         if not self._hiveserde_in_place_migrate:
             # TODO: Add sql_migrate_external_hiveserde_ctas here
             return False
