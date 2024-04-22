@@ -151,7 +151,7 @@ def test_dependency_graph_builder_throws_with_invalid_dependencies():
         builder.build_local_file_dependency_graph(Path("root7.py.txt"))
 
 
-def test_file_build_dependency_graph_ignores_builtin_dependencies():
+def test_dependency_graph_builder_ignores_builtin_dependencies():
     paths = ["python_builtins.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     whi = Whitelist()
