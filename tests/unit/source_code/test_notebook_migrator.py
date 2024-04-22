@@ -56,7 +56,7 @@ def test_apply_returns_false_when_language_not_supported():
     dependency = create_autospec(Dependency)
     dependency.load.return_value = Notebook.parse('path', notebook_code, Language.R)
     resolver = create_autospec(DependencyResolver)
-    resolver.resolve_object_info.return_value = dependency
+    resolver.resolve_notebook.return_value = dependency
     migrator = NotebookMigrator(ws, languages, resolver)
     object_info = ObjectInfo(path='path', language=Language.R, object_type=ObjectType.NOTEBOOK)
     result = migrator.apply(object_info)
@@ -75,7 +75,7 @@ def test_apply_returns_false_when_no_fixes_applied():
     dependency = create_autospec(Dependency)
     dependency.load.return_value = Notebook.parse('path', notebook_code, Language.R)
     resolver = create_autospec(DependencyResolver)
-    resolver.resolve_object_info.return_value = dependency
+    resolver.resolve_notebook.return_value = dependency
     migrator = NotebookMigrator(ws, languages, resolver)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     assert not migrator.apply(object_info)
@@ -97,7 +97,7 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
     dependency = create_autospec(Dependency)
     dependency.load.return_value = Notebook.parse('path', original_code, Language.R)
     resolver = create_autospec(DependencyResolver)
-    resolver.resolve_object_info.return_value = dependency
+    resolver.resolve_notebook.return_value = dependency
     migrator = NotebookMigrator(ws, languages, resolver)
     object_info = ObjectInfo(path='path', language=Language.PYTHON, object_type=ObjectType.NOTEBOOK)
     assert migrator.apply(object_info)
