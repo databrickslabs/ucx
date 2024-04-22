@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect, whitelist_mock, _load_dependency_side_effect
 
 
-def test_dependency_graph_builder_visits_notebook_notebook_dependencies():
+def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
@@ -37,7 +37,21 @@ def test_dependency_graph_builder_visits_notebook_notebook_dependencies():
     assert len(visited) == len(paths)
 
 
-def test_dependency_graph_builder_visits_notebook_file_dependencies():
+def test_dependency_graph_builder_visits_local_notebook_dependencies():
+    paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    visited: dict[str, bool] = {}
+    whi = whitelist_mock()
+    loader = create_autospec(LocalLoader)
+    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
+    loader.is_notebook.return_value = True
+    loader.is_file.return_value = True
+    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
+    builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
+    assert len(visited) == len(paths)
+
+
+def test_dependency_graph_builder_visits_workspace_file_dependencies():
     paths = ["root8.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
@@ -98,18 +112,10 @@ def test_dependency_graph_builder_visits_file_dependencies():
     paths = ["root5.py.txt", "leaf4.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
-
-    def get_status_side_effect(*args):
-        path = args[0]
-        return ObjectInfo(path=path, object_type=ObjectType.FILE)
-
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
     loader = create_autospec(LocalLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
+    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
     builder.build_local_file_dependency_graph(Path("root5.py.txt"))
     assert len(visited) == len(paths)
 

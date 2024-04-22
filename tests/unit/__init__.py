@@ -18,6 +18,7 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.dependencies import SourceContainer
 from databricks.labs.ucx.source_code.files import LocalFile
+from databricks.labs.ucx.source_code.notebook import Notebook, NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
@@ -168,6 +169,8 @@ def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, boo
     if source is None:
         source = sources.get(filename)
     assert source is not None
+    if NOTEBOOK_HEADER in source:
+        return Notebook.parse(filename, source, Language.PYTHON)
     return LocalFile(filename, source, Language.PYTHON)
 
 
