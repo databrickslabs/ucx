@@ -1,13 +1,18 @@
+from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import SourceContainer, DependencyResolver, LocalLoader
-from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
+from databricks.labs.ucx.source_code.dependencies import (
+    SourceContainer,
+    DependencyResolver,
+    LocalLoader,
+    DependencyGraphBuilder,
+)
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect, _load_dependency_side_effect
 
@@ -112,9 +117,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     loader = create_autospec(LocalLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     resolver = DependencyResolver(whitelist, loader, ws)
-    migrator = NotebookMigrator(ws, empty_index, resolver)
-    object_info = ObjectInfo(path="path", language=Language.PYTHON, object_type=ObjectType.FILE)
-    migrator.build_dependency_graph(object_info)
+    builder = DependencyGraphBuilder(resolver)
+    builder.build_local_file_dependency_graph(Path("path"))
     advices = list(resolver.get_advices())
     assert advices == expected
 
@@ -151,8 +155,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
     loader = create_autospec(LocalLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     resolver = DependencyResolver(whitelist, loader, ws)
-    migrator = NotebookMigrator(ws, empty_index, resolver)
-    object_info = ObjectInfo(path="root9.py.txt", object_type=ObjectType.FILE)
-    migrator.build_dependency_graph(object_info)
+    builder = DependencyGraphBuilder(resolver)
+    builder.build_local_file_dependency_graph(Path("root9.py.txt"))
     advices = list(resolver.get_advices())
     assert advices == expected

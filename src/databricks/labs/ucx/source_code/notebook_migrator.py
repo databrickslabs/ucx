@@ -1,10 +1,11 @@
+from pathlib import Path
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
-    DependencyGraph,
     DependencyResolver,
 )
 
@@ -20,19 +21,6 @@ class NotebookMigrator:
         self._languages = languages
         self._resolver = resolver
 
-    def build_dependency_graph(self, object_info: ObjectInfo) -> DependencyGraph:
-        if not object_info.path or not object_info.object_type:
-            raise ValueError(f"Not a valid source of code: {object_info.path}")
-        if object_info.object_type is ObjectType.NOTEBOOK and not object_info.language:
-            raise ValueError(f"Not a valid notebook, missing default language: {object_info.path}")
-        dependency = self._resolver.resolve_object_info(object_info)
-        assert dependency is not None
-        graph = DependencyGraph(dependency, None, self._resolver)
-        container = dependency.load()
-        if container is not None:
-            container.build_dependency_graph(graph)
-        return graph
-
     def revert(self, object_info: ObjectInfo):
         if not object_info.path:
             return False
@@ -44,7 +32,7 @@ class NotebookMigrator:
     def apply(self, object_info: ObjectInfo) -> bool:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
-        dependency = self._resolver.resolve_object_info(object_info)
+        dependency = self._resolver.resolve_notebook(Path(object_info.path))
         assert dependency is not None
         container = dependency.load()
         assert isinstance(container, Notebook)

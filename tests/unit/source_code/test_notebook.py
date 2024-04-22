@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import create_autospec
 import re
 
@@ -135,9 +136,7 @@ def test_notebook_builds_leaf_dependency_graph():
         object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
     )
     resolver = DependencyResolver(whitelist_mock(), LocalLoader(), ws)
-    dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
-    )
+    dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -156,13 +155,11 @@ def test_notebook_builds_depth1_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(whitelist_mock(), LocalLoader(), ws)
-    dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
-    )
+    dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
     assert actual == set(paths)
 
 
@@ -173,13 +170,11 @@ def test_notebook_builds_depth2_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(whitelist_mock(), LocalLoader(), ws)
-    dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
-    )
+    dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
     assert actual == set(paths)
 
 
@@ -191,9 +186,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(whitelist_mock(), LocalLoader(), ws)
-    dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
-    )
+    dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
@@ -209,13 +202,11 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(whitelist_mock(), LocalLoader(), ws)
-    dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
-    )
+    dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
     assert actual == set(paths)
 
 
@@ -226,13 +217,11 @@ def test_notebook_builds_python_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     resolver = DependencyResolver(whitelist_mock(), LocalLoader(), ws)
-    dependency = resolver.resolve_object_info(
-        ObjectInfo(object_type=ObjectType.NOTEBOOK, path=paths[0], language=Language.PYTHON)
-    )
+    dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
     assert actual == set(paths)
 
 

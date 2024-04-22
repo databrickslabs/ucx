@@ -5,7 +5,7 @@ from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo,
 
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyResolver,
-    WorkspaceNotebookDependency,
+    NotebookDependency,
     LocalLoader,
 )
 from databricks.labs.ucx.source_code.languages import Languages
@@ -53,7 +53,7 @@ def test_apply_returns_false_when_language_not_supported():
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = notebook_code.encode("utf-8")
     languages = create_autospec(Languages)
     languages.is_supported.return_value = False
-    dependency = create_autospec(WorkspaceNotebookDependency)
+    dependency = create_autospec(NotebookDependency)
     dependency.load.return_value = Notebook.parse('path', notebook_code, Language.R)
     resolver = create_autospec(DependencyResolver)
     resolver.resolve_object_info.return_value = dependency
@@ -72,7 +72,7 @@ def test_apply_returns_false_when_no_fixes_applied():
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
     languages.apply_fixes.return_value = "# original code"  # cell code
-    dependency = create_autospec(WorkspaceNotebookDependency)
+    dependency = create_autospec(NotebookDependency)
     dependency.load.return_value = Notebook.parse('path', notebook_code, Language.R)
     resolver = create_autospec(DependencyResolver)
     resolver.resolve_object_info.return_value = dependency
@@ -94,7 +94,7 @@ def test_apply_returns_true_and_changes_code_when_fixes_applied():
     languages = create_autospec(Languages)
     languages.is_supported.return_value = True
     languages.apply_fixes.return_value = migrated_cell_code
-    dependency = create_autospec(WorkspaceNotebookDependency)
+    dependency = create_autospec(NotebookDependency)
     dependency.load.return_value = Notebook.parse('path', original_code, Language.R)
     resolver = create_autospec(DependencyResolver)
     resolver.resolve_object_info.return_value = dependency

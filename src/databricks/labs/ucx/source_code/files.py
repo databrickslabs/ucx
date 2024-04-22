@@ -8,8 +8,6 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyGraph,
-    UnresolvedDependency,
-    DependencyResolver,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
@@ -35,29 +33,19 @@ class LocalFile(SourceContainer):
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         notebook_paths = {PythonLinter.get_dbutils_notebook_run_path_arg(call) for call in run_notebook_calls}
         for path in notebook_paths:
-            parent.register_dependency(UnresolvedDependency(path))
+            parent.register_notebook(Path(path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         import_names = PythonLinter.list_import_sources(linter)
         for import_name in import_names:
-            parent.register_dependency(UnresolvedDependency(import_name))
+            parent.register_import(import_name)
 
 
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(self, languages: Languages, resolver: DependencyResolver):
+    def __init__(self, languages: Languages):
         self._languages = languages
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-        self._resolver = resolver
-
-    def build_dependency_graph(self, path: Path) -> DependencyGraph:
-        dependency = self._resolver.resolve_dependency(UnresolvedDependency(str(path)))
-        assert dependency is not None
-        graph = DependencyGraph(dependency, None, self._resolver)
-        container = dependency.load()
-        if container is not None:
-            container.build_dependency_graph(graph)
-        return graph
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():

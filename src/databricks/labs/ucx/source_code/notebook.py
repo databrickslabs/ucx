@@ -4,15 +4,15 @@ import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
+from pathlib import Path
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language, ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     SourceContainer,
-    UnresolvedDependency,
 )
 
 
@@ -79,9 +79,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        parent.build_graph_from_python_source(
-            self._original_code, lambda name: parent.register_dependency(UnresolvedDependency(name))
-        )
+        parent.build_graph_from_python_source(self._original_code, parent.register_import)
 
 
 class RCell(Cell):
@@ -158,11 +156,8 @@ class RunCell(Cell):
             if start >= 0:
                 path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
-                object_info = ObjectInfo(object_type=ObjectType.NOTEBOOK, path=path)
-                dependency = parent.resolve_object_info(object_info)
-                if dependency is not None:
-                    parent.register_dependency(dependency)
-                else:
+                dependency = parent.register_notebook(Path(path))
+                if dependency is None:
                     # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                     raise ValueError(f"Invalid notebook path in %run command: {path}")
                 return
