@@ -210,7 +210,9 @@ class DependencyGraph:
 
         def check_registered_dependency(graph):
             # TODO https://github.com/databrickslabs/ucx/issues/1287
-            graph_path = graph.path[2:] if graph.path.startswith('./') else graph.path
+            graph_path = str(graph.path)
+            if graph_path.startswith('./'):
+                graph_path = graph_path[2:]
             if graph_path == path:
                 found.append(graph)
                 return True

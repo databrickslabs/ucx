@@ -156,7 +156,7 @@ def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *ar
 
 def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, bool], *args):
     dependency = args[0]
-    filename = dependency.path
+    filename = str(dependency.path)
     if filename.startswith('./'):
         filename = filename[2:]
     visited[filename] = True
