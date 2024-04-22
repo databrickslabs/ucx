@@ -1735,6 +1735,33 @@ def test_account_installer(ws):
         ),
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
-    account_installer.run()
+    account_installer.install_on_account()
     # should have 4 uploaded call, 2 for config.yml, 2 for workspace.json
     assert ws.workspace.upload.call_count == 4
+
+
+@pytest.fixture
+def mock_ws():
+    def get_status(path: str):
+        raise NotFound(path)
+
+    workspace_client = create_autospec(WorkspaceClient)
+    workspace_client.workspace.get_status = get_status
+
+    return workspace_client
+
+
+def test_global_workspace_installer(mock_ws):
+    workspace_installer = WorkspaceInstaller(
+        mock_ws,
+        {'UCX_FORCE_INSTALL': 'global'},
+    )
+    workspace_installer.replace(product_info=ProductInfo.for_testing(WorkspaceConfig))
+    # installation folder should start with /Applications
+    assert workspace_installer.install_state.install_folder().startswith("/Applications")
+
+
+def test_user_workspace_installer(mock_ws):
+    workspace_installer = WorkspaceInstaller(mock_ws, {'UCX_FORCE_INSTALL': 'user'})
+    # installation folder should start with /Users/
+    assert workspace_installer.install_state.install_folder().startswith("/Users/")

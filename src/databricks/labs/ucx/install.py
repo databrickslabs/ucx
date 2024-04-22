@@ -618,7 +618,7 @@ class AccountInstaller(AccountContext):
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
         return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
 
-    def run(self):
+    def install_on_account(self):
         ctx = AccountContext(self._get_safe_account_client())
         default_config = None
         confirmed = False
@@ -663,7 +663,7 @@ if __name__ == "__main__":
     force_install = env.get("UCX_FORCE_INSTALL")
     if force_install == "account":
         account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
-        account_installer.run()
+        account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
         workspace_installer.run()
