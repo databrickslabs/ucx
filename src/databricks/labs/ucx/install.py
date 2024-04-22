@@ -113,23 +113,6 @@ def extract_major_minor(version_string):
 
 class WorkspaceInstaller(WorkspaceContext):
 
-    @cached_property
-    def upgrades(self):
-        return Upgrades(self.product_info, self.installation)
-
-    @cached_property
-    def policy_installer(self):
-        return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
-
-    @cached_property
-    def installation(self):
-        try:
-            installation = self.product_info.current_installation(self.workspace_client)
-        except NotFound:
-            if self._force_install == "user":
-                return Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
-            return Installation.assume_global(self.workspace_client, self.product_info.product_name())
-
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -146,6 +129,23 @@ class WorkspaceInstaller(WorkspaceContext):
 
         self._is_account_install = self._force_install == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
+
+    @cached_property
+    def upgrades(self):
+        return Upgrades(self.product_info, self.installation)
+
+    @cached_property
+    def policy_installer(self):
+        return ClusterPolicyInstaller(self.installation, self.workspace_client, self.prompts)
+
+    @cached_property
+    def installation(self):
+        try:
+            return self.product_info.current_installation(self.workspace_client)
+        except NotFound:
+            if self._force_install == "user":
+                return Installation.assume_user_home(self.workspace_client, self.product_info.product_name())
+            return Installation.assume_global(self.workspace_client, self.product_info.product_name())
 
     def run(
         self,
