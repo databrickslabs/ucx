@@ -67,7 +67,11 @@ def new_installation(ws, env_or_skip, make_random):
 
         if not installation:
             installation = Installation(ws, product_info.product_name())
-        installer = WorkspaceInstaller(prompts, installation, ws, product_info, environ)
+        installer = WorkspaceInstaller(ws, environ).replace(
+            installation=installation,
+            product_info=product_info,
+            prompts=prompts,
+        )
         workspace_config = installer.configure()
         installation = product_info.current_installation(ws)
         installation.save(workspace_config)

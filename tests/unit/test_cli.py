@@ -40,6 +40,8 @@ from databricks.labs.ucx.cli import (
     validate_groups_membership,
     workflows,
     logs,
+    show_all_metastores,
+    assign_metastore,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
@@ -425,3 +427,13 @@ def test_relay_logs(ws, caplog):
     ]
     logs(ws)
     assert 'Something is logged' in caplog.messages
+
+
+def test_show_all_metastores(acc_client, caplog):
+    show_all_metastores(acc_client)
+    assert 'Matching metastores are:' in caplog.messages
+
+
+def test_assign_metastore(acc_client, caplog):
+    with pytest.raises(ValueError):
+        assign_metastore(acc_client, "123")

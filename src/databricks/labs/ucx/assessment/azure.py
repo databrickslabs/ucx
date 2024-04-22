@@ -24,7 +24,7 @@ class AzureServicePrincipalInfo:
     secret_scope: str | None = None
     # fs.azure.account.oauth2.client.secret: {{secrets/${local.secret_scope}/${local.secret_key}}}
     secret_key: str | None = None
-    # fs.azure.account.oauth2.client.endpoint: "https://login.microsoftonline.com/${local.tenant_id}/oauth2/token"
+    # fs.azure.account.oauth2.client.endpoint: https://login.microsoftonline.com/${local.tenant_id}/oauth2/token
     tenant_id: str | None = None
     # Azure Storage account to which the SP has been given access
     storage_account: str | None = None

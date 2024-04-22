@@ -10,20 +10,11 @@ from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
+from . import get_azure_spark_conf
 
 
 logger = logging.getLogger(__name__)
-_SPARK_CONF = {
-    "spark.databricks.cluster.profile": "singleNode",
-    "spark.master": "local[*]",
-    "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
-    "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
-    ".azurebfs.oauth2.ClientCredsTokenProvider",
-    "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
-    "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
-    "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
-    ".microsoftonline.com/directory_12345/oauth2/token",
-}
+_SPARK_CONF = get_azure_spark_conf()
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -425,56 +416,54 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
-@pytest.fixture
-def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make_catalog, make_schema):
-    src_schema = make_schema(catalog_name="hive_metastore")
-    src_external_table = runtime_ctx.make_table(
-        catalog_name=src_schema.catalog_name,
-        schema_name=src_schema.name,
-        external_csv=make_mounted_location,
-    )
-    dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
-    runtime_ctx.with_table_mapping_rules(rules)
-    return (
-        runtime_ctx,
-        f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
-    )
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_migrate_managed_tables_with_principal_acl_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+def test_migrate_external_tables_with_principal_acl_azure(
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_ucx_group
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
-    ctx, table_full_name = prepared_principal_acl
+    ctx, table_full_name, _, _ = prepared_principal_acl
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     ctx.with_dummy_resource_permission()
     table_migrate = ctx.tables_migrator
-    user = make_user()
+
+    user_with_cluster_access = make_user()
+    user_without_cluster_access = make_user()
+    group_with_cluster_access, _ = make_ucx_group()
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
-        user_name=user.user_name,
+        user_name=user_with_cluster_access.user_name,
+        group_name=group_with_cluster_access.display_name,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
     for _ in target_table_grants.privilege_assignments:
-        if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+        if _.principal == user_with_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
 
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == group_with_cluster_access.display_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == user_without_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            assert False, "User without cluster access should not have access to the table"
+    assert True
+
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_principal_acl_aws(
+def test_migrate_external_tables_with_principal_acl_aws(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
-    ctx, table_full_name = prepared_principal_acl
+    ctx, table_full_name, _, _ = prepared_principal_acl
     ctx.with_dummy_resource_permission()
     cluster = make_cluster(
         single_node=True,
@@ -494,6 +483,34 @@ def test_migrate_managed_tables_with_principal_acl_aws(
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+
+def test_migrate_external_tables_with_spn_azure(
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    ctx, table_full_name = prepared_principal_acl
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    ctx.with_dummy_resource_permission()
+
+    table_migrate = ctx.tables_migrator
+
+    spn_with_mount_access = "5a11359f-ba1f-483f-8e00-0fe55ec003ed"
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        service_principal_name=spn_with_mount_access,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == spn_with_mount_access and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
