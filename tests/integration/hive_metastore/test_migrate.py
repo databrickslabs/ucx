@@ -8,12 +8,10 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore.mapping import Rule
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
-from . import get_azure_spark_conf  # noqa: F403
-from ..conftest import (
-    StaticTableMapping,
-)
+from . import get_azure_spark_conf
+
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
@@ -325,6 +323,7 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
+    # prepare 2 tables to migrate
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
@@ -333,13 +332,19 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     runtime_ctx.with_dummy_resource_permission()
-    runtime_ctx.with_table_mapping_rules([Rule.from_src_dst(table_to_skip, dst_schema)])
 
+    # set up ucx to migrate only 1 table
+    runtime_ctx.with_table_mapping_rules(
+        [
+            Rule.from_src_dst(table_to_skip, dst_schema),
+        ]
+    )
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
-
+    # validate that the table is migrated successfully
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties
     assert target_table_properties["upgraded_from"] == table_to_skip.full_name
 
+    # mock that the other table was migrated
     sql_backend.execute(
         f"ALTER TABLE {table_to_revert.full_name} SET "
         f"TBLPROPERTIES('upgraded_to' = 'fake_catalog.fake_schema.fake_table');"
@@ -349,16 +354,19 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     assert "upgraded_to" in results
     assert results["upgraded_to"] == "fake_catalog.fake_schema.fake_table"
 
-    rules2 = [
-        Rule.from_src_dst(table_to_revert, dst_schema),
-        Rule.from_src_dst(table_to_skip, dst_schema),
-    ]
-    table_mapping2 = StaticTableMapping(ws, sql_backend, rules=rules2)
-    mapping2 = list(table_mapping2.get_tables_to_migrate(runtime_ctx.tables_crawler))
+    # set up ucx to migrate both tables
+    runtime_ctx.with_table_mapping_rules(
+        [
+            Rule.from_src_dst(table_to_revert, dst_schema),
+            Rule.from_src_dst(table_to_skip, dst_schema),
+        ]
+    )
+    table_mapping = TableMapping(runtime_ctx.installation, ws, sql_backend)
+    mapping = list(table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler))
 
     # Checking to validate that table_to_skip was omitted from the list of rules
-    assert len(mapping2) == 1
-    assert mapping2[0].rule == Rule(
+    assert len(mapping) == 1
+    assert mapping[0].rule == Rule(
         "workspace",
         dst_catalog.name,
         src_schema.name,
@@ -366,10 +374,8 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
         table_to_revert.name,
         table_to_revert.name,
     )
-    results2 = {
-        _["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))
-    }
-    assert "upgraded_to" not in results2
+    results = {_["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))}
+    assert "upgraded_to" not in results
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
