@@ -2,7 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
 index = MigrationIndex([])
@@ -461,6 +461,14 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                 Deprecation(
                     code='table-migrate',
                     message='Table numbers is migrated to cata4.counting.numbers in ' 'Unity Catalog',
+                    start_line=26,
+                    start_col=0,
+                    end_line=26,
+                    end_col=38,
+                ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from ' 'Parquet to Delta',
                     start_line=26,
                     start_col=0,
                     end_line=26,
