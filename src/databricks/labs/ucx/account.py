@@ -5,8 +5,10 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
+from databricks.sdk.service.catalog import MetastoreInfo
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
+
 
 logger = logging.getLogger(__name__)
 
@@ -258,3 +260,50 @@ class WorkspaceInfo:
         for installation in Installation.existing(self._ws, 'ucx'):
             installation.save(workspaces, filename=AccountWorkspaces.SYNC_FILE_NAME)
         logger.info("Synchronised workspace id mapping for installations on current workspace")
+
+
+class AccountMetastores:
+    def __init__(
+        self,
+        account_client: AccountClient,
+    ):
+        self._ac = account_client
+
+    def show_all_metastores(self, workspace_id: str | None = None):
+        location = None
+        if workspace_id:
+            logger.info(f"Workspace ID: {workspace_id}")
+            location = self._get_region(workspace_id)
+        logger.info("Matching metastores are:")
+        for metastore in self._get_all_metastores(location):
+            logger.info(f"{metastore.name} - {metastore.metastore_id}")
+
+    def _all_metastores(self):
+        return self._ac.metastores.list()
+
+    def _get_region(self, workspace_id: str) -> str:
+        workspace = self._ac.workspaces.get(int(workspace_id))
+        if self._ac.config.is_aws:
+            return str(workspace.aws_region)
+        return str(workspace.location)
+
+    def _get_all_metastores(self, location: str | None = None) -> list[MetastoreInfo]:
+        return [
+            metastore for metastore in self._ac.metastores.list() if location is None or metastore.region == location
+        ]
+
+    def assign_metastore(self, workspace_id: str, metastore_id: str | None = None):
+        if not metastore_id:
+            # search for all matching metastores
+            matching_metastores = self._get_all_metastores(self._get_region(workspace_id))
+            if len(matching_metastores) == 0:
+                raise ValueError(f"No matching metastore found for workspace {workspace_id}")
+            # if there are multiple matches, raise an error
+            if len(matching_metastores) > 1:
+                self.show_all_metastores(workspace_id)
+                raise ValueError(
+                    f"Multiple metastores found for workspace {workspace_id}. Please specify one using --metastore-id"
+                )
+            metastore_id = matching_metastores[0].metastore_id
+        if metastore_id is not None:
+            self._ac.metastore_assignments.create(int(workspace_id), metastore_id)
