@@ -177,6 +177,58 @@ class ASTLinter(Generic[T]):
         visitor.visit(self._root)
         return visitor.appended_paths
 
+    def extract_callchain(self) -> ast.Call | None:
+        """If 'node' is an assignment or expression, extract its full call-chain (if it has one)"""
+        call = None
+        if isinstance(self._root, ast.Assign):
+            call = self._root.value
+        elif isinstance(self._root, ast.Expr):
+            call = self._root.value
+        if not isinstance(call, ast.Call):
+            call = None
+        return call
+
+    def extract_call_by_name(self, name: str) -> ast.Call | None:
+        """Given a call-chain, extract its sub-call by method name (if it has one)"""
+        assert isinstance(self._root, ast.Call)
+        node = self._root
+        while True:
+            func = node.func
+            if not isinstance(func, ast.Attribute):
+                return None
+            if func.attr == name:
+                return node
+            if not isinstance(func.value, ast.Call):
+                return None
+            node = func.value
+
+    def args_count(self) -> int:
+        """Count the number of arguments (positionals + keywords)"""
+        assert isinstance(self._root, ast.Call)
+        return len(self._root.args) + len(self._root.keywords)
+
+    def get_arg(
+        self,
+        arg_index: int | None,
+        arg_name: str | None,
+    ) -> ast.expr | None:
+        """Extract the call argument identified by an optional position or name (if it has one)"""
+        assert isinstance(self._root, ast.Call)
+        if arg_index is not None and len(self._root.args) > arg_index:
+            return self._root.args[arg_index]
+        if arg_name is not None:
+            arg = [kw.value for kw in self._root.keywords if kw.arg == arg_name]
+            if len(arg) == 1:
+                return arg[0]
+        return None
+
+    def is_none(self) -> bool:
+        """Check if the given AST expression is the None constant"""
+        assert isinstance(self._root, ast.expr)
+        if not isinstance(self._root, ast.Constant):
+            return False
+        return self._root.value is None
+
 
 class PythonLinter(Linter):
 

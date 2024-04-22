@@ -3,7 +3,6 @@ import functools
 import collections
 import os
 import logging
-import warnings
 from dataclasses import replace
 from functools import partial, cached_property
 from datetime import timedelta
@@ -20,7 +19,6 @@ from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -143,21 +141,6 @@ class StaticTablesCrawler(TablesCrawler):
 
     def snapshot(self) -> list[Table]:
         return self._tables
-
-
-class StaticTableMapping(TableMapping):
-    def __init__(self, workspace_client: WorkspaceClient, sb: SqlBackend, rules: list[Rule]):
-        # TODO: remove this class, it creates difficulties when used together with Permission mapping
-        warnings.warn("switch to using runtime_ctx fixture", DeprecationWarning)
-        installation = Installation(workspace_client, 'ucx')
-        super().__init__(installation, workspace_client, sb)
-        self._rules = rules
-
-    def load(self):
-        return self._rules
-
-    def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
-        raise RuntimeWarning("not available")
 
 
 class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
