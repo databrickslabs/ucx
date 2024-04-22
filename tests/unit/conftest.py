@@ -6,7 +6,8 @@ from unittest.mock import patch, create_autospec
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk.config import Config
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
@@ -72,3 +73,10 @@ def run_workflow(mocker):
             return ctx
 
     yield inner
+
+
+@pytest.fixture
+def acc_client():
+    acc = create_autospec(AccountClient)
+    acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
+    return acc
