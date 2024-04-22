@@ -12,6 +12,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.catalog import MetastoreInfo
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
+from databricks.sdk.service.settings import DefaultNamespaceSetting, StringMessage
 
 from databricks.labs.ucx.account import AccountWorkspaces, WorkspaceInfo, AccountMetastores
 
@@ -540,12 +541,27 @@ def test_assign_metastore(acc_client):
         MetastoreInfo(name="metastore_use_3", metastore_id="126", region="us-east-2"),
     ]
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-west-2")
+    ws = create_autospec(WorkspaceClient)
+    acc_client.get_workspace_client.return_value = ws
+    default_namespace = ws.settings.default_namespace
+    default_namespace.get.return_value = DefaultNamespaceSetting(etag="123", namespace=StringMessage("hive_metastore"))
+
     account_metastores = AccountMetastores(acc_client)
     # multiple metastores, need to choose one
+    # also provide a default catalog name
     prompts = MockPrompts({"Multiple metastores found, please select one*": "0"})
-    account_metastores.assign_metastore(prompts, "123456")
+    account_metastores.assign_metastore(prompts, "123456", "", "main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
+    default_namespace.update.assert_called_with(
+        allow_missing=True,
+        field_mask="namespace.value",
+        setting=DefaultNamespaceSetting(etag="123", namespace=StringMessage("main")),
+    )
     # only one metastore, should assign directly
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-east-2")
     account_metastores.assign_metastore(MockPrompts({}), "123456")
     acc_client.metastore_assignments.create.assert_called_with(123456, "126")
+    # no metastore found, error
+    acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-central-2")
+    with pytest.raises(ValueError):
+        account_metastores.assign_metastore(MockPrompts({}), "123456")

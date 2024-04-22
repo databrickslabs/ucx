@@ -5,9 +5,9 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
-from databricks.sdk.service import settings
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
 from databricks.sdk.service.provisioning import Workspace
+from databricks.sdk.service.settings import DefaultNamespaceSetting, StringMessage
 
 logger = logging.getLogger(__name__)
 
@@ -300,9 +300,6 @@ class AccountMetastores:
         if default_catalog is not None:
             self._set_default_catalog(workspace_id, default_catalog)
 
-    def _all_metastores(self):
-        return self._ac.metastores.list()
-
     def _get_region(self, workspace_id: int) -> str:
         workspace = self._ac.workspaces.get(workspace_id)
         if self._ac.config.is_aws:
@@ -324,7 +321,5 @@ class AccountMetastores:
         default_namespace.update(
             allow_missing=True,
             field_mask="namespace.value",
-            setting=settings.DefaultNamespaceSetting(
-                etag=current.etag, namespace=settings.StringMessage(default_catalog)
-            ),
+            setting=DefaultNamespaceSetting(etag=current.etag, namespace=StringMessage(default_catalog)),
         )
