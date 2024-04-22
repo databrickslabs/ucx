@@ -402,7 +402,7 @@ class WorkspaceInstallation(InstallationMixin):
         self._sql_backend = sql_backend
         self._workflows_installer = workflows_installer
         self._prompts = prompts
-        self.product_info = product_info
+        self._product_info = product_info
         environ = dict(os.environ.items())
         self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
         self._skip_dashboards = skip_dashboards
@@ -451,7 +451,7 @@ class WorkspaceInstallation(InstallationMixin):
         return self._installation.install_folder()
 
     def run(self):
-        logger.info(f"Installing UCX v{self.product_info.version()}")
+        logger.info(f"Installing UCX v{self._product_info.version()}")
         install_tasks = [self._create_database]
         if not self._skip_dashboards:
             install_tasks.append(self._create_dashboards)
@@ -502,7 +502,7 @@ class WorkspaceInstallation(InstallationMixin):
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
-        logger.info(f"Deleting UCX v{self.product_info.version()} from {self._ws.config.host}")
+        logger.info(f"Deleting UCX v{self._product_info.version()} from {self._ws.config.host}")
         try:
             self._installation.files()
         except NotFound:
