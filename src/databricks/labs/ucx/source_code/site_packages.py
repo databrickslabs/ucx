@@ -38,7 +38,7 @@ class SitePackage:
 class SitePackages:
 
     @staticmethod
-    def parse(site_packages_path: str):
+    def parse(site_packages_path: Path):
         dist_info_dirs = [dir for dir in os.listdir(site_packages_path) if dir.endswith(".dist-info")]
         packages = [SitePackage.parse(Path(site_packages_path, dist_info_dir)) for dist_info_dir in dist_info_dirs]
         return SitePackages(packages)

@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
@@ -118,10 +119,12 @@ class DependencyResolver:
     def __init__(
         self,
         whitelist: Whitelist,
+        site_packages: SitePackages,
         file_loader: LocalFileLoader,
         notebook_loader: NotebookLoader,
     ):
-        self._whitelist = Whitelist() if whitelist is None else whitelist
+        self._whitelist = whitelist
+        self._site_packages = site_packages
         self._file_loader = file_loader
         self._notebook_loader = notebook_loader
         self._advices: list[Advice] = []
