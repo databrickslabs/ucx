@@ -13,6 +13,19 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.queries import FromTable
 
+CLOUD_DIRECT_REFS = {
+    "s3a://",
+    "s3n://",
+    "s3://",
+    "wasb://",
+    "wasbs://",
+    "abfs://",
+    "abfss://",
+    "dbfs:/",
+    "hdfs://",
+    "file:/",
+}
+
 
 @dataclass
 class Matcher(ABC):
