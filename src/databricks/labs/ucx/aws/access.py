@@ -18,7 +18,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSResources,
     AWSRoleAction,
-    logger,
+    logger, AWSUCRoleCandidate,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -51,13 +51,14 @@ class AWSResourcePermissions:
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
         self._principal_acl = principal_acl
 
-    def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+    def generate_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         # Get the missing paths
         # Identify the S3 prefixes
         # Create the roles and policies for the missing S3 prefixes
         # If single_role is True, create a single role and policy for all the missing S3 prefixes
         # If single_role is False, create a role and policy for each missing S3 prefix
-        missing_paths = self._identify_missing_paths()
+        roles: list[AWSRoleAction] = []
+        missing_paths = self.identify_missing_paths()
         s3_prefixes = set()
         for missing_path in missing_paths:
             match = re.match(AWSResources.S3_PATH_REGEX, missing_path)
@@ -68,6 +69,10 @@ class AWSResourcePermissions:
                 self._aws_resources.put_role_policy(
                     role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
                 )
+            AWSUCRoleCandidate(
+                role_name=role_name,
+                resource_paths=list(s3_prefixes),
+            )
         else:
             for idx, s3_prefix in enumerate(sorted(list(s3_prefixes))):
                 if self._aws_resources.create_uc_role(f"{role_name}-{idx+1}"):
@@ -167,7 +172,7 @@ class AWSResourcePermissions:
                 )
         return policy_actions
 
-    def _identify_missing_paths(self):
+    def identify_missing_paths(self):
         external_locations = self._locations.snapshot()
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()

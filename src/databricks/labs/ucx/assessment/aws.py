@@ -29,6 +29,13 @@ class AWSPolicyAction:
 
 
 @dataclass
+# Candidates for UC IAM roles with the paths they have access to
+class AWSUCRoleCandidate:
+    role_name: str
+    resource_paths: list[str]
+
+
+@dataclass
 class AWSRoleAction:
     role_arn: str
     resource_type: str
