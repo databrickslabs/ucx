@@ -162,16 +162,16 @@ commands:
     is_account_level: true
     description: Show all metastores available in the same region as the specified workspace
     flags:
-      - name: workspace_id
-        description: Workspace ID to show metastores for
+      - name: workspace-id
+        description: (Optional) Workspace ID to show metastores for
 
   - name: assign-metastore
     is_account_level: true
     description: Show all metastores available in the same region as the specified workspace
     flags:
-      - name: workspace_id
-        description: Workspace ID to assign a metastore to
-      - name: metastore_id
+      - name: workspace-id
+        description: (Optional) Workspace ID to assign a metastore to
+      - name: metastore-id
         description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
-      - name: default_catalog
+      - name: default-catalog
         description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
