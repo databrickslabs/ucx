@@ -77,7 +77,17 @@
   {
     "db": "db1",
     "table": "v12",
-    "view_text": "select * from db1.v11"
+    "view_text": "select * from db1.v13"
+  },
+  {
+    "db": "db1",
+    "table": "v13",
+    "view_text": "select * from db1.v14"
+  },
+  {
+    "db": "db1",
+    "table": "v14",
+    "view_text": "select * from db1.v12"
   }
 
 
