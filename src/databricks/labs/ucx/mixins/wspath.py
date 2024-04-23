@@ -16,6 +16,9 @@ class _DatabricksFlavour(_PosixFlavour):
     def make_uri(self, path):
         return self._ws.config.host + '#workspace' + urlquote_from_bytes(bytes(path))
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} for {self._ws}>"
+
 
 
 class _DatabricksAccessor(_Accessor):
@@ -30,9 +33,19 @@ class _DatabricksAccessor(_Accessor):
     link = _na
     symlink = _na
     readlink = _na
+    #
+    # def open(self):
+    #     return os.open()
 
-    def open(self):
-        return os.open()
+    # mkdir(self, mode)
+
+
+    def expanduser(self, path):
+        home = f"/Users/{self._ws.current_user.me().user_name}"
+        return path.replace("~", home)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} for {self._ws}>"
 
     #
     # open = io.open
@@ -66,21 +79,24 @@ class _DatabricksAccessor(_Accessor):
     group = _na
     getcwd = _na
     # getcwd = os.getcwd
-    # expanduser = staticmethod(os.path.expanduser)
     # realpath = staticmethod(os.path.realpath)
 
+
 class WorkspacePath(Path):
-    def __new__(cls, ws: WorkspaceClient, path: str | Path, *, object_info: ObjectInfo | None = None):
+    def __new__(cls, ws: WorkspaceClient, path: str | Path):
         self = object.__new__(cls)
         self._flavour = _DatabricksFlavour(ws)
         drv, root, parts = self._parse_args([path])
+        return self.__from_raw_parts(self, ws, self._flavour, drv, root, parts)
+
+    @staticmethod
+    def __from_raw_parts(self, ws: WorkspaceClient, flavour: _DatabricksFlavour, drv, root, parts) -> 'WorkspacePath':
+        self._accessor = _DatabricksAccessor(ws)
+        self._flavour = flavour
         self._drv = drv
         self._root = root
         self._parts = parts
         self._ws = ws
-        if object_info is not None:
-            # If object_info is not none, we can avoid an extra API call
-            self.__dict__["_object_info"] = object_info
         return self
 
     def _parse_args(self, args):
@@ -93,15 +109,10 @@ class WorkspacePath(Path):
             parts.append(str(a))
         return self._flavour.parse_parts(parts)
 
-    def iterdir(self):
-        for object_info in self._ws.workspace.list(self.as_posix()):
-            yield WorkspacePath(self._ws, object_info.path, object_info=object_info)
-
     def _make_child_relpath(self, part):
-        # This is an optimization used for dir walking.  `part` must be
-        # a single part relative to this path.
-        parts = self._parts + [part]
-        return self._from_parsed_parts(self._drv, self._root, parts)
+        # used in dir walking
+        path = self._flavour.join(self._parts + [part])
+        return WorkspacePath(self._ws, path)
 
     def _format_parsed_parts(self, drv, root, parts):
         # instance method adapted from pathlib.Path
@@ -109,13 +120,15 @@ class WorkspacePath(Path):
             return drv + root + self._flavour.join(parts[1:])
         return self._flavour.join(parts)
 
-    @classmethod
-    def _from_parsed_parts(cls, drv, root, parts):
-        self = object.__new__(cls)
-        self._drv = drv
-        self._root = root
-        self._parts = parts
-        return self
+    def _from_parsed_parts(self, drv, root, parts):
+        # instance method adapted from pathlib.Path
+        this = object.__new__(self.__class__)
+        return self.__from_raw_parts(this, self._ws, self._flavour, drv, root, parts)
+
+    def _from_parts(self, args):
+        # instance method adapted from pathlib.Path
+        drv, root, parts = self._parse_args(args)
+        return self._from_parsed_parts(drv, root, parts)
 
     def exists(self, *, follow_symlinks=True):
         try:
@@ -123,6 +136,15 @@ class WorkspacePath(Path):
             return True
         except FileNotFoundError:
             return False
+
+    def mkdir(self, mode=0o600, parents=True, exist_ok=True):
+        if not exist_ok:
+            raise ValueError("exist_ok must be True for Databricks Workspace")
+        if not parents:
+            raise ValueError("parents must be True for Databricks Workspace")
+        if mode != 0o600:
+            raise ValueError("other modes than 0o600 are not yet supported")
+        self._ws.workspace.mkdirs(self.as_posix())
 
     @cached_property
     def _object_info(self) -> ObjectInfo:
@@ -180,9 +202,6 @@ class WorkspacePath(Path):
 
     def lstat(self):
         return super().lstat()
-
-    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
-        super().mkdir(mode, parents, exist_ok)
 
     # @overload
     # def open(
@@ -284,9 +303,6 @@ class WorkspacePath(Path):
 
     def absolute(self):
         return super().absolute()
-
-    def expanduser(self):
-        return super().expanduser()
 
     def read_bytes(self):
         return super().read_bytes()
