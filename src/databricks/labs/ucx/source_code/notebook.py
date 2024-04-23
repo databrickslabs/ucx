@@ -1,17 +1,19 @@
 from __future__ import annotations  # for type hints
 
-import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
+from pathlib import Path
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language, ObjectType
+from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyGraph,
+    SourceContainer,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -77,18 +79,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph):
-        linter = ASTLinter.parse(self._original_code)
-        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        for call in calls:
-            assert isinstance(call, ast.Call)
-            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(path, ast.Constant):
-                dependency = Dependency(ObjectType.NOTEBOOK, path.value.strip("'").strip('"'))
-                parent.register_dependency(dependency)
-        names = PythonLinter.list_import_sources(linter)
-        for name in names:
-            dependency = Dependency(None, name)
-            parent.register_dependency(dependency)
+        parent.build_graph_from_python_source(self._original_code)
 
 
 class RCell(Cell):
@@ -163,8 +154,12 @@ class RunCell(Cell):
         for line in lines:
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command) :].strip()
-                parent.register_dependency(Dependency(ObjectType.NOTEBOOK, path.strip('"')))
+                path = line[start + len(command) :]
+                path = path.strip().strip("'").strip('"')
+                dependency = parent.register_notebook(Path(path))
+                if dependency is None:
+                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
+                    raise ValueError(f"Invalid notebook path in %run command: {path}")
                 return
         raise ValueError("Missing notebook path in %run command")
 
@@ -185,7 +180,7 @@ class ShellCell(Cell):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
-        pass
+        pass  # nothing to do
 
 
 class PipCell(Cell):
@@ -375,10 +370,6 @@ class Notebook(SourceContainer):
         self._ends_with_lf = ends_with_lf
 
     @property
-    def object_type(self) -> ObjectType:
-        return ObjectType.NOTEBOOK
-
-    @property
     def path(self) -> str:
         return self._path
 
@@ -407,6 +398,6 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
         for cell in self._cells:
-            cell.build_dependency_graph(graph)
+            cell.build_dependency_graph(parent)
