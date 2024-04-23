@@ -10,7 +10,7 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyResolver,
-    LocalLoader,
+    LocalFileLoader,
     DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -114,7 +114,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = source.encode("utf-8")
     ws.workspace.get_status.return_value = ObjectInfo(path="path", object_type=ObjectType.FILE)
     sources = {"path": source}
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     resolver = DependencyResolver(whitelist, loader, ws)
     builder = DependencyGraphBuilder(resolver)
@@ -152,7 +152,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     resolver = DependencyResolver(whitelist, loader, ws)
     builder = DependencyGraphBuilder(resolver)

@@ -46,8 +46,12 @@ class DependencyLoader(abc.ABC):
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def is_notebook(self, path: Path) -> bool:
+        raise NotImplementedError()
 
-class LocalLoader(DependencyLoader):
+
+class LocalFileLoader(DependencyLoader):
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         raise NotImplementedError()
 
@@ -58,7 +62,15 @@ class LocalLoader(DependencyLoader):
         raise NotImplementedError()
 
 
-class WorkspaceLoader(DependencyLoader):
+class NotebookLoader(DependencyLoader, abc.ABC):
+    pass
+
+
+class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
+    pass
+
+
+class WorkspaceNotebookLoader(NotebookLoader):
 
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
@@ -104,26 +116,22 @@ class DependencyResolver:
     def __init__(
         self,
         whitelist: Whitelist,
-        local_loader: LocalLoader,
-        workspace_loader: WorkspaceLoader | None,
+        file_loader: LocalFileLoader,
+        notebook_loader: NotebookLoader,
     ):
         self._whitelist = Whitelist() if whitelist is None else whitelist
-        self._local_loader = local_loader
-        self._workspace_loader = workspace_loader
+        self._file_loader = file_loader
+        self._notebook_loader = notebook_loader
         self._advices: list[Advice] = []
 
     def resolve_notebook(self, path: Path) -> Dependency | None:
-        if self._local_loader.is_notebook(path):
-            return Dependency(self._local_loader, path)
-        if self._workspace_loader is not None and self._workspace_loader.is_notebook(path):
-            return Dependency(self._workspace_loader, path)
+        if self._notebook_loader.is_notebook(path):
+            return Dependency(self._notebook_loader, path)
         return None
 
     def resolve_local_file(self, path: Path) -> Dependency | None:
-        if self._local_loader.is_notebook(path):
-            return Dependency(self._local_loader, path)
-        if self._local_loader.is_file(path):
-            return Dependency(self._local_loader, path)
+        if self._file_loader.is_file(path) and not self._file_loader.is_notebook(path):
+            return Dependency(self._file_loader, path)
         return None
 
     def resolve_import(self, name: str) -> Dependency | None:
@@ -142,8 +150,8 @@ class DependencyResolver:
                     )
                 )
             return None
-        if self._local_loader.is_file(Path(name)):
-            return Dependency(self._local_loader, Path(name))
+        if self._file_loader.is_file(Path(name)):
+            return Dependency(self._file_loader, Path(name))
         raise ValueError(f"Could not locate {name}")
 
     def get_advices(self) -> Iterable[Advice]:

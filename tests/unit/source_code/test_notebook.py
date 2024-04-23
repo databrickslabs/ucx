@@ -11,8 +11,8 @@ from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     SourceContainer,
     DependencyResolver,
-    LocalLoader,
-    WorkspaceLoader,
+    LocalFileLoader,
+    WorkspaceNotebookLoader,
 )
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
@@ -136,9 +136,9 @@ def test_notebook_builds_leaf_dependency_graph():
     ws.workspace.get_status.return_value = ObjectInfo(
         object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
     )
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = True
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceLoader(ws))
+    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -157,9 +157,9 @@ def test_notebook_builds_depth1_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceLoader(ws))
+    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -174,9 +174,9 @@ def test_notebook_builds_depth2_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceLoader(ws))
+    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -192,9 +192,9 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = True
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceLoader(ws))
+    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -210,9 +210,9 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceLoader(ws))
+    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -227,9 +227,9 @@ def test_notebook_builds_python_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalLoader)
+    loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceLoader(ws))
+    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()

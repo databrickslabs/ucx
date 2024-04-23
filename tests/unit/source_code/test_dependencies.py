@@ -9,9 +9,10 @@ from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyResolver,
-    LocalLoader,
+    LocalFileLoader,
     DependencyGraphBuilder,
-    WorkspaceLoader,
+    WorkspaceNotebookLoader,
+    LocalNotebookLoader,
 )
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _download_side_effect, whitelist_mock, _load_dependency_side_effect
@@ -30,9 +31,9 @@ def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
-    loader = create_autospec(LocalLoader)
-    loader.is_notebook.return_value = False
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, WorkspaceLoader(ws)))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_notebook.return_value = False
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, WorkspaceNotebookLoader(ws)))
     builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
     assert len(visited) == len(paths)
 
@@ -42,11 +43,13 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
     whi = whitelist_mock()
-    loader = create_autospec(LocalLoader)
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    loader.is_notebook.return_value = True
-    loader.is_file.return_value = True
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    file_loader.is_notebook.return_value = True
+    file_loader.is_file.return_value = True
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, LocalNotebookLoader()))
     builder.build_notebook_dependency_graph(Path("root4.py.txt"))
     assert len(visited) == len(paths)
 
@@ -68,10 +71,12 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
-    loader = create_autospec(LocalLoader)
-    loader.is_notebook.return_value = False
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, ws))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_notebook.return_value = False
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, WorkspaceNotebookLoader(ws)))
     builder.build_local_file_dependency_graph(Path("root8.py.txt"))
     assert len(visited) == len(paths)
 
@@ -101,9 +106,9 @@ def test_dependency_graph_builder_fails_with_unfound_dependency():
     ws.workspace.download.side_effect = download_side_effect
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
-    loader = create_autospec(LocalLoader)
-    loader.is_notebook.return_value = False
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, WorkspaceLoader(ws)))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_notebook.return_value = False
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, WorkspaceNotebookLoader(ws)))
     with pytest.raises(ValueError):
         builder.build_notebook_dependency_graph(Path("root1.run.py.txt"))
 
@@ -113,9 +118,11 @@ def test_dependency_graph_builder_visits_file_dependencies():
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
     whi = whitelist_mock()
-    loader = create_autospec(LocalLoader)
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, LocalNotebookLoader()))
     builder.build_local_file_dependency_graph(Path("root5.py.txt"))
     assert len(visited) == len(paths)
 
@@ -125,10 +132,12 @@ def test_dependency_graph_builder_visits_recursive_file_dependencies():
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
     whi = whitelist_mock()
-    loader = create_autospec(LocalLoader)
-    loader.is_file.return_value = True
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_file.return_value = True
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, LocalNotebookLoader()))
     builder.build_local_file_dependency_graph(Path("root6.py.txt"))
     assert len(visited) == len(paths)
 
@@ -143,10 +152,12 @@ def test_dependency_graph_builder_throws_with_invalid_dependencies():
         filename = args[0]
         return filename in paths
 
-    loader = create_autospec(LocalLoader)
-    loader.is_file.side_effect = is_file_side_effect
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, visited, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, LocalNotebookLoader()))
     with pytest.raises(ValueError):
         builder.build_local_file_dependency_graph(Path("root7.py.txt"))
 
@@ -160,10 +171,10 @@ def test_dependency_graph_builder_ignores_builtin_dependencies():
         filename = args[0]
         return filename in paths
 
-    loader = create_autospec(LocalLoader)
-    loader.is_file.side_effect = is_file_side_effect
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whi, loader, None))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    builder = DependencyGraphBuilder(DependencyResolver(whi, file_loader, LocalNotebookLoader()))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert not graph.locate_dependency("os")
     assert not graph.locate_dependency("path")
@@ -179,9 +190,9 @@ def test_dependency_graph_builder_ignores_known_dependencies():
         filename = args[0]
         return filename in paths
 
-    loader = create_autospec(LocalLoader)
-    loader.is_file.side_effect = is_file_side_effect
-    loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
-    builder = DependencyGraphBuilder(DependencyResolver(whitelist, loader, None))
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    builder = DependencyGraphBuilder(DependencyResolver(whitelist, file_loader, LocalNotebookLoader()))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert not graph.locate_dependency("databricks")
