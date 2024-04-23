@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import os
 import pathlib
 from unittest.mock import create_autospec
 from typing import BinaryIO
@@ -226,3 +227,10 @@ def whitelist_mock():
     wls = create_autospec(Whitelist)
     wls.compatibility.return_value = None
     return wls
+
+
+def locate_site_packages() -> pathlib.Path:
+    project_path = pathlib.Path(os.path.dirname(__file__)).parent.parent
+    python_lib_path = pathlib.Path(project_path, ".venv", "lib")
+    actual_python = next(file for file in os.listdir(str(python_lib_path)) if file.startswith("python3."))
+    return pathlib.Path(python_lib_path, actual_python, "site-packages")

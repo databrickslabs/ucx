@@ -208,3 +208,17 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     builder = DependencyGraphBuilder(DependencyResolver(whitelist, file_loader, LocalNotebookLoader()))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert not graph.locate_dependency("databricks")
+
+
+def test_dependency_graph_builder_visits_site_packages(empty_index):
+    paths = ["import-site-package.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
+    whitelist = Whitelist.parse(datas[0])
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_file.return_value = True
+    file_loader.is_notebook.return_value = False
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
+    builder = DependencyGraphBuilder(DependencyResolver(whitelist, file_loader, LocalNotebookLoader()))
+    graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
+    assert graph.locate_dependency("certifi/core.py")
