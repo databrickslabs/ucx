@@ -1,6 +1,7 @@
 from __future__ import annotations  # for type hints
 
 import logging
+import sys
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
@@ -35,7 +36,13 @@ class LocalFile(SourceContainer):
         for path in notebook_paths:
             parent.register_notebook(Path(path))
         # TODO https://github.com/databrickslabs/ucx/issues/1287
+        in_site_packages = "site-packages" in parent.dependency.path.as_posix()
+        sys_module_keys = sys.modules.keys()
         for import_name in PythonLinter.list_import_sources(linter):
+            # TODO remove HORRIBLE hack until we implement https://github.com/databrickslabs/ucx/issues/1421
+            # if it's a site-package, provide full path until we implement 1421
+            if in_site_packages and import_name not in sys_module_keys:
+                import_name = Path(parent.dependency.path.parent, import_name + ".py").as_posix()
             parent.register_import(import_name)
 
 

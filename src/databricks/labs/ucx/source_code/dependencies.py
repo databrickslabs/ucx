@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
@@ -51,6 +52,22 @@ class DependencyLoader(abc.ABC):
         raise NotImplementedError()
 
 
+# a DependencyLoader that simply wraps a pre-existing SourceContainer
+class WrappingLoader(DependencyLoader):
+
+    def __init__(self, source_container: SourceContainer):
+        self._source_container = source_container
+
+    def is_file(self, path: Path) -> bool:
+        raise NotImplementedError()  # should never happen
+
+    def is_notebook(self, path: Path) -> bool:
+        raise NotImplementedError()  # should never happen
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        return self._source_container
+
+
 class LocalFileLoader(DependencyLoader):
     # see https://github.com/databrickslabs/ucx/issues/1499
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
@@ -70,6 +87,17 @@ class NotebookLoader(DependencyLoader, abc.ABC):
 class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
     # see https://github.com/databrickslabs/ucx/issues/1499
     pass
+
+
+class SitePackageContainer(SourceContainer):
+
+    def __init__(self, file_loader: LocalFileLoader, site_package: SitePackage):
+        self._file_loader = file_loader
+        self._site_package = site_package
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+        for module_path in self._site_package.module_paths:
+            parent.register_dependency(Dependency(self._file_loader, module_path))
 
 
 class WorkspaceNotebookLoader(NotebookLoader):
@@ -118,10 +146,12 @@ class DependencyResolver:
     def __init__(
         self,
         whitelist: Whitelist,
+        site_packages: SitePackages,
         file_loader: LocalFileLoader,
         notebook_loader: NotebookLoader,
     ):
-        self._whitelist = Whitelist() if whitelist is None else whitelist
+        self._whitelist = whitelist
+        self._site_packages = site_packages
         self._file_loader = file_loader
         self._notebook_loader = notebook_loader
         self._advices: list[Advice] = []
@@ -137,24 +167,34 @@ class DependencyResolver:
         return None
 
     def resolve_import(self, name: str) -> Dependency | None:
-        compatibility = self._whitelist.compatibility(name)
-        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
-        if compatibility is not None:
-            if compatibility == UCCompatibility.NONE:
-                self._advices.append(
-                    Deprecation(
-                        code="dependency-check",
-                        message=f"Use of dependency {name} is deprecated",
-                        start_line=0,
-                        start_col=0,
-                        end_line=0,
-                        end_col=0,
-                    )
-                )
+        if self._is_whitelisted(name):
             return None
         if self._file_loader.is_file(Path(name)):
             return Dependency(self._file_loader, Path(name))
+        site_package = self._site_packages[name]
+        if site_package is not None:
+            container = SitePackageContainer(self._file_loader, site_package)
+            return Dependency(WrappingLoader(container), Path(name))
         raise ValueError(f"Could not locate {name}")
+
+    def _is_whitelisted(self, name: str) -> bool:
+        compatibility = self._whitelist.compatibility(name)
+        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        if compatibility is None:
+            return False
+        if compatibility == UCCompatibility.NONE:
+            # TODO this should be done as part of linting, not as part of dependency graph building
+            self._advices.append(
+                Deprecation(
+                    code="dependency-check",
+                    message=f"Use of dependency {name} is deprecated",
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
+                )
+            )
+        return True
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
@@ -215,20 +255,24 @@ class DependencyGraph:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        path_str = str(path)
-        path_str = path_str[2:] if path_str.startswith('./') else path_str
+        posix_path = path.as_posix()
+        posix_path = posix_path[2:] if posix_path.startswith('./') else posix_path
 
         def check_registered_dependency(graph):
             # TODO https://github.com/databrickslabs/ucx/issues/1287
-            graph_path = str(graph.path)
-            if graph_path.startswith('./'):
-                graph_path = graph_path[2:]
-            if graph_path == path_str:
+            graph_posix_path = graph.path.as_posix()
+            if graph_posix_path.startswith('./'):
+                graph_posix_path = graph_posix_path[2:]
+            if graph_posix_path == posix_path:
+                found.append(graph)
+                return True
+            # TODO remove HORRIBLE hack until we implement https://github.com/databrickslabs/ucx/issues/1421
+            if "site-packages" in graph_posix_path and graph_posix_path.endswith(posix_path):
                 found.append(graph)
                 return True
             return False
 
-        self.root.visit(check_registered_dependency)
+        self.root.visit(check_registered_dependency, set())
         return found[0] if len(found) > 0 else None
 
     @property
@@ -245,7 +289,7 @@ class DependencyGraph:
             dependencies.add(graph.dependency)
             return False
 
-        self.visit(add_to_dependencies)
+        self.visit(add_to_dependencies, set())
         return dependencies
 
     @property
@@ -253,11 +297,14 @@ class DependencyGraph:
         return {d.path for d in self.dependencies}
 
     # when visit_node returns True it interrupts the visit
-    def visit(self, visit_node: Callable[[DependencyGraph], bool | None]) -> bool | None:
+    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool | None:
+        if self.path in visited:
+            return False
+        visited.add(self.path)
         if visit_node(self):
             return True
         for dependency in self._dependencies.values():
-            if dependency.visit(visit_node):
+            if dependency.visit(visit_node, visited):
                 return True
         return False
 
@@ -269,7 +316,7 @@ class DependencyGraph:
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
                 path = path.value.strip().strip("'").strip('"')
-                dependency = self.register_notebook(path)
+                dependency = self.register_notebook(Path(path))
                 if dependency is None:
                     # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                     raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")

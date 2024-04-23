@@ -16,7 +16,9 @@ from databricks.labs.ucx.source_code.dependencies import (
 )
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
-from tests.unit import _load_sources, _download_side_effect, whitelist_mock
+from databricks.labs.ucx.source_code.site_packages import SitePackages
+from tests.unit import _load_sources, _download_side_effect, whitelist_mock, locate_site_packages
+
 
 # fmt: off
 # the following samples are real samples from https://github.com/databricks-industry-solutions
@@ -139,7 +141,8 @@ def test_notebook_builds_leaf_dependency_graph():
     )
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = True
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
+    site_packages = SitePackages.parse(locate_site_packages())
+    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -160,7 +163,8 @@ def test_notebook_builds_depth1_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
+    site_packages = SitePackages.parse(locate_site_packages())
+    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -177,7 +181,8 @@ def test_notebook_builds_depth2_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
+    site_packages = SitePackages.parse(locate_site_packages())
+    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -195,7 +200,8 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws.workspace.get_status.side_effect = get_status_side_effect
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = True
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
+    site_packages = SitePackages.parse(locate_site_packages())
+    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -213,7 +219,8 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
+    site_packages = SitePackages.parse(locate_site_packages())
+    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
@@ -230,7 +237,8 @@ def test_notebook_builds_python_dependency_graph():
     ws.workspace.get_status.side_effect = get_status_side_effect
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
-    resolver = DependencyResolver(whitelist_mock(), loader, WorkspaceNotebookLoader(ws))
+    site_packages = SitePackages.parse(locate_site_packages())
+    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
     dependency = resolver.resolve_notebook(Path(paths[0]))
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
