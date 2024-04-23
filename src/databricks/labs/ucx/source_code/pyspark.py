@@ -237,8 +237,6 @@ class SparkMatchers:
             TableNameMatcher("register", 1, 2, 0, "name"),
         ]
 
-        # TODO: Identify all methods in the Spark API that may refer to direct cloud storage,
-        #  check parameter location/name
         spark_cloud_matchers = [
             CloudAccessMatcher("ls", 1, 1, 0),
             CloudAccessMatcher("cp", 1, 2, 0),
@@ -259,6 +257,15 @@ class SparkMatchers:
             CloudAccessMatcher("binaryFiles", 1, 2, 0),
             CloudAccessMatcher("binaryRecords", 1, 2, 0),
             CloudAccessMatcher("dump_profiles", 1, 1, 0),
+            CloudAccessMatcher("hadoopFile", 1, 8, 0),
+            CloudAccessMatcher("newAPIHadoopFile", 1, 8, 0),
+            CloudAccessMatcher("pickleFile", 1, 3, 0),
+            CloudAccessMatcher("saveAsHadoopFile", 1, 8, 0),
+            CloudAccessMatcher("saveAsNewAPIHadoopFile", 1, 7, 0),
+            CloudAccessMatcher("saveAsPickleFile", 1, 2, 0),
+            CloudAccessMatcher("saveAsSequenceFile", 1, 2, 0),
+            CloudAccessMatcher("saveAsTextFile", 1, 2, 0),
+            CloudAccessMatcher("load_from_path", 1, 1, 0),
         ]
 
         # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html

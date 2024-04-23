@@ -530,9 +530,134 @@ for i in range(10):
                 )
             ],
         ),
+        # Test for 'hadoopFile' function
+        (
+            """spark.hadoopFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=37,
+                )
+            ],
+        ),
+        # Test for 'newAPIHadoopFile' function
+        (
+            """spark.newAPIHadoopFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=43,
+                )
+            ],
+        ),
+        # Test for 'pickleFile' function
+        (
+            """spark.pickleFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=37,
+                )
+            ],
+        ),
+        # Test for 'saveAsHadoopFile' function
+        (
+            """spark.saveAsHadoopFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=43,
+                )
+            ],
+        ),
+        # Test for 'saveAsNewAPIHadoopFile' function
+        (
+            """spark.saveAsNewAPIHadoopFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=49,
+                )
+            ],
+        ),
+        # Test for 'saveAsPickleFile' function
+        (
+            """spark.saveAsPickleFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=43,
+                )
+            ],
+        ),
+        # Test for 'saveAsSequenceFile' function
+        (
+            """spark.saveAsSequenceFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=45,
+                )
+            ],
+        ),
+        # Test for 'saveAsTextFile' function
+        (
+            """spark.saveAsTextFile("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=41,
+                )
+            ],
+        ),
+        # Test for 'load_from_path' function
+        (
+            """spark.load_from_path("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=41,
+                )
+            ],
+        ),
     ],
 )
-# TODO Add more tests
 def test_spark_cloud_direct_access(empty_index, code, expected):
     ftf = FromTable(empty_index, CurrentSessionState())
     sqf = SparkSql(ftf, empty_index)
