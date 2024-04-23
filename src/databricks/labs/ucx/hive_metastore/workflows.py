@@ -44,8 +44,11 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_hive_serde_in_place(self, ctx: RuntimeContext):
         """This workflow task migrates ParquetHiveSerDe, OrcSerde, AvroSerDe tables in place from the Hive Metastore to the Unity Catalog."""
-        ctx.table_migrator_hiveserde_in_place.migrate_tables(
-            what=What.EXTERNAL_HIVESERDE, acl_strategy=[AclMigrationWhat.LEGACY_TACL], mounts_crawler=ctx.mounts_crawler
+        ctx.tables_migrator.migrate_tables(
+            what=What.EXTERNAL_HIVESERDE,
+            acl_strategy=[AclMigrationWhat.LEGACY_TACL],
+            mounts_crawler=ctx.mounts_crawler,
+            hiveserde_in_place_migrate=True,
         )
 
     @job_task(

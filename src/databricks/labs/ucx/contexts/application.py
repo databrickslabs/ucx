@@ -227,21 +227,6 @@ class GlobalContext(abc.ABC):
             self.group_manager,
             self.migration_status_refresher,
             self.principal_acl,
-            hiveserde_in_place_migrate=False,
-        )
-
-    @cached_property
-    def table_migrator_hiveserde_in_place(self):
-        return TablesMigrator(
-            self.tables_crawler,
-            self.grants_crawler,
-            self.workspace_client,
-            self.sql_backend,
-            self.table_mapping,
-            self.group_manager,
-            self.migration_status_refresher,
-            self.principal_acl,
-            hiveserde_in_place_migrate=True,
         )
 
     @cached_property

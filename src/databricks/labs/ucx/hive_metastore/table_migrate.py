@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class TablesMigrator:
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         table_crawler: TablesCrawler,
         grant_crawler: GrantsCrawler,
@@ -45,7 +45,6 @@ class TablesMigrator:
         group_manager: GroupManager,
         migration_status_refresher: 'MigrationStatusRefresher',
         principal_grants: PrincipalACL,
-        hiveserde_in_place_migrate: bool = False,
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -56,14 +55,17 @@ class TablesMigrator:
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
-        self._hiveserde_in_place_migrate = hiveserde_in_place_migrate
 
     def index(self):
         # TODO: remove this method
         return self._migration_status_refresher.index()
 
     def migrate_tables(
-        self, what: What, acl_strategy: list[AclMigrationWhat] | None = None, mounts_crawler: Mounts | None = None
+        self,
+        what: What,
+        acl_strategy: list[AclMigrationWhat] | None = None,
+        mounts_crawler: Mounts | None = None,
+        hiveserde_in_place_migrate: bool = False,
     ):
         if what in [What.DB_DATASET, What.UNKNOWN]:
             logger.error(f"Can't migrate tables with type {what.name}")
@@ -79,7 +81,13 @@ class TablesMigrator:
         if what == What.VIEW:
             return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
         return self._migrate_tables(
-            what, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants, mounts
+            what,
+            acl_strategy,
+            all_grants_to_migrate,
+            all_migrated_groups,
+            all_principal_grants,
+            mounts,
+            hiveserde_in_place_migrate,
         )
 
     def _migrate_tables(
@@ -90,6 +98,7 @@ class TablesMigrator:
         all_migrated_groups,
         all_principal_grants,
         mounts: list[Mount],
+        hiveserde_in_place_migrate: bool = False,
     ):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         tables_in_scope = filter(lambda t: t.src.what == what, tables_to_migrate)
@@ -98,7 +107,7 @@ class TablesMigrator:
             grants = self._compute_grants(
                 table.src, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants
             )
-            tasks.append(partial(self._migrate_table, table, grants, mounts))
+            tasks.append(partial(self._migrate_table, table, grants, mounts, hiveserde_in_place_migrate))
         Threads.strict("migrate tables", tasks)
         if not tasks:
             logger.info(f"No tables found to migrate with type {what.name}")
@@ -141,7 +150,13 @@ class TablesMigrator:
             grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
         return grants
 
-    def _migrate_table(self, src_table: TableToMigrate, grants: list[Grant], mounts: list[Mount]):
+    def _migrate_table(
+        self,
+        src_table: TableToMigrate,
+        grants: list[Grant],
+        mounts: list[Mount],
+        hiveserde_in_place_migrate: bool = False,
+    ):
         if self._table_already_migrated(src_table.rule.as_uc_table_key):
             logger.info(f"Table {src_table.src.key} already migrated to {src_table.rule.as_uc_table_key}")
             return True
@@ -152,7 +167,9 @@ class TablesMigrator:
         if src_table.src.what == What.EXTERNAL_SYNC:
             return self._migrate_external_table(src_table.src, src_table.rule, grants)
         if src_table.src.what == What.EXTERNAL_HIVESERDE:
-            return self._migrate_external_table_hiveserde(src_table.src, src_table.rule, grants, mounts)
+            return self._migrate_external_table_hiveserde(
+                src_table.src, src_table.rule, grants, mounts, hiveserde_in_place_migrate
+            )
         logger.info(f"Table {src_table.src.key} is not supported for migration")
         return True
 
@@ -207,8 +224,21 @@ class TablesMigrator:
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
-    def _migrate_external_table_hiveserde(self, src_table: Table, rule: Rule, grants: list[Grant], mounts: list[Mount]):
-        if not self._hiveserde_in_place_migrate:
+    def _migrate_external_table_hiveserde(
+        self,
+        src_table: Table,
+        rule: Rule,
+        grants: list[Grant],
+        mounts: list[Mount],
+        hiveserde_in_place_migrate: bool = False,
+    ):
+        # This hiveserde_in_place_migrate is used to determine if current migration should use in-place migration or CTAS.
+        # We will provide two workflows for hiveserde table migration: One will migrate all hiveserde tables using CTAS which we officially support.
+        # The other workflow will migrate certain types of hiveserde in place, which is technically working, but the user need to accept the risk that
+        # there may be unseen corner cases where the old files created by hiveserde are not processed correctly by Spark datasource.
+        # User will need to decide which workflow to runs first which will migrate the tables and mark the upgraded_to property and hence those tables
+        # will be skipped in the migration workflow runs later.
+        if not hiveserde_in_place_migrate:
             # TODO: Add sql_migrate_external_hiveserde_ctas here
             return False
 
