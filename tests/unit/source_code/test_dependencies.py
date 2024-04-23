@@ -1,3 +1,4 @@
+import os.path
 from pathlib import Path
 from typing import BinaryIO
 from unittest.mock import create_autospec
@@ -202,8 +203,8 @@ def test_dependency_graph_builder_ignores_builtin_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, LocalNotebookLoader()))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
-    assert not graph.locate_dependency("os")
-    assert not graph.locate_dependency("path")
+    assert not graph.locate_dependency(Path("os"))
+    assert not graph.locate_dependency(Path("path"))
 
 
 def test_dependency_graph_builder_ignores_known_dependencies():
@@ -223,19 +224,25 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     builder = DependencyGraphBuilder(DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader()))
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
-    assert not graph.locate_dependency("databricks")
+    assert not graph.locate_dependency(Path("databricks"))
 
 
 def test_dependency_graph_builder_visits_site_packages(empty_index):
-    paths = ["import-site-package.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
+    paths = ["import-site-package.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     file_loader = create_autospec(LocalFileLoader)
-    file_loader.is_file.return_value = True
+
+    def is_file_side_effect(*args):
+        path = args[0]
+        filename = path.as_posix()
+        return filename in paths or os.path.isfile(filename)
+
+    file_loader.is_file.side_effect = is_file_side_effect
     file_loader.is_notebook.return_value = False
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     site_packages = SitePackages.parse(locate_site_packages())
     builder = DependencyGraphBuilder(DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader()))
-    graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
-    assert graph.locate_dependency("certifi/core.py")
+    graph = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
+    assert graph.locate_dependency(Path("certifi/core.py"))

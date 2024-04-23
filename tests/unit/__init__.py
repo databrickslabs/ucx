@@ -159,16 +159,21 @@ def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *ar
 def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, bool], *args):
     dependency = args[0]
     filename = str(dependency.path)
-    if filename.startswith('./'):
-        filename = filename[2:]
-    visited[filename] = True
-    source = sources.get(filename, None)
-    if filename.find(".py") < 0:
-        filename = filename + ".py"
-    if filename.find(".txt") < 0:
-        filename = filename + ".txt"
-    if source is None:
-        source = sources.get(filename)
+    is_package_file = os.path.isfile(dependency.path)
+    if is_package_file:
+        with dependency.path.open("r") as f:
+            source = f.read()
+    else:
+        if filename.startswith('./'):
+            filename = filename[2:]
+        visited[filename] = True
+        source = sources.get(filename, None)
+        if filename.find(".py") < 0:
+            filename = filename + ".py"
+        if filename.find(".txt") < 0:
+            filename = filename + ".txt"
+        if source is None:
+            source = sources.get(filename)
     assert source is not None
     if NOTEBOOK_HEADER in source:
         return Notebook.parse(filename, source, Language.PYTHON)

@@ -23,16 +23,20 @@ class SitePackage:
             # strip version
             dir_name = dir_name[: dir_name.rindex('-')]
             top_levels = [dir_name]
-        return SitePackage(path, top_levels, modules)
+        return SitePackage(path, top_levels, [Path(module) for module in modules])
 
-    def __init__(self, dist_info_path: Path, top_levels: list[str], modules: list[str]):
+    def __init__(self, dist_info_path: Path, top_levels: list[str], module_paths: list[Path]):
         self._dist_info_path = dist_info_path
         self._top_levels = top_levels
-        self._modules = modules
+        self._module_paths = module_paths
 
     @property
     def top_levels(self) -> list[str]:
         return self._top_levels
+
+    @property
+    def module_paths(self) -> list[Path]:
+        return [Path(self._dist_info_path.parent, path) for path in self._module_paths]
 
 
 class SitePackages:
