@@ -8,7 +8,6 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler, Mounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import Mount, ExternalLocations
@@ -176,9 +175,7 @@ class TablesMigrator:
             # User will need to decide which workflow to runs first which will migrate the hiveserde tables and mark the
             # `upgraded_to` property and hence those tables will be skipped in the migration workflow runs later.
             if hiveserde_in_place_migrate:
-                return self._migrate_external_table_hiveserde_in_place(
-                    src_table.src, src_table.rule, grants, mounts
-                )
+                return self._migrate_external_table_hiveserde_in_place(src_table.src, src_table.rule, grants, mounts)
             return self._migrate_table_create_ctas(src_table.src, src_table.rule, grants, mounts)
         if src_table.src.what == What.EXTERNAL_NO_SYNC:
             # use CTAS if table cannot be upgraded using SYNC and table is not hiveserde table
@@ -268,7 +265,9 @@ class TablesMigrator:
             )
             return False
 
-        logger.debug(f"Migrating external table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}")
+        logger.debug(
+            f"Migrating external table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
+        )
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
@@ -277,14 +276,16 @@ class TablesMigrator:
     def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
-        logger.debug(f"Migrating managed table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}")
+        logger.debug(
+            f"Migrating managed table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
+        )
         self._backend.execute(table_migrate_sql)
         self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
         self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
     def _migrate_table_create_ctas(self, src_table: Table, rule: Rule, grants: list[Grant], mounts: list[Mount]):
-        if src_table.what != What.EXTERNAL_NO_SYNC:
+        if src_table.what not in [What.EXTERNAL_NO_SYNC, What.EXTERNAL_HIVESERDE]:
             table_migrate_sql = src_table.sql_migrate_ctas_managed(rule.as_uc_table_key)
         elif not src_table.location:
             table_migrate_sql = src_table.sql_migrate_ctas_managed(rule.as_uc_table_key)
