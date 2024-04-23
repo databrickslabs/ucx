@@ -100,10 +100,10 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     group_manager.delete_original_workspace_groups()
 
     # The API needs a moment to delete a group, i.e. until the group is not found anymore
-    @retried(on=[AssertionError], timeout=timedelta(minutes=2))
+    @retried(on=[KeyError], timeout=timedelta(minutes=2))
     def get_group(group_id: str):
         ws.groups.get(group_id)
-        assert False, "Group is not deleted"
+        raise KeyError(f"Group is not deleted: {group_id}")
 
     with pytest.raises(NotFound):
         get_group(ws_group.id)
