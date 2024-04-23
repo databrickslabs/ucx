@@ -325,8 +325,7 @@ class AWSResources:
         self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
     ) -> bool:
         if not self._run_command(
-            f"iam put-role-policy --role-name {role_name}"
-            f"--policy-name {policy_name} "
+            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
             f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
         ):
             return False
