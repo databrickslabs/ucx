@@ -663,3 +663,11 @@ def test_spark_cloud_direct_access(empty_index, code, expected):
     sqf = SparkSql(ftf, empty_index)
     advisories = list(sqf.lint(code))
     assert advisories == expected
+
+
+def test_direct_cloud_access_reports_nothing(empty_index):
+    ftf = FromTable(empty_index, CurrentSessionState())
+    sqf = SparkSql(ftf, empty_index)
+    code = """spark.read.csv("/bucket/path")"""
+    advisories = list(sqf.lint(code))
+    assert not advisories
