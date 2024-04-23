@@ -52,6 +52,7 @@ class DependencyLoader(abc.ABC):
 
 
 class LocalFileLoader(DependencyLoader):
+    # see https://github.com/databrickslabs/ucx/issues/1499
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         raise NotImplementedError()
 
@@ -67,6 +68,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
 
 
 class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
+    # see https://github.com/databrickslabs/ucx/issues/1499
     pass
 
 
