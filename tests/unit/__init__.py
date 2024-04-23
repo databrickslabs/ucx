@@ -174,6 +174,22 @@ def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, boo
     return LocalFile(filename, source, Language.PYTHON)
 
 
+def _is_notebook_side_effect(sources: dict[str, str], *args):
+    dependency = args[0]
+    filename = str(dependency.path)
+    if filename.startswith('./'):
+        filename = filename[2:]
+    source = sources.get(filename, None)
+    if filename.find(".py") < 0:
+        filename = filename + ".py"
+    if filename.find(".txt") < 0:
+        filename = filename + ".txt"
+    if source is None:
+        source = sources.get(filename)
+    assert source is not None
+    return NOTEBOOK_HEADER in source
+
+
 def workspace_client_mock(
     cluster_ids: list[str] | None = None,
     pipeline_ids: list[str] | None = None,
