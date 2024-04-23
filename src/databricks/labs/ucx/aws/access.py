@@ -67,11 +67,11 @@ class AWSResourcePermissions:
                     role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
                 )
         else:
-            for count, s3_prefix in enumerate(sorted(list(s3_prefixes))):
-                if self._aws_resources.create_uc_role(f"{role_name}-{count}"):
+            for idx, s3_prefix in enumerate(sorted(list(s3_prefixes))):
+                if self._aws_resources.create_uc_role(f"{role_name}-{idx+1}"):
                     self._aws_resources.put_role_policy(
-                        f"{role_name}-{count}",
-                        f"{policy_name}-{count}",
+                        f"{role_name}-{idx+1}",
+                        f"{policy_name}-{idx+1}",
                         {s3_prefix},
                         self._aws_account_id,
                         self._kms_key,
