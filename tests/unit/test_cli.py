@@ -316,7 +316,7 @@ def test_migrate_credentials_azure(ws):
     ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_credentials_aws(ws, mocker):
+def test_migrate_credentials_aws(ws):
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})

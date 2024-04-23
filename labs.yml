@@ -132,6 +132,11 @@ commands:
 
   - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+      - name: aws-profile
+        description: AWS Profile to use for authentication
 
   - name: create-account-groups
     is_account_level: true

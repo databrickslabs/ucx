@@ -536,7 +536,7 @@ def test_create_uc_role(mocker):
         '--assume-role-policy-document '
         '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
         '{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"}'
-        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --output json'
+        ',"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --profile Fake_Profile --output json'
     ) in command_calls
 
 
@@ -599,7 +599,7 @@ def test_update_uc_trust_role_append(mocker):
         '{"Effect":"Allow",'
         '"Principal":{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
-        '--output json'
+        '--profile Fake_Profile --output json'
     ) in command_calls
 
 
@@ -640,7 +640,7 @@ def test_update_uc_trust_role(mocker):
         '{"Effect":"Allow",'
         '"Principal":{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
-        '--output json'
+        '--profile Fake_Profile --output json'
     ) in command_calls
 
 
@@ -662,7 +662,7 @@ def test_create_uc_role_policy_no_kms(mocker):
         '"s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
-        '"Effect":"Allow"}]} --output json'
+        '"Effect":"Allow"}]} --profile Fake_Profile --output json'
     ) in command_calls
 
 
@@ -685,7 +685,7 @@ def test_create_uc_role_kms(mocker):
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
         '"Effect":"Allow"},{"Action":["kms:Decrypt","kms:Encrypt","kms:GenerateDataKey*"],'
-        '"Resource":["arn:aws:kms:key_arn"],"Effect":"Allow"}]} --output json'
+        '"Resource":["arn:aws:kms:key_arn"],"Effect":"Allow"}]} --profile Fake_Profile --output json'
     ) in command_calls
 
 
@@ -699,7 +699,10 @@ def test_create_instance_profile(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     aws.create_instance_profile("test_profile")
-    assert '/path/aws iam create-instance-profile --instance-profile-name test_profile --output json' in command_calls
+    assert (
+        '/path/aws iam create-instance-profile --instance-profile-name test_profile --profile Fake_Profile --output json'
+        in command_calls
+    )
 
     def failed_call(_):
         return -1, "", "Can't connect"
@@ -718,11 +721,14 @@ def test_delete_instance_profile(mocker):
 
     aws = AWSResources("Fake_Profile", command_call)
     aws.delete_instance_profile("test_profile", "test_profile")
-    assert '/path/aws iam delete-instance-profile --instance-profile-name test_profile --output json' in command_calls
-    assert '/path/aws iam delete-role --role-name test_profile --output json' in command_calls
+    assert (
+        '/path/aws iam delete-instance-profile --instance-profile-name test_profile --profile Fake_Profile --output json'
+        in command_calls
+    )
+    assert '/path/aws iam delete-role --role-name test_profile --profile Fake_Profile --output json' in command_calls
     assert (
         '/path/aws iam remove-role-from-instance-profile '
-        '--instance-profile-name test_profile --role-name test_profile --output json'
+        '--instance-profile-name test_profile --role-name test_profile --profile Fake_Profile --output json'
     ) in command_calls
 
 
@@ -736,7 +742,7 @@ def test_role_exists(mocker):
 
     aws = AWSResources("Fake_Profile", empty_call)
     assert aws.role_exists("test_profile") is False
-    assert '/path/aws iam list-roles --output json' in command_calls
+    assert '/path/aws iam list-roles --profile Fake_Profile --output json' in command_calls
 
     def exists_call(cmd: str):
         command_calls.append(cmd)
@@ -744,4 +750,4 @@ def test_role_exists(mocker):
 
     aws = AWSResources("Fake_Profile", exists_call)
     assert aws.role_exists("test_profile") is True
-    assert '/path/aws iam list-roles --output json' in command_calls
+    assert '/path/aws iam list-roles --profile Fake_Profile --output json' in command_calls
