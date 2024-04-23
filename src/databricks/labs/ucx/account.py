@@ -331,14 +331,14 @@ class AccountMetastores:
         if default_catalog == "":
             return
         workspace = self._ac.workspaces.get(int(workspace_id))
-        ws = self._ac.get_workspace_client(workspace)
+        default_namespace = self._ac.get_workspace_client(workspace).settings.default_namespace
         # needs to get the etag first, before patching the setting
         try:
-            etag = ws.settings.default_namespace.get().etag
+            etag = default_namespace.get().etag
         except NotFound as err:
             # if not found, the etag is returned in the header
             etag = err.details[0].metadata.get("etag")
-        ws.settings.default_namespace.update(
+        default_namespace.update(
             allow_missing=True,
             field_mask="namespace.value",
             setting=DefaultNamespaceSetting(etag=etag, namespace=StringMessage(default_catalog)),
