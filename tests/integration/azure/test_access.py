@@ -55,7 +55,7 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
     assert ws.workspace.get_status(path)
 
 
-@pytest.mark.skip
+#@pytest.mark.skip
 def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip):
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
@@ -88,7 +88,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
             break
     assert global_spn_assignment
     assert global_spn_assignment.principal.client_id == config.uber_spn_id
-    assert global_spn_assignment.role_name == "Storage Blob Data Reader"
+    assert global_spn_assignment.role_name == "Storage Blob Data Contributor"
     assert str(global_spn_assignment.scope) == resource_id
     assert (
         policy_definition["spark_conf.fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net"]["value"]
