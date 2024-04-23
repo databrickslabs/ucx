@@ -119,11 +119,9 @@ def test_print_action_plan(caplog, ws, instance_profile_migration, credential_ma
 
 
 def test_run_without_confirmation(ws, instance_profile_migration):
-    prompts = MockPrompts(
-        {
+    prompts = MockPrompts({
             "Above IAM roles will be migrated to UC storage credentials*": "No",
-        }
-    )
+    })
 
     assert instance_profile_migration(10).run(prompts) == []
 
@@ -134,6 +132,15 @@ def test_run(ws, instance_profile_migration, num_instance_profiles: int):
     migration = instance_profile_migration(num_instance_profiles)
     results = migration.run(prompts)
     assert len(results) == num_instance_profiles
+
+
+def test_run_no_credential_to_migrate(caplog, ws, installation, credential_manager):
+    caplog.set_level(logging.INFO)
+    arp = create_autospec(AWSResourcePermissions)
+    arp.load_uc_compatible_roles.return_value = []
+    migration = IamRoleMigration(installation, ws, arp, credential_manager)
+    migration.run(MockPrompts({}))
+    assert "No IAM Role to migrate" in caplog.messages
 
 
 def test_validate_read_only_storage_credentials(credential_manager):
