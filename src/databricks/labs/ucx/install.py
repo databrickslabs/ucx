@@ -589,6 +589,7 @@ class WorkspaceInstallation(InstallationMixin):
             workspace_installer = WorkspaceInstaller(self._prompts, current, self._ws, self._product_info)
             warehouse_id = workspace_installer.configure_warehouse()
             self._config = workspace_installer.replace_config(warehouse_id=warehouse_id)
+            self._sql_backend = StatementExecutionBackend(self._ws, self._config.warehouse_id)
 
 
 class AccountInstaller(AccountContext):
