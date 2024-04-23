@@ -127,10 +127,10 @@ def test_migrate_invalid_sql_tables_raises_value_error() -> None:
         batches = sequencer.sequence_batches()
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
-    assert "Circular view references are preventing migration:" in str(error)
+    assert "Invalid table references are preventing migration:" in str(error)
 
 
-def test_migrate_circular_vues_raises_value_error() -> None:
+def test_migrate_circular_views_raises_value_error() -> None:
     with pytest.raises(ValueError) as error:
         samples = Samples.load("db1.v10", "db1.v11")
         sql_backend = mock_backend(samples, "db1")
@@ -141,7 +141,21 @@ def test_migrate_circular_vues_raises_value_error() -> None:
         batches = sequencer.sequence_batches()
         sequence = list(flatten(batches))
         assert sequence is None  # should never get there
-    assert "Circular view references are preventing migration:" in str(error)
+    assert "Circular dependency detected between" in str(error)
+
+
+def test_migrate_circular_view_chain_raises_value_error() -> None:
+    with pytest.raises(ValueError) as error:
+        samples = Samples.load("db1.v10", "db1.v11", "db1.v12")
+        sql_backend = mock_backend(samples, "db1")
+        crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
+        tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
+        migration_index = MigrationIndex([])
+        sequencer = ViewsMigrationSequencer(tables, migration_index)
+        batches = sequencer.sequence_batches()
+        sequence = list(flatten(batches))
+        assert sequence is None  # should never get there
+    assert "Circular dependency detected between" in str(error)
 
 
 def mock_backend(samples: list[dict], *dbnames: str) -> SqlBackend:
