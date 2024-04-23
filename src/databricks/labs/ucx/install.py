@@ -118,7 +118,7 @@ def extract_major_minor(version_string):
     return None
 
 
-class WorkspaceInstaller:
+class WorkspaceInstaller(WorkspaceContext):
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -278,7 +278,7 @@ class WorkspaceInstaller:
             new_config = dataclasses.replace(config, **changes)
             self.installation.save(new_config)
         except (PermissionDenied, NotFound, ValueError):
-            logger.warning(f"Failed to replace config for {self._ws.config.host}")
+            logger.warning(f"Failed to replace config for {self.workspace_client.config.host}")
             new_config = None
         return new_config
 
@@ -294,8 +294,7 @@ class WorkspaceInstaller:
         HiveMetastoreLineageEnabler(self.workspace_client).apply(self.prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
         warehouse_id = self.configure_warehouse()
-
-        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self._policy_installer.create(
+        policy_id, instance_profile, spark_conf_dict, instance_pool_id = self.policy_installer.create(
             default_config.inventory_database
         )
 
@@ -358,17 +357,17 @@ class WorkspaceInstaller:
 
         pro_warehouses = {"[Create new PRO SQL warehouse]": "create_new"} | {
             f"{_.name} ({_.id}, {warehouse_type(_)}, {_.state.value})": _.id
-            for _ in self._ws.warehouses.list()
+            for _ in self.workspace_client.warehouses.list()
             if _.warehouse_type == EndpointInfoWarehouseType.PRO
         }
         if self._is_account_install:
             warehouse_id = "create_new"
         else:
-            warehouse_id = self._prompts.choice_from_dict(
+            warehouse_id = self.prompts.choice_from_dict(
                 "Select PRO or SERVERLESS SQL warehouse to run assessment dashboards on", pro_warehouses
             )
         if warehouse_id == "create_new":
-            new_warehouse = self._ws.warehouses.create(
+            new_warehouse = self.workspace_client.warehouses.create(
                 name=f"{WAREHOUSE_PREFIX} {time.time_ns()}",
                 spot_instance_policy=SpotInstancePolicy.COST_OPTIMIZED,
                 warehouse_type=CreateWarehouseRequestWarehouseType.PRO,
@@ -585,10 +584,9 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws.warehouses.get(self._config.warehouse_id)
         except ResourceDoesNotExist:
             logger.critical(f"warehouse with id {self._config.warehouse_id} does not exists anymore")
-            current = self._product_info.current_installation(self._ws)
-            workspace_installer = WorkspaceInstaller(self._prompts, current, self._ws, self._product_info)
-            warehouse_id = workspace_installer.configure_warehouse()
-            self._config = workspace_installer.replace_config(warehouse_id=warehouse_id)
+            installer = WorkspaceInstaller(self._ws).replace(product_info=self._product_info, prompts=self._prompts)
+            warehouse_id = installer.configure_warehouse()
+            self._config = installer.replace_config(warehouse_id=warehouse_id)
             self._sql_backend = StatementExecutionBackend(self._ws, self._config.warehouse_id)
 
 
