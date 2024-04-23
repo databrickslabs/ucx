@@ -3,11 +3,13 @@ import locale
 import os
 import pathlib
 from functools import cached_property
-from pathlib import Path, _PosixFlavour, _Accessor  # type: ignore
-from io import BytesIO, StringIO, TextIOWrapper
-from databricks.sdk import WorkspaceClient
-from urllib.parse import quote_from_bytes as urlquote_from_bytes
 
+# pylint: disable-next=import-private-name
+from pathlib import Path, _PosixFlavour, _Accessor  # type: ignore
+from urllib.parse import quote_from_bytes as urlquote_from_bytes
+from io import BytesIO, StringIO
+
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat
 
@@ -24,18 +26,65 @@ class _DatabricksFlavour(_PosixFlavour):
         return f"<{self.__class__.__name__} for {self._ws}>"
 
 
+def _na(*args, **kwargs):
+    raise NotImplementedError("Not available for Databricks Workspace")
+
+
+class _ScandirItem:
+    def __init__(self, object_info):
+        self._object_info = object_info
+
+    def __fspath__(self):
+        return self._object_info.path
+
+    def is_dir(self):
+        return self._object_info.object_type == ObjectType.DIRECTORY
+
+    def is_file(self):
+        return self._object_info.object_type == ObjectType.FILE
+
+    def is_symlink(self):
+        return False
+
+    @property
+    def name(self):
+        return os.path.basename(self._object_info.path)
+
+
+class _ScandirIterator:
+    def __init__(self, objects):
+        self._it = objects
+
+    def __iter__(self):
+        for object_info in self._it:
+            yield _ScandirItem(object_info)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
 class _DatabricksAccessor(_Accessor):
-    def __init__(self, ws: WorkspaceClient):
-        self._ws = ws
-
-    def _na(self):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
+    listdir = _na
+    mkdir = _na
+    unlink = _na
+    rmdir = _na
+    rename = _na
+    replace = _na
     stat = _na
     chmod = _na
     link = _na
     symlink = _na
     readlink = _na
+    owner = _na
+    group = _na
+    getcwd = _na
+    realpath = _na
+
+    def __init__(self, ws: WorkspaceClient):
+        self._ws = ws
 
     def expanduser(self, path):
         home = f"/Users/{self._ws.current_user.me().user_name}"
@@ -45,73 +94,7 @@ class _DatabricksAccessor(_Accessor):
         return f"<{self.__class__.__name__} for {self._ws}>"
 
     def scandir(self, path):
-        class _as_path:
-            def __init__(self, object_info):
-                self._object_info = object_info
-
-            def __fspath__(self):
-                return self._object_info.path
-
-            def is_dir(self):
-                return self._object_info.object_type == ObjectType.DIRECTORY
-
-            def is_file(self):
-                return self._object_info.object_type == ObjectType.FILE
-
-            def is_symlink(self):
-                return False
-
-            @property
-            def name(self):
-                return os.path.basename(self._object_info.path)
-
-        class _enterable:
-            def __init__(self, it):
-                self._it = it
-
-            def __iter__(self):
-                for object_info in self._it:
-                    yield _as_path(object_info)
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
-        return _enterable(self._ws.workspace.list(path))
-
-    # listdir = os.listdir
-    # scandir = os.scandir
-    # mkdir = os.mkdir
-    # unlink = os.unlink
-    # rmdir = os.rmdir
-    # rename = os.rename
-    # replace = os.replace
-    #
-    # def touch(self, path, mode=0o666, exist_ok=True):
-    #     if exist_ok:
-    #         # First try to bump modification time
-    #         # Implementation note: GNU touch uses the UTIME_NOW option of
-    #         # the utimensat() / futimens() functions.
-    #         try:
-    #             os.utime(path, None)
-    #         except OSError:
-    #             # Avoid exception chaining
-    #             pass
-    #         else:
-    #             return
-    #     flags = os.O_CREAT | os.O_WRONLY
-    #     if not exist_ok:
-    #         flags |= os.O_EXCL
-    #     fd = os.open(path, flags, mode)
-    #     os.close(fd)
-    #
-    owner = _na
-    group = _na
-    getcwd = _na
-    # getcwd = os.getcwd
-    # realpath = staticmethod(os.path.realpath)
+        return _ScandirIterator(self._ws.workspace.list(path))
 
 
 class _UploadIO(abc.ABC):
@@ -120,48 +103,69 @@ class _UploadIO(abc.ABC):
         self._path = path
 
     def close(self):
-        x = self.getvalue()  # noqa
-        self._ws.workspace.upload(self._path, x, format=ImportFormat.AUTO)
+        # pylint: disable-next=no-member
+        io_stream = self.getvalue()  # noqa
+        self._ws.workspace.upload(self._path, io_stream, format=ImportFormat.AUTO)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} for {self._path} on {self._ws}>"
 
 
-class _BinaryUploadIO(_UploadIO, BytesIO):
+class _BinaryUploadIO(_UploadIO, BytesIO):  # type: ignore
     def __init__(self, ws: WorkspaceClient, path: str):
         _UploadIO.__init__(self, ws, path)
         BytesIO.__init__(self)
 
 
-class _TextUploadIO(_UploadIO, StringIO):
+class _TextUploadIO(_UploadIO, StringIO):  # type: ignore
     def __init__(self, ws: WorkspaceClient, path: str):
         _UploadIO.__init__(self, ws, path)
         StringIO.__init__(self)
 
 
-class WorkspacePath(Path):
+class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
+    _ws: WorkspaceClient
+    _flavour: _DatabricksFlavour
+    _accessor: _DatabricksAccessor
+
+    resolve = _na
+    stat = _na
+    chmod = _na
+    lchmod = _na
+    lstat = _na
+    owner = _na
+    group = _na
+    readlink = _na
+    symlink_to = _na
+    hardlink_to = _na
+    touch = _na
+    link_to = _na
+
     def __new__(cls, ws: WorkspaceClient, path: str | Path):
-        self = object.__new__(cls)
-        self._flavour = _DatabricksFlavour(ws)
-        drv, root, parts = self._parse_args([path])
-        return self.__from_raw_parts(self, ws, self._flavour, drv, root, parts)
+        this = object.__new__(cls)
+        # pathlib does a lot of clever performance tricks, and it's not designed to be subclassed,
+        # so we need to set the attributes directly, bypassing the most of a common sense.
+        this._flavour = _DatabricksFlavour(ws)
+        drv, root, parts = this._parse_args([path])
+        return this.__from_raw_parts(this, ws, this._flavour, drv, root, parts)
 
     @staticmethod
-    def __from_raw_parts(self, ws: WorkspaceClient, flavour: _DatabricksFlavour, drv, root, parts) -> 'WorkspacePath':
-        self._accessor = _DatabricksAccessor(ws)
-        self._flavour = flavour
-        self._drv = drv
-        self._root = root
-        self._parts = parts
-        self._ws = ws
-        return self
+    def __from_raw_parts(this, ws: WorkspaceClient, flavour: _DatabricksFlavour, drv, root, parts) -> 'WorkspacePath':
+        # pylint: disable=protected-access
+        this._accessor = _DatabricksAccessor(ws)
+        this._flavour = flavour
+        this._drv = drv
+        this._root = root
+        this._parts = parts
+        this._ws = ws
+        return this
 
-    def _parse_args(self, args):
+    def _parse_args(self, args):  # pylint: disable=arguments-differ
         """This instance method is adapted from a @classmethod of pathlib.Path"""
         parts = []
         for a in args:
             if isinstance(a, pathlib.PurePath):
-                parts += a._parts
+                parts += a._parts  # pylint: disable=protected-access
                 continue
             parts.append(str(a))
         return self._flavour.parse_parts(parts)
@@ -171,23 +175,25 @@ class WorkspacePath(Path):
         path = self._flavour.join(self._parts + [part])
         return WorkspacePath(self._ws, path)
 
-    def _format_parsed_parts(self, drv, root, parts):
+    def _format_parsed_parts(self, drv, root, parts):  # pylint: disable=arguments-differ
         # instance method adapted from pathlib.Path
         if drv or root:
             return drv + root + self._flavour.join(parts[1:])
         return self._flavour.join(parts)
 
-    def _from_parsed_parts(self, drv, root, parts):
+    def _from_parsed_parts(self, drv, root, parts):  # pylint: disable=arguments-differ
         # instance method adapted from pathlib.Path
         this = object.__new__(self.__class__)
         return self.__from_raw_parts(this, self._ws, self._flavour, drv, root, parts)
 
-    def _from_parts(self, args):
+    def _from_parts(self, args):  # pylint: disable=arguments-differ
         # instance method adapted from pathlib.Path
         drv, root, parts = self._parse_args(args)
         return self._from_parsed_parts(drv, root, parts)
 
     def exists(self, *, follow_symlinks=True):
+        if not follow_symlinks:
+            raise NotImplementedError("follow_symlinks=False is not supported for Databricks Workspace")
         try:
             self._ws.workspace.get_status(self.as_posix())
             return True
@@ -220,7 +226,7 @@ class WorkspacePath(Path):
             raise FileNotFoundError(f"{self.as_posix()} does not exist")
         self._ws.workspace.delete(self.as_posix())
 
-    def home(self):
+    def home(self):  # pylint: disable=arguments-differ
         return WorkspacePath(self._ws, "~").expanduser()
 
     def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
@@ -243,12 +249,11 @@ class WorkspacePath(Path):
         raise NotImplementedError("Not available for Databricks Workspace")
 
     def absolute(self):
+        # TODO: check if this is correct
         return super().absolute()
 
-    def walk(self, top_down=..., on_error=..., follow_symlinks=...):
-        return super().walk(top_down, on_error, follow_symlinks)
-
     def samefile(self, other_path):
+        # TODO: check if this is correct
         return super().samefile(other_path)
 
     @cached_property
@@ -286,44 +291,3 @@ class WorkspacePath(Path):
 
     def is_mount(self):
         return False
-
-    ######################################################################
-    # The following methods are not implemented for Databricks Workspace #
-    ######################################################################
-
-    def resolve(self, strict=False):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def stat(self, *, follow_symlinks=True):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def chmod(self, mode, *, follow_symlinks=True):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def lchmod(self, mode):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def lstat(self):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def owner(self):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def group(self):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def readlink(self):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def symlink_to(self, target, target_is_directory=False):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def hardlink_to(self, target):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def touch(self, mode=0o666, exist_ok=True):
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def link_to(self, target):
-        raise NotImplementedError("Not available for Databricks Workspace")
-

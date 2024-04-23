@@ -33,12 +33,12 @@ def test_open_text_io(ws, make_random):
 
     hello_txt = with_user / "hello.txt"
     hello_txt.write_text("Hello, World!")
-    assert 'Hello, World!' == hello_txt.read_text()
+    assert hello_txt.read_text() == 'Hello, World!'
 
     files = list(with_user.glob("**/*.txt"))
     assert len(files) == 1
     assert hello_txt == files[0]
-    assert 'hello.txt' == files[0].name
+    assert files[0].name == 'hello.txt'
 
     with_user.joinpath("hello.txt").unlink()
 
@@ -54,7 +54,7 @@ def test_open_binary_io(ws, make_random):
     hello_bin = with_user.joinpath("hello.bin")
     hello_bin.write_bytes(b"Hello, World!")
 
-    assert b'Hello, World!' == hello_bin.read_bytes()
+    assert hello_bin.read_bytes() == b'Hello, World!'
 
     with_user.joinpath("hello.bin").unlink()
 
@@ -73,4 +73,4 @@ def test_replace(ws, make_random):
     hello_txt.replace(with_user / "hello2.txt")
 
     assert not hello_txt.exists()
-    assert 'Hello, World!' == (with_user / "hello2.txt").read_text()
+    assert (with_user / "hello2.txt").read_text() == 'Hello, World!'
