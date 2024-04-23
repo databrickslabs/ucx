@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import ast
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
@@ -12,6 +13,22 @@ from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
+
+
+MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
+
+
+@dataclass
+class DependencyProblem:
+    code: str
+    message: str
+    start_line = -1
+    start_col = -1
+    end_line = -1
+    end_col = -1
+    source_type: ObjectType or None = None
+    source_path = MISSING_SOURCE_PATH
+
 
 
 class Dependency(abc.ABC):
@@ -154,16 +171,22 @@ class DependencyResolver:
         self._site_packages = site_packages
         self._file_loader = file_loader
         self._notebook_loader = notebook_loader
-        self._advices: list[Advice] = []
+        self._problems: list[DependencyProblem] = []
+
+    @property
+    def problems(self):
+        return self._problems
 
     def resolve_notebook(self, path: Path) -> Dependency | None:
         if self._notebook_loader.is_notebook(path):
             return Dependency(self._notebook_loader, path)
+
         return None
 
     def resolve_local_file(self, path: Path) -> Dependency | None:
         if self._file_loader.is_file(path) and not self._file_loader.is_notebook(path):
             return Dependency(self._file_loader, path)
+        self._problems.append(DependencyProblem('dependency-check', f"File not found: {path.as_posix()}"))
         return None
 
     def resolve_import(self, name: str) -> Dependency | None:
@@ -195,9 +218,6 @@ class DependencyResolver:
                 )
             )
         return True
-
-    def get_advices(self) -> Iterable[Advice]:
-        yield from self._advices
 
 
 class DependencyGraph:
@@ -332,16 +352,21 @@ class DependencyGraphBuilder:
     def __init__(self, resolver: DependencyResolver):
         self._resolver = resolver
 
-    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph:
+    @property
+    def problems(self):
+        return self._resolver.problems
+
+    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph or None:
         dependency = self._resolver.resolve_local_file(path)
-        assert dependency is not None
+        if dependency is None:
+            return None
         graph = DependencyGraph(dependency, None, self._resolver)
         container = dependency.load()
         if container is not None:
             container.build_dependency_graph(graph)
         return graph
 
-    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph:
+    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph or None:
         dependency = self._resolver.resolve_notebook(path)
         assert dependency is not None
         graph = DependencyGraph(dependency, None, self._resolver)

@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.dependencies import (
     LocalFileLoader,
     DependencyGraphBuilder,
     WorkspaceNotebookLoader,
-    LocalNotebookLoader,
+    LocalNotebookLoader, DependencyProblem,
 )
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -165,7 +165,7 @@ def test_dependency_graph_builder_visits_recursive_file_dependencies():
     assert len(visited) == len(paths)
 
 
-def test_dependency_graph_builder_throws_with_invalid_dependencies():
+def test_dependency_graph_builder_raises_problem_with_invalid_dependencies():
     paths = ["root7.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
@@ -246,3 +246,22 @@ def test_dependency_graph_builder_visits_site_packages(empty_index):
     builder = DependencyGraphBuilder(DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader()))
     graph = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
     assert graph.locate_dependency(Path("certifi/core.py"))
+
+
+def test_dependency_graph_builder_raises_problem_with_unfound_root(empty_index):
+    sources: dict[str, str] = {}
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.return_value = None
+    site_packages = SitePackages.parse(locate_site_packages())
+    whi = whitelist_mock()
+    file_loader = create_autospec(LocalFileLoader)
+    builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, LocalNotebookLoader()))
+    graph = builder.build_local_file_dependency_graph(Path("root1.run.py.txt"))
+    assert builder.problems == [
+        # pylint: disable=duplicate-code
+        DependencyProblem(
+            'dependency-check',
+            'File not found: root1.run.py.txt'
+        )
+    ]
