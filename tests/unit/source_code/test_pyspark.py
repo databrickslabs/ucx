@@ -1,19 +1,19 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advisory, Deprecation
+from databricks.labs.ucx.source_code.base import Advisory, Deprecation, CurrentSessionState
 from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
 def test_spark_no_sql(empty_index):
-    ftf = FromTable(empty_index)
+    ftf = FromTable(empty_index, CurrentSessionState())
     sqf = SparkSql(ftf, empty_index)
 
     assert not list(sqf.lint("print(1)"))
 
 
 def test_spark_sql_no_match(empty_index):
-    ftf = FromTable(empty_index)
+    ftf = FromTable(empty_index, CurrentSessionState())
     sqf = SparkSql(ftf, empty_index)
 
     old_code = """
@@ -27,7 +27,7 @@ for i in range(10):
 
 
 def test_spark_sql_match(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
@@ -49,7 +49,7 @@ for i in range(10):
 
 
 def test_spark_sql_match_named(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
@@ -91,7 +91,7 @@ METHOD_NAMES = [
 @pytest.mark.parametrize("method_name", METHOD_NAMES)
 def test_spark_table_match(migration_index, method_name):
     spark_matchers = SparkMatchers()
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
     args_list = ["a"] * min(5, matcher.max_args)
@@ -118,7 +118,7 @@ for i in range(10):
 @pytest.mark.parametrize("method_name", METHOD_NAMES)
 def test_spark_table_no_match(migration_index, method_name):
     spark_matchers = SparkMatchers()
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
     args_list = ["a"] * min(5, matcher.max_args)
@@ -136,7 +136,7 @@ for i in range(10):
 @pytest.mark.parametrize("method_name", METHOD_NAMES)
 def test_spark_table_too_many_args(migration_index, method_name):
     spark_matchers = SparkMatchers()
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
     if matcher.max_args > 100:
@@ -154,7 +154,7 @@ for i in range(10):
 
 
 def test_spark_table_named_args(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -175,7 +175,7 @@ for i in range(10):
 
 
 def test_spark_table_variable_arg(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -196,7 +196,7 @@ for i in range(10):
 
 
 def test_spark_table_fstring_arg(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -217,7 +217,7 @@ for i in range(10):
 
 
 def test_spark_table_return_value(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -237,7 +237,7 @@ for table in spark.listTables():
 
 
 def test_spark_sql_fix(migration_index):
-    ftf = FromTable(migration_index)
+    ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """spark.read.csv("s3://bucket/path")

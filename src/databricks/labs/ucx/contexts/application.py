@@ -303,7 +303,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def catalog_schema(self):
-        return CatalogSchema(self.workspace_client, self.table_mapping)
+        return CatalogSchema(self.workspace_client, self.table_mapping, self.principal_acl, self.sql_backend)
 
     @cached_property
     def languages(self):

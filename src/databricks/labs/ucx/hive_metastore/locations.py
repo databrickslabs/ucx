@@ -89,9 +89,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
         # Find all matches in the input string
         # Storage properties is of the format
-        # "[personalAccessToken=*********(redacted), \
-        #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
-        #  dbtable=samples.nyctaxi.trips]"
+        # "personalAccessToken=*********(redacted),
+        #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com,
+        #  dbtable=samples.nyctaxi.trips"
         matches = re.findall(pattern, table.storage_properties)
         # Create a dictionary from the matches
         result_dict = dict(matches)
@@ -101,7 +101,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         database = result_dict.get("database", "")
         httppath = result_dict.get("httpPath", "")
         provider = result_dict.get("provider", "")
-        # dbtable = result_dict.get("dbtable", "")
         # currently supporting databricks and mysql external tables
         # add other jdbc types
         if "databricks" in location.lower():

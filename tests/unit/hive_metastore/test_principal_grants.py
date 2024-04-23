@@ -258,10 +258,8 @@ def test_interactive_cluster_single_spn(ws, installation):
         Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table3'),
         Grant('group1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
         Grant('foo.bar@imagine.com', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
-        Grant('group1', "USE", "hive_metastore", 'schema1'),
-        Grant('foo.bar@imagine.com', "USE", "hive_metastore", 'schema1'),
-        Grant('group1', "USE", "hive_metastore"),
-        Grant('foo.bar@imagine.com', "USE", "hive_metastore"),
+        Grant('group1', "USAGE", "hive_metastore", 'schema1'),
+        Grant('foo.bar@imagine.com', "USAGE", "hive_metastore", 'schema1'),
     ]
     actual_grants = grants.get_interactive_cluster_grants()
     for grant in expected_grants:
@@ -284,9 +282,8 @@ def test_interactive_cluster_multiple_spn(ws, installation):
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema2', 'table4'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
-        Grant('spn1', "USE", "hive_metastore", 'schema1'),
-        Grant('spn1', "USE", "hive_metastore", 'schema2'),
-        Grant('spn1', "USE", "hive_metastore"),
+        Grant('spn1', "USAGE", "hive_metastore", 'schema1'),
+        Grant('spn1', "USAGE", "hive_metastore", 'schema2'),
     ]
     actual_grants = grants.get_interactive_cluster_grants()
     for grant in expected_grants:
@@ -432,9 +429,8 @@ def test_interactive_cluster_aws(ws, installation):
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', 'table5'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema1', view='view1'),
         Grant('spn1', "ALL PRIVILEGES", "hive_metastore", 'schema4', 'table6'),
-        Grant('spn1', "USE", "hive_metastore", 'schema1'),
-        Grant('spn1', "USE", "hive_metastore", 'schema4'),
-        Grant('spn1', "USE", "hive_metastore"),
+        Grant('spn1', "USAGE", "hive_metastore", 'schema1'),
+        Grant('spn1', "USAGE", "hive_metastore", 'schema4'),
     ]
     actual_grants = grants.get_interactive_cluster_grants()
     for grant in expected_grants:

@@ -8,25 +8,13 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
 
-from databricks.labs.ucx.hive_metastore.mapping import Rule
+from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
+from . import get_azure_spark_conf
 
-from ..conftest import (
-    StaticTableMapping,
-)
 
 logger = logging.getLogger(__name__)
-_SPARK_CONF = {
-    "spark.databricks.cluster.profile": "singleNode",
-    "spark.master": "local[*]",
-    "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
-    "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
-    ".azurebfs.oauth2.ClientCredsTokenProvider",
-    "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
-    "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
-    "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
-    ".microsoftonline.com/directory_12345/oauth2/token",
-}
+_SPARK_CONF = get_azure_spark_conf()
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -335,6 +323,7 @@ def test_mapping_skips_tables_databases(ws, sql_backend, runtime_ctx, make_catal
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
+    # prepare 2 tables to migrate
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     table_to_revert = runtime_ctx.make_table(schema_name=src_schema.name)
     table_to_skip = runtime_ctx.make_table(schema_name=src_schema.name)
@@ -343,13 +332,19 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
 
     runtime_ctx.with_dummy_resource_permission()
-    runtime_ctx.with_table_mapping_rules([Rule.from_src_dst(table_to_skip, dst_schema)])
 
+    # set up ucx to migrate only 1 table
+    runtime_ctx.with_table_mapping_rules(
+        [
+            Rule.from_src_dst(table_to_skip, dst_schema),
+        ]
+    )
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
-
+    # validate that the table is migrated successfully
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{table_to_skip.name}").properties
     assert target_table_properties["upgraded_from"] == table_to_skip.full_name
 
+    # mock that the other table was migrated
     sql_backend.execute(
         f"ALTER TABLE {table_to_revert.full_name} SET "
         f"TBLPROPERTIES('upgraded_to' = 'fake_catalog.fake_schema.fake_table');"
@@ -359,16 +354,19 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     assert "upgraded_to" in results
     assert results["upgraded_to"] == "fake_catalog.fake_schema.fake_table"
 
-    rules2 = [
-        Rule.from_src_dst(table_to_revert, dst_schema),
-        Rule.from_src_dst(table_to_skip, dst_schema),
-    ]
-    table_mapping2 = StaticTableMapping(ws, sql_backend, rules=rules2)
-    mapping2 = list(table_mapping2.get_tables_to_migrate(runtime_ctx.tables_crawler))
+    # set up ucx to migrate both tables
+    runtime_ctx.with_table_mapping_rules(
+        [
+            Rule.from_src_dst(table_to_revert, dst_schema),
+            Rule.from_src_dst(table_to_skip, dst_schema),
+        ]
+    )
+    table_mapping = TableMapping(runtime_ctx.installation, ws, sql_backend)
+    mapping = list(table_mapping.get_tables_to_migrate(runtime_ctx.tables_crawler))
 
     # Checking to validate that table_to_skip was omitted from the list of rules
-    assert len(mapping2) == 1
-    assert mapping2[0].rule == Rule(
+    assert len(mapping) == 1
+    assert mapping[0].rule == Rule(
         "workspace",
         dst_catalog.name,
         src_schema.name,
@@ -376,10 +374,8 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
         table_to_revert.name,
         table_to_revert.name,
     )
-    results2 = {
-        _["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))
-    }
-    assert "upgraded_to" not in results2
+    results = {_["key"]: _["value"] for _ in list(sql_backend.fetch(f"SHOW TBLPROPERTIES {table_to_revert.full_name}"))}
+    assert "upgraded_to" not in results
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -420,56 +416,54 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
-@pytest.fixture
-def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make_catalog, make_schema):
-    src_schema = make_schema(catalog_name="hive_metastore")
-    src_external_table = runtime_ctx.make_table(
-        catalog_name=src_schema.catalog_name,
-        schema_name=src_schema.name,
-        external_csv=make_mounted_location,
-    )
-    dst_catalog = make_catalog()
-    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
-    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
-    runtime_ctx.with_table_mapping_rules(rules)
-    return (
-        runtime_ctx,
-        f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
-    )
-
-
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_migrate_managed_tables_with_principal_acl_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+def test_migrate_external_tables_with_principal_acl_azure(
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_ucx_group
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
-    ctx, table_full_name = prepared_principal_acl
+    ctx, table_full_name, _, _ = prepared_principal_acl
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
     ctx.with_dummy_resource_permission()
     table_migrate = ctx.tables_migrator
-    user = make_user()
+
+    user_with_cluster_access = make_user()
+    user_without_cluster_access = make_user()
+    group_with_cluster_access, _ = make_ucx_group()
     make_cluster_permissions(
         object_id=cluster.cluster_id,
         permission_level=PermissionLevel.CAN_ATTACH_TO,
-        user_name=user.user_name,
+        user_name=user_with_cluster_access.user_name,
+        group_name=group_with_cluster_access.display_name,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
 
     target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
     match = False
     for _ in target_table_grants.privilege_assignments:
-        if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+        if _.principal == user_with_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
 
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == group_with_cluster_access.display_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == user_without_cluster_access.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            assert False, "User without cluster access should not have access to the table"
+    assert True
+
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
-def test_migrate_managed_tables_with_principal_acl_aws(
+def test_migrate_external_tables_with_principal_acl_aws(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, env_or_skip
 ):
-    ctx, table_full_name = prepared_principal_acl
+    ctx, table_full_name, _, _ = prepared_principal_acl
     ctx.with_dummy_resource_permission()
     cluster = make_cluster(
         single_node=True,
@@ -489,6 +483,34 @@ def test_migrate_managed_tables_with_principal_acl_aws(
     match = False
     for _ in target_table_grants.privilege_assignments:
         if _.principal == user.user_name and _.privileges == [Privilege.ALL_PRIVILEGES]:
+            match = True
+            break
+    assert match
+
+
+def test_migrate_external_tables_with_spn_azure(
+    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+):
+    if not ws.config.is_azure:
+        pytest.skip("temporary: only works in azure test env")
+    ctx, table_full_name = prepared_principal_acl
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    ctx.with_dummy_resource_permission()
+
+    table_migrate = ctx.tables_migrator
+
+    spn_with_mount_access = "5a11359f-ba1f-483f-8e00-0fe55ec003ed"
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        service_principal_name=spn_with_mount_access,
+    )
+    table_migrate.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.PRINCIPAL])
+
+    target_table_grants = ws.grants.get(SecurableType.TABLE, table_full_name)
+    match = False
+    for _ in target_table_grants.privilege_assignments:
+        if _.principal == spn_with_mount_access and _.privileges == [Privilege.ALL_PRIVILEGES]:
             match = True
             break
     assert match
