@@ -166,7 +166,7 @@ class IamRoleMigration:
                 continue
 
             self._resource_permissions.update_uc_role_trust_policy(
-                iam.role_arn, storage_credential.aws_iam_role.external_id
+                iam.role_name, storage_credential.aws_iam_role.external_id
             )
 
             execution_result.append(self._storage_credential_manager.validate(iam))
