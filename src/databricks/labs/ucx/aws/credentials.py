@@ -151,6 +151,9 @@ class IamRoleMigration:
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[CredentialValidationResult]:
 
         iam_list = self._generate_migration_list(include_names)
+        if len(iam_list) == 0:
+            logger.info("No IAM Role to migrate")
+            return []
 
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC storage credentials, please review and confirm."

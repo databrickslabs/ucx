@@ -67,17 +67,15 @@ class AWSResourcePermissions:
                     role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
                 )
         else:
-            role_id = 1
-            for s3_prefix in sorted(list(s3_prefixes)):
-                if self._aws_resources.create_uc_role(f"{role_name}-{role_id}"):
+            for count, s3_prefix in enumerate(sorted(list(s3_prefixes))):
+                if self._aws_resources.create_uc_role(f"{role_name}-{count}"):
                     self._aws_resources.put_role_policy(
-                        f"{role_name}-{role_id}",
-                        f"{policy_name}-{role_id}",
+                        f"{role_name}-{count}",
+                        f"{policy_name}-{count}",
                         {s3_prefix},
                         self._aws_account_id,
                         self._kms_key,
                     )
-                role_id += 1
 
     def update_uc_role_trust_policy(self, role_name, external_id="0000"):
         return self._aws_resources.update_uc_trust_role(role_name, external_id)
