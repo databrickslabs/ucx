@@ -52,6 +52,8 @@ class Matcher(ABC):
         if len(node.args) > 0:
             return node.args[self.table_arg_index] if self.min_args <= len(node.args) <= self.max_args else None
         assert self.table_arg_name is not None
+        if not node.keywords:
+            return None
         arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
         return arg.value if arg is not None else None
 
@@ -238,17 +240,25 @@ class SparkMatchers:
         # TODO: Identify all methods in the Spark API that may refer to direct cloud storage,
         #  check parameter location/name
         spark_cloud_matchers = [
-            CloudAccessMatcher("read", 1, 1, 0),
-            CloudAccessMatcher("write", 1, 1, 0),
             CloudAccessMatcher("ls", 1, 1, 0),
-            CloudAccessMatcher("cp", 1, 1, 0),
+            CloudAccessMatcher("cp", 1, 2, 0),
             CloudAccessMatcher("rm", 1, 1, 0),
             CloudAccessMatcher("head", 1, 1, 0),
-            CloudAccessMatcher("put", 1, 1, 0),
+            CloudAccessMatcher("put", 1, 2, 0),
             CloudAccessMatcher("mkdirs", 1, 1, 0),
-            CloudAccessMatcher("move", 1, 1, 0),
-            CloudAccessMatcher("text", 1, 1, 0),
-            CloudAccessMatcher("csv", 1, 1, 0),
+            CloudAccessMatcher("move", 1, 2, 0),
+            CloudAccessMatcher("text", 1, 3, 0),
+            CloudAccessMatcher("csv", 1, 1000, 0),
+            CloudAccessMatcher("json", 1, 1000, 0),
+            CloudAccessMatcher("orc", 1, 1000, 0),
+            CloudAccessMatcher("parquet", 1, 1000, 0),
+            CloudAccessMatcher("save", 0, 1000, -1, "path"),
+            CloudAccessMatcher("load", 0, 1000, -1, "path"),
+            CloudAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
+            CloudAccessMatcher("addFile", 1, 3, 0),
+            CloudAccessMatcher("binaryFiles", 1, 2, 0),
+            CloudAccessMatcher("binaryRecords", 1, 2, 0),
+            CloudAccessMatcher("dump_profiles", 1, 1, 0),
         ]
 
         # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
