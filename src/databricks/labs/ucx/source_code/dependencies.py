@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import abc
 import ast
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
-from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
@@ -22,13 +21,31 @@ MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
 class DependencyProblem:
     code: str
     message: str
-    start_line = -1
-    start_col = -1
-    end_line = -1
-    end_col = -1
-    source_type: ObjectType or None = None
-    source_path = MISSING_SOURCE_PATH
+    source_path: Path = Path(MISSING_SOURCE_PATH)
+    start_line: int = -1
+    start_col: int = -1
+    end_line: int = -1
+    end_col: int = -1
 
+    def replace(
+        self,
+        code: str | None = None,
+        message: str | None = None,
+        source_path: Path | None = None,
+        start_line: int | None = None,
+        start_col: int | None = None,
+        end_line: int | None = None,
+        end_col: int | None = None,
+    ) -> DependencyProblem:
+        return DependencyProblem(
+            code if code is not None else self.code,
+            message if message is not None else self.message,
+            source_path if source_path is not None else self.source_path,
+            start_line if start_line is not None else self.start_line,
+            start_col if start_col is not None else self.start_col,
+            end_line if end_line is not None else self.end_line,
+            end_col if end_col is not None else self.end_col,
+        )
 
 
 class Dependency(abc.ABC):
@@ -177,19 +194,39 @@ class DependencyResolver:
     def problems(self):
         return self._problems
 
-    def resolve_notebook(self, path: Path) -> Dependency | None:
+    def add_problems(self, problems: list[DependencyProblem]):
+        self._problems.extend(problems)
+
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def resolve_notebook(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
         if self._notebook_loader.is_notebook(path):
             return Dependency(self._notebook_loader, path)
-
+        problem = DependencyProblem('dependency-check', f"Notebook not found: {path.as_posix()}")
+        if problem_collector:
+            problem_collector(problem)
+        else:
+            self._problems.append(problem)
         return None
 
-    def resolve_local_file(self, path: Path) -> Dependency | None:
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def resolve_local_file(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
         if self._file_loader.is_file(path) and not self._file_loader.is_notebook(path):
             return Dependency(self._file_loader, path)
-        self._problems.append(DependencyProblem('dependency-check', f"File not found: {path.as_posix()}"))
+        problem = DependencyProblem('dependency-check', f"File not found: {path.as_posix()}")
+        if problem_collector:
+            problem_collector(problem)
+        else:
+            self._problems.append(problem)
         return None
 
-    def resolve_import(self, name: str) -> Dependency | None:
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def resolve_import(
+        self, name: str, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
         if self._is_whitelisted(name):
             return None
         if self._file_loader.is_file(Path(name)):
@@ -205,18 +242,18 @@ class DependencyResolver:
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is None:
             return False
-        if compatibility == UCCompatibility.NONE:
-            # TODO this should be done as part of linting, not as part of dependency graph building
-            self._advices.append(
-                Deprecation(
-                    code="dependency-check",
-                    message=f"Use of dependency {name} is deprecated",
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=0,
-                )
-            )
+        # if compatibility == UCCompatibility.NONE:
+        #     # TODO this should be done as part of linting, not as part of dependency graph building
+        #     self._advices.append(
+        #         Deprecation(
+        #             code="dependency-check",
+        #             message=f"Use of dependency {name} is deprecated",
+        #             start_line=0,
+        #             start_col=0,
+        #             end_line=0,
+        #             end_col=0,
+        #         )
+        #     )
         return True
 
 
@@ -241,14 +278,20 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_notebook(self, path: Path) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_notebook(path)
+    def add_problems(self, problems: list[DependencyProblem]):
+        problems = [problem.replace(source_path=self.dependency.path) for problem in problems]
+        self._resolver.add_problems(problems)
+
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def register_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None] = None) -> DependencyGraph | None:
+        resolved = self._resolver.resolve_notebook(path, problem_collector)
         if resolved is None:
             return None
         return self.register_dependency(resolved)
 
-    def register_import(self, name: str) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_import(name)
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def register_import(self, name: str, problem_collector: Callable[[DependencyProblem], None] = None) -> DependencyGraph | None:
+        resolved = self._resolver.resolve_import(name, problem_collector)
         if resolved is None:
             return None
         return self.register_dependency(resolved)
@@ -356,7 +399,7 @@ class DependencyGraphBuilder:
     def problems(self):
         return self._resolver.problems
 
-    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph or None:
+    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_local_file(path)
         if dependency is None:
             return None
@@ -366,9 +409,10 @@ class DependencyGraphBuilder:
             container.build_dependency_graph(graph)
         return graph
 
-    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph or None:
+    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_notebook(path)
-        assert dependency is not None
+        if dependency is None:
+            return None
         graph = DependencyGraph(dependency, None, self._resolver)
         container = dependency.load()
         if container is not None:
