@@ -87,12 +87,8 @@ class _UploadIO(abc.ABC):
         self._ws = ws
         self._path = path
 
-    # @abc.abstractmethod
-    # def getvalue(self):
-    #     pass
-
     def close(self):
-        x = self.getvalue()
+        x = self.getvalue()  # noqa
         self._ws.workspace.upload(self._path, x, format=ImportFormat.AUTO)
 
     def __repr__(self):
@@ -178,11 +174,14 @@ class WorkspacePath(Path):
     def rmdir(self, recursive=False):
         self._ws.workspace.delete(self.as_posix(), recursive=recursive)
 
-    def rename(self, target):
+    def rename(self, target, overwrite=False):
         dst = WorkspacePath(self._ws, target)
         with self._ws.workspace.download(self.as_posix(), format=ExportFormat.AUTO) as f:
-            self._ws.workspace.upload(dst.as_posix(), f.read(), format=ImportFormat.AUTO)
+            self._ws.workspace.upload(dst.as_posix(), f.read(), format=ImportFormat.AUTO, overwrite=overwrite)
         self.unlink()
+
+    def replace(self, target):
+        return self.rename(target, overwrite=True)
 
     def unlink(self, missing_ok=False):
         if not missing_ok and not self.exists():
@@ -269,8 +268,7 @@ class WorkspacePath(Path):
     def readlink(self):
         raise NotImplementedError("Not available for Databricks Workspace")
 
-    def replace(self, target):
-        return super().replace(target)
+
 
     def resolve(self, strict=False):
         return super().resolve(strict)
