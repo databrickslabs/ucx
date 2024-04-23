@@ -12,7 +12,7 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 
 logger = logging.getLogger(__name__)
@@ -181,3 +181,62 @@ class IamRoleMigration:
         else:
             logger.info("No IAM Role migrated to UC Storage credentials")
         return execution_result
+
+class IamRoleCreation:
+
+    def __init__(
+            self,
+            installation: Installation,
+            ws: WorkspaceClient,
+            resource_permissions: AWSResourcePermissions,
+            storage_credential_manager: CredentialManager,
+    ):
+        self._output_file = "aws_iam_role_creation_result.csv"
+        self._installation = installation
+        self._ws = ws
+        self._resource_permissions = resource_permissions
+        self._storage_credential_manager = storage_credential_manager
+
+    @staticmethod
+    def _print_action_plan(iam_list: list[AWSUCRoleCandidate]):
+        # print action plan to console for customer to review.
+        for iam in iam_list:
+            logger.info(f"Role:{iam.role_name} Policy:{iam.policy_name} Paths:{iam.resource_paths}")
+
+    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSRoleAction]:
+        """
+        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm
+        """
+        # load IAM role list
+        iam_list = self._resource_permissions.load_uc_compatible_roles()
+        # list existing storage credentials
+        sc_set = self._storage_credential_manager.list(include_names)
+        # check if the iam is already used in UC storage credential
+        filtered_iam_list = [iam for iam in iam_list if iam.role_arn not in sc_set]
+
+        # output the action plan for customer to confirm
+        self._print_action_plan(filtered_iam_list)
+
+        return filtered_iam_list
+
+    def save(self, migration_results: list[CredentialValidationResult]) -> str:
+        return self._installation.save(migration_results, filename=self._output_file)
+
+    def run(self, prompts: Prompts, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY") -> list[CredentialValidationResult]:
+
+        iam_list = self._resource_permissions.uc_roles_list(single_role=single_role,
+                                                            role_name=role_name,
+                                                            policy_name=policy_name)
+
+        plan_confirmed = prompts.confirm(
+            "Above UC Compatible IAM roles will be created and granted access to the corresponding paths, "
+            "please review and confirm."
+        )
+        if plan_confirmed is not True:
+            return []
+
+        return self._resource_permissions.create_uc_roles(iam_list)
+
+        execution_result = []
+
+

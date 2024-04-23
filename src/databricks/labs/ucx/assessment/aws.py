@@ -32,6 +32,7 @@ class AWSPolicyAction:
 # Candidates for UC IAM roles with the paths they have access to
 class AWSUCRoleCandidate:
     role_name: str
+    policy_name: str
     resource_paths: list[str]
 
 
