@@ -390,7 +390,6 @@ class AWSResources:
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
         code, output, error = self._command_runner(f"{aws_cmd} {command} --profile {self._profile} --output json")
-        print(code, output, error)
         if code != 0:
             logger.error(error)
             return None
