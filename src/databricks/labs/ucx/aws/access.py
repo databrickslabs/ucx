@@ -18,7 +18,8 @@ from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSResources,
     AWSRoleAction,
-    logger, AWSUCRoleCandidate,
+    logger,
+    AWSUCRoleCandidate,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations

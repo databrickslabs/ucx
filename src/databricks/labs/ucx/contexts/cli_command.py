@@ -170,6 +170,15 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
+    def iam_create_uc_roles(self):
+        return IamRoleCreation(
+            self.installation,
+            self.workspace_client,
+            self.aws_resource_permissions,
+            self.iam_credential_manager,
+        )
+
+    @cached_property
     def notebook_loader(self) -> NotebookLoader:
         return LocalNotebookLoader(self.syspath_provider)
 
