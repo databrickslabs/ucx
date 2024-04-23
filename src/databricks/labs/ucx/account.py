@@ -334,6 +334,7 @@ class AccountMetastores:
         try:
             etag = ws.settings.default_namespace.get().etag
         except NotFound as err:
+            # if not found, the etag is returned in the header
             etag = err.details[0].metadata.get("etag")
         ws.settings.default_namespace.update(
             allow_missing=True,
