@@ -156,14 +156,14 @@ class AWSResources:
 
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
-            get_policy = f"iam get-role-policy --role-name {role_name} " f"--policy-name {policy_name}"
+            get_policy = f"iam get-role-policy --role-name {role_name} --policy-name {policy_name}"
         elif attached_policy_arn:
             get_attached_policy = f"iam get-policy --policy-arn {attached_policy_arn}"
             attached_policy = self._run_json_command(get_attached_policy)
             if not attached_policy:
                 return []
             policy_version = attached_policy["Policy"]["DefaultVersionId"]
-            get_policy = f"iam get-policy-version --policy-arn {attached_policy_arn} " f"--version-id {policy_version}"
+            get_policy = f"iam get-policy-version --policy-arn {attached_policy_arn} --version-id {policy_version}"
         else:
             logger.error("Failed to retrieve role. No role name or attached role ARN specified.")
             return []
@@ -315,7 +315,7 @@ class AWSResources:
         else:
             policy_document_json = self._aws_role_trust_doc(external_id)
         update_role = self._run_json_command(
-            f"iam update-assume-role-policy --role-name {role_name} " f"--policy-document {policy_document_json}"
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {policy_document_json}"
         )
         if not update_role:
             return None
