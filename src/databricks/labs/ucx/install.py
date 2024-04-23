@@ -118,16 +118,6 @@ def extract_major_minor(version_string):
     return None
 
 
-def _replace_config(installation: Installation, **changes):
-    """
-    Persist the list of workspaces where UCX is successfully installed in the config
-    """
-    config = installation.load(WorkspaceConfig)
-    new_config = dataclasses.replace(config, **changes)
-    installation.save(new_config)
-    return new_config
-
-
 class WorkspaceInstaller:
     def __init__(
         self,
@@ -279,7 +269,7 @@ class WorkspaceInstaller:
             logger.debug(f"Cannot find previous installation: {err}")
         return self._configure_new_installation(default_config)
 
-    def replace_config(self, **changes: Any):
+    def replace_config(self, **changes: Any) -> None:
         """
         Persist the list of workspaces where UCX is successfully installed in the config
         """
@@ -596,7 +586,8 @@ class WorkspaceInstallation(InstallationMixin):
             current = self._product_info.current_installation(self._ws)
             workspace_installer = WorkspaceInstaller(self._prompts, current, self._ws, self._product_info)
             warehouse_id = workspace_installer.configure_warehouse()
-            self._config = _replace_config(self._installation, warehouse_id=warehouse_id)
+            workspace_installer.replace_config(warehouse_id=warehouse_id)
+            self._config = self._installation.load(WorkspaceConfig)
 
 
 class AccountInstaller(AccountContext):
