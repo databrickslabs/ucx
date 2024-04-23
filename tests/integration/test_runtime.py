@@ -127,3 +127,29 @@ def test_hiveserde_table_in_place_migration_job(
             assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
+def test_hiveserde_table_ctas_migration_job(
+        ws,
+        installation_ctx,
+        prepare_tables_for_migration,
+        env_or_skip,
+):
+    tables, dst_schema = prepare_tables_for_migration
+    ctx = installation_ctx.replace(
+        extend_prompts={
+            r".*Do you want to update the existing installation?.*": 'yes',
+        },
+    )
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("migrate-external-tables-ctas")
+    # assert the workflow is successful
+    assert ctx.deployed_workflows.validate_step("migrate-external-tables-ctas")
+    # assert the tables are migrated
+    for table in tables.values():
+        try:
+            assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
+        except NotFound:
+            assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"

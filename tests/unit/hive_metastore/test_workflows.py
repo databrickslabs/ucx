@@ -20,7 +20,7 @@ def test_migrate_hive_serde_in_place(run_workflow):
 def test_migrate_other_external_ctas(run_workflow):
     ctx = run_workflow(MigrateExternalTablesCTAS.migrate_other_external_ctas)
     ctx.workspace_client.catalogs.list.assert_called_once()
-    
+
 
 def test_migrate_hive_serde_ctas(run_workflow):
     ctx = run_workflow(MigrateExternalTablesCTAS.migrate_hive_serde_ctas)
