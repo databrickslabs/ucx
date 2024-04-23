@@ -549,8 +549,7 @@ def test_assign_metastore(acc_client):
     account_metastores.assign_metastore(prompts, "", "", "")
     acc_client.metastore_assignments.create.assert_called_with(123457, "123")
 
-    # multiple metastores, need to choose one
-    # also provide a default catalog name
+    # multiple metastores & default catalog name, need to choose one
     account_metastores.assign_metastore(prompts, "123456", "", "main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
     default_namespace.update.assert_called_with(
@@ -558,10 +557,22 @@ def test_assign_metastore(acc_client):
         field_mask="namespace.value",
         setting=DefaultNamespaceSetting(etag="123", namespace=StringMessage("main")),
     )
+
+    # default catalog not found, still get etag
+    default_namespace.get.side_effect = NotFound(details=[{"metadata": {"etag": "not_found"}}])
+    account_metastores.assign_metastore(prompts, "123456", "", "main")
+    acc_client.metastore_assignments.create.assert_called_with(123456, "123")
+    default_namespace.update.assert_called_with(
+        allow_missing=True,
+        field_mask="namespace.value",
+        setting=DefaultNamespaceSetting(etag="not_found", namespace=StringMessage("main")),
+    )
+
     # only one metastore, should assign directly
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-east-2")
     account_metastores.assign_metastore(MockPrompts({}), "123456")
     acc_client.metastore_assignments.create.assert_called_with(123456, "126")
+
     # no metastore found, error
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-central-2")
     with pytest.raises(ValueError):
