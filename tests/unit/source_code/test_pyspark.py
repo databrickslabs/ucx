@@ -17,7 +17,7 @@ def test_spark_sql_no_match(empty_index):
     sqf = SparkSql(ftf, empty_index)
 
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
@@ -31,7 +31,7 @@ def test_spark_sql_match(migration_index):
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
@@ -53,7 +53,7 @@ def test_spark_sql_match_named(migration_index):
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
@@ -98,7 +98,7 @@ def test_spark_table_match(migration_index, method_name):
     args_list[matcher.table_arg_index] = '"old.things"'
     args = ",".join(args_list)
     old_code = f"""
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     df = spark.{method_name}({args})
     do_stuff_with_df(df)
@@ -111,7 +111,7 @@ for i in range(10):
             start_col=9,
             end_line=4,
             end_col=17 + len(method_name) + len(args),
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -125,7 +125,7 @@ def test_spark_table_no_match(migration_index, method_name):
     args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
     args = ",".join(args_list)
     old_code = f"""
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     df = spark.{method_name}({args})
     do_stuff_with_df(df)
@@ -145,7 +145,7 @@ def test_spark_table_too_many_args(migration_index, method_name):
     args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
     args = ",".join(args_list)
     old_code = f"""
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     df = spark.{method_name}({args})
     do_stuff_with_df(df)
@@ -157,7 +157,7 @@ def test_spark_table_named_args(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     df = spark.saveAsTable(format="xyz", name="old.things")
     do_stuff_with_df(df)
@@ -178,7 +178,7 @@ def test_spark_table_variable_arg(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     df = spark.saveAsTable(name)
     do_stuff_with_df(df)
@@ -199,7 +199,7 @@ def test_spark_table_fstring_arg(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for i in range(10):
     df = spark.saveAsTable(f"boop{stuff}")
     do_stuff_with_df(df)
@@ -220,7 +220,7 @@ def test_spark_table_return_value(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+spark.read.csv("/some/path")
 for table in spark.listTables():
     do_stuff_with_table(table)
 """
@@ -240,7 +240,7 @@ def test_spark_sql_fix(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
 
-    old_code = """spark.read.csv("s3://bucket/path")
+    old_code = """spark.read.csv("/some/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
@@ -248,8 +248,34 @@ for i in range(10):
     fixed_code = sqf.apply(old_code)
     assert (
         fixed_code
-        == """spark.read.csv('s3://bucket/path')
+        == """spark.read.csv('/some/path')
 for i in range(10):
     result = spark.sql('SELECT * FROM brand.new.stuff').collect()
     print(len(result))"""
     )
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        (
+            """spark.read.csv("s3a://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=35,
+                )
+            ],
+        ),
+    ],
+)
+# TODO Add more tests
+def test_spark_cloud_direct_access(empty_index, code, expected):
+    ftf = FromTable(empty_index, CurrentSessionState())
+    sqf = SparkSql(ftf, empty_index)
+    advisories = list(sqf.lint(code))
+    assert advisories == expected

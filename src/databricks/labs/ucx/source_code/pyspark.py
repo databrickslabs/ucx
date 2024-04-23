@@ -151,6 +151,35 @@ class ReturnValueMatcher(Matcher):
         raise NotImplementedError("Should never get there!")
 
 
+@dataclass
+class CloudAccessMatcher(Matcher):
+
+    def matches(self, node: ast.AST):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            return False
+        return self._get_table_arg(node) is not None
+
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+        table_arg = self._get_table_arg(node)
+        if isinstance(table_arg, ast.Constant):
+            # check for cloud direct references
+            if any(table_arg.value.startswith(prefix) for prefix in CLOUD_DIRECT_REFS):
+                yield Deprecation(
+                    code='cloud-access',
+                    message=f"The use of cloud direct references is deprecated: '{table_arg.value}'",
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
+        # Do we wish to raise an advice for every use of the method that we
+        # find does not use constant references? That probably pollutes the report.
+
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+        # No transformations to apply
+        return
+
+
 class SparkMatchers:
 
     def __init__(self):
@@ -206,6 +235,22 @@ class SparkMatchers:
             TableNameMatcher("register", 1, 2, 0, "name"),
         ]
 
+        # TODO: Identify all methods in the Spark API that may refer to direct cloud storage,
+        #  check parameter location/name
+        spark_cloud_matchers = [
+            CloudAccessMatcher("read", 1, 1, 0),
+            CloudAccessMatcher("write", 1, 1, 0),
+            CloudAccessMatcher("ls", 1, 1, 0),
+            CloudAccessMatcher("cp", 1, 1, 0),
+            CloudAccessMatcher("rm", 1, 1, 0),
+            CloudAccessMatcher("head", 1, 1, 0),
+            CloudAccessMatcher("put", 1, 1, 0),
+            CloudAccessMatcher("mkdirs", 1, 1, 0),
+            CloudAccessMatcher("move", 1, 1, 0),
+            CloudAccessMatcher("text", 1, 1, 0),
+            CloudAccessMatcher("csv", 1, 1, 0),
+        ]
+
         # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
         # nothing to migrate in UserDefinedTableFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedTableFunction.html
         self._matchers = {}
@@ -216,6 +261,7 @@ class SparkMatchers:
             + spark_dataframereader_matchers
             + spark_dataframewriter_matchers
             + spark_udtfregistration_matchers
+            + spark_cloud_matchers
         ):
             self._matchers[matcher.method_name] = matcher
 
