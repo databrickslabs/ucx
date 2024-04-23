@@ -584,7 +584,7 @@ class WorkspaceInstallation(InstallationMixin):
         try:
             self._ws.warehouses.get(self._config.warehouse_id)
         except ResourceDoesNotExist:
-            logger.critical(f"warehouse does not exists anymore {self._config.warehouse_id}")
+            logger.critical(f"warehouse with id {self._config.warehouse_id} does not exists anymore")
             current = self._product_info.current_installation(self._ws)
             workspace_installer = WorkspaceInstaller(self._prompts, current, self._ws, self._product_info)
             warehouse_id = workspace_installer.configure_warehouse()
