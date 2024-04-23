@@ -157,9 +157,8 @@ class ReturnValueMatcher(Matcher):
 class CloudAccessMatcher(Matcher):
 
     def matches(self, node: ast.AST):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
-            return False
-        return self._get_table_arg(node) is not None
+        return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and self._get_table_arg(
+            node) is not None
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
