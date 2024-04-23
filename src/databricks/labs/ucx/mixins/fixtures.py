@@ -961,7 +961,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
-    def create(
+    def create(  # pylint: disable=too-many-locals,too-many-arguments
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
@@ -972,6 +972,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
+        hiveserde_ddl: str | None = None,
+        storage_override: str | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1021,6 +1023,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         if tbl_properties:
             str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
+
+        if hiveserde_ddl:
+            ddl = hiveserde_ddl
+            data_source_format = None
+            table_type = TableType.EXTERNAL
+            storage_location = storage_override
 
         sql_backend.execute(ddl)
         table_info = TableInfo(
@@ -1216,3 +1224,24 @@ def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     return new_mounted_location
+
+
+@pytest.fixture
+def make_storage_dir(ws, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.mkdirs('{path}')")
+        else:
+            ws.dbfs.mkdirs(path)
+        return path
+
+    def remove(path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{path}', recurse=True)")
+        else:
+            ws.dbfs.delete(path, recursive=True)
+
+    yield from factory("make_storage_dir", create, remove)

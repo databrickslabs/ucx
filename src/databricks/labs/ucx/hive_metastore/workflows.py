@@ -37,6 +37,31 @@ class TableMigration(Workflow):
         ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
+class MigrateHiveSerdeTablesInPlace(Workflow):
+    def __init__(self):
+        super().__init__('migrate-external-hiveserde-tables-in-place-experimental')
+
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    def migrate_hive_serde_in_place(self, ctx: RuntimeContext):
+        """This workflow task migrates ParquetHiveSerDe, OrcSerde, AvroSerDe tables in place from the Hive Metastore to the Unity Catalog."""
+        ctx.tables_migrator.migrate_tables(
+            what=What.EXTERNAL_HIVESERDE,
+            acl_strategy=[AclMigrationWhat.LEGACY_TACL],
+            mounts_crawler=ctx.mounts_crawler,
+            hiveserde_in_place_migrate=True,
+        )
+
+    @job_task(
+        job_cluster="table_migration",
+        depends_on=[Assessment.crawl_tables, migrate_hive_serde_in_place],
+    )
+    def migrate_views(self, ctx: RuntimeContext):
+        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
+        It is dependent on the migration of the tables.
+        """
+        ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+
 class MigrateTablesInMounts(Workflow):
     def __init__(self):
         super().__init__('migrate-tables-in-mounts-experimental')

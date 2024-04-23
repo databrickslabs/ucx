@@ -333,6 +333,7 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job(
     ws,
     installation_ctx,
@@ -378,6 +379,7 @@ def test_table_migration_job(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job_cluster_override(
     ws,
     installation_ctx,

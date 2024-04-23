@@ -9,7 +9,9 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import CatalogInfo, SchemaInfo, TableInfo
 
+from databricks.labs.ucx.hive_metastore import Mounts
 from databricks.labs.ucx.hive_metastore.grants import Grant, GrantsCrawler, PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import Mount
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -83,53 +85,6 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
         f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     ) in backend.queries
     assert "SYNC TABLE ucx_default.db1_dst.managed_other FROM hive_metastore.db1_src.managed_other;" in backend.queries
-
-
-def test_non_sync_tables_should_produce_proper_queries(ws):
-    errors = {}
-    rows = {
-        "SHOW CREATE TABLE": [
-            {
-                "createtab_stmt": "CREATE EXTERNAL TABLE hive_metastore.db1_src.external_src "
-                "(foo STRING,bar STRING) USING XML "
-                "LOCATION 's3://some_location/table'"
-            }
-        ]
-    }
-    backend = MockBackend(fails_on_first=errors, rows=rows)
-    table_crawler = TablesCrawler(backend, "inventory_database")
-    udf_crawler = UdfsCrawler(backend, "inventory_database")
-    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["external_src_non_sync"])
-    group_manager = GroupManager(backend, ws, "inventory_database")
-    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
-    principal_grants = create_autospec(PrincipalACL)
-    table_migrate = TablesMigrator(
-        table_crawler,
-        grant_crawler,
-        ws,
-        backend,
-        table_mapping,
-        group_manager,
-        migration_status_refresher,
-        principal_grants,
-    )
-    table_migrate.migrate_tables(what=What.EXTERNAL_NO_SYNC)
-
-    assert (
-        "CREATE EXTERNAL TABLE IF NOT EXISTS "
-        "ucx_default.db1_dst.external_dst (foo STRING, bar STRING) "
-        "USING XML LOCATION 's3://some_location/table'" in backend.queries
-    )
-    assert (
-        "ALTER TABLE hive_metastore.db1_src.external_src "
-        "SET TBLPROPERTIES ('upgraded_to' = 'ucx_default.db1_dst.external_dst');"
-    ) in backend.queries
-    assert (
-        f"ALTER TABLE ucx_default.db1_dst.external_dst "
-        f"SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.external_src' , "
-        f"'{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
-    ) in backend.queries
 
 
 def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
@@ -263,6 +218,96 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
+
+
+@pytest.mark.parametrize(
+    'hiveserde_in_place_migrate, describe, ddl, migrated, expected_value',
+    [
+        # test migrate parquet hiveserde table in place
+        (
+            True,
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
+            ],
+            MockBackend.rows("createtab_stmt")[
+                (
+                    "CREATE TABLE hive_metastore.schema.test_parquet (id INT) USING PARQUET LOCATION 'dbfs:/mnt/test/table1'"
+                ),
+            ],
+            True,
+            "CREATE TABLE ucx_default.db1_dst.external_dst (id INT) USING PARQUET LOCATION 's3://test/folder/table1'",
+        ),
+        # test unsupported hiveserde type
+        (
+            True,
+            MockBackend.rows("col_name", "data_type", "comment")[("dummy", "dummy", None)],
+            MockBackend.rows("createtab_stmt")[("dummy"),],
+            False,
+            "hive_metastore.db1_src.external_src table can only be migrated using CTAS.",
+        ),
+        # test None table_migrate_sql returned
+        (
+            True,
+            MockBackend.rows("col_name", "data_type", "comment")[
+                ("Serde Library", "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", None),
+                ("InputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat", None),
+                ("OutputFormat", "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat", None),
+            ],
+            MockBackend.rows("createtab_stmt")[("dummy"),],
+            False,
+            "Failed to generate in-place migration DDL for hive_metastore.db1_src.external_src, skip the in-place migration. It can be migrated in CTAS workflow",
+        ),
+        # test not in place migration
+        (
+            False,
+            None,
+            None,
+            False,
+            "",
+        ),
+    ],
+)
+def test_migrate_external_hiveserde_table_in_place(
+    ws, caplog, hiveserde_in_place_migrate, describe, ddl, migrated, expected_value
+):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend(
+        rows={
+            "DESCRIBE TABLE EXTENDED *": describe,
+            "SHOW CREATE TABLE *": ddl,
+        }
+    )
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    udf_crawler = UdfsCrawler(backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    table_mapping = table_mapping_mock(["external_hiveserde"])
+    group_manager = GroupManager(backend, ws, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    mount_crawler = create_autospec(Mounts)
+    mount_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+
+    table_migrate.migrate_tables(
+        what=What.EXTERNAL_HIVESERDE,
+        mounts_crawler=mount_crawler,
+        hiveserde_in_place_migrate=hiveserde_in_place_migrate,
+    )
+    if migrated:
+        assert expected_value in backend.queries
+    else:
+        assert expected_value in caplog.text
 
 
 def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
@@ -604,8 +649,8 @@ def test_revert_report(ws, capsys):
     table_migrate = get_table_migrator(backend)
     table_migrate.print_revert_report(delete_managed=True)
     captured = capsys.readouterr()
-    assert "test_schema1|1|0|1|0|1|0|0|" in captured.out.replace(" ", "")
-    assert "test_schema2|1|0|0|0|0|0|0|" in captured.out.replace(" ", "")
+    assert "test_schema1|1|0|0|1|0|1|0|0|" in captured.out.replace(" ", "")
+    assert "test_schema2|1|0|0|0|0|0|0|0|" in captured.out.replace(" ", "")
     assert "- Migrated DBFS Root Tables will be deleted" in captured.out
 
     table_migrate.print_revert_report(delete_managed=False)
