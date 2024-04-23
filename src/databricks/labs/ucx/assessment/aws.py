@@ -268,7 +268,7 @@ class AWSResources:
         Create an AWS role with the given name and assume role policy document.
         """
         add_role = self._run_json_command(
-            f"iam create-role --role-name {role_name} " f"--assume-role-policy-document {assume_role_json}"
+            f"iam create-role --role-name {role_name} --assume-role-policy-document {assume_role_json}"
         )
         if not add_role:
             return None
@@ -289,10 +289,10 @@ class AWSResources:
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
         role_document = self._run_json_command(f"iam get-role --role-name {role_name}")
-        role = role_document.get("Role", {})
-        if role is None:
+        if role_document is None:
             logger.error(f"Role {role_name} doesn't exist")
             return None
+        role = role_document.get("Role")
         policy_document = role.get("AssumeRolePolicyDocument")
         if policy_document and policy_document.get("Statement"):
             for idx, statement in enumerate(policy_document["Statement"]):

@@ -174,7 +174,7 @@ class IamRoleMigration:
         if execution_result:
             results_file = self.save(execution_result)
             logger.info(
-                f"Completed migration from IAM Role to UC Storage credentials"
+                f"Completed migration from IAM Role to UC Storage credentials. "
                 f"Please check {results_file} for validation results"
             )
         else:
