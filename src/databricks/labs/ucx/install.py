@@ -515,7 +515,7 @@ class WorkspaceInstallation(InstallationMixin):
         except NotFound:
             logger.error(f"Check if {self._installation.install_folder()} is present")
             return
-        self._validate_config()
+        self._check_and_fix_if_warehouse_does_not_exists()
         self._remove_database()
         self._remove_jobs()
         self._remove_warehouse()
@@ -578,7 +578,7 @@ class WorkspaceInstallation(InstallationMixin):
         if self._prompts.confirm(f"Open {step} Job url that just triggered ? {job_url}"):
             webbrowser.open(job_url)
 
-    def _validate_config(self):
+    def _check_and_fix_if_warehouse_does_not_exists(self):
         try:
             self._ws.warehouses.get(self._config.warehouse_id)
         except ResourceDoesNotExist:
