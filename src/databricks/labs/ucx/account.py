@@ -296,7 +296,9 @@ class AccountMetastores:
                 raise ValueError(f"No matching metastore found for workspace {workspace_id}")
             # if there are multiple matches, prompt users to select one
             if len(metastore_choices) > 1:
-                metastore_id = prompts.choice_from_dict("Multiple metastores found, please select one:", metastore_choices)
+                metastore_id = prompts.choice_from_dict(
+                    "Multiple metastores found, please select one:", metastore_choices
+                )
             else:
                 metastore_id = list(metastore_choices.values())[0]
         if metastore_id is not None:

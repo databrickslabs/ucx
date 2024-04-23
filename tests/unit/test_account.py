@@ -543,10 +543,7 @@ def test_assign_metastore(acc_client):
     default_namespace = ws.settings.default_namespace
     default_namespace.get.return_value = DefaultNamespaceSetting(etag="123", namespace=StringMessage("hive_metastore"))
     account_metastores = AccountMetastores(acc_client)
-    prompts = MockPrompts({
-        "Multiple metastores found, please select one*": "0",
-        "Please select a workspace:*": "0"
-    })
+    prompts = MockPrompts({"Multiple metastores found, please select one*": "0", "Please select a workspace:*": "0"})
 
     # need to select a workspace - since it is alphabetically sorted, needs to pick workspace bar
     account_metastores.assign_metastore(prompts, "", "", "")
