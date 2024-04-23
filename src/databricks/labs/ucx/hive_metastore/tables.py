@@ -193,6 +193,19 @@ class Table:
             f"{escape_sql_identifier(self.key)};"
         )
 
+    def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
+        return (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} "
+            f"LOCATION '{dst_table_location}' "
+            f"AS SELECT * FROM {self.safe_sql_key}"
+        )
+
+    def sql_migrate_ctas_managed(self, target_table_key) -> str:
+        return (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} "
+            f"AS SELECT * FROM {self.safe_sql_key}"
+        )
+
     def hiveserde_type(self, backend: SqlBackend) -> HiveSerdeType:
         if self.table_format != "HIVE":
             return HiveSerdeType.NOT_HIVESERDE
