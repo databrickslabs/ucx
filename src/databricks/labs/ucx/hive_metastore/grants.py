@@ -166,6 +166,7 @@ class Grant:
             ("DATABASE", "OWN"): self._set_owner_sql,
             ("DATABASE", "READ_METADATA"): self._uc_action("BROWSE"),
             ("CATALOG", "OWN"): self._set_owner_sql,
+            ("CATALOG", "USAGE"): self._uc_action("USE CATALOG"),
         }
         make_query = hive_to_uc.get((object_type, self.action_type), None)
         if make_query is None:
@@ -530,8 +531,6 @@ class PrincipalACL:
                 continue
             cluster_usage = self._get_grants(locations, principals, tables, mounts)
             grants.update(cluster_usage)
-            catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
-            grants.update(catalog_grants)
         return list(grants)
 
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
@@ -557,7 +556,7 @@ class PrincipalACL:
     def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
         databases = {table.database for table in tables}
         return [
-            Grant(principal, "USE", "hive_metastore", database) for database in databases for principal in principals
+            Grant(principal, "USAGE", "hive_metastore", database) for database in databases for principal in principals
         ]
 
     def _get_grants(

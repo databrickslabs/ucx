@@ -665,3 +665,24 @@ def prepare_tables_for_migration(
     installation_ctx.save_mounts()
     installation_ctx.with_dummy_grants_and_tacls()
     return tables, dst_schema
+
+
+@pytest.fixture
+def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make_catalog, make_schema):
+    src_schema = make_schema(catalog_name="hive_metastore")
+    src_external_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+        external_csv=make_mounted_location,
+    )
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    return (
+        runtime_ctx,
+        f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
+        f"{dst_catalog.name}.{dst_schema.name}",
+        dst_catalog.name,
+    )

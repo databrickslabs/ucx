@@ -82,6 +82,25 @@ class Fixer:
     def apply(self, code: str) -> str: ...
 
 
+# The default schema to use when the schema is not specified in a table reference
+# See: https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-qry-select-usedb.html
+DEFAULT_SCHEMA = 'default'
+
+
+@dataclass
+class CurrentSessionState:
+    """
+    A data class that represents the current state of a session.
+
+    This class can be used to track various aspects of a session, such as the current schema.
+
+    Attributes:
+        schema (str): The current schema of the session. If not provided, it defaults to 'DEFAULT_SCHEMA'.
+    """
+
+    schema: str = DEFAULT_SCHEMA
+
+
 class SequentialLinter(Linter):
     def __init__(self, linters: list[Linter]):
         self._linters = linters

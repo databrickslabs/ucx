@@ -8,7 +8,6 @@ from typing import TypeVar, Generic
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
 
-
 logger = logging.getLogger(__name__)
 
 
