@@ -377,7 +377,7 @@ def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     ctx.local_file_migrator.apply(working_directory)
 
 
-@ucx.command
+@ucx.command(is_account=True)
 def show_all_metastores(a: AccountClient, workspace_id: str | None = None):
     """Show all metastores in the account"""
     logger.info(f"Account ID: {a.config.account_id}")
@@ -385,10 +385,10 @@ def show_all_metastores(a: AccountClient, workspace_id: str | None = None):
     ctx.account_metastores.show_all_metastores(workspace_id)
 
 
-@ucx.command
+@ucx.command(is_account=True)
 def assign_metastore(
-    a: AccountClient, workspace_id: str, metastore_id: str | None = None, default_catalog: str | None = None
-):
+    a: AccountClient, workspace_id: str | None = None, metastore_id: str | None = None,
+        default_catalog: str | None = None):
     """Assign metastore to a workspace"""
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = AccountContext(a)
