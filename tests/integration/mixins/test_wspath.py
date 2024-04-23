@@ -24,3 +24,19 @@ def test_mkdirs(ws, make_random):
 
     assert not wsp_check.exists()
 
+
+def test_open(ws, make_random):
+    name = make_random()
+    wsp = WorkspacePath(ws, f"~/{name}/foo/bar/baz")
+    with_user = wsp.expanduser()
+    with_user.mkdir(parents=True)
+
+    hello_txt = with_user / "hello.txt"
+    hello_txt.write_text("Hello, World!")
+
+    assert b'Hello, World!' == hello_txt.read_bytes()
+
+    with_user.joinpath("hello.txt").unlink()
+
+    assert not hello_txt.exists()
+

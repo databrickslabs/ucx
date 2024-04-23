@@ -1,13 +1,14 @@
+import abc
 import os
 import pathlib
 from functools import cached_property
 from pathlib import Path, _PosixFlavour, _Accessor  # type: ignore
-
+from io import BytesIO, StringIO
 from databricks.sdk import WorkspaceClient
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat
 
 
 class _DatabricksFlavour(_PosixFlavour):
@@ -81,6 +82,35 @@ class _DatabricksAccessor(_Accessor):
     # realpath = staticmethod(os.path.realpath)
 
 
+class _UploadIO(abc.ABC):
+    def __init__(self, ws: WorkspaceClient, path: str):
+        self._ws = ws
+        self._path = path
+
+    # @abc.abstractmethod
+    # def getvalue(self):
+    #     pass
+
+    def close(self):
+        x = self.getvalue()
+        self._ws.workspace.upload(self._path, x, format=ImportFormat.AUTO)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} for {self._path} on {self._ws}>"
+
+
+class _BinaryUploadIO(_UploadIO, BytesIO):
+    def __init__(self, ws: WorkspaceClient, path: str):
+        _UploadIO.__init__(self, ws, path)
+        BytesIO.__init__(self)
+
+
+class _TextUploadIO(_UploadIO, StringIO):
+    def __init__(self, ws: WorkspaceClient, path: str):
+        _UploadIO.__init__(self, ws, path)
+        StringIO.__init__(self)
+
+
 class WorkspacePath(Path):
     def __new__(cls, ws: WorkspaceClient, path: str | Path):
         self = object.__new__(cls)
@@ -148,8 +178,36 @@ class WorkspacePath(Path):
     def rmdir(self, recursive=False):
         self._ws.workspace.delete(self.as_posix(), recursive=recursive)
 
+    def rename(self, target):
+        dst = WorkspacePath(self._ws, target)
+        with self._ws.workspace.download(self.as_posix(), format=ExportFormat.AUTO) as f:
+            self._ws.workspace.upload(dst.as_posix(), f.read(), format=ImportFormat.AUTO)
+        self.unlink()
+
+    def unlink(self, missing_ok=False):
+        if not missing_ok and not self.exists():
+            raise FileNotFoundError(f"{self.as_posix()} does not exist")
+        self._ws.workspace.delete(self.as_posix())
+
+    def home(self):
+        return WorkspacePath(self._ws, "~").expanduser()
+
+    def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if "b" in mode and "r" in mode:
+            return self._ws.workspace.download(self.as_posix(), format=ExportFormat.AUTO)
+        if "b" in mode and "w" in mode:
+            return _BinaryUploadIO(self._ws, self.as_posix())
+        if "r" in mode:
+            with self._ws.workspace.download(self.as_posix(), format=ExportFormat.AUTO) as f:
+                return StringIO(f.read().decode(encoding or "utf-8"))
+        if "w" in mode:
+            return _TextUploadIO(self._ws, self.as_posix())
+        raise ValueError(f"invalid mode: {mode}")
+
     @cached_property
     def _object_info(self) -> ObjectInfo:
+        # this method is cached because it is used in multiple is_* methods.
+        # DO NOT use this method in methods, where fresh result is required.
         return self._ws.workspace.get_status(self.as_posix())
 
     def is_dir(self):
@@ -193,90 +251,23 @@ class WorkspacePath(Path):
     def chmod(self, mode, *, follow_symlinks=True):
         raise NotImplementedError("Not available for Databricks Workspace")
 
-    def glob(self, pattern, *, case_sensitive=None):
-        return super().glob(pattern, case_sensitive=case_sensitive)
-
-    def rglob(self, pattern, *, case_sensitive=None):
-        return super().rglob(pattern, case_sensitive=case_sensitive)
-
     def lchmod(self, mode):
-        super().lchmod(mode)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def lstat(self):
-        return super().lstat()
-
-    # @overload
-    # def open(
-    #     self,
-    #     mode: OpenTextMode = "r",
-    #     buffering: int = -1,
-    #     encoding: str | None = None,
-    #     errors: str | None = None,
-    #     newline: str | None = None,
-    # ) -> TextIOWrapper: ...
-    #
-    # @overload
-    # def open(
-    #     self, mode: OpenBinaryMode, buffering: Literal[0], encoding: None = None, errors: None = None, newline: None = None
-    # ) -> FileIO: ...
-    #
-    # @overload
-    # def open(
-    #     self,
-    #     mode: OpenBinaryModeUpdating,
-    #     buffering: Literal[-1, 1] = -1,
-    #     encoding: None = None,
-    #     errors: None = None,
-    #     newline: None = None,
-    # ) -> BufferedRandom: ...
-    #
-    # @overload
-    # def open(
-    #     self,
-    #     mode: OpenBinaryModeWriting,
-    #     buffering: Literal[-1, 1] = -1,
-    #     encoding: None = None,
-    #     errors: None = None,
-    #     newline: None = None,
-    # ) -> BufferedWriter: ...
-    #
-    # @overload
-    # def open(
-    #     self,
-    #     mode: OpenBinaryModeReading,
-    #     buffering: Literal[-1, 1] = -1,
-    #     encoding: None = None,
-    #     errors: None = None,
-    #     newline: None = None,
-    # ) -> BufferedReader: ...
-    #
-    # @overload
-    # def open(
-    #     self, mode: pathlib.OpenBinaryMode, buffering: int = -1, encoding: None = None, errors: None = None, newline: None = None
-    # ) -> BinaryIO: ...
-    #
-    # @overload
-    # def open(
-    #     self, mode: str, buffering: int = -1, encoding: str | None = None, errors: str | None = None, newline: str | None = None
-    # ) -> IO[Any]: ...
-
-    def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
-        return super().open(mode, buffering, encoding, errors, newline)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def owner(self):
-        return super().owner()
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def group(self):
-        return super().group()
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def is_mount(self):
-        return super().is_mount()
+        return False
 
     def readlink(self):
-        return super().readlink()
-
-    def rename(self, target):
-        return super().rename(target)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def replace(self, target):
         return super().replace(target)
@@ -285,20 +276,13 @@ class WorkspacePath(Path):
         return super().resolve(strict)
 
     def symlink_to(self, target, target_is_directory=False):
-        super().symlink_to(target, target_is_directory)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def hardlink_to(self, target):
-        super().hardlink_to(target)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def touch(self, mode=0o666, exist_ok=True):
         super().touch(mode, exist_ok)
-
-    def unlink(self, missing_ok=False):
-        super().unlink(missing_ok)
-
-    @classmethod
-    def home(cls):
-        return super().home()
 
     def absolute(self):
         return super().absolute()
@@ -312,14 +296,8 @@ class WorkspacePath(Path):
     def samefile(self, other_path):
         return super().samefile(other_path)
 
-    def write_bytes(self, data):
-        return super().write_bytes(data)
-
-    def write_text(self, data, encoding=None, errors=None, newline=None):
-        return super().write_text(data, encoding, errors, newline)
-
     def link_to(self, target):
-        super().link_to(target)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def walk(self, top_down=..., on_error=..., follow_symlinks=...):
         return super().walk(top_down, on_error, follow_symlinks)
