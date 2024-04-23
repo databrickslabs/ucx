@@ -5,6 +5,8 @@ from pathlib import Path, _PosixFlavour, _Accessor  # type: ignore
 
 from databricks.sdk import WorkspaceClient
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
+
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 
@@ -36,9 +38,6 @@ class _DatabricksAccessor(_Accessor):
     #
     # def open(self):
     #     return os.open()
-
-    # mkdir(self, mode)
-
 
     def expanduser(self, path):
         home = f"/Users/{self._ws.current_user.me().user_name}"
@@ -132,9 +131,9 @@ class WorkspacePath(Path):
 
     def exists(self, *, follow_symlinks=True):
         try:
-            _ = self._object_info
+            self._ws.workspace.get_status(self.as_posix())
             return True
-        except FileNotFoundError:
+        except NotFound:
             return False
 
     def mkdir(self, mode=0o600, parents=True, exist_ok=True):
@@ -145,6 +144,9 @@ class WorkspacePath(Path):
         if mode != 0o600:
             raise ValueError("other modes than 0o600 are not yet supported")
         self._ws.workspace.mkdirs(self.as_posix())
+
+    def rmdir(self, recursive=False):
+        self._ws.workspace.delete(self.as_posix(), recursive=recursive)
 
     @cached_property
     def _object_info(self) -> ObjectInfo:
@@ -281,9 +283,6 @@ class WorkspacePath(Path):
 
     def resolve(self, strict=False):
         return super().resolve(strict)
-
-    def rmdir(self):
-        super().rmdir()
 
     def symlink_to(self, target, target_is_directory=False):
         super().symlink_to(target, target_is_directory)
