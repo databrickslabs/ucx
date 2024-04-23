@@ -27,7 +27,7 @@ def test_mkdirs(ws, make_random):
 
 def test_open(ws, make_random):
     name = make_random()
-    wsp = WorkspacePath(ws, f"~/{name}/foo/bar/baz")
+    wsp = WorkspacePath(ws, f"~/{name}")
     with_user = wsp.expanduser()
     with_user.mkdir(parents=True)
 
