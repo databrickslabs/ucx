@@ -27,14 +27,18 @@ def test_mkdirs(ws, make_random):
 
 def test_open_text_io(ws, make_random):
     name = make_random()
-    wsp = WorkspacePath(ws, f"~/{name}")
+    wsp = WorkspacePath(ws, f"~/{name}/a/b/c")
     with_user = wsp.expanduser()
     with_user.mkdir(parents=True)
 
     hello_txt = with_user / "hello.txt"
     hello_txt.write_text("Hello, World!")
+    assert 'Hello, World!' == hello_txt.read_text()
 
-    assert b'Hello, World!' == hello_txt.read_bytes()
+    files = list(with_user.glob("**/*.txt"))
+    assert len(files) == 1
+    assert hello_txt == files[0]
+    assert 'hello.txt' == files[0].name
 
     with_user.joinpath("hello.txt").unlink()
 
@@ -69,4 +73,4 @@ def test_replace(ws, make_random):
     hello_txt.replace(with_user / "hello2.txt")
 
     assert not hello_txt.exists()
-    assert b'Hello, World!' == (with_user / "hello2.txt").read_bytes()
+    assert 'Hello, World!' == (with_user / "hello2.txt").read_text()

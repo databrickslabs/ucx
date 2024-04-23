@@ -1,9 +1,10 @@
 import abc
+import locale
 import os
 import pathlib
 from functools import cached_property
 from pathlib import Path, _PosixFlavour, _Accessor  # type: ignore
-from io import BytesIO, StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from databricks.sdk import WorkspaceClient
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
 
@@ -23,7 +24,6 @@ class _DatabricksFlavour(_PosixFlavour):
         return f"<{self.__class__.__name__} for {self._ws}>"
 
 
-
 class _DatabricksAccessor(_Accessor):
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
@@ -36,9 +36,6 @@ class _DatabricksAccessor(_Accessor):
     link = _na
     symlink = _na
     readlink = _na
-    #
-    # def open(self):
-    #     return os.open()
 
     def expanduser(self, path):
         home = f"/Users/{self._ws.current_user.me().user_name}"
@@ -47,8 +44,43 @@ class _DatabricksAccessor(_Accessor):
     def __repr__(self):
         return f"<{self.__class__.__name__} for {self._ws}>"
 
-    #
-    # open = io.open
+    def scandir(self, path):
+        class _as_path:
+            def __init__(self, object_info):
+                self._object_info = object_info
+
+            def __fspath__(self):
+                return self._object_info.path
+
+            def is_dir(self):
+                return self._object_info.object_type == ObjectType.DIRECTORY
+
+            def is_file(self):
+                return self._object_info.object_type == ObjectType.FILE
+
+            def is_symlink(self):
+                return False
+
+            @property
+            def name(self):
+                return os.path.basename(self._object_info.path)
+
+        class _enterable:
+            def __init__(self, it):
+                self._it = it
+
+            def __iter__(self):
+                for object_info in self._it:
+                    yield _as_path(object_info)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+        return _enterable(self._ws.workspace.list(path))
+
     # listdir = os.listdir
     # scandir = os.scandir
     # mkdir = os.mkdir
@@ -192,16 +224,32 @@ class WorkspacePath(Path):
         return WorkspacePath(self._ws, "~").expanduser()
 
     def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if encoding is None or encoding == "locale":
+            encoding = locale.getpreferredencoding(False)
         if "b" in mode and "r" in mode:
             return self._ws.workspace.download(self.as_posix(), format=ExportFormat.AUTO)
         if "b" in mode and "w" in mode:
             return _BinaryUploadIO(self._ws, self.as_posix())
         if "r" in mode:
             with self._ws.workspace.download(self.as_posix(), format=ExportFormat.AUTO) as f:
-                return StringIO(f.read().decode(encoding or "utf-8"))
+                return StringIO(f.read().decode(encoding))
         if "w" in mode:
             return _TextUploadIO(self._ws, self.as_posix())
         raise ValueError(f"invalid mode: {mode}")
+
+    @classmethod
+    def cwd(cls):
+        # should we?..
+        raise NotImplementedError("Not available for Databricks Workspace")
+
+    def absolute(self):
+        return super().absolute()
+
+    def walk(self, top_down=..., on_error=..., follow_symlinks=...):
+        return super().walk(top_down, on_error, follow_symlinks)
+
+    def samefile(self, other_path):
+        return super().samefile(other_path)
 
     @cached_property
     def _object_info(self) -> ObjectInfo:
@@ -236,12 +284,14 @@ class WorkspacePath(Path):
     def is_junction(self):
         return False
 
+    def is_mount(self):
+        return False
+
     ######################################################################
     # The following methods are not implemented for Databricks Workspace #
     ######################################################################
 
-    @classmethod
-    def cwd(cls):
+    def resolve(self, strict=False):
         raise NotImplementedError("Not available for Databricks Workspace")
 
     def stat(self, *, follow_symlinks=True):
@@ -262,16 +312,8 @@ class WorkspacePath(Path):
     def group(self):
         raise NotImplementedError("Not available for Databricks Workspace")
 
-    def is_mount(self):
-        return False
-
     def readlink(self):
         raise NotImplementedError("Not available for Databricks Workspace")
-
-
-
-    def resolve(self, strict=False):
-        return super().resolve(strict)
 
     def symlink_to(self, target, target_is_directory=False):
         raise NotImplementedError("Not available for Databricks Workspace")
@@ -280,22 +322,8 @@ class WorkspacePath(Path):
         raise NotImplementedError("Not available for Databricks Workspace")
 
     def touch(self, mode=0o666, exist_ok=True):
-        super().touch(mode, exist_ok)
-
-    def absolute(self):
-        return super().absolute()
-
-    def read_bytes(self):
-        return super().read_bytes()
-
-    def read_text(self, encoding=None, errors=None):
-        return super().read_text(encoding, errors)
-
-    def samefile(self, other_path):
-        return super().samefile(other_path)
+        raise NotImplementedError("Not available for Databricks Workspace")
 
     def link_to(self, target):
         raise NotImplementedError("Not available for Databricks Workspace")
 
-    def walk(self, top_down=..., on_error=..., follow_symlinks=...):
-        return super().walk(top_down, on_error, follow_symlinks)
