@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import os.path
@@ -11,6 +12,7 @@ from databricks.labs.blueprint.installer import RawState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
@@ -201,6 +203,18 @@ def test_uninstallation(ws, sql_backend, installation_ctx):
         ws.workspace.get_status(installation_ctx.workspace_installation.folder)
     with pytest.raises(InvalidParameterValue):
         ws.jobs.get(job_id=assessment_job_id)
+    with pytest.raises(NotFound):
+        sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
+
+
+def test_uninstallation_after_warehouse_is_deleted(ws, installation_ctx):
+    """A warehouse might be deleted (manually), the uninstallation should reset the warehouse."""
+    non_existing_warehouse_id = "00aa00aa00a00a00"
+    config = dataclasses.replace(installation_ctx.config, warehouse_id=non_existing_warehouse_id)
+    sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+    installation_ctx = installation_ctx.replace(sql_backend=sql_backend, config=config)
+
+    installation_ctx.workspace_installation.uninstall()
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
 
