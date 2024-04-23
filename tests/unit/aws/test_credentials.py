@@ -118,12 +118,27 @@ def test_print_action_plan(caplog, ws, instance_profile_migration, credential_ma
     assert False, "Action plan is not logged"
 
 
-def test_run_without_confirmation(ws, instance_profile_migration):
-    prompts = MockPrompts({
-            "Above IAM roles will be migrated to UC storage credentials*": "No",
-    })
+def test_migrate_credential_failed_creation(caplog, ws, instance_profile_migration):
+    caplog.set_level(logging.ERROR)
+    prompts = MockPrompts(
+        {
+            "Above IAM roles will be migrated to UC storage credentials*": "Yes",
+        }
+    )
+    ws.storage_credentials.create.return_value = StorageCredentialInfo(aws_iam_role=None)
+    ws.storage_credentials.create.side_effect = None
+    instance_profile_migration(1).run(prompts)
+    assert "Failed to create storage credential for IAM role: arn:aws:iam::123456789012:role/prefix0" in caplog.messages
 
-    assert instance_profile_migration(10).run(prompts) == []
+
+def test_run_without_confirmation(ws, instance_profile_migration):
+    prompts = MockPrompts(
+        {
+            "Above IAM roles will be migrated to UC storage credentials*": "No",
+        }
+    )
+
+    assert instance_profile_migration(1).run(prompts) == []
 
 
 @pytest.mark.parametrize("num_instance_profiles", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
