@@ -269,7 +269,7 @@ class WorkspaceInstaller:
             logger.debug(f"Cannot find previous installation: {err}")
         return self._configure_new_installation(default_config)
 
-    def replace_config(self, **changes: Any) -> None:
+    def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
         """
         Persist the list of workspaces where UCX is successfully installed in the config
         """
@@ -278,7 +278,9 @@ class WorkspaceInstaller:
             new_config = dataclasses.replace(config, **changes)
             self.installation.save(new_config)
         except (PermissionDenied, NotFound, ValueError):
-            logger.warning(f"Failed to replace config for {self.workspace_client.config.host}")
+            logger.warning(f"Failed to replace config for {self._ws.config.host}")
+            new_config = None
+        return new_config
 
     def _apply_upgrades(self):
         try:
@@ -586,8 +588,7 @@ class WorkspaceInstallation(InstallationMixin):
             current = self._product_info.current_installation(self._ws)
             workspace_installer = WorkspaceInstaller(self._prompts, current, self._ws, self._product_info)
             warehouse_id = workspace_installer.configure_warehouse()
-            workspace_installer.replace_config(warehouse_id=warehouse_id)
-            self._config = self._installation.load(WorkspaceConfig)
+            self._config = workspace_installer.replace_config(warehouse_id=warehouse_id)
 
 
 class AccountInstaller(AccountContext):
