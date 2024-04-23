@@ -233,11 +233,13 @@ class TablesMigrator:
         hiveserde_in_place_migrate: bool = False,
     ):
         # This hiveserde_in_place_migrate is used to determine if current migration should use in-place migration or CTAS.
-        # We will provide two workflows for hiveserde table migration: One will migrate all hiveserde tables using CTAS which we officially support.
-        # The other workflow will migrate certain types of hiveserde in place, which is technically working, but the user need to accept the risk that
-        # there may be unseen corner cases where the old files created by hiveserde are not processed correctly by Spark datasource.
-        # User will need to decide which workflow to runs first which will migrate the tables and mark the upgraded_to property and hence those tables
-        # will be skipped in the migration workflow runs later.
+        # We will provide two workflows for hiveserde table migration:
+        # 1. One will migrate all hiveserde tables using CTAS which we officially support.
+        # 2. The other one will migrate certain types of hiveserde in place, which is technically working, but the user
+        # need to accept the risk that the old files created by hiveserde may not be processed correctly by Spark
+        # datasource in corner cases.
+        # User will need to decide which workflow to runs first which will migrate the hiveserde tables and mark the
+        # `upgraded_to` property and hence those tables will be skipped in the migration workflow runs later.
         if not hiveserde_in_place_migrate:
             # TODO: Add sql_migrate_external_hiveserde_ctas here
             return False
