@@ -146,7 +146,7 @@ def test_migrate_circular_views_raises_value_error() -> None:
 
 def test_migrate_circular_view_chain_raises_value_error() -> None:
     with pytest.raises(ValueError) as error:
-        samples = Samples.load("db1.v10", "db1.v11", "db1.v12")
+        samples = Samples.load("db1.v12", "db1.v13", "db1.v14")
         sql_backend = mock_backend(samples, "db1")
         crawler = TablesCrawler(sql_backend, SCHEMA_NAME, ["db1"])
         tables = [TableToMigrate(table, create_autospec(Rule)) for table in crawler.snapshot()]
