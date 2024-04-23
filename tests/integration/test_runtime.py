@@ -104,7 +104,7 @@ def test_running_real_validate_groups_permissions_job_fails(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
-@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde_in_place')], indirect=True)
+@pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_in_place_migration_job(
     ws,
     installation_ctx,

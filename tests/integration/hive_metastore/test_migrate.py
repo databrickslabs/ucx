@@ -205,8 +205,8 @@ def test_migrate_external_table_hiveserde_in_place(
     runtime_ctx.with_table_mapping_rules(rules)
     runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.table_migrator_hiveserde_in_place.migrate_tables(
-        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler
+    runtime_ctx.tables_migrator.migrate_tables(
+        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler, hiveserde_in_place_migrate=True
     )
 
     # assert results
