@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import sys
 
 import pytest
 from databricks.labs.blueprint.installation import Installation
@@ -13,11 +15,15 @@ from databricks.labs.ucx.hive_metastore.locations import (
     ExternalLocations,
 )
 
+from databricks.sdk.errors.platform import PermissionDenied
 
-@pytest.mark.skip
+logger = logging.getLogger(__name__)
+
+
 def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
-    logger = logging.getLogger(__name__)
-    logger.setLevel("DEBUG")
+    # skip this test if not in local mode
+    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
+        return
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
@@ -36,8 +42,10 @@ def test_azure_storage_accounts(ws, sql_backend, inventory_schema, make_random):
     assert mapping[0].prefix == "abfss://things@labsazurethings.dfs.core.windows.net/"
 
 
-@pytest.mark.skip
 def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_random):
+    # skip this test if not in local mode
+    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
+        return
     tables = [
         ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
     ]
@@ -55,10 +63,27 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
     assert ws.workspace.get_status(path)
 
 
-# @pytest.mark.skip
-def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip):
+@pytest.fixture
+def clean_up_spn():
+    graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
+    yield
+    spns = graph_client.get("/v1.0/applications?$filter=startswith(displayName, 'UCXServicePrincipal')")['value']
+    logging.debug("clearing ucx uber service principals")
+    for spn in spns:
+        try:
+            graph_client.delete(f"/v1.0/applications(appId='{spn['appId']}')")
+        except PermissionDenied:
+            continue
+
+
+def test_create_global_spn(
+    ws, sql_backend, inventory_schema, make_random, make_cluster_policy, env_or_skip, clean_up_spn
+):
+    # skip this test if not in local mode
+    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
+        return
     tables = [
-        ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1),
+        ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1),
     ]
     sql_backend.save_table(f"{inventory_schema}.external_locations", tables, ExternalLocation)
     installation = Installation(ws, make_random(4))
@@ -79,8 +104,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     config = installation.load(WorkspaceConfig)
     assert config.uber_spn_id is not None
     policy_definition = json.loads(ws.cluster_policies.get(policy_id=policy.policy_id).definition)
-    resource_id = env_or_skip("TEST_STORAGE_RESOURCE")
-    role_assignments = azure_resources.role_assignments(resource_id)
+    role_assignments = azure_resources.role_assignments(env_or_skip("TEST_STORAGE_RESOURCE"))
     global_spn_assignment = None
     for assignment in role_assignments:
         if assignment.principal.client_id == config.uber_spn_id:
@@ -89,7 +113,7 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
     assert global_spn_assignment
     assert global_spn_assignment.principal.client_id == config.uber_spn_id
     assert global_spn_assignment.role_name == "Storage Blob Data Contributor"
-    assert str(global_spn_assignment.scope) == resource_id
+    assert str(global_spn_assignment.scope) == env_or_skip("TEST_STORAGE_RESOURCE")
     assert (
         policy_definition["spark_conf.fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net"]["value"]
         == config.uber_spn_id
@@ -100,4 +124,3 @@ def test_create_global_spn(ws, sql_backend, inventory_schema, make_random, make_
         ]
         == "https://login.microsoftonline.com/9f37a392-f0ae-4280-9796-f1864a10effc/oauth2/token"
     )
-    graph_client.delete(f"/v1.0/applications(appId='{config.uber_spn_id}')")
