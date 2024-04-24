@@ -6,12 +6,10 @@ import pytest
 from databricks.labs.ucx.source_code.base import Advice, Deprecation
 
 from databricks.labs.ucx.source_code.dependencies import (
-    SourceContainer,
-    DependencyResolver,
-    LocalFileLoader,
     DependencyGraphBuilder,
-    LocalNotebookLoader,
 )
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalFileLoader, LocalNotebookLoader
+from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import _load_sources, _load_dependency_side_effect, locate_site_packages
