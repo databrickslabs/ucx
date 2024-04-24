@@ -223,6 +223,44 @@ def test_migrate_external_table_hiveserde_in_place(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_migrate_external_table_hiveserde_ctas(
+        ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+):
+    random = make_random(4).lower()
+    src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_ctas_{random}")
+    # prepare source external table location
+    table_base_dir = make_storage_dir(path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_ctas_{random}')
+    # prepare source tables
+    src_tables = prepare_hiveserde_tables(runtime_ctx, random, src_schema, table_base_dir)
+    for src_table in src_tables.values():
+        sql_backend.execute(f"INSERT INTO {src_table.full_name} VALUES (1, 'us')")
+    # prepare target catalog and schema
+    dst_catalog = make_catalog()
+    dst_schema = runtime_ctx.make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+
+    rules = [Rule.from_src_dst(table, dst_schema) for _, table in src_tables.items()]
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+
+    runtime_ctx.tables_migrator.migrate_tables(
+        what=What.EXTERNAL_HIVESERDE, mounts_crawler=runtime_ctx.mounts_crawler, hiveserde_in_place_migrate=False
+    )
+
+    # assert results
+    for src_table in src_tables.values():
+        try:
+            target_table = ws.tables.get(f"{dst_schema.full_name}.{src_table.name}")
+            row = next(sql_backend.fetch(f"SELECT * FROM {dst_schema.full_name}.{src_table.name}"))
+        except NotFound:
+            assert False, f"{src_table.name} not found in {dst_schema.full_name}"
+        assert target_table.properties["upgraded_from"] == src_table.full_name
+        assert target_table.properties[Table.UPGRADED_FROM_WS_PARAM] == str(ws.get_workspace_id())
+        assert target_table.storage_location.endswith("_ctas_migrated")
+        assert row["id"] == 1
+        assert row["region"] == "us"
+
+
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
