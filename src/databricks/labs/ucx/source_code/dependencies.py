@@ -373,7 +373,7 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str):
+    def build_graph_from_python_source(self, python_code: str, problem_collector: Callable[[DependencyProblem], None]):
         linter = ASTLinter.parse(python_code)
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:
@@ -381,10 +381,11 @@ class DependencyGraph:
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
                 path = path.value.strip().strip("'").strip('"')
-                dependency = self.register_notebook(Path(path))
-                if dependency is None:
-                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
+                problems: list[DependencyProblem] = []
+                self.register_notebook(Path(path), problems.append)
+                for problem in problems:
+                    problem = problem.replace(start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
+                    problem_collector(problem)
             else:
                 # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                 pass

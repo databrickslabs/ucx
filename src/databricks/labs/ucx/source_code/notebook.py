@@ -81,7 +81,7 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        parent.build_graph_from_python_source(self._original_code)
+        parent.build_graph_from_python_source(self._original_code, problem_collector)
 
 
 class RCell(Cell):
