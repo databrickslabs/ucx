@@ -145,19 +145,9 @@ class WorkspaceNotebookLoader(NotebookLoader):
         return object_info is not None and object_info.object_type is ObjectType.NOTEBOOK
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        object_info = self._load_object(dependency)
-        return self._load_notebook(object_info)
-
-    def _load_object(self, dependency: Dependency) -> ObjectInfo:
         object_info = self._ws.workspace.get_status(str(dependency.path))
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        if object_info is None or object_info.object_type is None:
-            raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if object_info.object_type is not ObjectType.NOTEBOOK:
-            raise ValueError(
-                f"Invalid object at '{dependency.path}', expected a {ObjectType.NOTEBOOK.name}, got a {str(object_info.object_type)}"
-            )
-        return object_info
+        return self._load_notebook(object_info)
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid cyclic dependency
@@ -170,8 +160,6 @@ class WorkspaceNotebookLoader(NotebookLoader):
         return Notebook.parse(object_info.path, source, object_info.language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
-        if not object_info.path:
-            raise ValueError(f"Invalid ObjectInfo: {object_info}")
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
             return f.read().decode("utf-8")
 
@@ -392,8 +380,8 @@ class DependencyGraph:
         for pair in PythonLinter.list_import_sources(linter):
             problems: list[DependencyProblem] = []
             self.register_import(pair[0], problems.append)
+            node = pair[1]
             for problem in problems:
-                node = pair[1]
                 problem = problem.replace(start_line=node.lineno, start_col=node.col_offset, end_line=node.end_lineno or 0, end_col=node.end_col_offset or 0)
                 problem_collector(problem)
 

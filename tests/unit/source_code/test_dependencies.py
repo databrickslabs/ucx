@@ -110,7 +110,6 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
         return ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=path)
 
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.is_notebook.return_value = True
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
@@ -183,7 +182,6 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     paths = ["leaf6.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.is_notebook.return_value = True
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=paths[0])
     whi = whitelist_mock()
