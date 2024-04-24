@@ -731,12 +731,23 @@ def test_spark_cloud_direct_access(empty_index, code, expected):
     assert advisories == expected
 
 
-# TODO: Expand the tests  to cover all dbutils.fs functions
-def test_direct_cloud_access_reports_nothing(empty_index):
+FS_FUNCTIONS = [
+    "ls",
+    "cp",
+    "rm",
+    "mv",
+    "head",
+    "put",
+    "mkdirs",
+]
+
+
+@pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
+def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
     ftf = FromTable(empty_index, CurrentSessionState())
     sqf = SparkSql(ftf, empty_index)
     # ls function calls have to be from dbutils.fs, or we ignore them
-    code = """spark.ls("/bucket/path")"""
+    code = f"""spark.{fs_function}("/bucket/path")"""
     advisories = list(sqf.lint(code))
     assert not advisories
 
