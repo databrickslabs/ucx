@@ -1,9 +1,7 @@
 import os.path
 from pathlib import Path
-from typing import BinaryIO
 from unittest.mock import create_autospec
 
-import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
@@ -146,9 +144,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, notebook_loader))
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert builder.problems == [
-        DependencyProblem(
-            'dependency-check', 'Notebook not found: leaf3.py.txt', Path(paths[0]), 1, 0, 1, 38
-        )
+        DependencyProblem('dependency-check', 'Notebook not found: leaf3.py.txt', Path(paths[0]), 1, 0, 1, 38)
     ]
 
 
@@ -178,12 +174,15 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
         )
     ]
 
+
 def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     paths = ["leaf6.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=paths[0])
+    ws.workspace.get_status.return_value = ObjectInfo(
+        object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=paths[0]
+    )
     whi = whitelist_mock()
     file_loader = create_autospec(LocalFileLoader)
     file_loader.is_notebook.return_value = False
@@ -191,9 +190,7 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws)))
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert builder.problems == [
-        DependencyProblem(
-            'dependency-check', 'Missing notebook path in %run command', Path("leaf6.py.txt"), 5, 0, 5, 4
-        )
+        DependencyProblem('dependency-check', 'Missing notebook path in %run command', Path("leaf6.py.txt"), 5, 0, 5, 4)
     ]
 
 

@@ -160,6 +160,7 @@ class WorkspaceNotebookLoader(NotebookLoader):
         return Notebook.parse(object_info.path, source, object_info.language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
+        assert object_info.path is not None
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
             return f.read().decode("utf-8")
 
@@ -212,9 +213,7 @@ class DependencyResolver:
         return None
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
-    def resolve_import(
-        self, name: str, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         if self._is_whitelisted(name):
             return None
         if self._file_loader.is_file(Path(name)):
@@ -273,14 +272,18 @@ class DependencyGraph:
         self._resolver.add_problems(problems)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
-    def register_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None] = None) -> DependencyGraph | None:
+    def register_notebook(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
+    ) -> DependencyGraph | None:
         resolved = self._resolver.resolve_notebook(path, problem_collector)
         if resolved is None:
             return None
         return self.register_dependency(resolved)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
-    def register_import(self, name: str, problem_collector: Callable[[DependencyProblem], None] = None) -> DependencyGraph | None:
+    def register_import(
+        self, name: str, problem_collector: Callable[[DependencyProblem], None]
+    ) -> DependencyGraph | None:
         resolved = self._resolver.resolve_import(name, problem_collector)
         if resolved is None:
             return None
@@ -369,20 +372,37 @@ class DependencyGraph:
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
                 path = path.value.strip().strip("'").strip('"')
-                problems: list[DependencyProblem] = []
-                self.register_notebook(Path(path), problems.append)
-                for problem in problems:
-                    problem = problem.replace(start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
+                call_problems: list[DependencyProblem] = []
+                self.register_notebook(Path(path), call_problems.append)
+                for problem in call_problems:
+                    problem = problem.replace(
+                        start_line=call.lineno,
+                        start_col=call.col_offset,
+                        end_line=call.end_lineno or 0,
+                        end_col=call.end_col_offset or 0,
+                    )
                     problem_collector(problem)
             else:
-                problem = DependencyProblem(code='dependency-check', message="Can't check dependency not provided as a constant", start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
+                problem = DependencyProblem(
+                    code='dependency-check',
+                    message="Can't check dependency not provided as a constant",
+                    start_line=call.lineno,
+                    start_col=call.col_offset,
+                    end_line=call.end_lineno or 0,
+                    end_col=call.end_col_offset or 0,
+                )
                 problem_collector(problem)
         for pair in PythonLinter.list_import_sources(linter):
-            problems: list[DependencyProblem] = []
-            self.register_import(pair[0], problems.append)
+            import_problems: list[DependencyProblem] = []
+            self.register_import(pair[0], import_problems.append)
             node = pair[1]
-            for problem in problems:
-                problem = problem.replace(start_line=node.lineno, start_col=node.col_offset, end_line=node.end_lineno or 0, end_col=node.end_col_offset or 0)
+            for problem in import_problems:
+                problem = problem.replace(
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
                 problem_collector(problem)
 
 

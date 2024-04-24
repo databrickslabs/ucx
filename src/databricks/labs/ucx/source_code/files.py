@@ -9,7 +9,8 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
-    DependencyGraph, DependencyProblem,
+    DependencyGraph,
+    DependencyProblem,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
@@ -35,15 +36,32 @@ class LocalFile(SourceContainer):
         linter = ASTLinter.parse(self._original_code)
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         for call in run_notebook_calls:
-            problems: list[DependencyProblem] = []
+            call_problems: list[DependencyProblem] = []
             notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(notebook_path_arg, ast.Constant):
                 notebook_path = notebook_path_arg.value
-                parent.register_notebook(Path(notebook_path), problems.append)
-                problems = [problem.replace(source_path=self._path, start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0) for problem in problems]
-                parent.add_problems(problems)
+                parent.register_notebook(Path(notebook_path), call_problems.append)
+                call_problems = [
+                    problem.replace(
+                        source_path=self._path,
+                        start_line=call.lineno,
+                        start_col=call.col_offset,
+                        end_line=call.end_lineno or 0,
+                        end_col=call.end_col_offset or 0,
+                    )
+                    for problem in call_problems
+                ]
+                parent.add_problems(call_problems)
                 continue
-            problem = DependencyProblem(code='dependency-check', message="Can't check dependency not provided as a constant", source_path=self._path, start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
+            problem = DependencyProblem(
+                code='dependency-check',
+                message="Can't check dependency not provided as a constant",
+                source_path=self._path,
+                start_line=call.lineno,
+                start_col=call.col_offset,
+                end_line=call.end_lineno or 0,
+                end_col=call.end_col_offset or 0,
+            )
             parent.add_problems([problem])
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         in_site_packages = "site-packages" in parent.dependency.path.as_posix()
@@ -54,11 +72,20 @@ class LocalFile(SourceContainer):
             # if it's a site-package, provide full path until we implement 1421
             if in_site_packages and import_name not in sys_module_keys:
                 import_name = Path(parent.dependency.path.parent, import_name + ".py").as_posix()
-            problems: list[DependencyProblem] = []
-            parent.register_import(import_name, problems.append)
+            import_problems: list[DependencyProblem] = []
+            parent.register_import(import_name, import_problems.append)
             node = pair[1]
-            problems = [problem.replace(source_path=self._path, start_line=node.lineno, start_col=node.col_offset, end_line=node.end_lineno or 0, end_col=node.end_col_offset or 0) for problem in problems]
-            parent.add_problems(problems)
+            import_problems = [
+                problem.replace(
+                    source_path=self._path,
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
+                for problem in import_problems
+            ]
+            parent.add_problems(import_problems)
 
 
 class LocalFileMigrator:

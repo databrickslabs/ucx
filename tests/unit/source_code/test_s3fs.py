@@ -8,7 +8,8 @@ from databricks.labs.ucx.source_code.dependencies import (
     DependencyResolver,
     LocalFileLoader,
     DependencyGraphBuilder,
-    LocalNotebookLoader, DependencyProblem,
+    LocalNotebookLoader,
+    DependencyProblem,
 )
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist

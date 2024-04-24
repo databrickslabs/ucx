@@ -153,7 +153,7 @@ class RunCell(Cell):
     def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
-        for idx, line  in enumerate(lines):
+        for idx, line in enumerate(lines):
             start = line.index(command)
             if start >= 0:
                 path = line[start + len(command) :]
@@ -161,19 +161,23 @@ class RunCell(Cell):
                 if len(path) == 0:
                     continue
                 problems: list[DependencyProblem] = []
-                dependency = parent.register_notebook(Path(path), problems.append)
-                if dependency is None:
-                    assert len(problems) > 0
-                    start_line = self._original_offset + idx + 1
-                    for problem in problems:
-                        problem = problem.replace(start_line=start_line,
-                            start_col=0,
-                            end_line=start_line,
-                            end_col=len(line))
-                        problem_collector(problem)
+                parent.register_notebook(Path(path), problems.append)
+                start_line = self._original_offset + idx + 1
+                for problem in problems:
+                    problem = problem.replace(
+                        start_line=start_line, start_col=0, end_line=start_line, end_col=len(line)
+                    )
+                    problem_collector(problem)
                 return
         start_line = self._original_offset + 1
-        problem = DependencyProblem('dependency-check', "Missing notebook path in %run command", start_line=start_line, start_col=0, end_line=start_line, end_col=len(self._original_code))
+        problem = DependencyProblem(
+            'dependency-check',
+            "Missing notebook path in %run command",
+            start_line=start_line,
+            start_col=0,
+            end_line=start_line,
+            end_col=len(self._original_code),
+        )
         problem_collector(problem)
 
     def migrate_notebook_path(self):
