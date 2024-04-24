@@ -185,12 +185,17 @@ class Table:
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
 
-    def sql_migrate_create_like(self, target_table_key):
-        # Create table as a copy of the source table
-        # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
+    def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
         return (
-            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} LIKE "
-            f"{escape_sql_identifier(self.key)};"
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} "
+            f"LOCATION '{dst_table_location}' "
+            f"AS SELECT * FROM {self.safe_sql_key}"
+        )
+
+    def sql_migrate_ctas_managed(self, target_table_key) -> str:
+        return (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} "
+            f"AS SELECT * FROM {self.safe_sql_key}"
         )
 
     def hiveserde_type(self, backend: SqlBackend) -> HiveSerdeType:
@@ -261,7 +266,7 @@ class Table:
         self, backend: SqlBackend, catalog_name, dst_schema, dst_table, replace_location
     ) -> str | None:
         # get raw DDL from "SHOW CREATE TABLE..."
-        createtab_stmt = next(backend.fetch(self.sql_show_create()))["createtab_stmt"]
+        createtab_stmt = next(backend.fetch(f"SHOW CREATE {self.kind} {self.safe_sql_key};"))["createtab_stmt"]
         # parse the DDL and replace the old table name with the new UC table name
         try:
             statements = sqlglot.parse(createtab_stmt)
@@ -298,9 +303,6 @@ class Table:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
         return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} DEEP CLONE {escape_sql_identifier(self.key)};"
-
-    def sql_show_create(self):
-        return f"SHOW CREATE {self.kind} {self.safe_sql_key};"
 
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
