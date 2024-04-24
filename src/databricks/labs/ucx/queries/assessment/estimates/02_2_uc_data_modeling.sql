@@ -8,11 +8,13 @@ SELECT
   tables.table_format,
   tables.location,
   tables.view_text,
-  tables.upgraded_to,
   CASE
-    WHEN migration_status.dst_table IS NOT NULL THEN 'Migrated'
-    ELSE 'Not migrated'
+      WHEN migration_status.dst_table IS NOT NULL THEN 'Migrated'
+      ELSE 'Not migrated'
   END AS upgraded_status,
+  migration_status.dst_catalog AS upgraded_to_catalog,
+  migration_status.dst_schema AS upgraded_to_schema,
+  migration_status.dst_table AS upgraded_to_table,
   tables.storage_properties,
   tables.is_partitioned
 FROM
