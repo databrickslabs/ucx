@@ -26,7 +26,7 @@ class ClusterPolicyInstaller:
         instance_profile = ""
         spark_conf_dict = {}
         # get instance pool id to be put into the cluster policy
-        instance_pool_id = self._get_instance_pool_id()
+        instance_pool_id = self._get_instance_pool_id() if self._ws.config.is_aws else None
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
             "We have identified one or more cluster policies set up for an external metastore"
