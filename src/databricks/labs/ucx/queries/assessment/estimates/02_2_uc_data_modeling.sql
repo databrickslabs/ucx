@@ -10,7 +10,7 @@ SELECT
   tables.view_text,
   tables.upgraded_to,
   CASE
-    WHEN migration_status.src_table IS NOT NULL THEN 'Migrated'
+    WHEN migration_status.dst_table IS NOT NULL THEN 'Migrated'
     ELSE 'Not migrated'
   END AS upgraded_status,
   tables.storage_properties,
