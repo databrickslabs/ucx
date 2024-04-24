@@ -1,5 +1,6 @@
 import io
 import json
+import time
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -106,7 +107,7 @@ def ws():
 def test_workflow(ws, caplog):
     workflows(ws)
     assert "Fetching deployed jobs..." in caplog.messages
-    ws.jobs.list_runs.assert_called_once()
+    ws.jobs.list_runs.assert_called()
 
 
 def test_open_remote_config(ws):
@@ -429,7 +430,7 @@ def test_revert_cluster_remap_empty(ws, caplog):
 
 
 def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123)]
+    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
     ws.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
