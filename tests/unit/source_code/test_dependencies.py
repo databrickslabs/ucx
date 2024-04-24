@@ -153,6 +153,32 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     ]
 
 
+def test_dependency_graph_builder_raises_problem_with_non_constant_local_notebook_dependency():
+    paths = ["root10.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    whi = whitelist_mock()
+
+    def is_file_side_effect(*args):
+        path = args[0]
+        return path.as_posix() in paths
+
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.is_notebook.side_effect = is_file_side_effect
+    file_loader.load_dependency.side_effect = lambda *args: _load_dependency_side_effect(sources, {}, *args)
+    notebook_loader = create_autospec(LocalNotebookLoader)
+    notebook_loader.is_file.side_effect = is_file_side_effect
+    notebook_loader.is_notebook.side_effect = is_file_side_effect
+    notebook_loader.load_dependency.side_effect = lambda *args: _load_dependency_side_effect(sources, {}, *args)
+    site_packages = SitePackages.parse(locate_site_packages())
+    builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, notebook_loader))
+    builder.build_notebook_dependency_graph(Path(paths[0]))
+    assert builder.problems == [
+        DependencyProblem(
+            'dependency-check', "Can't check dependency not provided as a constant", Path(paths[0]), 2, 0, 2, 35
+        )
+    ]
+
 def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     paths = ["leaf6.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))

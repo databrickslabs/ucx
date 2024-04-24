@@ -387,10 +387,15 @@ class DependencyGraph:
                     problem = problem.replace(start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
                     problem_collector(problem)
             else:
-                # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                pass
+                problem = DependencyProblem(code='dependency-check', message="Can't check dependency not provided as a constant", start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
+                problem_collector(problem)
         for pair in PythonLinter.list_import_sources(linter):
-            self.register_import(pair[0])
+            problems: list[DependencyProblem] = []
+            self.register_import(pair[0], problems.append)
+            for problem in problems:
+                node = pair[1]
+                problem = problem.replace(start_line=node.lineno, start_col=node.col_offset, end_line=node.end_lineno or 0, end_col=node.end_col_offset or 0)
+                problem_collector(problem)
 
 
 class DependencyGraphBuilder:
