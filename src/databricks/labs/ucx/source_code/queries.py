@@ -16,7 +16,7 @@ class FromTable(Linter, Fixer):
     SQL queries.
     """
 
-    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState):
+    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState | None = None):
         """
         Initializes the FromTable class.
 

@@ -1,5 +1,5 @@
 import logging
-from typing import Iterator
+from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
@@ -38,8 +38,8 @@ class Redash:
         backup_query = self._ws.queries.create(
             data_source_id=query.data_source_id,
             description=query.description,
-            name=query.name + "_original",
-            options=query.options.as_dict(),
+            name=str(query.name) + "_original",
+            options=query.options.as_dict() if query.options is not None else None,
             parent=query.parent,
             query=query.query,
             run_as_role=query.run_as_role,
@@ -70,8 +70,13 @@ class Redash:
             # new tags will have all the tags except the migrated tag & backup id
             new_tags.append(tag)
 
-        if not is_migrated or backup_id is None:
+        if not is_migrated:
+            logger.debug(f"Query {query.id} was not migrated by UCX")
+            return
+
+        if backup_id is None:
             logger.debug(f"Cannot find backup query for query {query.id}")
+            return
 
         original_query = self._ws.queries.get(backup_id)
         self._ws.api_client.do(
