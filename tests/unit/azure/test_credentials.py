@@ -16,9 +16,8 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
     ValidateStorageCredentialResponse,
     ValidationResult,
-    ValidationResultAzureOperation,
+    ValidationResultOperation,
     ValidationResultResult,
-    ValidationResultAwsOperation,
 )
 from databricks.sdk.service.workspace import GetSecretResponse
 
@@ -102,8 +101,6 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
 
 
 def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
-    is_aws = url.startswith("s3://")
-    is_azure = url.startswith("abfss://")
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "none" in storage_credential_name:
@@ -113,8 +110,7 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
             is_dir=True,
             results=[
                 ValidationResult(
-                    azure_operation=ValidationResultAzureOperation.LIST if is_azure else None,
-                    aws_operation=ValidationResultAwsOperation.LIST if is_aws else None,
+                    operation=ValidationResultOperation.LIST,
                     result=ValidationResultResult.FAIL,
                     message="fail",
                 ),
@@ -126,8 +122,7 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
             is_dir=True,
             results=[
                 ValidationResult(
-                    azure_operation=ValidationResultAzureOperation.READ if is_azure else None,
-                    aws_operation=ValidationResultAwsOperation.READ if is_aws else None,
+                    operation=ValidationResultOperation.READ,
                     result=ValidationResultResult.PASS,
                 )
             ],
@@ -136,8 +131,7 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
         is_dir=True,
         results=[
             ValidationResult(
-                azure_operation=ValidationResultAzureOperation.WRITE if is_azure else None,
-                aws_operation=ValidationResultAwsOperation.WRITE if is_aws else None,
+                operation=ValidationResultOperation.WRITE,
                 result=ValidationResultResult.PASS,
             )
         ],

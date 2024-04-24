@@ -95,10 +95,10 @@ class CredentialManager:
 
         failures = []
         for result in validation.results:
-            if result.aws_operation is None:
+            if result.operation is None:
                 continue
             if result.result == ValidationResultResult.FAIL:
-                failures.append(f"{result.aws_operation.value} validation failed with message: {result.message}")
+                failures.append(f"{result.operation.value} validation failed with message: {result.message}")
         return CredentialValidationResult(
             role_action.role_name,
             role_action.role_arn,
