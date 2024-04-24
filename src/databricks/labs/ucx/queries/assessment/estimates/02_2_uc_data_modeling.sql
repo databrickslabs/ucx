@@ -15,6 +15,7 @@ SELECT
   migration_status.dst_catalog AS upgraded_to_catalog,
   migration_status.dst_schema AS upgraded_to_schema,
   migration_status.dst_table AS upgraded_to_table,
+  migration_status.update_ts AS upgraded_timestamp,
   tables.storage_properties,
   tables.is_partitioned
 FROM
