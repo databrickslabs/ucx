@@ -44,6 +44,9 @@ from databricks.sdk.service.sql import (
     ObjectTypePlural,
     Query,
     QueryInfo,
+    Dashboard,
+    WidgetOptions,
+    WidgetPosition,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -1264,3 +1267,52 @@ def make_storage_dir(ws, env_or_skip):
             ws.dbfs.delete(path, recursive=True)
 
     yield from factory("make_storage_dir", create, remove)
+
+
+@pytest.fixture
+def make_dashboard(ws, make_random, make_query):
+    def create() -> (Dashboard, Query):
+        query = make_query()
+        viz = ws.query_visualizations.create(
+            type="table",
+            query_id=query.id,
+            options={
+                "itemsPerPage": 1,
+                "condensed": True,
+                "withRowNumber": False,
+                "version": 2,
+                "columns": [
+                    {"name": "id", "title": "id", "allowSearch": True},
+                ],
+            },
+        )
+
+        dashboard_name = f"ucx_dashboard_D{make_random(4)}"
+        dashboard = ws.dashboards.create(
+            name=f"{dashboard_name}",
+        )
+        ws.dashboard_widgets.create(
+            dashboard_id=dashboard.id,
+            visualization_id=viz.id,
+            width=1,
+            options=WidgetOptions(
+                title="",
+                position=WidgetPosition(
+                    col=0,
+                    row=0,
+                    size_x=3,
+                    size_y=3,
+                ),
+            ),
+        )
+        logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
+        return dashboard, query
+
+    def remove(pair: (Dashboard, Query)):
+        try:
+            dashboard, _ = pair
+            ws.dashboards.delete(dashboard_id=dashboard.id)
+        except RuntimeError as e:
+            logger.info(f"Can't drop dashboard {e}")
+
+    yield from factory("dashboard", create, remove)

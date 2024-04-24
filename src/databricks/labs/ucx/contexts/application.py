@@ -11,6 +11,7 @@ from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
@@ -45,6 +46,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -402,6 +404,11 @@ class GlobalContext(abc.ABC):
             self.path_lookup,
             MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
         )
+
+    @cached_property
+    def redash(self):
+        languages = Languages(self.migration_status_refresher.index())
+        return Redash(languages.fixer(Language.SQL, "table-migrate"), self.workspace_client)
 
 
 class CliContext(GlobalContext, abc.ABC):
