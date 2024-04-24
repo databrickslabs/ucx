@@ -42,6 +42,8 @@ from databricks.labs.ucx.cli import (
     logs,
     show_all_metastores,
     assign_metastore,
+    migrate_tables,
+    migrate_external_hiveserde_tables_in_place,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
@@ -60,7 +62,17 @@ def ws():
                 },
             }
         ),
-        '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
+        '/Users/foo/.ucx/state.json': json.dumps(
+            {
+                'resources': {
+                    'jobs': {
+                        'assessment': '123',
+                        'migrate-tables': '456',
+                        'migrate-external-hiveserde-tables-in-place-experimental': '789',
+                    }
+                }
+            }
+        ),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
@@ -437,3 +449,13 @@ def test_show_all_metastores(acc_client, caplog):
 def test_assign_metastore(acc_client, caplog):
     with pytest.raises(ValueError):
         assign_metastore(acc_client, "123")
+
+
+def test_migrate_tables(ws):
+    migrate_tables(ws)
+    ws.jobs.run_now.assert_called_with(456)
+
+
+def test_migrate_external_hiveserde_tables_in_place(ws):
+    migrate_external_hiveserde_tables_in_place(ws)
+    ws.jobs.run_now.assert_called_with(789)

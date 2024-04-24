@@ -398,5 +398,21 @@ def assign_metastore(
     ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
 
 
+@ucx.command
+def migrate_tables(w: WorkspaceClient):
+    """Trigger the migrate-tables workflow"""
+    ctx = WorkspaceContext(w)
+    deployed_workflows = ctx.deployed_workflows
+    deployed_workflows.run_workflow("migrate-tables")
+
+
+@ucx.command
+def migrate_external_hiveserde_tables_in_place(w: WorkspaceClient):
+    """Trigger the migrate-external-hiveserde-tables-in-place-experimental workflow"""
+    ctx = WorkspaceContext(w)
+    deployed_workflows = ctx.deployed_workflows
+    deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+
+
 if __name__ == "__main__":
     ucx()
