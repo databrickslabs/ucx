@@ -22,8 +22,6 @@ class MatchingVisitor(ast.NodeVisitor):
     def matched_nodes(self):
         return self._matched_nodes
 
-    # visit_Call follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Call(self, node: ast.Call):
         if self._node_type is not ast.Call:
             return
@@ -33,15 +31,11 @@ class MatchingVisitor(ast.NodeVisitor):
         except NotImplementedError as e:
             logger.warning(f"Missing implementation: {e.args[0]}")
 
-    # visit_Import follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Import(self, node: ast.Import):
         if self._node_type is not ast.Import:
             return
         self._matched_nodes.append(node)
 
-    # visit_ImportFrom follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_ImportFrom(self, node: ast.ImportFrom):
         if self._node_type is not ast.ImportFrom:
             return
@@ -99,15 +93,11 @@ class SysPathVisitor(ast.NodeVisitor):
     def appended_paths(self):
         return self._appended_paths
 
-    # visit_Import follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
             if alias.name in {"sys", "os"}:
                 self._aliases[alias.name] = alias.asname or alias.name
 
-    # visit_ImportFrom follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_ImportFrom(self, node: ast.ImportFrom):
         interesting_aliases = [("sys", "path"), ("os", "path"), ("os.path", "abspath")]
         interesting_alias = next((t for t in interesting_aliases if t[0] == node.module), None)
@@ -118,8 +108,6 @@ class SysPathVisitor(ast.NodeVisitor):
                 self._aliases[f"{node.module}.{interesting_alias[1]}"] = alias.asname or alias.name
                 break
 
-    # visit_Call follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Call(self, node: ast.Call):
         # check for 'sys.path.append'
         if not self._match_aliases(node.func, ["sys", "path", "append"]):
