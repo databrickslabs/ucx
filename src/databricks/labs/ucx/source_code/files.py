@@ -1,5 +1,6 @@
 from __future__ import annotations  # for type hints
 
+import ast
 import logging
 import sys
 from pathlib import Path
@@ -35,10 +36,15 @@ class LocalFile(SourceContainer):
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         for call in run_notebook_calls:
             problems: list[DependencyProblem] = []
-            notebook_path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            parent.register_notebook(Path(notebook_path), problems.append)
-            problems = [problem.replace(source_path=self._path, start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0) for problem in problems]
-            parent.add_problems(problems)
+            notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+            if isinstance(notebook_path_arg, ast.Constant):
+                notebook_path = notebook_path_arg.value
+                parent.register_notebook(Path(notebook_path), problems.append)
+                problems = [problem.replace(source_path=self._path, start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0) for problem in problems]
+                parent.add_problems(problems)
+                continue
+            problem = DependencyProblem(code='dependency-check', message="Can't check dependency not provided as a constant", source_path=self._path, start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0)
+            parent.add_problems([problem])
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         in_site_packages = "site-packages" in parent.dependency.path.as_posix()
         sys_module_keys = sys.modules.keys()

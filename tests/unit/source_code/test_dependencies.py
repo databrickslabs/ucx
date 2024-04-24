@@ -99,7 +99,7 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
     assert len(visited) == len(paths)
 
 
-def test_dependency_graph_builder_fails_with_unfound_workspace_notebook_dependency():
+def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook_dependency():
     paths = ["root1.run.py.txt", "leaf1.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
 
@@ -126,7 +126,7 @@ def test_dependency_graph_builder_fails_with_unfound_workspace_notebook_dependen
     ]
 
 
-def test_dependency_graph_builder_fails_with_invalid_run_cell():
+def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     paths = ["leaf6.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     ws = create_autospec(WorkspaceClient)
@@ -146,7 +146,7 @@ def test_dependency_graph_builder_fails_with_invalid_run_cell():
     ]
 
 
-def test_dependency_graph_builder_raises_problem_with_invalid_dependencies():
+def test_dependency_graph_builder_raises_problem_with_unresolved_import():
     paths = ["root7.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
@@ -164,10 +164,36 @@ def test_dependency_graph_builder_raises_problem_with_invalid_dependencies():
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, LocalNotebookLoader()))
-    builder.build_local_file_dependency_graph(Path("root7.py.txt"))
+    builder.build_local_file_dependency_graph(Path(paths[0]))
     assert builder.problems == [
         DependencyProblem(
             'dependency-check', 'Could not locate import: some_library', Path("root7.py.txt"), 1, 0, 1, 19
+        )
+    ]
+
+
+def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argument():
+    paths = ["run_notebooks.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    visited: dict[str, bool] = {}
+    whi = Whitelist()
+
+    def is_file_side_effect(*args):
+        path = args[0]
+        return str(path) in paths
+
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.is_notebook.return_value = False
+    site_packages = SitePackages.parse(locate_site_packages())
+    builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, LocalNotebookLoader()))
+    builder.build_local_file_dependency_graph(Path(paths[0]))
+    assert builder.problems == [
+        DependencyProblem(
+            'dependency-check', "Can't check dependency not provided as a constant", Path(paths[0]), 14, 13, 14, 50
         )
     ]
 
