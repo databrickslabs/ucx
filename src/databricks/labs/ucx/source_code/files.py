@@ -32,7 +32,8 @@ class LocalFile(SourceContainer):
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
-
+        # TODO replace the below with parent.build_graph_from_python_source
+        # can only be done after https://github.com/databrickslabs/ucx/issues/1287
         linter = ASTLinter.parse(self._original_code)
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         for call in run_notebook_calls:
