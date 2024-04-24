@@ -14,6 +14,28 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
+class AstHelper:
+    @staticmethod
+    def get_full_function_name(node):
+        if isinstance(node.func, ast.Attribute):
+            return AstHelper._get_value(node.func)
+
+        if isinstance(node.func, ast.Name):
+            return node.func.id
+
+        return None
+
+    @staticmethod
+    def _get_value(node):
+        if isinstance(node.value, ast.Name):
+            return node.value.id + '.' + node.attr
+
+        if isinstance(node.value, ast.Attribute):
+            return AstHelper._get_value(node.value) + '.' + node.attr
+
+        return None
+
+
 @dataclass
 class Matcher(ABC):
     method_name: str
@@ -24,9 +46,11 @@ class Matcher(ABC):
     call_context: dict[str, set[str]] | None = None
 
     def matches(self, node: ast.AST):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
-            return False
-        return self._get_table_arg(node) is not None
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and self._get_table_arg(node) is not None
+        )
 
     @abstractmethod
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
@@ -45,37 +69,20 @@ class Matcher(ABC):
         arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
         return arg.value if arg is not None else None
 
-    @classmethod
-    def _get_full_function_name(cls, node: ast.Call) -> str:
-        def _get_value(next_node):
-            if isinstance(next_node, ast.Name):
-                return next_node.id
-            if isinstance(next_node, ast.Attribute):
-                return f"{_get_value(next_node.value)}.{next_node.attr}"
-            return ""
-
-        if isinstance(node.func, ast.Attribute):
-            return _get_value(node.func)
-        if isinstance(node.func, ast.Name):
-            return node.func.id
-        return ""
-
     def _check_call_context(self, node: ast.Call) -> bool:
         assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
         func_name = node.func.attr
-        qualified_name = self._get_full_function_name(node)
+        qualified_name = AstHelper.get_full_function_name(node)
 
         # Check if the call_context is None as that means all calls are checked
         if self.call_context is None:
             return True
 
-        # Check if the function name is in the call_context dictionary
-        if func_name in self.call_context:
-            qualified_names = self.call_context[func_name]
-            # Check if the qualified name is in the set of qualified names that are allowed
-            if qualified_name in qualified_names:
-                return True
-        return False
+        # Get the qualified names from the call_context dictionary
+        qualified_names = self.call_context.get(func_name)
+
+        # Check if the qualified name is in the set of qualified names that are allowed
+        return qualified_name in qualified_names if qualified_names else False
 
 
 @dataclass

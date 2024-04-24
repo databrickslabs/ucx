@@ -1,7 +1,9 @@
+import ast
+
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advisory, Deprecation, CurrentSessionState
-from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSql
+from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSql, AstHelper, TableNameMatcher
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -737,3 +739,55 @@ def test_direct_cloud_access_reports_nothing(empty_index):
     code = """spark.ls("/bucket/path")"""
     advisories = list(sqf.lint(code))
     assert not advisories
+
+
+def test_get_full_function_name():
+
+    # Test when node.func is an instance of ast.Attribute
+    node = ast.Call(func=ast.Attribute(value=ast.Name(id='value'), attr='attr'))
+    # noinspection PyProtectedMember
+    assert AstHelper.get_full_function_name(node) == 'value.attr'
+
+    # Test when node.func is an instance of ast.Name
+    node = ast.Call(func=ast.Name(id='name'))
+    # noinspection PyProtectedMember
+    assert AstHelper.get_full_function_name(node) == 'name'
+
+    # Test when node.func is neither ast.Attribute nor ast.Name
+    node = ast.Call(func=ast.Constant(value='constant'))
+    # noinspection PyProtectedMember
+    assert AstHelper.get_full_function_name(node) is None
+
+    # Test when next_node in _get_value is an instance of ast.Name
+    node = ast.Call(func=ast.Attribute(value=ast.Name(id='name'), attr='attr'))
+    # noinspection PyProtectedMember
+    assert AstHelper.get_full_function_name(node) == 'name.attr'
+
+    # Test when next_node in _get_value is an instance of ast.Attribute
+    node = ast.Call(func=ast.Attribute(value=ast.Attribute(value=ast.Name(id='value'), attr='attr'), attr='attr'))
+    # noinspection PyProtectedMember
+    assert AstHelper.get_full_function_name(node) == 'value.attr.attr'
+
+    # Test when next_node in _get_value is neither ast.Name nor ast.Attribute
+    node = ast.Call(func=ast.Attribute(value=ast.Constant(value='constant'), attr='attr'))
+    # noinspection PyProtectedMember
+    assert AstHelper.get_full_function_name(node) is None
+
+
+def test_apply_table_name_matcher(migration_index):
+    from_table = FromTable(migration_index, CurrentSessionState('old'))
+    matcher = TableNameMatcher('things', 1, 1, 0)
+
+    # Test when table_arg is an instance of ast.Constant but the destination does not exist in the index
+    node = ast.Call(args=[ast.Constant(value='some.things')])
+    matcher.apply(from_table, migration_index, node)
+    table_constant = node.args[0]
+    assert isinstance(table_constant, ast.Constant)
+    assert table_constant.value == 'some.things'
+
+    # Test when table_arg is an instance of ast.Constant and the destination exists in the index
+    node = ast.Call(args=[ast.Constant(value='old.things')])
+    matcher.apply(from_table, migration_index, node)
+    table_constant = node.args[0]
+    assert isinstance(table_constant, ast.Constant)
+    assert table_constant.value == 'brand.new.stuff'
