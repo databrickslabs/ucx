@@ -9,6 +9,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,9 +90,10 @@ class ClusterPolicyInstaller:
 
     def _definition(self, conf: dict, instance_profile: str | None, instance_pool_id: str | None) -> str:
         latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
+        node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         policy_definition = {
             "spark_version": self._policy_config(latest_lts_dbr),
-            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
+            "node_type_id": self._policy_config(node_type_id),
         }
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)
