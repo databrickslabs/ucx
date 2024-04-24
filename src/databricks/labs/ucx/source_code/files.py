@@ -8,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
-    DependencyGraph,
+    DependencyGraph, DependencyProblem,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class LocalFile(SourceContainer):
 
-    def __init__(self, path: str, source: str, language: Language):
+    def __init__(self, path: Path, source: str, language: Language):
         self._path = path
         self._original_code = source
         # using CellLanguage so we can reuse the facilities it provides
@@ -30,20 +30,29 @@ class LocalFile(SourceContainer):
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
+
         linter = ASTLinter.parse(self._original_code)
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        notebook_paths = {PythonLinter.get_dbutils_notebook_run_path_arg(call) for call in run_notebook_calls}
-        for path in notebook_paths:
-            parent.register_notebook(Path(path))
+        for call in run_notebook_calls:
+            problems: list[DependencyProblem] = []
+            notebook_path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+            parent.register_notebook(Path(notebook_path), problems.append)
+            problems = [problem.replace(source_path=self._path, start_line=call.lineno, start_col=call.col_offset, end_line=call.end_lineno or 0, end_col=call.end_col_offset or 0) for problem in problems]
+            parent.add_problems(problems)
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         in_site_packages = "site-packages" in parent.dependency.path.as_posix()
         sys_module_keys = sys.modules.keys()
-        for import_name in PythonLinter.list_import_sources(linter):
+        for pair in PythonLinter.list_import_sources(linter):
+            import_name = pair[0]
             # TODO remove HORRIBLE hack until we implement https://github.com/databrickslabs/ucx/issues/1421
             # if it's a site-package, provide full path until we implement 1421
             if in_site_packages and import_name not in sys_module_keys:
                 import_name = Path(parent.dependency.path.parent, import_name + ".py").as_posix()
-            parent.register_import(import_name)
+            problems: list[DependencyProblem] = []
+            parent.register_import(import_name, problems.append)
+            node = pair[1]
+            problems = [problem.replace(source_path=self._path, start_line=node.lineno, start_col=node.col_offset, end_line=node.end_lineno or 0, end_col=node.end_col_offset or 0) for problem in problems]
+            parent.add_problems(problems)
 
 
 class LocalFileMigrator:

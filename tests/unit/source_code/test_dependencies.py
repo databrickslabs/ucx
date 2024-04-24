@@ -164,8 +164,12 @@ def test_dependency_graph_builder_raises_problem_with_invalid_dependencies():
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, LocalNotebookLoader()))
-    with pytest.raises(ValueError):
-        builder.build_local_file_dependency_graph(Path("root7.py.txt"))
+    builder.build_local_file_dependency_graph(Path("root7.py.txt"))
+    assert builder.problems == [
+        DependencyProblem(
+            'dependency-check', 'Could not locate import: some_library', Path("root7.py.txt"), 1, 0, 1, 19
+        )
+    ]
 
 
 def test_dependency_graph_builder_visits_file_dependencies():

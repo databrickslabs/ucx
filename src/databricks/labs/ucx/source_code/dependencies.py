@@ -232,10 +232,12 @@ class DependencyResolver:
         if self._file_loader.is_file(Path(name)):
             return Dependency(self._file_loader, Path(name))
         site_package = self._site_packages[name]
-        if site_package is not None:
-            container = SitePackageContainer(self._file_loader, site_package)
-            return Dependency(WrappingLoader(container), Path(name))
-        raise ValueError(f"Could not locate {name}")
+        if site_package is None:
+            problem = DependencyProblem(code='dependency-check', message=f"Could not locate import: {name}")
+            problem_collector(problem)
+            return None
+        container = SitePackageContainer(self._file_loader, site_package)
+        return Dependency(WrappingLoader(container), Path(name))
 
     def _is_whitelisted(self, name: str) -> bool:
         compatibility = self._whitelist.compatibility(name)
@@ -386,8 +388,8 @@ class DependencyGraph:
             else:
                 # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
                 pass
-        for name in PythonLinter.list_import_sources(linter):
-            self.register_import(name)
+        for pair in PythonLinter.list_import_sources(linter):
+            self.register_import(pair[0])
 
 
 class DependencyGraphBuilder:
