@@ -103,16 +103,6 @@ def test_dependency_graph_builder_fails_with_unfound_workspace_notebook_dependen
     paths = ["root1.run.py.txt", "leaf1.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
 
-    # can't remove **kwargs because it receives format=xxx
-    # pylint: disable=unused-argument
-    def download_side_effect(*args, **kwargs):
-        filename = args[0]
-        if filename.startswith('./'):
-            filename = filename[2:]
-        result = create_autospec(BinaryIO)
-        result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
-        return result
-
     def get_status_side_effect(*args):
         path = args[0]
         if "leaf2" in path:
@@ -121,7 +111,7 @@ def test_dependency_graph_builder_fails_with_unfound_workspace_notebook_dependen
 
     ws = create_autospec(WorkspaceClient)
     ws.workspace.is_notebook.return_value = True
-    ws.workspace.download.side_effect = download_side_effect
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
     file_loader = create_autospec(LocalFileLoader)
@@ -132,6 +122,26 @@ def test_dependency_graph_builder_fails_with_unfound_workspace_notebook_dependen
     assert builder.problems == [
         DependencyProblem(
             'dependency-check', 'Notebook not found: leaf2.py.txt', Path("root1.run.py.txt"), 19, 0, 19, 21
+        )
+    ]
+
+
+def test_dependency_graph_builder_fails_with_invalid_run_cell():
+    paths = ["leaf6.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.is_notebook.return_value = True
+    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
+    ws.workspace.get_status.return_value = ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=paths[0])
+    whi = whitelist_mock()
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.is_notebook.return_value = False
+    site_packages = SitePackages.parse(locate_site_packages())
+    builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws)))
+    builder.build_notebook_dependency_graph(Path(paths[0]))
+    assert builder.problems == [
+        DependencyProblem(
+            'dependency-check', 'Missing notebook path in %run command', Path("leaf6.py.txt"), 5, 0, 5, 4
         )
     ]
 

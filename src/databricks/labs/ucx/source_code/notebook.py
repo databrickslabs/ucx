@@ -158,6 +158,8 @@ class RunCell(Cell):
             if start >= 0:
                 path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
+                if len(path) == 0:
+                    continue
                 problems: list[DependencyProblem] = []
                 dependency = parent.register_notebook(Path(path), problems.append)
                 if dependency is None:
@@ -170,7 +172,9 @@ class RunCell(Cell):
                             end_col=len(line))
                         problem_collector(problem)
                 return
-        raise ValueError("Missing notebook path in %run command")
+        start_line = self._original_offset + 1
+        problem = DependencyProblem('dependency-check', "Missing notebook path in %run command", start_line=start_line, start_col=0, end_line=start_line, end_col=len(self._original_code))
+        problem_collector(problem)
 
     def migrate_notebook_path(self):
         pass
