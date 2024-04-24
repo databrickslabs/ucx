@@ -12,6 +12,7 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
+from databricks.labs.ucx.hive_metastore.tables import What
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -411,7 +412,12 @@ def migrate_external_hiveserde_tables_in_place(w: WorkspaceClient):
     """Trigger the migrate-external-hiveserde-tables-in-place-experimental workflow"""
     ctx = WorkspaceContext(w)
     deployed_workflows = ctx.deployed_workflows
-    deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+    tables = ctx.tables_crawler.snapshot()
+    hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
+    if len(hiveserde_tables) > 0:
+        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables)
+        logger.info(f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) tables")
+        deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
 
 if __name__ == "__main__":
