@@ -38,7 +38,7 @@ for i in range(10):
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -68,7 +68,7 @@ for i in range(10):
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -121,7 +121,7 @@ for i in range(10):
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -186,7 +186,7 @@ for i in range(10):
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -215,7 +215,7 @@ for i in range(10):
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -244,7 +244,7 @@ for i in range(10):
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -272,7 +272,7 @@ for table in spark.listTables():
     assert [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
             start_line=2,
             start_col=0,
             end_line=2,
@@ -287,6 +287,17 @@ for table in spark.listTables():
             end_col=31,
         ),
     ] == list(sqf.lint(old_code))
+
+
+def test_spark_table_return_value_apply(migration_index):
+    ftf = FromTable(migration_index, CurrentSessionState())
+    sqf = SparkSql(ftf, migration_index)
+    old_code = """spark.read.csv('s3://bucket/path')
+for table in spark.listTables():
+    do_stuff_with_table(table)"""
+    fixed_code = sqf.apply(old_code)
+    # no transformations to apply, only lint messages
+    assert fixed_code == old_code
 
 
 def test_spark_sql_fix(migration_index):
@@ -317,7 +328,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -331,7 +342,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3n://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3n://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -345,7 +356,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -359,7 +370,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: wasb://bucket/path",
+                    message="The use of direct filesystem references is deprecated: wasb://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -373,7 +384,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: wasbs://bucket/path",
+                    message="The use of direct filesystem references is deprecated: wasbs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -387,7 +398,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: abfs://bucket/path",
+                    message="The use of direct filesystem references is deprecated: abfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -401,7 +412,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: wasb://bucket/path",
+                    message="The use of direct filesystem references is deprecated: wasb://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -415,7 +426,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: wasbs://bucket/path",
+                    message="The use of direct filesystem references is deprecated: wasbs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -429,7 +440,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: abfs://bucket/path",
+                    message="The use of direct filesystem references is deprecated: abfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -448,7 +459,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message='The use of cloud direct references is deprecated: '
+                    message='The use of direct filesystem references is deprecated: '
                     "s3a://your_bucket_name/your_directory/",
                     start_line=1,
                     start_col=1,
@@ -463,7 +474,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: abfss://bucket/path",
+                    message="The use of direct filesystem references is deprecated: abfss://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -477,7 +488,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: dbfs://bucket/path",
+                    message="The use of direct filesystem references is deprecated: dbfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -491,7 +502,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: hdfs://bucket/path",
+                    message="The use of direct filesystem references is deprecated: hdfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -505,7 +516,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: file://bucket/path",
+                    message="The use of direct filesystem references is deprecated: file://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -533,7 +544,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -547,7 +558,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -561,7 +572,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -575,7 +586,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -589,7 +600,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -603,7 +614,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -617,7 +628,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -631,7 +642,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -645,7 +656,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -659,7 +670,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -673,7 +684,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -687,7 +698,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -701,7 +712,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='direct-filesystem-access',
-                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
+                    message="The use of direct filesystem references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,

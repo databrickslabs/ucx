@@ -174,7 +174,8 @@ class ReturnValueMatcher(Matcher):
         )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
-        raise NotImplementedError("Should never get there!")
+        # No transformations to apply
+        return
 
 
 @dataclass
@@ -208,7 +209,7 @@ class DirectFilesystemAccessMatcher(Matcher):
         if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
             yield Deprecation(
                 code='direct-filesystem-access',
-                message=f"The use of cloud direct references is deprecated: {table_arg.value}",
+                message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
                 start_line=node.lineno,
                 start_col=node.col_offset,
                 end_line=node.end_lineno or 0,

@@ -180,7 +180,7 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 ),
                 Deprecation(
                     code='direct-filesystem-access',
-                    message='The use of cloud direct references is deprecated: dbfs:/mnt/foo/bar',
+                    message='The use of direct filesystem references is deprecated: dbfs:/mnt/foo/bar',
                     start_line=16,
                     start_col=0,
                     end_line=16,
@@ -188,7 +188,7 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                 ),
                 Deprecation(
                     code='direct-filesystem-access',
-                    message='The use of cloud direct references is deprecated: dbfs://mnt/foo/bar',
+                    message='The use of direct filesystem references is deprecated: dbfs://mnt/foo/bar',
                     start_line=17,
                     start_col=0,
                     end_line=17,
