@@ -161,8 +161,11 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
         match = re.match(r"LIST validation failed with message: .*The specified path does not exist", failures[0])
         assert match is not None, "LIST validation should fail"
     else:
-        # all validation should pass
-        assert not migration_results[0].failures
+        failures = migration_results[0].failures
+        # in this test PATH_EXISTS should fail as validation path does not exist
+        assert failures
+        match = re.match(r"PATH_EXISTS validation failed with message.*", failures[0])
+        assert match is not None, "PATH_EXISTS validation should fail"
 
 
 @pytest.mark.skip(reason="TODO: Let migration create storage credentials.")
