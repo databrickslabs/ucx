@@ -11,7 +11,7 @@ from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
@@ -244,18 +244,18 @@ class DependencyResolver:
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is None:
             return False
-        # if compatibility == UCCompatibility.NONE:
-        #     # TODO this should be done as part of linting, not as part of dependency graph building
-        #     self._advices.append(
-        #         Deprecation(
-        #             code="dependency-check",
-        #             message=f"Use of dependency {name} is deprecated",
-        #             start_line=0,
-        #             start_col=0,
-        #             end_line=0,
-        #             end_col=0,
-        #         )
-        #     )
+        if compatibility == UCCompatibility.NONE:
+            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
+            self._problems.append(
+                DependencyProblem(
+                    code="dependency-check",
+                    message=f"Use of dependency {name} is deprecated",
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
+                )
+            )
         return True
 
 
