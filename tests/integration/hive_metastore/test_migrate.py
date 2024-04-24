@@ -224,7 +224,7 @@ def test_migrate_external_table_hiveserde_in_place(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_migrate_external_table_hiveserde_ctas(
-        ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
+    ws, sql_backend, make_random, runtime_ctx, make_storage_dir, env_or_skip, make_catalog
 ):
     random = make_random(4).lower()
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_ctas_{random}")

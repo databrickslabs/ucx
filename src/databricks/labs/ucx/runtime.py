@@ -12,7 +12,8 @@ from databricks.labs.ucx.installer.logs import TaskLogger
 from databricks.labs.ucx.hive_metastore.workflows import (
     MigrateTablesInMounts,
     TableMigration,
-    MigrateHiveSerdeTablesInPlace, MigrateExternalTablesCTAS,
+    MigrateHiveSerdeTablesInPlace,
+    MigrateExternalTablesCTAS,
 )
 from databricks.labs.ucx.workspace_access.workflows import (
     GroupMigration,

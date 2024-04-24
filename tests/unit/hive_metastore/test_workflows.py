@@ -1,5 +1,8 @@
-from databricks.labs.ucx.hive_metastore.workflows import TableMigration, MigrateHiveSerdeTablesInPlace, \
-    MigrateExternalTablesCTAS
+from databricks.labs.ucx.hive_metastore.workflows import (
+    TableMigration,
+    MigrateHiveSerdeTablesInPlace,
+    MigrateExternalTablesCTAS,
+)
 
 
 def test_migrate_external_tables_sync(run_workflow):

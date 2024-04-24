@@ -132,10 +132,10 @@ def test_hiveserde_table_in_place_migration_job(
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_ctas_migration_job(
-        ws,
-        installation_ctx,
-        prepare_tables_for_migration,
-        env_or_skip,
+    ws,
+    installation_ctx,
+    prepare_tables_for_migration,
+    env_or_skip,
 ):
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(

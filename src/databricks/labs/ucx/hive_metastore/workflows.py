@@ -95,7 +95,6 @@ class MigrateExternalTablesCTAS(Workflow):
         ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
 
-
 class MigrateTablesInMounts(Workflow):
     def __init__(self):
         super().__init__('migrate-tables-in-mounts-experimental')
