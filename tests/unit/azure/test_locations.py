@@ -7,7 +7,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
 from databricks.sdk.service.catalog import (
-    AzureManagedIdentity,
+    AzureManagedIdentityResponse,
     AzureServicePrincipal,
     ExternalLocationInfo,
     StorageCredentialInfo,
@@ -203,13 +203,13 @@ def test_run_managed_identity(ws, mocker):
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
             name="credential_system_assigned_mi",
-            azure_managed_identity=AzureManagedIdentity(
+            azure_managed_identity=AzureManagedIdentityResponse(
                 "/subscriptions/123/resourcegroups/abc/providers/Microsoft.Databricks/accessConnectors/credential_system_assigned_mi"
             ),
         ),
         StorageCredentialInfo(
             name="credential_user_assigned_mi",
-            azure_managed_identity=AzureManagedIdentity(
+            azure_managed_identity=AzureManagedIdentityResponse(
                 "/subscriptions/123/resourcegroups/abc/providers/Microsoft.ManagedIdentity/accessConnectors/credential_user_assigned_mi",
                 managed_identity_id="/subscriptions/123/resourceGroups/abc/providers/Microsoft.ManagedIdentity/userAssignedIdentities/credential_user_assigned_mi",
             ),
@@ -432,7 +432,7 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
         ),
         StorageCredentialInfo(
             name="credential_no_id_mi",
-            azure_managed_identity=AzureManagedIdentity(
+            azure_managed_identity=AzureManagedIdentityResponse(
                 "/subscriptions/123/no_id_test/accessConnectors/credential_no_id_mi",
             ),
         ),

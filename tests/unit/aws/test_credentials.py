@@ -8,7 +8,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
-    AzureManagedIdentity,
+    AzureManagedIdentityResponse,
     AzureServicePrincipal,
     Privilege,
     StorageCredentialInfo,
@@ -44,7 +44,7 @@ def credential_manager(ws):
             aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/example-role-name")
         ),
         StorageCredentialInfo(
-            azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
+            azure_managed_identity=AzureManagedIdentityResponse("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
         StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/another-role-name")),
         StorageCredentialInfo(azure_service_principal=AzureServicePrincipal("directory_id_1", "app_secret2", "secret")),
