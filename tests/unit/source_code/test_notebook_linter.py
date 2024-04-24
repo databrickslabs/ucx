@@ -40,6 +40,14 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                     end_col=1024,
                 ),
                 Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
+                    start_line=14,
+                    start_col=8,
+                    end_line=14,
+                    end_col=43,
+                ),
+                Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/things/e/f/g',
                     start_line=14,
@@ -82,6 +90,14 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 
 """,
             [
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
+                    start_line=5,
+                    start_col=8,
+                    end_line=5,
+                    end_col=43,
+                ),
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/things/e/f/g',
@@ -154,6 +170,30 @@ SELECT * FROM delta.`/mnt/...` WHERE foo > 6
 MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """,
             [
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of default dbfs: references is deprecated: /mnt/foo/bar',
+                    start_line=15,
+                    start_col=0,
+                    end_line=15,
+                    end_col=34,
+                ),
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of direct filesystem references is deprecated: dbfs:/mnt/foo/bar',
+                    start_line=16,
+                    start_col=0,
+                    end_line=16,
+                    end_col=39,
+                ),
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of direct filesystem references is deprecated: dbfs://mnt/foo/bar',
+                    start_line=17,
+                    start_col=0,
+                    end_line=17,
+                    end_col=40,
+                ),
                 Advisory(
                     code='dbfs-usage',
                     message='Possible deprecated file system path: dbfs:/...',
