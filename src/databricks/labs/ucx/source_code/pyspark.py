@@ -13,19 +13,6 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.queries import FromTable
 
-CLOUD_DIRECT_REFS = {
-    "s3a://",
-    "s3n://",
-    "s3://",
-    "wasb://",
-    "wasbs://",
-    "abfs://",
-    "abfss://",
-    "dbfs:/",
-    "hdfs://",
-    "file:/",
-}
-
 
 @dataclass
 class Matcher(ABC):
@@ -34,6 +21,7 @@ class Matcher(ABC):
     max_args: int
     table_arg_index: int
     table_arg_name: str | None = None
+    call_context: dict[str, set[str]] | None = None
 
     def matches(self, node: ast.AST):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
@@ -56,6 +44,38 @@ class Matcher(ABC):
             return None
         arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
         return arg.value if arg is not None else None
+
+    @classmethod
+    def _get_full_function_name(cls, node: ast.Call) -> str:
+        def _get_value(next_node):
+            if isinstance(next_node, ast.Name):
+                return next_node.id
+            if isinstance(next_node, ast.Attribute):
+                return f"{_get_value(next_node.value)}.{next_node.attr}"
+            return ""
+
+        if isinstance(node.func, ast.Attribute):
+            return _get_value(node.func)
+        if isinstance(node.func, ast.Name):
+            return node.func.id
+        return ""
+
+    def _check_call_context(self, node: ast.Call) -> bool:
+        assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
+        func_name = node.func.attr
+        qualified_name = self._get_full_function_name(node)
+
+        # Check if the call_context is None as that means all calls are checked
+        if self.call_context is None:
+            return True
+
+        # Check if the function name is in the call_context dictionary
+        if func_name in self.call_context:
+            qualified_names = self.call_context[func_name]
+            # Check if the qualified name is in the set of qualified names that are allowed
+            if qualified_name in qualified_names:
+                return True
+        return False
 
 
 @dataclass
@@ -155,6 +175,18 @@ class ReturnValueMatcher(Matcher):
 
 @dataclass
 class CloudAccessMatcher(Matcher):
+    _CLOUD_DIRECT_REFS = {
+        "s3a://",
+        "s3n://",
+        "s3://",
+        "wasb://",
+        "wasbs://",
+        "abfs://",
+        "abfss://",
+        "dbfs:/",
+        "hdfs://",
+        "file:/",
+    }
 
     def matches(self, node: ast.AST):
         return (
@@ -167,15 +199,29 @@ class CloudAccessMatcher(Matcher):
         table_arg = self._get_table_arg(node)
         if isinstance(table_arg, ast.Constant):
             # check for cloud direct references
-            if any(table_arg.value.startswith(prefix) for prefix in CLOUD_DIRECT_REFS):
+            if any(table_arg.value.startswith(prefix) for prefix in self._CLOUD_DIRECT_REFS):
                 yield Deprecation(
                     code='cloud-access',
-                    message=f"The use of cloud direct references is deprecated: '{table_arg.value}'",
+                    message=f"The use of cloud direct references is deprecated: {table_arg.value}",
                     start_line=node.lineno,
                     start_col=node.col_offset,
                     end_line=node.end_lineno or 0,
                     end_col=node.end_col_offset or 0,
                 )
+            elif table_arg.value.startswith("/"):
+                # Special case access to / as it defaults to dfbs: but certain methods only
+                # have default dbfs: references if the call is made from a specific package
+
+                if self._check_call_context(node):
+                    yield Deprecation(
+                        code='cloud-access',
+                        message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
+                        start_line=node.lineno,
+                        start_col=node.col_offset,
+                        end_line=node.end_lineno or 0,
+                        end_col=node.end_col_offset or 0,
+                    )
+
         # Do we wish to raise an advice for every use of the method that we
         # find does not use constant references? That probably pollutes the report.
 
@@ -240,13 +286,13 @@ class SparkMatchers:
         ]
 
         spark_cloud_matchers = [
-            CloudAccessMatcher("ls", 1, 1, 0),
-            CloudAccessMatcher("cp", 1, 2, 0),
-            CloudAccessMatcher("rm", 1, 1, 0),
-            CloudAccessMatcher("head", 1, 1, 0),
-            CloudAccessMatcher("put", 1, 2, 0),
-            CloudAccessMatcher("mkdirs", 1, 1, 0),
-            CloudAccessMatcher("move", 1, 2, 0),
+            CloudAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
+            CloudAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
+            CloudAccessMatcher("rm", 1, 1, 0, call_context={"rm": {"dbutils.fs.rm"}}),
+            CloudAccessMatcher("head", 1, 1, 0, call_context={"head": {"dbutils.fs.head"}}),
+            CloudAccessMatcher("put", 1, 2, 0, call_context={"put": {"dbutils.fs.put"}}),
+            CloudAccessMatcher("mkdirs", 1, 1, 0, call_context={"mkdirs": {"dbutils.fs.mkdirs"}}),
+            CloudAccessMatcher("mv", 1, 2, 0, call_context={"mv": {"dbutils.fs.mv"}}),
             CloudAccessMatcher("text", 1, 3, 0),
             CloudAccessMatcher("csv", 1, 1000, 0),
             CloudAccessMatcher("json", 1, 1000, 0),

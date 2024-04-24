@@ -17,7 +17,6 @@ def test_spark_sql_no_match(empty_index):
     sqf = SparkSql(ftf, empty_index)
 
     old_code = """
-spark.read.csv("/bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
@@ -31,12 +30,20 @@ def test_spark_sql_match(migration_index):
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
@@ -44,7 +51,7 @@ for i in range(10):
             start_col=13,
             end_line=4,
             end_col=50,
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -53,12 +60,20 @@ def test_spark_sql_match_named(migration_index):
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
@@ -66,7 +81,7 @@ for i in range(10):
             start_col=13,
             end_line=4,
             end_col=71,
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -98,12 +113,20 @@ def test_spark_table_match(migration_index, method_name):
     args_list[matcher.table_arg_index] = '"old.things"'
     args = ",".join(args_list)
     old_code = f"""
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for i in range(10):
     df = spark.{method_name}({args})
     do_stuff_with_df(df)
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
@@ -125,7 +148,6 @@ def test_spark_table_no_match(migration_index, method_name):
     args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
     args = ",".join(args_list)
     old_code = f"""
-spark.read.csv("/some/path")
 for i in range(10):
     df = spark.{method_name}({args})
     do_stuff_with_df(df)
@@ -145,7 +167,6 @@ def test_spark_table_too_many_args(migration_index, method_name):
     args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
     args = ",".join(args_list)
     old_code = f"""
-spark.read.csv("/some/path")
 for i in range(10):
     df = spark.{method_name}({args})
     do_stuff_with_df(df)
@@ -157,12 +178,20 @@ def test_spark_table_named_args(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for i in range(10):
     df = spark.saveAsTable(format="xyz", name="old.things")
     do_stuff_with_df(df)
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
@@ -170,7 +199,7 @@ for i in range(10):
             start_col=9,
             end_line=4,
             end_col=59,
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -178,12 +207,20 @@ def test_spark_table_variable_arg(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for i in range(10):
     df = spark.saveAsTable(name)
     do_stuff_with_df(df)
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Advisory(
             code='table-migrate',
             message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
@@ -191,7 +228,7 @@ for i in range(10):
             start_col=9,
             end_line=4,
             end_col=32,
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -199,12 +236,20 @@ def test_spark_table_fstring_arg(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for i in range(10):
     df = spark.saveAsTable(f"boop{stuff}")
     do_stuff_with_df(df)
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Advisory(
             code='table-migrate',
             message="Can't migrate 'saveAsTable' because its table name argument is not a constant",
@@ -212,7 +257,7 @@ for i in range(10):
             start_col=9,
             end_line=4,
             end_col=42,
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -220,11 +265,19 @@ def test_spark_table_return_value(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("/some/path")
+spark.read.csv("s3://bucket/path")
 for table in spark.listTables():
     do_stuff_with_table(table)
 """
     assert [
+        Deprecation(
+            code='cloud-access',
+            message='The use of cloud direct references is deprecated: ' 's3://bucket/path',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=34,
+        ),
         Advisory(
             code='table-migrate',
             message="Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
@@ -232,7 +285,7 @@ for table in spark.listTables():
             start_col=13,
             end_line=3,
             end_col=31,
-        )
+        ),
     ] == list(sqf.lint(old_code))
 
 
@@ -240,7 +293,7 @@ def test_spark_sql_fix(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
 
-    old_code = """spark.read.csv("/some/path")
+    old_code = """spark.read.csv("s3://bucket/path")
 for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
@@ -248,7 +301,7 @@ for i in range(10):
     fixed_code = sqf.apply(old_code)
     assert (
         fixed_code
-        == """spark.read.csv('/some/path')
+        == """spark.read.csv('s3://bucket/path')
 for i in range(10):
     result = spark.sql('SELECT * FROM brand.new.stuff').collect()
     print(len(result))"""
@@ -260,81 +313,39 @@ for i in range(10):
     [
         # Test for 'ls' function
         (
-            """spark.ls("s3a://bucket/path")""",
+            """dbutils.fs.ls("s3a://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=29,
+                    end_col=34,
                 )
             ],
         ),
         # Test for 'cp' function. Note that the current code will stop at the first deprecation found.
         (
-            """spark.cp("s3a://bucket/path", "s3a://another_bucket/another_path")""",
+            """dbutils.fs.cp("s3n://bucket/path", "s3n://another_bucket/another_path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3n://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=66,
+                    end_col=71,
                 )
             ],
         ),
         # Test for 'rm' function
         (
-            """spark.rm("s3a://bucket/path")""",
+            """dbutils.fs.rm("s3://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
-                    start_line=1,
-                    start_col=0,
-                    end_line=1,
-                    end_col=29,
-                )
-            ],
-        ),
-        # Test for 'head' function
-        (
-            """spark.head("s3a://bucket/path")""",
-            [
-                Deprecation(
-                    code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
-                    start_line=1,
-                    start_col=0,
-                    end_line=1,
-                    end_col=31,
-                )
-            ],
-        ),
-        # Test for 'put' function
-        (
-            """spark.put("s3a://bucket/path", "data")""",
-            [
-                Deprecation(
-                    code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
-                    start_line=1,
-                    start_col=0,
-                    end_line=1,
-                    end_col=38,
-                )
-            ],
-        ),
-        # Test for 'mkdirs' function
-        (
-            """spark.mkdirs("s3a://bucket/path")""",
-            [
-                Deprecation(
-                    code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -342,45 +353,87 @@ for i in range(10):
                 )
             ],
         ),
-        # Test for 'move' function
+        # Test for 'head' function
         (
-            """spark.move("s3a://bucket/path", "s3a://another_bucket/another_path")""",
+            """dbutils.fs.head("wasb://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: wasb://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=68,
+                    end_col=37,
+                )
+            ],
+        ),
+        # Test for 'put' function
+        (
+            """dbutils.fs.put("wasbs://bucket/path", "data")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: wasbs://bucket/path",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=45,
+                )
+            ],
+        ),
+        # Test for 'mkdirs' function
+        (
+            """dbutils.fs.mkdirs("abfs://bucket/path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: abfs://bucket/path",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=39,
+                )
+            ],
+        ),
+        # Test for 'move' function
+        (
+            """dbutils.fs.mv("wasb://bucket/path", "wasb://another_bucket/another_path")""",
+            [
+                Deprecation(
+                    code='cloud-access',
+                    message="The use of cloud direct references is deprecated: wasb://bucket/path",
+                    start_line=1,
+                    start_col=0,
+                    end_line=1,
+                    end_col=73,
                 )
             ],
         ),
         # Test for 'text' function
         (
-            """spark.read.text("s3a://bucket/path")""",
+            """spark.read.text("wasbs://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: wasbs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=36,
+                    end_col=38,
                 )
             ],
         ),
         # Test for 'csv' function
         (
-            """spark.read.csv("s3a://bucket/path")""",
+            """spark.read.csv("abfs://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: abfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=35,
+                    end_col=36,
                 )
             ],
         ),
@@ -396,7 +449,7 @@ for i in range(10):
                 Deprecation(
                     code='cloud-access',
                     message='The use of cloud direct references is deprecated: '
-                    "'s3a://your_bucket_name/your_directory/'",
+                    "s3a://your_bucket_name/your_directory/",
                     start_line=1,
                     start_col=1,
                     end_line=3,
@@ -406,71 +459,71 @@ for i in range(10):
         ),
         # Test for 'json' function
         (
-            """spark.read.json("s3a://bucket/path")""",
+            """spark.read.json("abfss://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: abfss://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=36,
+                    end_col=38,
                 )
             ],
         ),
         # Test for 'orc' function
         (
-            """spark.read.orc("s3a://bucket/path")""",
+            """spark.read.orc("dbfs://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: dbfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=35,
+                    end_col=36,
                 )
             ],
         ),
         # Test for 'parquet' function
         (
-            """spark.read.parquet("s3a://bucket/path")""",
+            """spark.read.parquet("hdfs://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: hdfs://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=39,
+                    end_col=40,
                 )
             ],
         ),
         # Test for 'save' function
         (
-            """spark.write.save("s3a://bucket/path")""",
+            """spark.write.save("file://bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: file://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=37,
+                    end_col=38,
                 )
             ],
         ),
-        # Test for 'load' function
+        # Test for 'load' function with default to dbfs
         (
-            """spark.read.load("s3a://bucket/path")""",
+            """spark.read.load("/bucket/path")""",
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of default dbfs: references is deprecated: /bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=36,
+                    end_col=31,
                 )
             ],
         ),
@@ -480,7 +533,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -494,7 +547,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -508,7 +561,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -522,7 +575,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -536,7 +589,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -550,7 +603,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -564,7 +617,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -578,7 +631,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -592,7 +645,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -606,7 +659,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -620,7 +673,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -634,7 +687,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -648,7 +701,7 @@ for i in range(10):
             [
                 Deprecation(
                     code='cloud-access',
-                    message="The use of cloud direct references is deprecated: 's3a://bucket/path'",
+                    message="The use of cloud direct references is deprecated: s3a://bucket/path",
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -665,9 +718,11 @@ def test_spark_cloud_direct_access(empty_index, code, expected):
     assert advisories == expected
 
 
+# TODO: Expand the tests  to cover all dbutils.fs functions
 def test_direct_cloud_access_reports_nothing(empty_index):
     ftf = FromTable(empty_index, CurrentSessionState())
     sqf = SparkSql(ftf, empty_index)
-    code = """spark.read.csv("/bucket/path")"""
+    # ls function calls have to be from dbutils.fs, or we ignore them
+    code = """spark.ls("/bucket/path")"""
     advisories = list(sqf.lint(code))
     assert not advisories
