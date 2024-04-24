@@ -29,22 +29,22 @@ def test_linter_returns_empty_list_of_imports():
 
 def test_linter_returns_import():
     linter = ASTLinter.parse('import x')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert ["x"] == [pair[0] for pair in PythonLinter.list_import_sources(linter)]
 
 
 def test_linter_returns_import_from():
     linter = ASTLinter.parse('from x import z')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert ["x"] == [pair[0] for pair in PythonLinter.list_import_sources(linter)]
 
 
 def test_linter_returns_import_module():
     linter = ASTLinter.parse('importlib.import_module("x")')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert ["x"] == [pair[0] for pair in PythonLinter.list_import_sources(linter)]
 
 
 def test_linter_returns__import__():
     linter = ASTLinter.parse('importlib.__import__("x")')
-    assert ["x"] == PythonLinter.list_import_sources(linter)
+    assert ["x"] == [pair[0] for pair in PythonLinter.list_import_sources(linter)]
 
 
 def test_linter_returns_appended_absolute_paths():

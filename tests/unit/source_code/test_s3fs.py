@@ -3,14 +3,13 @@ from unittest.mock import create_autospec
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advice, Deprecation
-
 from databricks.labs.ucx.source_code.dependencies import (
     SourceContainer,
     DependencyResolver,
     LocalFileLoader,
     DependencyGraphBuilder,
     LocalNotebookLoader,
+    DependencyProblem,
 )
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -26,7 +25,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         (
             "import s3fs",
             [
-                Deprecation(
+                DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
                     start_line=0,
@@ -39,7 +38,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         (
             "from s3fs import something",
             [
-                Deprecation(
+                DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
                     start_line=0,
@@ -54,7 +53,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         (
             "import s3fs, leeds",
             [
-                Deprecation(
+                DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
                     start_line=0,
@@ -68,7 +67,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         (
             "def func():\n    import s3fs",
             [
-                Deprecation(
+                DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
                     start_line=0,
@@ -81,7 +80,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         (
             "import s3fs as s",
             [
-                Deprecation(
+                DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
                     start_line=0,
@@ -94,7 +93,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         (
             "from s3fs.subpackage import something",
             [
-                Deprecation(
+                DependencyProblem(
                     code='dependency-check',
                     message='Use of dependency s3fs.subpackage is deprecated',
                     start_line=0,
@@ -107,7 +106,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         ("", []),
     ],
 )
-def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
+def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyProblem]):
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
     sources = {"path": source}
@@ -119,15 +118,15 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
     resolver = DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader())
     builder = DependencyGraphBuilder(resolver)
     builder.build_local_file_dependency_graph(Path("path"))
-    advices = list(resolver.get_advices())
-    assert advices == expected
+    problems: list[DependencyProblem] = resolver.problems
+    assert problems == expected
 
 
 @pytest.mark.parametrize(
     " expected",
     (
         [
-            Deprecation(
+            DependencyProblem(
                 code='dependency-check',
                 message='Use of dependency s3fs is deprecated',
                 start_line=0,
@@ -138,7 +137,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[Advice]):
         ],
     ),
 )
-def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice]):
+def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[DependencyProblem]):
     paths = ["root9.py.txt", "leaf9.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
@@ -151,5 +150,5 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Advice])
     resolver = DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader())
     builder = DependencyGraphBuilder(resolver)
     builder.build_local_file_dependency_graph(Path("root9.py.txt"))
-    advices = list(resolver.get_advices())
-    assert advices == expected
+    problems: list[DependencyProblem] = resolver.problems
+    assert problems == expected

@@ -177,7 +177,7 @@ def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, boo
     assert source is not None
     if NOTEBOOK_HEADER in source:
         return Notebook.parse(filename, source, Language.PYTHON)
-    return LocalFile(filename, source, Language.PYTHON)
+    return LocalFile(pathlib.Path(filename), source, Language.PYTHON)
 
 
 def _is_notebook_side_effect(sources: dict[str, str], *args):

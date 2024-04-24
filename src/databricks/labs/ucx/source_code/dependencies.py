@@ -2,16 +2,50 @@ from __future__ import annotations
 
 import abc
 import ast
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.source_code.base import Advice, Deprecation
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
+
+
+MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
+
+
+@dataclass
+class DependencyProblem:
+    code: str
+    message: str
+    source_path: Path = Path(MISSING_SOURCE_PATH)
+    start_line: int = -1
+    start_col: int = -1
+    end_line: int = -1
+    end_col: int = -1
+
+    def replace(
+        self,
+        code: str | None = None,
+        message: str | None = None,
+        source_path: Path | None = None,
+        start_line: int | None = None,
+        start_col: int | None = None,
+        end_line: int | None = None,
+        end_col: int | None = None,
+    ) -> DependencyProblem:
+        return DependencyProblem(
+            code if code is not None else self.code,
+            message if message is not None else self.message,
+            source_path if source_path is not None else self.source_path,
+            start_line if start_line is not None else self.start_line,
+            start_col if start_col is not None else self.start_col,
+            end_line if end_line is not None else self.end_line,
+            end_col if end_col is not None else self.end_col,
+        )
 
 
 class Dependency(abc.ABC):
@@ -111,19 +145,9 @@ class WorkspaceNotebookLoader(NotebookLoader):
         return object_info is not None and object_info.object_type is ObjectType.NOTEBOOK
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        object_info = self._load_object(dependency)
-        return self._load_notebook(object_info)
-
-    def _load_object(self, dependency: Dependency) -> ObjectInfo:
         object_info = self._ws.workspace.get_status(str(dependency.path))
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        if object_info is None or object_info.object_type is None:
-            raise ValueError(f"Could not locate object at '{dependency.path}'")
-        if object_info.object_type is not ObjectType.NOTEBOOK:
-            raise ValueError(
-                f"Invalid object at '{dependency.path}', expected a {ObjectType.NOTEBOOK.name}, got a {str(object_info.object_type)}"
-            )
-        return object_info
+        return self._load_notebook(object_info)
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
         # local import to avoid cyclic dependency
@@ -136,8 +160,7 @@ class WorkspaceNotebookLoader(NotebookLoader):
         return Notebook.parse(object_info.path, source, object_info.language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
-        if not object_info.path:
-            raise ValueError(f"Invalid ObjectInfo: {object_info}")
+        assert object_info.path is not None
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
             return f.read().decode("utf-8")
 
@@ -154,28 +177,54 @@ class DependencyResolver:
         self._site_packages = site_packages
         self._file_loader = file_loader
         self._notebook_loader = notebook_loader
-        self._advices: list[Advice] = []
+        self._problems: list[DependencyProblem] = []
 
-    def resolve_notebook(self, path: Path) -> Dependency | None:
+    @property
+    def problems(self):
+        return self._problems
+
+    def add_problems(self, problems: list[DependencyProblem]):
+        self._problems.extend(problems)
+
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def resolve_notebook(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
         if self._notebook_loader.is_notebook(path):
             return Dependency(self._notebook_loader, path)
+        problem = DependencyProblem('dependency-check', f"Notebook not found: {path.as_posix()}")
+        if problem_collector:
+            problem_collector(problem)
+        else:
+            self._problems.append(problem)
         return None
 
-    def resolve_local_file(self, path: Path) -> Dependency | None:
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def resolve_local_file(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
         if self._file_loader.is_file(path) and not self._file_loader.is_notebook(path):
             return Dependency(self._file_loader, path)
+        problem = DependencyProblem('dependency-check', f"File not found: {path.as_posix()}")
+        if problem_collector:
+            problem_collector(problem)
+        else:
+            self._problems.append(problem)
         return None
 
-    def resolve_import(self, name: str) -> Dependency | None:
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         if self._is_whitelisted(name):
             return None
         if self._file_loader.is_file(Path(name)):
             return Dependency(self._file_loader, Path(name))
         site_package = self._site_packages[name]
-        if site_package is not None:
-            container = SitePackageContainer(self._file_loader, site_package)
-            return Dependency(WrappingLoader(container), Path(name))
-        raise ValueError(f"Could not locate {name}")
+        if site_package is None:
+            problem = DependencyProblem(code='dependency-check', message=f"Could not locate import: {name}")
+            problem_collector(problem)
+            return None
+        container = SitePackageContainer(self._file_loader, site_package)
+        return Dependency(WrappingLoader(container), Path(name))
 
     def _is_whitelisted(self, name: str) -> bool:
         compatibility = self._whitelist.compatibility(name)
@@ -183,9 +232,9 @@ class DependencyResolver:
         if compatibility is None:
             return False
         if compatibility == UCCompatibility.NONE:
-            # TODO this should be done as part of linting, not as part of dependency graph building
-            self._advices.append(
-                Deprecation(
+            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
+            self._problems.append(
+                DependencyProblem(
                     code="dependency-check",
                     message=f"Use of dependency {name} is deprecated",
                     start_line=0,
@@ -195,9 +244,6 @@ class DependencyResolver:
                 )
             )
         return True
-
-    def get_advices(self) -> Iterable[Advice]:
-        yield from self._advices
 
 
 class DependencyGraph:
@@ -221,14 +267,24 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_notebook(self, path: Path) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_notebook(path)
+    def add_problems(self, problems: list[DependencyProblem]):
+        problems = [problem.replace(source_path=self.dependency.path) for problem in problems]
+        self._resolver.add_problems(problems)
+
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def register_notebook(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
+    ) -> DependencyGraph | None:
+        resolved = self._resolver.resolve_notebook(path, problem_collector)
         if resolved is None:
             return None
         return self.register_dependency(resolved)
 
-    def register_import(self, name: str) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_import(name)
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    def register_import(
+        self, name: str, problem_collector: Callable[[DependencyProblem], None]
+    ) -> DependencyGraph | None:
+        resolved = self._resolver.resolve_import(name, problem_collector)
         if resolved is None:
             return None
         return self.register_dependency(resolved)
@@ -308,7 +364,7 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str):
+    def build_graph_from_python_source(self, python_code: str, problem_collector: Callable[[DependencyProblem], None]):
         linter = ASTLinter.parse(python_code)
         calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
         for call in calls:
@@ -316,15 +372,38 @@ class DependencyGraph:
             path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(path, ast.Constant):
                 path = path.value.strip().strip("'").strip('"')
-                dependency = self.register_notebook(Path(path))
-                if dependency is None:
-                    # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                    raise ValueError(f"Invalid notebook path in dbutils.notebook.run command: {path}")
+                call_problems: list[DependencyProblem] = []
+                self.register_notebook(Path(path), call_problems.append)
+                for problem in call_problems:
+                    problem = problem.replace(
+                        start_line=call.lineno,
+                        start_col=call.col_offset,
+                        end_line=call.end_lineno or 0,
+                        end_col=call.end_col_offset or 0,
+                    )
+                    problem_collector(problem)
             else:
-                # TODO raise Advice, see https://github.com/databrickslabs/ucx/issues/1439
-                pass
-        for name in PythonLinter.list_import_sources(linter):
-            self.register_import(name)
+                problem = DependencyProblem(
+                    code='dependency-check',
+                    message="Can't check dependency not provided as a constant",
+                    start_line=call.lineno,
+                    start_col=call.col_offset,
+                    end_line=call.end_lineno or 0,
+                    end_col=call.end_col_offset or 0,
+                )
+                problem_collector(problem)
+        for pair in PythonLinter.list_import_sources(linter):
+            import_problems: list[DependencyProblem] = []
+            self.register_import(pair[0], import_problems.append)
+            node = pair[1]
+            for problem in import_problems:
+                problem = problem.replace(
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
+                problem_collector(problem)
 
 
 class DependencyGraphBuilder:
@@ -332,18 +411,24 @@ class DependencyGraphBuilder:
     def __init__(self, resolver: DependencyResolver):
         self._resolver = resolver
 
-    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph:
+    @property
+    def problems(self):
+        return self._resolver.problems
+
+    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_local_file(path)
-        assert dependency is not None
+        if dependency is None:
+            return None
         graph = DependencyGraph(dependency, None, self._resolver)
         container = dependency.load()
         if container is not None:
             container.build_dependency_graph(graph)
         return graph
 
-    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph:
+    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_notebook(path)
-        assert dependency is not None
+        if dependency is None:
+            return None
         graph = DependencyGraph(dependency, None, self._resolver)
         container = dependency.load()
         if container is not None:
