@@ -310,6 +310,52 @@ def test_migrate_external_hiveserde_table_in_place(
         assert expected_value in caplog.text
 
 
+@pytest.mark.parametrize(
+    'what, test_table, expected_query',
+    [
+        (
+            What.EXTERNAL_HIVESERDE,
+            "external_hiveserde",
+            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst LOCATION 's3://test/folder/table1_ctas_migrated' AS SELECT * FROM hive_metastore.db1_src.external_src",
+        ),
+        (
+            What.EXTERNAL_NO_SYNC,
+            "external_no_sync",
+            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst LOCATION 's3:/bucket/test/table1_ctas_migrated' AS SELECT * FROM hive_metastore.db1_src.external_src",
+        ),
+        (
+            What.EXTERNAL_NO_SYNC,
+            "external_no_sync_missing_location",
+            "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.external_dst AS SELECT * FROM hive_metastore.db1_src.external_src",
+        ),
+    ],
+)
+def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, test_table, expected_query):
+    backend = MockBackend()
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    udf_crawler = UdfsCrawler(backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    table_mapping = table_mapping_mock([test_table])
+    group_manager = GroupManager(backend, ws, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    mounts_crawler = create_autospec(Mounts)
+    mounts_crawler.snapshot.return_value = [Mount('/mnt/test', 's3://test/folder')]
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        ws,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+    table_migrate.migrate_tables(what=what, mounts_crawler=mounts_crawler)
+
+    assert expected_query in backend.queries
+
+
 def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
     errors = {}
     rows = {}
