@@ -40,7 +40,7 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                     end_col=1024,
                 ),
                 Deprecation(
-                    code='cloud-access',
+                    code='direct-filesystem-access',
                     message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
                     start_line=14,
                     start_col=8,
@@ -91,7 +91,7 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 """,
             [
                 Deprecation(
-                    code='cloud-access',
+                    code='direct-filesystem-access',
                     message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
                     start_line=5,
                     start_col=8,
@@ -171,7 +171,7 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
     """,
             [
                 Deprecation(
-                    code='cloud-access',
+                    code='direct-filesystem-access',
                     message='The use of default dbfs: references is deprecated: /mnt/foo/bar',
                     start_line=15,
                     start_col=0,
@@ -179,7 +179,7 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                     end_col=34,
                 ),
                 Deprecation(
-                    code='cloud-access',
+                    code='direct-filesystem-access',
                     message='The use of cloud direct references is deprecated: dbfs:/mnt/foo/bar',
                     start_line=16,
                     start_col=0,
@@ -187,7 +187,7 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                     end_col=39,
                 ),
                 Deprecation(
-                    code='cloud-access',
+                    code='direct-filesystem-access',
                     message='The use of cloud direct references is deprecated: dbfs://mnt/foo/bar',
                     start_line=17,
                     start_col=0,

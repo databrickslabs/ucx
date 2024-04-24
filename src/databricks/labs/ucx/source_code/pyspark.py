@@ -113,19 +113,8 @@ class TableNameMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if isinstance(table_arg, ast.Constant):
-            dst = self._find_dest(index, table_arg.value, from_table.schema)
-            if dst is not None:
-                yield Deprecation(
-                    code='table-migrate',
-                    message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
-                    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno or 0,
-                    end_col=node.end_col_offset or 0,
-                )
-        else:
+
+        if not isinstance(table_arg, ast.Constant):
             assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
             yield Advisory(
                 code='table-migrate',
@@ -135,6 +124,21 @@ class TableNameMatcher(Matcher):
                 end_line=node.end_lineno or 0,
                 end_col=node.end_col_offset or 0,
             )
+            return
+
+        dst = self._find_dest(index, table_arg.value, from_table.schema)
+        if dst is None:
+            return
+
+        yield Deprecation(
+            code='table-migrate',
+            message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
+            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+            start_line=node.lineno,
+            start_col=node.col_offset,
+            end_line=node.end_lineno or 0,
+            end_col=node.end_col_offset or 0,
+        )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         table_arg = self._get_table_arg(node)
@@ -174,8 +178,8 @@ class ReturnValueMatcher(Matcher):
 
 
 @dataclass
-class CloudAccessMatcher(Matcher):
-    _CLOUD_DIRECT_REFS = {
+class DirectFilesystemAccessMatcher(Matcher):
+    _DIRECT_FS_REFS = {
         "s3a://",
         "s3n://",
         "s3://",
@@ -197,33 +201,30 @@ class CloudAccessMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if isinstance(table_arg, ast.Constant):
-            # check for cloud direct references
-            if any(table_arg.value.startswith(prefix) for prefix in self._CLOUD_DIRECT_REFS):
-                yield Deprecation(
-                    code='cloud-access',
-                    message=f"The use of cloud direct references is deprecated: {table_arg.value}",
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno or 0,
-                    end_col=node.end_col_offset or 0,
-                )
-            elif table_arg.value.startswith("/"):
-                # Special case access to / as it defaults to dfbs: but certain methods only
-                # have default dbfs: references if the call is made from a specific package
 
-                if self._check_call_context(node):
-                    yield Deprecation(
-                        code='cloud-access',
-                        message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
-                        start_line=node.lineno,
-                        start_col=node.col_offset,
-                        end_line=node.end_lineno or 0,
-                        end_col=node.end_col_offset or 0,
-                    )
+        if not isinstance(table_arg, ast.Constant):
+            return
 
-        # Do we wish to raise an advice for every use of the method that we
-        # find does not use constant references? That probably pollutes the report.
+        if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
+            yield Deprecation(
+                code='direct-filesystem-access',
+                message=f"The use of cloud direct references is deprecated: {table_arg.value}",
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
+            return
+
+        if table_arg.value.startswith("/") and self._check_call_context(node):
+            yield Deprecation(
+                code='direct-filesystem-access',
+                message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         # No transformations to apply
@@ -285,35 +286,35 @@ class SparkMatchers:
             TableNameMatcher("register", 1, 2, 0, "name"),
         ]
 
-        spark_cloud_matchers = [
-            CloudAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
-            CloudAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
-            CloudAccessMatcher("rm", 1, 1, 0, call_context={"rm": {"dbutils.fs.rm"}}),
-            CloudAccessMatcher("head", 1, 1, 0, call_context={"head": {"dbutils.fs.head"}}),
-            CloudAccessMatcher("put", 1, 2, 0, call_context={"put": {"dbutils.fs.put"}}),
-            CloudAccessMatcher("mkdirs", 1, 1, 0, call_context={"mkdirs": {"dbutils.fs.mkdirs"}}),
-            CloudAccessMatcher("mv", 1, 2, 0, call_context={"mv": {"dbutils.fs.mv"}}),
-            CloudAccessMatcher("text", 1, 3, 0),
-            CloudAccessMatcher("csv", 1, 1000, 0),
-            CloudAccessMatcher("json", 1, 1000, 0),
-            CloudAccessMatcher("orc", 1, 1000, 0),
-            CloudAccessMatcher("parquet", 1, 1000, 0),
-            CloudAccessMatcher("save", 0, 1000, -1, "path"),
-            CloudAccessMatcher("load", 0, 1000, -1, "path"),
-            CloudAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
-            CloudAccessMatcher("addFile", 1, 3, 0),
-            CloudAccessMatcher("binaryFiles", 1, 2, 0),
-            CloudAccessMatcher("binaryRecords", 1, 2, 0),
-            CloudAccessMatcher("dump_profiles", 1, 1, 0),
-            CloudAccessMatcher("hadoopFile", 1, 8, 0),
-            CloudAccessMatcher("newAPIHadoopFile", 1, 8, 0),
-            CloudAccessMatcher("pickleFile", 1, 3, 0),
-            CloudAccessMatcher("saveAsHadoopFile", 1, 8, 0),
-            CloudAccessMatcher("saveAsNewAPIHadoopFile", 1, 7, 0),
-            CloudAccessMatcher("saveAsPickleFile", 1, 2, 0),
-            CloudAccessMatcher("saveAsSequenceFile", 1, 2, 0),
-            CloudAccessMatcher("saveAsTextFile", 1, 2, 0),
-            CloudAccessMatcher("load_from_path", 1, 1, 0),
+        direct_fs_access_matchers = [
+            DirectFilesystemAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
+            DirectFilesystemAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
+            DirectFilesystemAccessMatcher("rm", 1, 1, 0, call_context={"rm": {"dbutils.fs.rm"}}),
+            DirectFilesystemAccessMatcher("head", 1, 1, 0, call_context={"head": {"dbutils.fs.head"}}),
+            DirectFilesystemAccessMatcher("put", 1, 2, 0, call_context={"put": {"dbutils.fs.put"}}),
+            DirectFilesystemAccessMatcher("mkdirs", 1, 1, 0, call_context={"mkdirs": {"dbutils.fs.mkdirs"}}),
+            DirectFilesystemAccessMatcher("mv", 1, 2, 0, call_context={"mv": {"dbutils.fs.mv"}}),
+            DirectFilesystemAccessMatcher("text", 1, 3, 0),
+            DirectFilesystemAccessMatcher("csv", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("json", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("orc", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("parquet", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("save", 0, 1000, -1, "path"),
+            DirectFilesystemAccessMatcher("load", 0, 1000, -1, "path"),
+            DirectFilesystemAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
+            DirectFilesystemAccessMatcher("addFile", 1, 3, 0),
+            DirectFilesystemAccessMatcher("binaryFiles", 1, 2, 0),
+            DirectFilesystemAccessMatcher("binaryRecords", 1, 2, 0),
+            DirectFilesystemAccessMatcher("dump_profiles", 1, 1, 0),
+            DirectFilesystemAccessMatcher("hadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("newAPIHadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("pickleFile", 1, 3, 0),
+            DirectFilesystemAccessMatcher("saveAsHadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("saveAsNewAPIHadoopFile", 1, 7, 0),
+            DirectFilesystemAccessMatcher("saveAsPickleFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("saveAsSequenceFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("saveAsTextFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("load_from_path", 1, 1, 0),
         ]
 
         # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
@@ -326,7 +327,7 @@ class SparkMatchers:
             + spark_dataframereader_matchers
             + spark_dataframewriter_matchers
             + spark_udtfregistration_matchers
-            + spark_cloud_matchers
+            + direct_fs_access_matchers
         ):
             self._matchers[matcher.method_name] = matcher
 
