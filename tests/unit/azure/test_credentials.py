@@ -101,6 +101,7 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
 
 
 def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
+    _ = url
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "none" in storage_credential_name:
@@ -110,31 +111,19 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
             is_dir=True,
             results=[
                 ValidationResult(
-                    operation=ValidationResultOperation.LIST,
-                    result=ValidationResultResult.FAIL,
-                    message="fail",
+                    operation=ValidationResultOperation.LIST, result=ValidationResultResult.FAIL, message="fail"
                 ),
-                ValidationResult(result=ValidationResultResult.FAIL, message="fail"),
+                ValidationResult(operation=None, result=ValidationResultResult.FAIL, message="fail"),
             ],
         )
     if read_only:
         return ValidateStorageCredentialResponse(
             is_dir=True,
-            results=[
-                ValidationResult(
-                    operation=ValidationResultOperation.READ,
-                    result=ValidationResultResult.PASS,
-                )
-            ],
+            results=[ValidationResult(operation=ValidationResultOperation.READ, result=ValidationResultResult.PASS)],
         )
     return ValidateStorageCredentialResponse(
         is_dir=True,
-        results=[
-            ValidationResult(
-                operation=ValidationResultOperation.WRITE,
-                result=ValidationResultResult.PASS,
-            )
-        ],
+        results=[ValidationResult(operation=ValidationResultOperation.WRITE, result=ValidationResultResult.PASS)],
     )
 
 
@@ -252,7 +241,7 @@ def test_validate_storage_credentials_non_response(credential_manager):
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
     permission_mapping = StoragePermissionMapping(
-        "abfss://prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
+        "prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
     )
 
     validation = credential_manager.validate(permission_mapping)
