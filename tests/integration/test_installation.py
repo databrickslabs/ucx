@@ -201,7 +201,7 @@ def test_uninstallation(ws, sql_backend, installation_ctx):
     installation_ctx.workspace_installation.uninstall()
     with pytest.raises(NotFound):
         ws.workspace.get_status(installation_ctx.workspace_installation.folder)
-    with pytest.raises(InvalidParameterValue):
+    with pytest.raises(NotFound):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
