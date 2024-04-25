@@ -6,14 +6,16 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
 from databricks.labs.ucx.source_code.dependencies import (
-    SourceContainer,
-    DependencyResolver,
-    LocalFileLoader,
     DependencyGraphBuilder,
-    WorkspaceNotebookLoader,
-    LocalNotebookLoader,
     DependencyProblem,
 )
+from databricks.labs.ucx.source_code.dependency_loaders import (
+    SourceContainer,
+    LocalFileLoader,
+    LocalNotebookLoader,
+    WorkspaceNotebookLoader,
+)
+from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from tests.unit import (

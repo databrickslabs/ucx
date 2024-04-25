@@ -9,11 +9,9 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
-    SourceContainer,
-    DependencyResolver,
-    LocalFileLoader,
-    WorkspaceNotebookLoader,
 )
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalFileLoader, WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from databricks.labs.ucx.source_code.site_packages import SitePackages

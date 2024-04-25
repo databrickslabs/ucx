@@ -7,8 +7,8 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
 from databricks.labs.ucx.source_code.dependencies import (
     Dependency,
-    WorkspaceNotebookLoader,
 )
+from databricks.labs.ucx.source_code.dependency_loaders import WorkspaceNotebookLoader
 
 
 class NotebookMigrator:

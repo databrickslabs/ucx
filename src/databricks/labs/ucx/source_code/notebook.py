@@ -13,9 +13,9 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
-    SourceContainer,
     DependencyProblem,
 )
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
 
 
 logger = logging.getLogger(__name__)

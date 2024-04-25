@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import abc
 import ast
-from collections.abc import Callable
+import typing
 from dataclasses import dataclass
+from collections.abc import Callable
 from pathlib import Path
 
-from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
-from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackage
-from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
+
+if typing.TYPE_CHECKING:
+    from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
+    from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, DependencyLoader
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
@@ -66,184 +67,6 @@ class Dependency(abc.ABC):
 
     def load(self) -> SourceContainer | None:
         return self._loader.load_dependency(self)
-
-
-class SourceContainer(abc.ABC):
-
-    @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
-        raise NotImplementedError()
-
-
-class DependencyLoader(abc.ABC):
-
-    @abc.abstractmethod
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def is_notebook(self, path: Path) -> bool:
-        raise NotImplementedError()
-
-
-# a DependencyLoader that simply wraps a pre-existing SourceContainer
-class WrappingLoader(DependencyLoader):
-
-    def __init__(self, source_container: SourceContainer):
-        self._source_container = source_container
-
-    def is_file(self, path: Path) -> bool:
-        raise NotImplementedError()  # should never happen
-
-    def is_notebook(self, path: Path) -> bool:
-        raise NotImplementedError()  # should never happen
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        return self._source_container
-
-
-class LocalFileLoader(DependencyLoader):
-    # see https://github.com/databrickslabs/ucx/issues/1499
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
-
-    def is_file(self, path: Path) -> bool:
-        raise NotImplementedError()
-
-    def is_notebook(self, path: Path) -> bool:
-        raise NotImplementedError()
-
-
-class NotebookLoader(DependencyLoader, abc.ABC):
-    pass
-
-
-class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
-    # see https://github.com/databrickslabs/ucx/issues/1499
-    pass
-
-
-class SitePackageContainer(SourceContainer):
-
-    def __init__(self, file_loader: LocalFileLoader, site_package: SitePackage):
-        self._file_loader = file_loader
-        self._site_package = site_package
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
-        for module_path in self._site_package.module_paths:
-            parent.register_dependency(Dependency(self._file_loader, module_path))
-
-
-class WorkspaceNotebookLoader(NotebookLoader):
-
-    def __init__(self, ws: WorkspaceClient):
-        self._ws = ws
-
-    def is_notebook(self, path: Path):
-        object_info = self._ws.workspace.get_status(str(path))
-        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        return object_info is not None and object_info.object_type is ObjectType.NOTEBOOK
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        object_info = self._ws.workspace.get_status(str(dependency.path))
-        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        return self._load_notebook(object_info)
-
-    def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
-        # local import to avoid cyclic dependency
-        # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.notebook import Notebook
-
-        assert object_info.path is not None
-        assert object_info.language is not None
-        source = self._load_source(object_info)
-        return Notebook.parse(object_info.path, source, object_info.language)
-
-    def _load_source(self, object_info: ObjectInfo) -> str:
-        assert object_info.path is not None
-        with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
-            return f.read().decode("utf-8")
-
-
-class DependencyResolver:
-    def __init__(
-        self,
-        whitelist: Whitelist,
-        site_packages: SitePackages,
-        file_loader: LocalFileLoader,
-        notebook_loader: NotebookLoader,
-    ):
-        self._whitelist = whitelist
-        self._site_packages = site_packages
-        self._file_loader = file_loader
-        self._notebook_loader = notebook_loader
-        self._problems: list[DependencyProblem] = []
-
-    @property
-    def problems(self):
-        return self._problems
-
-    def add_problems(self, problems: list[DependencyProblem]):
-        self._problems.extend(problems)
-
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
-    def resolve_notebook(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
-        if self._notebook_loader.is_notebook(path):
-            return Dependency(self._notebook_loader, path)
-        problem = DependencyProblem('dependency-check', f"Notebook not found: {path.as_posix()}")
-        if problem_collector:
-            problem_collector(problem)
-        else:
-            self._problems.append(problem)
-        return None
-
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
-        if self._file_loader.is_file(path) and not self._file_loader.is_notebook(path):
-            return Dependency(self._file_loader, path)
-        problem = DependencyProblem('dependency-check', f"File not found: {path.as_posix()}")
-        if problem_collector:
-            problem_collector(problem)
-        else:
-            self._problems.append(problem)
-        return None
-
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        if self._is_whitelisted(name):
-            return None
-        if self._file_loader.is_file(Path(name)):
-            return Dependency(self._file_loader, Path(name))
-        site_package = self._site_packages[name]
-        if site_package is None:
-            problem = DependencyProblem(code='dependency-check', message=f"Could not locate import: {name}")
-            problem_collector(problem)
-            return None
-        container = SitePackageContainer(self._file_loader, site_package)
-        return Dependency(WrappingLoader(container), Path(name))
-
-    def _is_whitelisted(self, name: str) -> bool:
-        compatibility = self._whitelist.compatibility(name)
-        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
-        if compatibility is None:
-            return False
-        if compatibility == UCCompatibility.NONE:
-            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
-            self._problems.append(
-                DependencyProblem(
-                    code="dependency-check",
-                    message=f"Use of dependency {name} is deprecated",
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=0,
-                )
-            )
-        return True
 
 
 class DependencyGraph:
