@@ -17,6 +17,7 @@ from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore.grants import AzureACL, PrincipalACL
 from tests.unit.azure import azure_api_client
 
 
@@ -30,7 +31,12 @@ def location_migration_for_test(ws, mock_backend, mock_installation):
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
 
     return ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
+        ws,
+        location_crawler,
+        AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler),
+        azurerm,
+        create_autospec(AzureACL),
+        create_autospec(PrincipalACL),
     )
 
 

@@ -526,7 +526,7 @@ class PrincipalACL:
         grants: set[Grant] = set()
 
         for cluster_id, locations in self._cluster_locations.items():
-            principals = self._get_cluster_principal_mapping(cluster_id)
+            principals = self.get_cluster_principal_mapping(cluster_id)
             if len(principals) == 0:
                 continue
             cluster_usage = self._get_grants(locations, principals, tables, mounts)
@@ -596,7 +596,7 @@ class PrincipalACL:
 
         return grants
 
-    def _get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
+    def get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
         # gets all the users,groups,spn which have access to the clusters and returns a dataclass of that mapping
         principal_list = []
         cluster_permission = self._ws.permissions.get("clusters", cluster_id)

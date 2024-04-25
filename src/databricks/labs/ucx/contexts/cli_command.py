@@ -118,6 +118,8 @@ class WorkspaceContext(CliContext):
             self.external_locations,
             self.azure_resource_permissions,
             self.azure_resources,
+            self.azure_acl,
+            self.principal_acl,
         )
 
     @cached_property
