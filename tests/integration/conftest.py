@@ -443,7 +443,7 @@ class LocalAzureCliTest(WorkspaceContext):
 
     @cached_property
     def azure_subscription_id(self):
-        return "bf472657-510a-4fad-a050-87cfb4e1a2ce"
+        return self._env_or_skip("TEST_SUBSCRIPTION_ID")
 
     @cached_property
     def config(self) -> WorkspaceConfig:
