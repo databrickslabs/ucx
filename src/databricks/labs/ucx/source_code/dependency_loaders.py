@@ -22,6 +22,12 @@ class SourceContainer(abc.ABC):
         raise NotImplementedError()
 
 
+class StubContainer(SourceContainer):
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+        pass
+
+
 class DependencyLoader(abc.ABC):
 
     @abc.abstractmethod

@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from databricks.labs.ucx.source_code.dependencies import Dependency, DependencyProblem
-from databricks.labs.ucx.source_code.dependency_loaders import SitePackageContainer, WrappingLoader
+from databricks.labs.ucx.source_code.dependency_loaders import SitePackageContainer, WrappingLoader, StubContainer
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
@@ -109,7 +109,8 @@ class WhitelistResolver(BaseDependencyResolver):
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         if self._is_whitelisted(name):
-            return None
+            container = StubContainer()
+            return Dependency(WrappingLoader(container), Path(name))
         return super().resolve_import(name, problem_collector)
 
     def _is_whitelisted(self, name: str) -> bool:
