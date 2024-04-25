@@ -322,6 +322,7 @@ class DashboardFromFiles:
         description: str | None = None,
         search_by: str | None = None,
     ) -> dict:
+        search_by_columns = set(search_by.split(","))
         return {
             "type": "TABLE",
             "name": name,
@@ -332,7 +333,7 @@ class DashboardFromFiles:
                 "withRowNumber": with_row_number,
                 "version": 2,
                 "columns": [
-                    VizColumn(name=x, title=x, allowSearch=x == search_by).as_dict() for x in columns.split(",")
+                    VizColumn(name=x, title=x, allowSearch=x in search_by_columns).as_dict() for x in columns.split(",")
                 ],
             },
         }
