@@ -8,10 +8,10 @@ from pathlib import Path
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependencies import (
-    SourceContainer,
     DependencyGraph,
     DependencyProblem,
 )
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter

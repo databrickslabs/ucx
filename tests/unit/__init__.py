@@ -17,7 +17,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, Language
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.dependencies import SourceContainer
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.notebook import Notebook, NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.whitelist import Whitelist
