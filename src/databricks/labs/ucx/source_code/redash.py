@@ -20,15 +20,19 @@ class Redash:
 
     def fix_all_dashboards(self):
         for dashboard in self._ws.dashboards.list():
-            if self.MIGRATED_TAG in dashboard.tags or self.BACKUP_TAG in dashboard.tags:
-                continue
             self.fix_dashboard(dashboard)
 
     def fix_dashboard(self, dashboard: Dashboard):
+        if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
+            # already migrated
+            return
         for query in self._get_queries_from_dashboard(dashboard):
             self._fix_query(query)
 
     def revert_dashboard(self, dashboard: Dashboard):
+        if dashboard.tags is None or self.MIGRATED_TAG not in dashboard.tags:
+            logger.debug(f"Dashboard {dashboard.id} was not migrated by UCX")
+            return
         for query in self._get_queries_from_dashboard(dashboard):
             self._revert_query(query)
 
