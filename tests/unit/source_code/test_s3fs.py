@@ -113,10 +113,10 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     file_loader.is_file.return_value = True
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader())
+    resolver = DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader())
     builder = DependencyGraphBuilder(resolver)
     builder.build_local_file_dependency_graph(Path("path"))
-    problems: list[DependencyProblem] = resolver.problems
+    problems: list[DependencyProblem] = list(resolver.problems)
     assert problems == expected
 
 
@@ -145,8 +145,8 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     file_loader.is_file.return_value = True
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist, site_packages, file_loader, LocalNotebookLoader())
+    resolver = DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader())
     builder = DependencyGraphBuilder(resolver)
     builder.build_local_file_dependency_graph(Path("root9.py.txt"))
-    problems: list[DependencyProblem] = resolver.problems
+    problems: list[DependencyProblem] = list(resolver.problems)
     assert problems == expected
