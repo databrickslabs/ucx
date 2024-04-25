@@ -205,7 +205,9 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
             temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             account_group = self.account_groups_in_account.get(group.display_name)
             if not account_group:
-                logger.info(f"Couldn't find a matching account group for {group.display_name} group")
+                logger.info(
+                    f"Couldn't find a matching account group for {group.display_name} group using name matching"
+                )
                 continue
             yield MigratedGroup(
                 id_in_workspace=group.id,
@@ -252,9 +254,7 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
                 external_id=account_group.external_id,
                 members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
                 roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
-                entitlements=(
-                    json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None
-                ),
+                entitlements=(json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None),
             )
 
 
@@ -287,7 +287,9 @@ class RegexSubStrategy(GroupMigrationStrategy):
             )
             account_group = self.account_groups_in_account.get(name_in_account)
             if not account_group:
-                logger.info(f"Couldn't find a matching account group for {group.display_name} group with regex substitution")
+                logger.info(
+                    f"Couldn't find a matching account group for {group.display_name} group with regex substitution"
+                )
                 continue
             yield MigratedGroup(
                 id_in_workspace=group.id,
@@ -334,7 +336,9 @@ class RegexMatchStrategy(GroupMigrationStrategy):
             temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             account_group = account_groups_by_match.get(group_match)
             if not account_group:
-                logger.info(f"Couldn't find a match for group {ws_group.display_name}")
+                logger.info(
+                    f"Couldn't find a matching account group for {ws_group.display_name} group with regex matching"
+                )
                 continue
             yield MigratedGroup(
                 id_in_workspace=ws_group.id,
