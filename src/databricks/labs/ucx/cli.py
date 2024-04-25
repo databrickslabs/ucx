@@ -405,8 +405,6 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
     Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
     workflow.
     """
-    migrate_hiveserde_tables_workflow_name = "migrate-external-hiveserde-tables-in-place-experimental"
-
     if ctx is None:
         ctx = WorkspaceContext(w)
     deployed_workflows = ctx.deployed_workflows
@@ -418,9 +416,9 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
         percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
         if prompts.confirm(
             f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables, do you want to run "
-            f"the {migrate_hiveserde_tables_workflow_name} workflow?"
+            f"the migrate-external-hiveserde-tables-in-place-experimental workflow?"
         ):
-            deployed_workflows.run_workflow(migrate_hiveserde_tables_workflow_name)
+            deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
 
 if __name__ == "__main__":

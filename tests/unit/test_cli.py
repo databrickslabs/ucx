@@ -462,11 +462,7 @@ def test_migrate_tables(ws):
 def test_migrate_external_hiveserde_tables_in_place(ws):
     tables_crawler = create_autospec(TablesCrawler)
     table = Table(
-        catalog="hive_metastore",
-        database="test",
-        name="hiveserde",
-        object_type="UNKNOWN",
-        table_format="HIVE"
+        catalog="hive_metastore", database="test", name="hiveserde", object_type="UNKNOWN", table_format="HIVE"
     )
     tables_crawler.snapshot.return_value = [table]
     ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
