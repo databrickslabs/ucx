@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, 
 from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources, _load_dependency_side_effect, locate_site_packages
+from tests.unit import _load_sources, _load_dependency_side_effect, locate_site_packages, _is_file_side_effect
 
 
 S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
@@ -110,7 +110,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     sources = {"path": source}
     file_loader = create_autospec(LocalFileLoader)
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
-    file_loader.is_file.return_value = True
+    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
     resolver = DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader())
@@ -142,7 +142,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     whitelist = Whitelist.parse(datas[0])
     file_loader = create_autospec(LocalFileLoader)
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
-    file_loader.is_file.return_value = True
+    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
     resolver = DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader())

@@ -182,7 +182,7 @@ def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, boo
 
 def _is_notebook_side_effect(sources: dict[str, str], *args):
     dependency = args[0]
-    filename = str(dependency.path)
+    filename = dependency.path.as_posix()
     if filename.startswith('./'):
         filename = filename[2:]
     source = sources.get(filename, None)
@@ -194,6 +194,20 @@ def _is_notebook_side_effect(sources: dict[str, str], *args):
         source = sources.get(filename)
     assert source is not None
     return NOTEBOOK_HEADER in source
+
+
+def _is_file_side_effect(sources: dict[str, str], *args):
+    path = args[0]
+    filename = path.as_posix()
+    if filename.startswith('./'):
+        filename = filename[2:]
+    if filename in sources:
+        return True
+    if filename.find(".py") < 0:
+        filename = filename + ".py"
+    if filename.find(".txt") < 0:
+        filename = filename + ".txt"
+    return filename in sources
 
 
 def workspace_client_mock(
