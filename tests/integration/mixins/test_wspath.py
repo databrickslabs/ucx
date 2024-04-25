@@ -93,3 +93,20 @@ def test_replace(ws, make_random):
 
     assert not hello_txt.exists()
     assert (with_user / "hello2.txt").read_text() == 'Hello, World!'
+
+
+def test_file_and_notebook_in_same_folder_with_different_suffixes(ws, make_notebook, make_directory):
+    folder = WorkspacePath(ws, make_directory())
+
+    txt_file = folder / "a.txt"
+    py_notebook = folder / 'b'  # notebooks have no file extension
+
+    make_notebook(path=py_notebook, content="display(spark.range(10))")
+    txt_file.write_text("Hello, World!")
+
+    files = {_.name: _ for _ in folder.glob("**/*")}
+    assert len(files) == 2
+
+    assert files['a.txt'].suffix == '.txt'
+    assert files['b'].suffix == '.py'  # suffix is determined from ObjectInfo
+    assert files['b'].read_text() == "# Databricks notebook source\ndisplay(spark.range(10))"
