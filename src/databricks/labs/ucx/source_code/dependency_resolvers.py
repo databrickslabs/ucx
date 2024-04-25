@@ -9,6 +9,7 @@ from pathlib import Path
 from databricks.labs.ucx.source_code.dependencies import Dependency, DependencyProblem
 from databricks.labs.ucx.source_code.dependency_loaders import SitePackageContainer, WrappingLoader, StubContainer
 from databricks.labs.ucx.source_code.site_packages import SitePackages
+from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 
 if typing.TYPE_CHECKING:
@@ -93,8 +94,9 @@ class LocalFileResolver(BaseDependencyResolver):
         return super().resolve_local_file(path, problem_collector)
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        if self._file_loader.is_file(Path(name)):
-            return Dependency(self._file_loader, Path(name))
+        fullpath = self._file_loader.full_path(Path(f"{name}.py"))
+        if fullpath is not None:
+            return Dependency(self._file_loader, fullpath)
         return super().resolve_import(name, problem_collector)
 
 
@@ -133,15 +135,16 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class SitePackagesResolver(BaseDependencyResolver):
 
-    def __init__(self, site_packages: SitePackages, file_loader: LocalFileLoader):
+    def __init__(self, site_packages: SitePackages, file_loader: LocalFileLoader, syspath_provider: SysPathProvider):
         super().__init__()
         self._site_packages = site_packages
         self._file_loader = file_loader
+        self._syspath_provider = syspath_provider
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         site_package = self._site_packages[name]
         if site_package is not None:
-            container = SitePackageContainer(self._file_loader, site_package)
+            container = SitePackageContainer(self._file_loader, site_package, self._syspath_provider)
             return Dependency(WrappingLoader(container), Path(name))
         return super().resolve_import(name, problem_collector)
 
@@ -154,10 +157,11 @@ class DependencyResolver:
         site_packages: SitePackages,
         file_loader: LocalFileLoader,
         notebook_loader: NotebookLoader,
+        syspath_provider: SysPathProvider,
     ) -> DependencyResolver:
         resolver = DependencyResolver()
         resolver.push(NotebookResolver(notebook_loader))
-        resolver.push(SitePackagesResolver(site_packages, file_loader))
+        resolver.push(SitePackagesResolver(site_packages, file_loader, syspath_provider))
         resolver.push(WhitelistResolver(whitelist))
         resolver.push(LocalFileResolver(file_loader))
         return resolver

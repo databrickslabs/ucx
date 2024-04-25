@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -108,3 +110,6 @@ class SequentialLinter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint(code)
+
+
+NOTEBOOK_HEADER = "Databricks notebook source"

@@ -7,11 +7,16 @@ from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraphBuilder,
     DependencyProblem,
 )
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalFileLoader, LocalNotebookLoader
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalNotebookLoader, LocalFileLoader
 from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages
+from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 from databricks.labs.ucx.source_code.whitelist import Whitelist
-from tests.unit import _load_sources, _load_dependency_side_effect, locate_site_packages, _is_file_side_effect
+from tests.unit import (
+    _load_sources,
+    locate_site_packages,
+    _local_loader_with_side_effects,
+)
 
 
 S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
@@ -108,12 +113,12 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
     sources = {"path": source}
-    file_loader = create_autospec(LocalFileLoader)
-    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
-    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
-    file_loader.is_notebook.return_value = False
+    file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, {})
     site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader())
+    provider = create_autospec(SysPathProvider)
+    resolver = DependencyResolver.initialize(
+        whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider
+    )
     builder = DependencyGraphBuilder(resolver)
     builder.build_local_file_dependency_graph(Path("path"))
     problems: list[DependencyProblem] = list(resolver.problems)
@@ -140,12 +145,12 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
-    file_loader = create_autospec(LocalFileLoader)
-    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
-    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
-    file_loader.is_notebook.return_value = False
+    file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, {})
     site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader())
+    provider = create_autospec(SysPathProvider)
+    resolver = DependencyResolver.initialize(
+        whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider
+    )
     builder = DependencyGraphBuilder(resolver)
     builder.build_local_file_dependency_graph(Path("root9.py.txt"))
     problems: list[DependencyProblem] = list(resolver.problems)

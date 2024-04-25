@@ -7,7 +7,7 @@ def test_provider_is_initialized():
     provider = SysPathProvider.initialize("what:on:earth")
     assert provider is not None
     paths = list(provider.paths)
-    assert [ "what", "on", "earth" ] == [path.as_posix() for path in paths]
+    assert ["what", "on", "earth"] == [path.as_posix() for path in paths]
 
 
 def test_provider_pushes():
@@ -15,12 +15,12 @@ def test_provider_pushes():
     provider.push(Path("is"))
     provider.push(Path("this"))
     paths = list(provider.paths)
-    assert [ "this", "is", "what", "on", "earth"] == [path.as_posix() for path in paths]
+    assert [path.as_posix() for path in paths] == ["this", "is", "what", "on", "earth"]
 
 
 def test_provider_pops():
     provider = SysPathProvider.initialize("what:on:earth")
     popped = provider.pop()
-    assert "what" == popped.as_posix()
+    assert popped.as_posix() == "what"
     paths = list(provider.paths)
-    assert [ "on", "earth" ] == [path.as_posix() for path in paths]
+    assert [path.as_posix() for path in paths] == ["on", "earth"]

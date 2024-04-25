@@ -11,6 +11,7 @@ from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.dependencies import (
     DependencyGraph,
     DependencyProblem,
@@ -22,7 +23,6 @@ logger = logging.getLogger(__name__)
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 
-NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
 MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'

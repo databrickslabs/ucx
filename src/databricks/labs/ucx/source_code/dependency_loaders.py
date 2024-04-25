@@ -5,9 +5,11 @@ import typing
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
+from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 
+from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.dependencies import Dependency
+from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 
 
 if typing.TYPE_CHECKING:
@@ -56,15 +58,39 @@ class WrappingLoader(DependencyLoader):
 
 
 class LocalFileLoader(DependencyLoader):
-    # see https://github.com/databrickslabs/ucx/issues/1499
+
+    def __init__(self, syspath_provider: SysPathProvider):
+        self._syspath_provider = syspath_provider
+
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
+        # the below is required to avoid cyclic import
+        # pylint: disable=import-outside-toplevel, cyclic-import
+        from databricks.labs.ucx.source_code.files import LocalFile
+
+        fullpath = self.full_path(dependency.path)
+        assert fullpath is not None
+        with fullpath.open(mode="r", encoding="utf-8") as stream:
+            source = stream.read()
+            return LocalFile(fullpath, source, Language.PYTHON)
 
     def is_file(self, path: Path) -> bool:
-        raise NotImplementedError()
+        return self.full_path(path) is not None
+
+    def full_path(self, path: Path) -> Path | None:
+        if path.is_file():
+            return path
+        for parent in self._syspath_provider.paths:
+            child = Path(parent, path)
+            if child.is_file():
+                return child
+        return None
 
     def is_notebook(self, path: Path) -> bool:
-        raise NotImplementedError()
+        fullpath = self.full_path(path)
+        assert fullpath is not None
+        with fullpath.open(mode="r", encoding="utf-8") as stream:
+            line = stream.readline()
+            return NOTEBOOK_HEADER in line
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):
@@ -78,13 +104,18 @@ class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
 
 class SitePackageContainer(SourceContainer):
 
-    def __init__(self, file_loader: LocalFileLoader, site_package: SitePackage):
+    def __init__(self, file_loader: LocalFileLoader, site_package: SitePackage, syspath_provider: SysPathProvider):
         self._file_loader = file_loader
         self._site_package = site_package
+        self._syspath_provider = syspath_provider
 
     def build_dependency_graph(self, parent: DependencyGraph) -> None:
         for module_path in self._site_package.module_paths:
-            parent.register_dependency(Dependency(self._file_loader, module_path))
+            self._syspath_provider.push(module_path.parent)
+            try:
+                parent.register_dependency(Dependency(self._file_loader, module_path))
+            finally:
+                self._syspath_provider.pop()
 
 
 class WorkspaceNotebookLoader(NotebookLoader):

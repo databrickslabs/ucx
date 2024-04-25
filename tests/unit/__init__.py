@@ -17,9 +17,11 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, Language
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalFileLoader
 from databricks.labs.ucx.source_code.files import LocalFile
-from databricks.labs.ucx.source_code.notebook import Notebook, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
@@ -119,6 +121,10 @@ def _load_sources(cls: type, *filenames: str):
     return [installation.load(cls, filename=_) for _ in filenames]
 
 
+def _samples_path(cls: type) -> str:
+    return (__dir / _FOLDERS[cls]).as_posix()
+
+
 def _cluster_policy(policy_id: str):
     fixture = _load_fixture(f"{_FOLDERS[Policy]}/{policy_id}.json")
     definition = json.dumps(fixture["definition"])
@@ -196,18 +202,57 @@ def _is_notebook_side_effect(sources: dict[str, str], *args):
     return NOTEBOOK_HEADER in source
 
 
-def _is_file_side_effect(sources: dict[str, str], *args):
+def _full_path_side_effect(sources: dict[str, str], *args):
     path = args[0]
     filename = path.as_posix()
     if filename.startswith('./'):
         filename = filename[2:]
     if filename in sources:
-        return True
+        return pathlib.Path(filename)
     if filename.find(".py") < 0:
         filename = filename + ".py"
     if filename.find(".txt") < 0:
         filename = filename + ".txt"
-    return filename in sources
+    if filename in sources:
+        return pathlib.Path(filename)
+    return None
+
+
+def _is_file_side_effect(sources: dict[str, str], *args):
+    return _full_path_side_effect(sources, *args) is not None
+
+
+def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited: dict[str, bool]):
+    file_loader = create_autospec(cls)
+    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
+    file_loader.is_notebook.return_value = False
+    file_loader.full_path.side_effect = lambda *args: _full_path_side_effect(sources, *args)
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    return file_loader
+
+
+class TestFileLoader(LocalFileLoader):
+    __test__ = False
+
+    def __init__(self, syspath_provider: SysPathProvider, sources: dict[str, str]):
+        super().__init__(syspath_provider)
+        self._sources = sources
+
+    def is_file(self, path: pathlib.Path):
+        if super().is_file(path):
+            return True
+        filename = path.as_posix()
+        if filename.startswith('./'):
+            filename = filename[2:]
+        if filename in self._sources:
+            return True
+        if filename.find(".py") < 0:
+            filename = filename + ".py"
+        if filename.find(".txt") < 0:
+            filename = filename + ".txt"
+        return filename in self._sources
 
 
 def workspace_client_mock(
