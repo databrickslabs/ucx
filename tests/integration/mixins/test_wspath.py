@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from databricks.sdk.errors import BadRequest
 
@@ -12,10 +14,27 @@ def test_exists(ws):
 def test_mkdirs(ws, make_random):
     name = make_random()
     wsp = WorkspacePath(ws, f"~/{name}/foo/bar/baz")
+    assert not wsp.is_absolute()
+
+    with pytest.raises(NotImplementedError):
+        wsp.absolute()
+
     with_user = wsp.expanduser()
     with_user.mkdir()
 
-    wsp_check = WorkspacePath(ws, f"/Users/{ws.current_user.me().user_name}/{name}/foo/bar/baz")
+    home = WorkspacePath(ws, "~").expanduser()
+    relative_name = with_user.relative_to(home)
+    assert relative_name.as_posix() == f'{name}/foo/bar/baz'
+
+    assert with_user.is_absolute()
+    assert with_user.absolute() == with_user
+    assert with_user.as_fuse() == Path('/Workspace') / with_user.as_posix()
+
+    user_name = ws.current_user.me().user_name
+    browser_uri = f'{ws.config.host}#workspace/Users/{user_name.replace("@", "%40")}/{name}/foo/bar/baz'
+    assert with_user.as_uri() == browser_uri
+
+    wsp_check = WorkspacePath(ws, f"/Users/{user_name}/{name}/foo/bar/baz")
     assert wsp_check.is_dir()
 
     with pytest.raises(BadRequest):

@@ -1,5 +1,6 @@
 import abc
 import locale
+import logging
 import os
 import pathlib
 from functools import cached_property
@@ -14,6 +15,9 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat
 
 
+logger = logging.getLogger(__name__)
+
+
 class _DatabricksFlavour(_PosixFlavour):
     def __init__(self, ws: WorkspaceClient):
         super().__init__()
@@ -26,8 +30,12 @@ class _DatabricksFlavour(_PosixFlavour):
         return f"<{self.__class__.__name__} for {self._ws}>"
 
 
-def _na(*args, **kwargs):
-    raise NotImplementedError("Not available for Databricks Workspace")
+def _na(fn: str):
+    def _inner(*_, **__):
+        __tracebackhide__ = True  # pylint: disable=unused-variable
+        raise NotImplementedError(f"{fn}() is not available for Databricks Workspace")
+
+    return _inner
 
 
 class _ScandirItem:
@@ -68,20 +76,20 @@ class _ScandirIterator:
 
 
 class _DatabricksAccessor(_Accessor):
-    mkdir = _na
-    unlink = _na
-    rmdir = _na
-    rename = _na
-    replace = _na
-    stat = _na
-    chmod = _na
-    link = _na
-    symlink = _na
-    readlink = _na
-    owner = _na
-    group = _na
-    getcwd = _na
-    realpath = _na
+    chmod = _na('accessor.chmod')
+    getcwd = _na('accessor.getcwd')
+    group = _na('accessor.group')
+    link = _na('accessor.link')
+    mkdir = _na('accessor.mkdir')
+    owner = _na('accessor.owner')
+    readlink = _na('accessor.readlink')
+    realpath = _na('accessor.realpath')
+    rename = _na('accessor.rename')
+    replace = _na('accessor.replace')
+    rmdir = _na('accessor.rmdir')
+    stat = _na('accessor.stat')
+    symlink = _na('accessor.symlink')
+    unlink = _na('accessor.unlink')
 
     def __init__(self, ws: WorkspaceClient):
         self._ws = ws
@@ -126,26 +134,27 @@ class _TextUploadIO(_UploadIO, StringIO):  # type: ignore
         StringIO.__init__(self)
 
 
-class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
+class WorkspacePath(Path):
     """Experimental implementation of pathlib.Path for Databricks Workspace."""
 
     _ws: WorkspaceClient
     _flavour: _DatabricksFlavour
     _accessor: _DatabricksAccessor
 
-    resolve = _na
-    stat = _na
-    chmod = _na
-    lchmod = _na
-    lstat = _na
-    owner = _na
-    group = _na
-    readlink = _na
-    symlink_to = _na
-    hardlink_to = _na
-    touch = _na
-    link_to = _na
-    samefile = _na
+    cwd = _na('cwd')
+    resolve = _na('resolve')
+    stat = _na('stat')
+    chmod = _na('chmod')
+    lchmod = _na('lchmod')
+    lstat = _na('lstat')
+    owner = _na('owner')
+    group = _na('group')
+    readlink = _na('readlink')
+    symlink_to = _na('symlink_to')
+    hardlink_to = _na('hardlink_to')
+    touch = _na('touch')
+    link_to = _na('link_to')
+    samefile = _na('samefile')
 
     def __new__(cls, ws: WorkspaceClient, path: str | Path):
         this = object.__new__(cls)
@@ -196,6 +205,17 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
         # instance method adapted from pathlib.Path
         drv, root, parts = self._parse_args(args)
         return self._from_parsed_parts(drv, root, parts)
+
+    def relative_to(self, *other) -> pathlib.PurePath:  # type: ignore
+        """Databricks Workspace works only with absolute paths, so we make sure to
+        return pathlib.Path instead of WorkspacePath to avoid confusion."""
+        return pathlib.PurePath(super().relative_to(*other))
+
+    def as_fuse(self):
+        """Return FUSE-mounted path in Databricks Runtime."""
+        if 'DATABRICKS_RUNTIME_VERSION' not in os.environ:
+            logger.warning("This method is only available in Databricks Runtime")
+        return Path('/Workspace', self.as_posix())
 
     def home(self):  # pylint: disable=arguments-differ
         # instance method adapted from pathlib.Path
@@ -250,23 +270,13 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
             return _TextUploadIO(self._ws, self.as_posix())
         raise ValueError(f"invalid mode: {mode}")
 
-    @classmethod
-    def cwd(cls):
-        # should we?..
-        raise NotImplementedError("Not available for Databricks Workspace")
-
-    def absolute(self):
-        # TODO: check if this is correct
-        return super().absolute()
-
     @cached_property
     def _object_info(self) -> ObjectInfo:
         # this method is cached because it is used in multiple is_* methods.
         # DO NOT use this method in methods, where fresh result is required.
         return self._ws.workspace.get_status(self.as_posix())
 
-    @staticmethod
-    def _return_false():
+    def _return_false(self) -> bool:
         return False
 
     is_symlink = _return_false
