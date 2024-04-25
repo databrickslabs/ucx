@@ -526,9 +526,7 @@ class WorkflowsDeployment(InstallationMixin):
         with self._wheels:
             try:
                 self._wheels.upload_to_dbfs()
-            except BadRequest as err:
-                if not prompts:
-                    raise RuntimeWarning("no Prompts instance found") from err
+            except (BadRequest, PermissionDenied) as err:
                 logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
                 configure_cluster_overrides = ConfigureClusterOverrides(self._ws, prompts.choice_from_dict)
                 self._config.override_clusters = configure_cluster_overrides.configure()
