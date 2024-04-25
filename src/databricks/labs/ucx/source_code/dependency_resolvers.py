@@ -85,7 +85,7 @@ class LocalFileResolver(BaseDependencyResolver):
         super().__init__()
         self._file_loader = file_loader
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1459
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
     def resolve_local_file(
         self, path: Path, problem_collector: Callable[[DependencyProblem], None]
     ) -> Dependency | None:
@@ -106,7 +106,7 @@ class WhitelistResolver(BaseDependencyResolver):
         super().__init__()
         self._whitelist = whitelist
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1459
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         if self._is_whitelisted(name):
             container = StubContainer()
