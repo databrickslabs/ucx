@@ -1,4 +1,3 @@
-from unittest import mock
 from unittest.mock import create_autospec, call
 
 import pytest
@@ -22,6 +21,8 @@ def redash_ws():
             dashboard_id = path.removeprefix("/api/2.0/preview/sql/dashboards/")
             tags = tags_lookup[dashboard_id]
             return {
+                "id": dashboard_id,
+                "tags": tags,
                 "widgets": [
                     {},
                     {"visualization": {}},
@@ -45,7 +46,7 @@ def redash_ws():
                             }
                         }
                     },
-                ]
+                ],
             }
         if path.startswith("/api/2.0/preview/sql/queries"):
             return {}
@@ -70,7 +71,7 @@ def empty_fixer(empty_index):
 
 def test_fix_all_dashboards(redash_ws, empty_fixer):
     redash = Redash(empty_fixer, redash_ws)
-    redash.fix_all_dashboards()
+    redash.fix_dashboard()
     redash_ws.queries.create.assert_called_with(
         name='test_query_original',
         query='SELECT * FROM old.things',
@@ -82,7 +83,7 @@ def test_fix_all_dashboards(redash_ws, empty_fixer):
     )
     redash_ws.api_client.do.assert_has_calls(
         [
-            call('GET', '/api/2.0/preview/sql/dashboards/3'),
+            call('GET', '/api/2.0/preview/sql/dashboards/1'),
             # tag the backup query
             call('POST', '/api/2.0/preview/sql/queries/123', body={'tags': [Redash.BACKUP_TAG]}),
             # tag the migrated query
@@ -96,16 +97,18 @@ def test_fix_all_dashboards(redash_ws, empty_fixer):
 
 
 def test_revert_dashboard(redash_ws, empty_fixer):
+    redash_ws.queries.get.return_value = Query(id="1", query="original_query")
     redash = Redash(empty_fixer, redash_ws)
-    redash.revert_dashboard(Dashboard(id="2", tags=[Redash.MIGRATED_TAG]))
+    redash.revert_dashboard("2")
     redash_ws.api_client.do.assert_has_calls(
         [
+            call('GET', '/api/2.0/preview/sql/dashboards/2'),
             call('GET', '/api/2.0/preview/sql/dashboards/2'),
             # update the migrated query
             call(
                 'POST',
                 '/api/2.0/preview/sql/queries/1',
-                body={'query': mock.ANY, 'tags': []},
+                body={'query': 'original_query', 'tags': ['original']},
             ),
         ]
     )
@@ -113,6 +116,7 @@ def test_revert_dashboard(redash_ws, empty_fixer):
 
 
 def test_delete_backup_dashboards(redash_ws, empty_fixer):
+    redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[])]
     redash = Redash(empty_fixer, redash_ws)
-    redash.delete_backup_dashboards()
-    redash_ws.dashboards.delete.assert_called_once_with("1")
+    redash.delete_backup_dbsql_queries()
+    redash_ws.queries.delete.assert_called_once_with("1")

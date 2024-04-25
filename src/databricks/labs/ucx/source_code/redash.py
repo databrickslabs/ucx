@@ -18,41 +18,38 @@ class Redash:
         self._fixer = fixer
         self._ws = ws
 
-    def fix_all_dashboards(self):
-        for dashboard in self._ws.dashboards.list():
-            self.fix_dashboard(dashboard)
-
-    def fix_dashboard(self, dashboard: Dashboard):
-        if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
-            # already migrated
-            return
-        for query in self._get_queries_from_dashboard(dashboard):
-            self._fix_query(query)
-
-    def revert_dashboard(self, dashboard: Dashboard):
-        if dashboard.tags is None or self.MIGRATED_TAG not in dashboard.tags:
-            logger.debug(f"Dashboard {dashboard.id} was not migrated by UCX")
-            return
-        for query in self._get_queries_from_dashboard(dashboard):
-            self._revert_query(query)
-
-    def delete_backup_dashboards(self):
-        for dashboard in self._ws.dashboards.list():
-            if dashboard.tags is None or self.BACKUP_TAG not in dashboard.tags:
-                continue
-
+    def fix_dashboard(self, dashboard_id: str | None = None):
+        if dashboard_id is None:
+            dashboards = list(self._ws.dashboards.list())
+        else:
+            dashboards = [Dashboard.from_dict(self._get_dashboard(dashboard_id))]
+        for dashboard in dashboards:
+            if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
+                # already migrated
+                return
             for query in self._get_queries_from_dashboard(dashboard):
-                if query.tags is None or self.BACKUP_TAG not in query.tags:
-                    continue
-                try:
-                    self._ws.queries.delete(query.id)
-                except NotFound:
-                    continue
+                self._fix_query(query)
 
+    def revert_dashboard(self, dashboard_id: str | None = None):
+        if dashboard_id is None:
+            dashboards = list(self._ws.dashboards.list())
+        else:
+            dashboards = [Dashboard.from_dict(self._get_dashboard(dashboard_id))]
+        for dashboard in dashboards:
+            if dashboard.tags is None or self.MIGRATED_TAG not in dashboard.tags:
+                logger.debug(f"Dashboard {dashboard.id} was not migrated by UCX")
+                return
+            for query in self._get_queries_from_dashboard(dashboard):
+                self._revert_query(query)
+
+    def delete_backup_dbsql_queries(self):
+        for query in self._ws.queries.list():
+            if query.tags is None or self.BACKUP_TAG not in query.tags:
+                continue
             try:
-                self._ws.dashboards.delete(dashboard.id)
+                self._ws.queries.delete(query.id)
             except NotFound:
-                pass
+                continue
 
     def _fix_query(self, query: Query):
         assert query.id is not None
@@ -116,9 +113,7 @@ class Redash:
         self._ws.queries.delete(backup_id)
 
     def _get_queries_from_dashboard(self, dashboard: Dashboard) -> Iterator[Query]:
-        raw = self._ws.api_client.do("GET", f"/api/2.0/preview/sql/dashboards/{dashboard.id}")
-        if not isinstance(raw, dict):
-            return
+        raw = self._get_dashboard(dashboard.id)
         for widget in raw["widgets"]:
             if "visualization" not in widget:
                 continue
@@ -126,3 +121,9 @@ class Redash:
             if "query" not in viz:
                 continue
             yield Query.from_dict(viz["query"])
+
+    def _get_dashboard(self, dashboard_id) -> dict:
+        raw = self._ws.api_client.do("GET", f"/api/2.0/preview/sql/dashboards/{dashboard_id}")
+        if not isinstance(raw, dict):
+            return {}
+        return raw
