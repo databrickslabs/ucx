@@ -45,6 +45,14 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
+    logs,
+    show_all_metastores,
+    assign_metastore,
+    migrate_tables,
+    create_missing_principals,
+    migrate_dbsql_dashboard,
+    revert_dbsql_dashboard,
+    delete_backup_dbsql_queries,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -530,3 +538,18 @@ def test_create_missing_principal_azure(ws, caplog):
     with pytest.raises(ValueError) as failure:
         create_missing_principals(ws, prompts=prompts, ctx=ctx)
     assert str(failure.value) == "Unsupported cloud provider"
+
+
+def test_migrate_dbsql_dashboards(ws, caplog):
+    migrate_dbsql_dashboard(ws)
+    ws.dashboards.list.assert_called_once()
+
+
+def test_revert_dbsql_dashboards(ws, caplog):
+    revert_dbsql_dashboard(ws)
+    ws.dashboards.list.assert_called_once()
+
+
+def test_delete_backup_dbsql_queries(ws, caplog):
+    delete_backup_dbsql_queries(ws)
+    ws.queries.list.assert_called_once()
