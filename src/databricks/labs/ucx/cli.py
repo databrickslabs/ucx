@@ -12,6 +12,7 @@ from databricks.sdk.errors import NotFound
 from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
+from databricks.labs.ucx.hive_metastore.tables import What
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -396,6 +397,28 @@ def assign_metastore(
     logger.info(f"Account ID: {a.config.account_id}")
     ctx = AccountContext(a)
     ctx.account_metastores.assign_metastore(ctx.prompts, workspace_id, metastore_id, default_catalog)
+
+
+@ucx.command
+def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
+    """
+    Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
+    workflow.
+    """
+    if ctx is None:
+        ctx = WorkspaceContext(w)
+    deployed_workflows = ctx.deployed_workflows
+    deployed_workflows.run_workflow("migrate-tables")
+
+    tables = ctx.tables_crawler.snapshot()
+    hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
+    if len(hiveserde_tables) > 0:
+        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
+        if prompts.confirm(
+            f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables, do you want to run "
+            f"the migrate-external-hiveserde-tables-in-place-experimental workflow?"
+        ):
+            deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
 
 if __name__ == "__main__":

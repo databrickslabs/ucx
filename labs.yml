@@ -180,3 +180,8 @@ commands:
         description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
       - name: default-catalog
         description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
+
+  - name: migrate-tables
+    description: |
+      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental 
+      workflow.

@@ -1,5 +1,6 @@
 import io
 import json
+import time
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -42,8 +43,11 @@ from databricks.labs.ucx.cli import (
     logs,
     show_all_metastores,
     assign_metastore,
+    migrate_tables,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.fixture
@@ -60,7 +64,17 @@ def ws():
                 },
             }
         ),
-        '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
+        '/Users/foo/.ucx/state.json': json.dumps(
+            {
+                'resources': {
+                    'jobs': {
+                        'assessment': '123',
+                        'migrate-tables': '456',
+                        'migrate-external-hiveserde-tables-in-place-experimental': '789',
+                    }
+                }
+            }
+        ),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
@@ -94,7 +108,7 @@ def ws():
 def test_workflow(ws, caplog):
     workflows(ws)
     assert "Fetching deployed jobs..." in caplog.messages
-    ws.jobs.list_runs.assert_called_once()
+    ws.jobs.list_runs.assert_called()
 
 
 def test_open_remote_config(ws):
@@ -417,7 +431,7 @@ def test_revert_cluster_remap_empty(ws, caplog):
 
 
 def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123)]
+    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
     ws.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
@@ -437,3 +451,28 @@ def test_show_all_metastores(acc_client, caplog):
 def test_assign_metastore(acc_client, caplog):
     with pytest.raises(ValueError):
         assign_metastore(acc_client, "123")
+
+
+def test_migrate_tables(ws):
+    prompts = MockPrompts({})
+    migrate_tables(ws, prompts)
+    ws.jobs.run_now.assert_called_with(456)
+
+
+def test_migrate_external_hiveserde_tables_in_place(ws):
+    tables_crawler = create_autospec(TablesCrawler)
+    table = Table(
+        catalog="hive_metastore", database="test", name="hiveserde", object_type="UNKNOWN", table_format="HIVE"
+    )
+    tables_crawler.snapshot.return_value = [table]
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+
+    prompt = (
+        "Found 1 (.*) hiveserde tables, do you want to run the "
+        "migrate-external-hiveserde-tables-in-place-experimental workflow?"
+    )
+    prompts = MockPrompts({prompt: "Yes"})
+
+    migrate_tables(ws, prompts, ctx=ctx)
+
+    ws.jobs.run_now.assert_called_with(789)
