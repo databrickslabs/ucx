@@ -400,19 +400,13 @@ def assign_metastore(
 
 
 @ucx.command
-def migrate_tables(w: WorkspaceClient):
+def migrate_tables(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None):
     """Trigger the migrate-tables workflow"""
-    ctx = WorkspaceContext(w)
-    deployed_workflows = ctx.deployed_workflows
-    deployed_workflows.run_workflow("migrate-tables")
-
-
-@ucx.command
-def migrate_external_hiveserde_tables_in_place(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None):
-    """Trigger the migrate-external-hiveserde-tables-in-place-experimental workflow"""
     if ctx is None:
         ctx = WorkspaceContext(w)
     deployed_workflows = ctx.deployed_workflows
+    deployed_workflows.run_workflow("migrate-tables")
+
     tables = ctx.tables_crawler.snapshot()
     hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
     if len(hiveserde_tables) > 0:
