@@ -15,7 +15,7 @@ from databricks.sdk import WorkspaceClient
 def redash_ws():
     def api_client_do(method: str, path: str, body: dict | None = None):
         _ = body
-        tags_lookup = {"1": [Redash.BACKUP_TAG], "2": [Redash.MIGRATED_TAG, "backup: 123"], "3": []}
+        tags_lookup = {"1": [Redash.BACKUP_TAG], "2": [Redash.MIGRATED_TAG, "backup: 123", "original"], "3": []}
         if method == "POST":
             return {}
         if path.startswith("/api/2.0/preview/sql/dashboards"):
@@ -23,6 +23,8 @@ def redash_ws():
             tags = tags_lookup[dashboard_id]
             return {
                 "widgets": [
+                    {},
+                    {"visualization": {}},
                     {
                         "visualization": {
                             "query": {
@@ -32,7 +34,17 @@ def redash_ws():
                                 "tags": tags,
                             }
                         }
-                    }
+                    },
+                    {
+                        "visualization": {
+                            "query": {
+                                "id": "1",
+                                "name": "test_query",
+                                "query": "SELECT * FROM old.things",
+                                "tags": None,
+                            }
+                        }
+                    },
                 ]
             }
         if path.startswith("/api/2.0/preview/sql/queries"):
