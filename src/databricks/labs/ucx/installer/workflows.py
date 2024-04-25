@@ -399,8 +399,8 @@ class WorkflowsDeployment(InstallationMixin):
         self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
-    def create_jobs(self, prompts):
-        remote_wheel = self._upload_wheel(prompts)
+    def create_jobs(self):
+        remote_wheel = self._wheels.upload_to_wsfs()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -521,19 +521,6 @@ class WorkflowsDeployment(InstallationMixin):
         assert new_job.job_id is not None
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
-
-    def _upload_wheel(self, prompts: Prompts):
-        with self._wheels:
-            try:
-                self._wheels.upload_to_dbfs()
-            except PermissionDenied as err:
-                if not prompts:
-                    raise RuntimeWarning("no Prompts instance found") from err
-                logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
-                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, prompts.choice_from_dict)
-                self._config.override_clusters = configure_cluster_overrides.configure()
-                self._installation.save(self._config)
-            return self._wheels.upload_to_wsfs()
 
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform

@@ -464,7 +464,7 @@ class WorkspaceInstallation(InstallationMixin):
         if not self._skip_dashboards:
             install_tasks.append(self._create_dashboards)
         Threads.strict("installing components", install_tasks)
-        readme_url = self._workflows_installer.create_jobs(self._prompts)
+        readme_url = self._workflows_installer.create_jobs()
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
