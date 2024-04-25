@@ -322,7 +322,10 @@ class DashboardFromFiles:
         description: str | None = None,
         search_by: str | None = None,
     ) -> dict:
-        search_by_columns = set(search_by.split(","))
+        if search_by is not None:
+            search_by_columns = set(search_by.split(","))
+        else:
+            search_by_columns = set()
         return {
             "type": "TABLE",
             "name": name,
