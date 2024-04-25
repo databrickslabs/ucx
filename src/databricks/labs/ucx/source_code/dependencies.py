@@ -145,10 +145,6 @@ class DependencyGraph:
             if graph_posix_path == posix_path:
                 found.append(graph)
                 return True
-            # TODO remove HORRIBLE hack until we implement https://github.com/databrickslabs/ucx/issues/1421
-            if "site-packages" in graph_posix_path and graph_posix_path.endswith(posix_path):
-                found.append(graph)
-                return True
             return False
 
         self.root.visit(check_registered_dependency, set())

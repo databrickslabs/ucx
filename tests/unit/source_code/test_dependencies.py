@@ -310,10 +310,10 @@ def test_dependency_graph_builder_skips_builtin_dependencies():
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     child = graph.locate_dependency(Path("os"))
     assert child
-    assert not len(child.local_dependencies)
+    assert len(child.local_dependencies) == 0
     child = graph.locate_dependency(Path("pathlib"))
     assert child
-    assert not len(child.local_dependencies)
+    assert len(child.local_dependencies) == 0
 
 
 def test_dependency_graph_builder_ignores_known_dependencies():
