@@ -64,7 +64,9 @@ def test_save_spn_permissions_local(ws, sql_backend, inventory_schema, make_rand
 
 
 @pytest.fixture
-def clean_up_spn():
+def clean_up_spn(env_or_skip):
+    # Making sure this test can only be launched from local
+    env_or_skip("IDE_PROJECT_ROOTS")
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     yield
     spns = graph_client.get("/v1.0/applications?$filter=startswith(displayName, 'UCXServicePrincipal')")['value']
