@@ -31,7 +31,7 @@ from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocations, ExternalLocation
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
@@ -428,9 +428,10 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
 
 
 class LocalAzureCliTest(WorkspaceContext):
-    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
+    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str], make_schema_fixture):
         super().__init__(_ws, {})
         self._env_or_skip = env_or_skip_fixture
+        self._make_schema = make_schema_fixture
 
     @cached_property
     def azure_cli_authenticated(self):
@@ -444,10 +445,76 @@ class LocalAzureCliTest(WorkspaceContext):
     def azure_subscription_id(self):
         return self._env_or_skip("TEST_SUBSCRIPTION_ID")
 
+    @cached_property
+    def config(self) -> WorkspaceConfig:
+        return WorkspaceConfig(
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+            inventory_database=self.inventory_database,
+            connect=self.workspace_client.config,
+            renamed_group_prefix=f'tmp-{self.inventory_database}-',
+        )
+
+    @cached_property
+    def installation(self):
+        return MockInstallation()
+
+    @cached_property
+    def external_locations(self):
+        return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
+
+    @cached_property
+    def workspace_client(self) -> WorkspaceClient:
+        return self._ws
+
+    @cached_property
+    def inventory_database(self) -> str:
+        return self._make_schema(catalog_name="hive_metastore").name
+
+    def with_dummy_resource_permission(self):
+        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
+        if self.workspace_client.config.is_azure:
+            self.with_azure_storage_permissions(
+                [
+                    StoragePermissionMapping(
+                        prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
+                        client_id='dummy_application_id',
+                        principal='principal_1',
+                        privilege='WRITE_FILES',
+                        type='Application',
+                        directory_id='directory_id_ss1',
+                    )
+                ]
+            )
+        if self.workspace_client.config.is_aws:
+            self.with_aws_storage_permissions(
+                [
+                    AWSRoleAction(
+                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
+                        's3',
+                        'WRITE_FILES',
+                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                    )
+                ]
+            )
+
+    def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
+        self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
+
+    def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
+        self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
+
+    def save_locations(self):
+        locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.external_locations",
+            locations,
+            ExternalLocation,
+        )
+
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip):
-    return LocalAzureCliTest(ws, env_or_skip)
+def az_cli_ctx(ws, env_or_skip, make_schema):
+    return LocalAzureCliTest(ws, env_or_skip, make_schema)
 
 
 class TestInstallationContext(TestRuntimeContext):
