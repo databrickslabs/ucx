@@ -82,7 +82,7 @@ def test_create_global_spn(
     # skip this test if not in local mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         return
-    print(os.path.basename(sys.argv[0]))
+    logger.debug(f"basename is {os.path.basename(sys.argv[0])}")
     tables = [
         ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1),
     ]
