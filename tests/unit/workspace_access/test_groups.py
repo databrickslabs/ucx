@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import create_autospec
 
 import pytest
@@ -636,6 +637,26 @@ def test_snapshot_with_group_matched_by_prefix():
     ]
 
 
+def test_snapshot_with_group_matched_by_prefix_not_found(caplog):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        display_name="de_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    wsclient.api_client.do.return_value = {
+        "Resources": [],
+    }
+    GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex="^", workspace_group_replace="px_"
+    ).snapshot()
+    assert "Couldn't find a matching account group for de_(1234) group with regex substitution" in caplog.text
+
+
 def test_snapshot_with_group_matched_by_subset():
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
@@ -675,6 +696,26 @@ def test_snapshot_with_group_matched_by_subset():
     ]
 
 
+def test_snapshot_with_group_matched_by_subset_not_found(caplog):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        display_name="de_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    wsclient.api_client.do.return_value = {
+        "Resources": [],
+    }
+    GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).snapshot()
+    assert "Couldn't find a matching account group for de_(1234) group with regex matching" in caplog.text
+
+
 def test_snapshot_with_group_matched_by_external_id():
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
@@ -710,6 +751,24 @@ def test_snapshot_with_group_matched_by_external_id():
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
     ]
+
+
+def test_snapshot_with_group_matched_by_external_id_not_found(caplog):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        display_name="de_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    wsclient.api_client.do.return_value = {
+        "Resources": [],
+    }
+    GroupManager(backend, wsclient, inventory_database="inv", external_id_match=True).snapshot()
+    assert "Couldn't find a matching account group for de_(1234) group with external_id" in caplog.text
 
 
 def test_configure_include_groups():
