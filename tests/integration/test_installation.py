@@ -17,7 +17,6 @@ from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
-    ResourceDoesNotExist
 )
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
@@ -38,11 +37,11 @@ def new_installation(ws, env_or_skip, make_random):
     cleanup = []
 
     def factory(
-            installation: Installation | None = None,
-            product_info: ProductInfo | None = None,
-            environ: dict[str, str] | None = None,
-            extend_prompts: dict[str, str] | None = None,
-            inventory_schema_name: str | None = None,
+        installation: Installation | None = None,
+        product_info: ProductInfo | None = None,
+        environ: dict[str, str] | None = None,
+        extend_prompts: dict[str, str] | None = None,
+        inventory_schema_name: str | None = None,
     ):
         logger.debug("Creating new installation...")
         if not product_info:
@@ -88,9 +87,9 @@ def new_installation(ws, env_or_skip, make_random):
 
 
 def test_experimental_permissions_migration_for_group_with_same_name(
-        installation_ctx,
-        make_cluster_policy,
-        make_cluster_policy_permissions,
+    installation_ctx,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
 ):
     ws_group, acc_group = installation_ctx.make_ucx_group()
     migrated_group = MigratedGroup.partial_info(ws_group, acc_group)
@@ -153,8 +152,8 @@ def test_job_cluster_policy(ws, installation_ctx):
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
     if ws.config.is_azure:
         assert (
-                policy_definition["azure_attributes.availability"]["value"]
-                == compute.AzureAvailability.ON_DEMAND_AZURE.value
+            policy_definition["azure_attributes.availability"]["value"]
+            == compute.AzureAvailability.ON_DEMAND_AZURE.value
         )
     if ws.config.is_aws:
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
@@ -202,7 +201,7 @@ def test_uninstallation(ws, sql_backend, installation_ctx):
     installation_ctx.workspace_installation.uninstall()
     with pytest.raises(NotFound):
         ws.workspace.get_status(installation_ctx.workspace_installation.folder)
-    with pytest.raises(ResourceDoesNotExist):
+    with pytest.raises(NotFound):
         ws.jobs.get(job_id=assessment_job_id)
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
@@ -224,16 +223,16 @@ def test_fresh_global_installation(ws, installation_ctx):
     installation_ctx.installation = Installation.assume_global(ws, installation_ctx.product_info.product_name())
     installation_ctx.installation.save(installation_ctx.config)
     assert (
-            installation_ctx.workspace_installation.folder
-            == f"/Applications/{installation_ctx.product_info.product_name()}"
+        installation_ctx.workspace_installation.folder
+        == f"/Applications/{installation_ctx.product_info.product_name()}"
     )
 
 
 def test_fresh_user_installation(ws, installation_ctx):
     installation_ctx.installation.save(installation_ctx.config)
     assert (
-            installation_ctx.workspace_installation.folder
-            == f"/Users/{ws.current_user.me().user_name}/.{installation_ctx.product_info.product_name()}"
+        installation_ctx.workspace_installation.folder
+        == f"/Users/{ws.current_user.me().user_name}/.{installation_ctx.product_info.product_name()}"
     )
 
 
@@ -241,8 +240,8 @@ def test_global_installation_on_existing_global_install(ws, installation_ctx):
     installation_ctx.installation = Installation.assume_global(ws, installation_ctx.product_info.product_name())
     installation_ctx.installation.save(installation_ctx.config)
     assert (
-            installation_ctx.workspace_installation.folder
-            == f"/Applications/{installation_ctx.product_info.product_name()}"
+        installation_ctx.workspace_installation.folder
+        == f"/Applications/{installation_ctx.product_info.product_name()}"
     )
     installation_ctx.replace(
         extend_prompts={
@@ -286,8 +285,8 @@ def test_user_installation_on_existing_global_install(ws, new_installation, make
         inventory_schema_name=f"ucx_S{make_random(4)}_reinstall",
     )
     assert (
-            reinstall_user_force.install_folder()
-            == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+        reinstall_user_force.install_folder()
+        == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
 
@@ -298,8 +297,8 @@ def test_global_installation_on_existing_user_install(ws, new_installation):
         product_info=product_info, installation=Installation.assume_user_home(ws, product_info.product_name())
     )
     assert (
-            existing_user_installation.install_folder()
-            == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
+        existing_user_installation.install_folder()
+        == f"/Users/{ws.current_user.me().user_name}/.{product_info.product_name()}"
     )
 
     # warning to be thrown by installer if override environment variable present but no confirmation
@@ -333,7 +332,7 @@ def test_check_inventory_database_exists(ws, installation_ctx):
     inventory_database = installation_ctx.inventory_database
 
     with pytest.raises(
-            AlreadyExists, match=f"Inventory database '{inventory_database}' already exists in another installation"
+        AlreadyExists, match=f"Inventory database '{inventory_database}' already exists in another installation"
     ):
         installation_ctx.installation = Installation.assume_user_home(ws, installation_ctx.product_info.product_name())
         installation_ctx.__dict__.pop("workspace_installer")
@@ -350,10 +349,10 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job(
-        ws,
-        installation_ctx,
-        env_or_skip,
-        prepare_tables_for_migration,
+    ws,
+    installation_ctx,
+    env_or_skip,
+    prepare_tables_for_migration,
 ):
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
@@ -383,7 +382,7 @@ def test_table_migration_job(
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
     # assert the cluster is configured correctly
     for job_cluster in ws.jobs.get(
-            ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
+        ctx.installation.load(RawState).resources["jobs"]["migrate-tables"]
     ).settings.job_clusters:
         if job_cluster.job_cluster_key != "table_migration":
             # don't assert on the cluster for parse logs task
@@ -396,10 +395,10 @@ def test_table_migration_job(
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job_cluster_override(
-        ws,
-        installation_ctx,
-        prepare_tables_for_migration,
-        env_or_skip,
+    ws,
+    installation_ctx,
+    prepare_tables_for_migration,
+    env_or_skip,
 ):
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
@@ -430,8 +429,8 @@ def test_table_migration_job_cluster_override(
 def test_compare_remote_local_install_versions(ws, installation_ctx):
     installation_ctx.workspace_installation.run()
     with pytest.raises(
-            RuntimeWarning,
-            match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
+        RuntimeWarning,
+        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         installation_ctx.workspace_installer.configure()
 
