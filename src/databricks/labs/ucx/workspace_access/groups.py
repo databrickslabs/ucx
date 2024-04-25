@@ -241,21 +241,21 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
         for group in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             account_group = account_groups_by_id.get(group.external_id)
-            if account_group:
-                yield MigratedGroup(
-                    id_in_workspace=group.id,
-                    name_in_workspace=group.display_name,
-                    name_in_account=account_group.display_name,
-                    temporary_name=temporary_name,
-                    external_id=account_group.external_id,
-                    members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
-                    roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
-                    entitlements=(
-                        json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None
-                    ),
-                )
-            else:
+            if not account_group:
                 logger.info(f"Couldn't find a matching account group for {group.display_name} group with external_id")
+                continue
+            yield MigratedGroup(
+                id_in_workspace=group.id,
+                name_in_workspace=group.display_name,
+                name_in_account=account_group.display_name,
+                temporary_name=temporary_name,
+                external_id=account_group.external_id,
+                members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
+                roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
+                entitlements=(
+                    json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None
+                ),
+            )
 
 
 class RegexSubStrategy(GroupMigrationStrategy):
@@ -285,12 +285,16 @@ class RegexSubStrategy(GroupMigrationStrategy):
             name_in_account = self._safe_sub(
                 group.display_name, self.workspace_group_regex, self.workspace_group_replace
             )
+            account_group = self.account_groups_in_account.get(name_in_account)
+            if not account_group:
+                logger.info(f"Couldn't find a matching account group for {group.display_name} group with regex substitution")
+                continue
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
                 name_in_account=name_in_account,
                 temporary_name=temporary_name,
-                external_id=self.account_groups_in_account[name_in_account].external_id,
+                external_id=account_group.external_id,
                 members=json.dumps([gg.as_dict() for gg in group.members]) if group.members else None,
                 roles=json.dumps([gg.as_dict() for gg in group.roles]) if group.roles else None,
                 entitlements=json.dumps([gg.as_dict() for gg in group.entitlements]) if group.entitlements else None,
@@ -329,21 +333,21 @@ class RegexMatchStrategy(GroupMigrationStrategy):
         for group_match, ws_group in workspace_groups_by_match.items():
             temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             account_group = account_groups_by_match.get(group_match)
-            if account_group:
-                yield MigratedGroup(
-                    id_in_workspace=ws_group.id,
-                    name_in_workspace=ws_group.display_name,
-                    name_in_account=account_group.display_name,
-                    temporary_name=temporary_name,
-                    external_id=account_group.external_id,
-                    members=json.dumps([gg.as_dict() for gg in ws_group.members]) if ws_group.members else None,
-                    roles=json.dumps([gg.as_dict() for gg in ws_group.roles]) if ws_group.roles else None,
-                    entitlements=(
-                        json.dumps([gg.as_dict() for gg in ws_group.entitlements]) if ws_group.entitlements else None
-                    ),
-                )
-            else:
+            if not account_group:
                 logger.info(f"Couldn't find a match for group {ws_group.display_name}")
+                continue
+            yield MigratedGroup(
+                id_in_workspace=ws_group.id,
+                name_in_workspace=ws_group.display_name,
+                name_in_account=account_group.display_name,
+                temporary_name=temporary_name,
+                external_id=account_group.external_id,
+                members=json.dumps([gg.as_dict() for gg in ws_group.members]) if ws_group.members else None,
+                roles=json.dumps([gg.as_dict() for gg in ws_group.roles]) if ws_group.roles else None,
+                entitlements=(
+                    json.dumps([gg.as_dict() for gg in ws_group.entitlements]) if ws_group.entitlements else None
+                ),
+            )
 
 
 class GroupManager(CrawlerBase[MigratedGroup]):
