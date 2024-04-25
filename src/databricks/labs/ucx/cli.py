@@ -408,9 +408,10 @@ def migrate_tables(w: WorkspaceClient):
 
 
 @ucx.command
-def migrate_external_hiveserde_tables_in_place(w: WorkspaceClient):
+def migrate_external_hiveserde_tables_in_place(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None):
     """Trigger the migrate-external-hiveserde-tables-in-place-experimental workflow"""
-    ctx = WorkspaceContext(w)
+    if ctx is None:
+        ctx = WorkspaceContext(w)
     deployed_workflows = ctx.deployed_workflows
     tables = ctx.tables_crawler.snapshot()
     hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
