@@ -45,7 +45,7 @@ from databricks.sdk.service.sql import (
     Query,
     QueryInfo,
 )
-from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -556,12 +556,20 @@ def make_secret_scope_acl(ws):
 
 @pytest.fixture
 def make_notebook(ws, make_random):
-    def create(*, path: str | None = None, content: BinaryIO | None = None, **kwargs):
+    def create(
+        *,
+        path: str | None = None,
+        content: BinaryIO | None = None,
+        language: Language = Language.PYTHON,
+        format: ImportFormat = ImportFormat.SOURCE,  # pylint:  disable=redefined-builtin
+        overwrite: bool = False,
+    ) -> str:
         if path is None:
-            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}.py"
+            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
         if content is None:
             content = io.BytesIO(b"print(1)")
-        ws.workspace.upload(path, content, **kwargs)
+        path = str(path)
+        ws.workspace.upload(path, content, language=language, format=format, overwrite=overwrite)
         return path
 
     yield from factory("notebook", create, lambda x: ws.workspace.delete(x))
