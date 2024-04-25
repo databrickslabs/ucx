@@ -455,5 +455,26 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
             deployed_workflows.run_workflow("migrate-external-tables-ctas")
 
 
+@ucx.command
+def migrate_dbsql_dashboard(w: WorkspaceClient, dashboard_id: str | None = None):
+    """Migrate table references in DBSQL Dashboard queries"""
+    ctx = WorkspaceContext(w)
+    ctx.redash.fix_dashboard(dashboard_id)
+
+
+@ucx.command
+def revert_dbsql_dashboard(w: WorkspaceClient, dashboard_id: str | None = None):
+    """Revert migrated DBSQL Dashboard queries back to their original state"""
+    ctx = WorkspaceContext(w)
+    ctx.redash.fix_dashboard(dashboard_id)
+
+
+@ucx.command
+def delete_backup_dbsql_queries(w: WorkspaceClient):
+    """Delete DBSQL queries that have been backed up by UCX"""
+    ctx = WorkspaceContext(w)
+    ctx.redash.delete_backup_dbsql_queries()
+
+
 if __name__ == "__main__":
     ucx()

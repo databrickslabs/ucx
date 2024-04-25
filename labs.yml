@@ -208,3 +208,19 @@ commands:
     description: |
       Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental 
       workflow and migrate-external-tables-ctas workflow.
+
+  - name: migrate-dbsql-dashboard
+    description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
+    flags:
+      - name: dashboard-id
+        description: (Optional) DBSQL dashboard ID to migrate. If no dashboard ID is provided, all DBSQL dashboards in the workspace will be migrated.
+
+  - name: revert-dbsql-dashboard
+    description: Revert DBSQL dashboard that has been migrated to their original state before the migration.
+    flags:
+      - name: dashboard-id
+        description: (Optional) DBSQL dashboard ID to revert. If no dashboard ID is provided, all migrated DBSQL dashboards in the workspace will be reverted.
+
+
+  - name: delete-backup-dbsql-queries
+    description: Delete backup DBSQL queries created during the migration process.
