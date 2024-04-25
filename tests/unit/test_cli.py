@@ -16,6 +16,7 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
+from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.cli import (
     alias,
@@ -44,6 +45,7 @@ from databricks.labs.ucx.cli import (
     show_all_metastores,
     assign_metastore,
     migrate_tables,
+    create_missing_principals,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext, AccountContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
@@ -479,3 +481,13 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(789)
+
+
+def test_create_missing_principal_aws(ws):
+    aws_resource_permissions = create_autospec(AWSResourcePermissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    iam_role = create_autospec(IamRoleCreation)
+    ctx.iam_create_uc_roles.return_value = iam_role
+    prompts = MockPrompts({'.*': 'yes'})
+    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    aws_resource_permissions.create_uc_roles.assert_called_once()
