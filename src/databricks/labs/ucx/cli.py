@@ -402,6 +402,10 @@ def assign_metastore(
 @ucx.command
 def migrate_tables(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None):
     """Trigger the migrate-tables workflow"""
+    """
+    Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
+    workflow.
+    """
     if ctx is None:
         ctx = WorkspaceContext(w)
     deployed_workflows = ctx.deployed_workflows
