@@ -190,13 +190,11 @@ class IamRoleCreation:
         installation: Installation,
         ws: WorkspaceClient,
         resource_permissions: AWSResourcePermissions,
-        storage_credential_manager: CredentialManager,
     ):
         self._output_file = "aws_iam_role_creation_result.csv"
         self._installation = installation
         self._ws = ws
         self._resource_permissions = resource_permissions
-        self._storage_credential_manager = storage_credential_manager
 
     @staticmethod
     def _print_action_plan(iam_list: list[AWSUCRoleCandidate]):
@@ -214,6 +212,9 @@ class IamRoleCreation:
         iam_list = self._resource_permissions.uc_roles_list(
             single_role=single_role, role_name=role_name, policy_name=policy_name
         )
+        if not iam_list:
+            logger.info("No IAM Role created")
+            return []
         self._print_action_plan(iam_list)
         plan_confirmed = prompts.confirm(
             "Above UC Compatible IAM roles will be created and granted access to the corresponding paths, "

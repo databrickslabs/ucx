@@ -72,6 +72,7 @@ class AWSResourcePermissions:
             for s3_prefix in sorted(list(s3_prefixes)):
                 roles.append(AWSUCRoleCandidate(f"{role_name}_{role_id}", policy_name, [s3_prefix]))
                 role_id += 1
+        return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
         roles_created = []
