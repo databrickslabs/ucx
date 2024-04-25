@@ -20,6 +20,8 @@ class Redash:
 
     def fix_all_dashboards(self):
         for dashboard in self._ws.dashboards.list():
+            if self.MIGRATED_TAG in dashboard.tags or self.BACKUP_TAG in dashboard.tags:
+                continue
             self.fix_dashboard(dashboard)
 
     def fix_dashboard(self, dashboard: Dashboard):
@@ -32,7 +34,7 @@ class Redash:
 
     def delete_backup_dashboards(self):
         for dashboard in self._ws.dashboards.list():
-            if dashboard.tags is None or self.BACKUP_TAG in dashboard.tags:
+            if dashboard.tags is None or self.BACKUP_TAG not in dashboard.tags:
                 continue
 
             for query in self._get_queries_from_dashboard(dashboard):
