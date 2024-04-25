@@ -145,7 +145,7 @@ def test_notebook_builds_leaf_dependency_graph():
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    assert {str(path) for path in graph.paths} == {"leaf1.py.txt"}
+    assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
 
 
 def get_status_side_effect(*args):
@@ -167,7 +167,7 @@ def test_notebook_builds_depth1_dependency_graph():
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 
@@ -185,7 +185,7 @@ def test_notebook_builds_depth2_dependency_graph():
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 
@@ -223,7 +223,7 @@ def test_notebook_builds_cyclical_dependency_graph():
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 
@@ -241,7 +241,7 @@ def test_notebook_builds_python_dependency_graph():
     graph = DependencyGraph(dependency, None, resolver)
     container = dependency.load()
     container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 

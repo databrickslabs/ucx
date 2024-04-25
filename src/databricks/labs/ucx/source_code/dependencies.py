@@ -159,7 +159,7 @@ class DependencyGraph:
         return self if self._parent is None else self._parent.root
 
     @property
-    def dependencies(self) -> set[Dependency]:
+    def all_dependencies(self) -> set[Dependency]:
         dependencies: set[Dependency] = set()
 
         def add_to_dependencies(graph: DependencyGraph) -> bool:
@@ -172,8 +172,12 @@ class DependencyGraph:
         return dependencies
 
     @property
-    def paths(self) -> set[Path]:
-        return {d.path for d in self.dependencies}
+    def local_dependencies(self) -> set[Dependency]:
+        return {child.dependency for child in self._dependencies.values()}
+
+    @property
+    def all_paths(self) -> set[Path]:
+        return {d.path for d in self.all_dependencies}
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool | None:

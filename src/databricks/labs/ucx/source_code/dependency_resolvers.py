@@ -90,8 +90,6 @@ class LocalFileResolver(BaseDependencyResolver):
     ) -> Dependency | None:
         if self._file_loader.is_file(path) and not self._file_loader.is_notebook(path):
             return Dependency(self._file_loader, path)
-        problem = DependencyProblem('dependency-check', f"File not found: {path.as_posix()}")
-        problem_collector(problem)
         return super().resolve_local_file(path, problem_collector)
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
@@ -195,7 +193,7 @@ class DependencyResolver:
         self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
     ) -> Dependency | None:
         problems: list[DependencyProblem] = []
-        dependency = self._resolver.resolve_local_file(path, problem_collector)
+        dependency = self._resolver.resolve_local_file(path, problems.append)
         if dependency is None:
             problem = DependencyProblem('dependency-check', f"File not found: {path.as_posix()}")
             problems.append(problem)
@@ -210,7 +208,7 @@ class DependencyResolver:
         self, name: str, problem_collector: Callable[[DependencyProblem], None] | None = None
     ) -> Dependency | None:
         problems: list[DependencyProblem] = []
-        dependency = self._resolver.resolve_import(name, problem_collector)
+        dependency = self._resolver.resolve_import(name, problems.append)
         if dependency is None:
             problem = DependencyProblem('dependency-check', f"Could not locate import: {name}")
             problems.append(problem)
