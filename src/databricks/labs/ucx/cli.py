@@ -400,12 +400,13 @@ def assign_metastore(
 
 
 @ucx.command
-def migrate_tables(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None):
-    """Trigger the migrate-tables workflow"""
+def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
     """
     Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
     workflow.
     """
+    migrate_hiveserde_tables_workflow_name = "migrate-external-hiveserde-tables-in-place-experimental"
+
     if ctx is None:
         ctx = WorkspaceContext(w)
     deployed_workflows = ctx.deployed_workflows
@@ -414,9 +415,12 @@ def migrate_tables(w: WorkspaceClient, *, ctx: WorkspaceContext | None = None):
     tables = ctx.tables_crawler.snapshot()
     hiveserde_tables = [table for table in tables if table.what == What.EXTERNAL_HIVESERDE]
     if len(hiveserde_tables) > 0:
-        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables)
-        logger.info(f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) tables")
-        deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+        percentage_hiveserde_tables = len(hiveserde_tables) / len(tables) * 100
+        if prompts.confirm(
+            f"Found {len(hiveserde_tables)} ({percentage_hiveserde_tables:.2f}%) hiveserde tables, do you want to run "
+            f"the {migrate_hiveserde_tables_workflow_name} workflow?"
+        ):
+            deployed_workflows.run_workflow(migrate_hiveserde_tables_workflow_name)
 
 
 if __name__ == "__main__":
