@@ -94,7 +94,7 @@ class DependencyGraph:
         problems = [problem.replace(source_path=self.dependency.path) for problem in problems]
         self._resolver.add_problems(problems)
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1459
     def register_notebook(
         self, path: Path, problem_collector: Callable[[DependencyProblem], None]
     ) -> DependencyGraph | None:
@@ -103,7 +103,7 @@ class DependencyGraph:
             return None
         return self.register_dependency(resolved)
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1421
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1459
     def register_import(
         self, name: str, problem_collector: Callable[[DependencyProblem], None]
     ) -> DependencyGraph | None:
