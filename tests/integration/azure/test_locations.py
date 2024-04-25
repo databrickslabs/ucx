@@ -1,12 +1,19 @@
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk.errors.platform import NotFound
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.sdk.service.compute import DataSecurityMode
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
+
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
+from .. import get_azure_spark_conf
+
+_SPARK_CONF = get_azure_spark_conf()
 
 
 def save_delete_location(ws, name):
@@ -212,3 +219,38 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, runtime
         assert "overlaps with an existing external location" in caplog.text
     finally:
         save_delete_location(ws, "uctest_ziyuanqintest_overlap")
+
+
+def test_run_validate_acl(make_cluster_permissions, ws, runtime_ctx, make_user, make_cluster, az_cli_ctx, env_or_skip):
+
+    runtime_ctx.with_dummy_resource_permission()
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    user = make_user()
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        user_name=user.user_name,
+    )
+
+    location_migration = az_cli_ctx.azure_external_locations_migration
+    try:
+        location_migration.run()
+        permissions = ws.grants.get(
+            SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=user.user_name
+        )
+        expected_permission = PrivilegeAssignment(
+            principal=user.user_name,
+            privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
+        )
+        assert expected_permission in permissions.privilege_assignments
+    finally:
+        permissions = [
+            Privilege.CREATE_EXTERNAL_TABLE,
+            Privilege.CREATE_EXTERNAL_VOLUME,
+            Privilege.READ_FILES,
+        ]
+        ws.grants.update(
+            SecurableType.EXTERNAL_LOCATION,
+            env_or_skip("TEST_A_LOCATION"),
+            changes=[PermissionsChange(remove=permissions, principal=user.user_name)],
+        )
