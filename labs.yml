@@ -182,7 +182,6 @@ commands:
         description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
 
   - name: migrate-tables
-    description: Trigger the migrate-tables workflow.
-
-  - name: migrate_external_hiveserde_tables_in_place
-    description: migrate-external-hiveserde-tables-in-place-experimental workflow.
+    description: |
+      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental 
+      workflow.
