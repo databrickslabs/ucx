@@ -3,6 +3,7 @@ from collections.abc import Iterator
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
+from databricks.sdk.errors.platform import NotFound
 
 from databricks.labs.ucx.source_code.base import Fixer
 
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class Redash:
     MIGRATED_TAG = "migrated by UCX"
+    BACKUP_TAG = "backup by UCX"
 
     def __init__(self, fixer: Fixer, ws: WorkspaceClient):
         self._fixer = fixer
@@ -28,6 +30,24 @@ class Redash:
         for query in self._get_queries_from_dashboard(dashboard):
             self._revert_query(query)
 
+    def delete_backup_dashboards(self):
+        for dashboard in self._ws.dashboards.list():
+            if dashboard.tags is None or self.BACKUP_TAG in dashboard.tags:
+                continue
+
+            for query in self._get_queries_from_dashboard(dashboard):
+                if query.tags is None or self.BACKUP_TAG not in query.tags:
+                    continue
+                try:
+                    self._ws.queries.delete(query.id)
+                except NotFound:
+                    continue
+
+            try:
+                self._ws.dashboards.delete(dashboard.id)
+            except NotFound:
+                pass
+
     def _fix_query(self, query: Query):
         assert query.id is not None
         assert query.query is not None
@@ -44,11 +64,16 @@ class Redash:
             query=query.query,
             run_as_role=query.run_as_role,
         )
+        self._ws.api_client.do(
+            "POST",
+            f'/api/2.0/preview/sql/queries/{backup_query.id}',
+            body={'tags': [self.BACKUP_TAG]},
+        )
         new_query = self._fixer.apply(query.query)
         self._ws.api_client.do(
             "POST",
             f'/api/2.0/preview/sql/queries/{query.id}',
-            body={'query': new_query, 'tags': ['migrated by UCX', f'backup: {backup_query.id}']},
+            body={'query': new_query, 'tags': [self.MIGRATED_TAG, f'backup: {backup_query.id}']},
         )
 
     def _revert_query(self, query: Query):
