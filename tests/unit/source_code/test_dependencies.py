@@ -24,6 +24,7 @@ from tests.unit import (
     whitelist_mock,
     _load_dependency_side_effect,
     locate_site_packages,
+    _is_file_side_effect,
 )
 
 
@@ -114,6 +115,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
         return ObjectInfo(object_type=ObjectType.NOTEBOOK, language=Language.PYTHON, path=path)
 
     ws = create_autospec(WorkspaceClient)
+    ws.workspace.is_notebook.return_value = True
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     whi = whitelist_mock()
@@ -204,21 +206,35 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     ]
 
 
+def test_dependency_graph_builder_visits_recursive_file_dependencies():
+    paths = ["root6.py.txt", "root5.py.txt", "leaf4.py.txt"]
+    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
+    visited: dict[str, bool] = {}
+    whi = whitelist_mock()
+    file_loader = create_autospec(LocalFileLoader)
+    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
+        sources, visited, *args
+    )
+    file_loader.is_file.return_value = True
+    file_loader.is_notebook.return_value = False
+    site_packages = SitePackages.parse(locate_site_packages())
+    builder = DependencyGraphBuilder(
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader())
+    )
+    builder.build_local_file_dependency_graph(Path("root6.py.txt"))
+    assert len(visited) == len(paths)
+
+
 def test_dependency_graph_builder_raises_problem_with_unresolved_import():
     paths = ["root7.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     visited: dict[str, bool] = {}
     whi = whitelist_mock()
-
-    def is_file_side_effect(*args):
-        path = args[0]
-        return str(path) in paths
-
     file_loader = create_autospec(LocalFileLoader)
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
         sources, visited, *args
     )
-    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
     builder = DependencyGraphBuilder(
@@ -279,36 +295,12 @@ def test_dependency_graph_builder_visits_file_dependencies():
     assert len(visited) == len(paths)
 
 
-def test_dependency_graph_builder_visits_recursive_file_dependencies():
-    paths = ["root6.py.txt", "root5.py.txt", "leaf4.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    visited: dict[str, bool] = {}
-    whi = whitelist_mock()
-    file_loader = create_autospec(LocalFileLoader)
-    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
-        sources, visited, *args
-    )
-    file_loader.is_file.return_value = True
-    file_loader.is_notebook.return_value = False
-    site_packages = SitePackages.parse(locate_site_packages())
-    builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader())
-    )
-    builder.build_local_file_dependency_graph(Path("root6.py.txt"))
-    assert len(visited) == len(paths)
-
-
 def test_dependency_graph_builder_ignores_builtin_dependencies():
     paths = ["python_builtins.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     whi = Whitelist()
-
-    def is_file_side_effect(*args):
-        path = args[0]
-        return str(path) in paths
-
     file_loader = create_autospec(LocalFileLoader)
-    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
     file_loader.is_notebook.return_value = False
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     site_packages = SitePackages.parse(locate_site_packages())
@@ -325,13 +317,8 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
-
-    def is_file_side_effect(*args):
-        path = args[0]
-        return str(path) in paths
-
     file_loader = create_autospec(LocalFileLoader)
-    file_loader.is_file.side_effect = is_file_side_effect
+    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
     file_loader.is_notebook.return_value = False
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(sources, {}, *args)
     site_packages = SitePackages.parse(locate_site_packages())
