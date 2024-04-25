@@ -175,7 +175,6 @@ class WorkspaceContext(CliContext):
             self.installation,
             self.workspace_client,
             self.aws_resource_permissions,
-            self.iam_credential_manager,
         )
 
     @cached_property
