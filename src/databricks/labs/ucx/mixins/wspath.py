@@ -41,6 +41,7 @@ class _ScandirItem:
         return self._object_info.object_type == ObjectType.DIRECTORY
 
     def is_file(self):
+        # TODO: check if we want to show notebooks as files
         return self._object_info.object_type == ObjectType.FILE
 
     def is_symlink(self):
@@ -67,7 +68,6 @@ class _ScandirIterator:
 
 
 class _DatabricksAccessor(_Accessor):
-    listdir = _na
     mkdir = _na
     unlink = _na
     rmdir = _na
@@ -95,6 +95,9 @@ class _DatabricksAccessor(_Accessor):
 
     def scandir(self, path):
         return _ScandirIterator(self._ws.workspace.list(path))
+
+    def listdir(self, path):
+        return [item.name for item in self.scandir(path)]
 
 
 class _UploadIO(abc.ABC):
@@ -124,6 +127,8 @@ class _TextUploadIO(_UploadIO, StringIO):  # type: ignore
 
 
 class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
+    """Experimental implementation of pathlib.Path for Databricks Workspace."""
+
     _ws: WorkspaceClient
     _flavour: _DatabricksFlavour
     _accessor: _DatabricksAccessor
@@ -140,6 +145,7 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
     hardlink_to = _na
     touch = _na
     link_to = _na
+    samefile = _na
 
     def __new__(cls, ws: WorkspaceClient, path: str | Path):
         this = object.__new__(cls)
@@ -160,8 +166,13 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
         this._ws = ws
         return this
 
+    def _make_child_relpath(self, part):
+        # used in dir walking
+        path = self._flavour.join(self._parts + [part])
+        return WorkspacePath(self._ws, path)
+
     def _parse_args(self, args):  # pylint: disable=arguments-differ
-        """This instance method is adapted from a @classmethod of pathlib.Path"""
+        # instance method adapted from pathlib.Path
         parts = []
         for a in args:
             if isinstance(a, pathlib.PurePath):
@@ -169,11 +180,6 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
                 continue
             parts.append(str(a))
         return self._flavour.parse_parts(parts)
-
-    def _make_child_relpath(self, part):
-        # used in dir walking
-        path = self._flavour.join(self._parts + [part])
-        return WorkspacePath(self._ws, path)
 
     def _format_parsed_parts(self, drv, root, parts):  # pylint: disable=arguments-differ
         # instance method adapted from pathlib.Path
@@ -190,6 +196,10 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
         # instance method adapted from pathlib.Path
         drv, root, parts = self._parse_args(args)
         return self._from_parsed_parts(drv, root, parts)
+
+    def home(self):  # pylint: disable=arguments-differ
+        # instance method adapted from pathlib.Path
+        return WorkspacePath(self._ws, "~").expanduser()
 
     def exists(self, *, follow_symlinks=True):
         if not follow_symlinks:
@@ -226,9 +236,6 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
             raise FileNotFoundError(f"{self.as_posix()} does not exist")
         self._ws.workspace.delete(self.as_posix())
 
-    def home(self):  # pylint: disable=arguments-differ
-        return WorkspacePath(self._ws, "~").expanduser()
-
     def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
         if encoding is None or encoding == "locale":
             encoding = locale.getpreferredencoding(False)
@@ -252,15 +259,23 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
         # TODO: check if this is correct
         return super().absolute()
 
-    def samefile(self, other_path):
-        # TODO: check if this is correct
-        return super().samefile(other_path)
-
     @cached_property
     def _object_info(self) -> ObjectInfo:
         # this method is cached because it is used in multiple is_* methods.
         # DO NOT use this method in methods, where fresh result is required.
         return self._ws.workspace.get_status(self.as_posix())
+
+    @staticmethod
+    def _return_false():
+        return False
+
+    is_symlink = _return_false
+    is_block_device = _return_false
+    is_char_device = _return_false
+    is_fifo = _return_false
+    is_socket = _return_false
+    is_mount = _return_false
+    is_junction = _return_false
 
     def is_dir(self):
         return self._object_info.object_type == ObjectType.DIRECTORY
@@ -270,24 +285,3 @@ class WorkspacePath(Path):  # pylint: disable=too-many-public-methods
 
     def is_notebook(self):
         return self._object_info.object_type == ObjectType.NOTEBOOK
-
-    def is_symlink(self):
-        return False
-
-    def is_socket(self):
-        return False
-
-    def is_fifo(self):
-        return False
-
-    def is_block_device(self):
-        return False
-
-    def is_char_device(self):
-        return False
-
-    def is_junction(self):
-        return False
-
-    def is_mount(self):
-        return False
