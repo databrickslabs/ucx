@@ -12,8 +12,7 @@ from io import BytesIO, StringIO
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat
-
+from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat, Language
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +135,8 @@ class _TextUploadIO(_UploadIO, StringIO):  # type: ignore
 
 class WorkspacePath(Path):
     """Experimental implementation of pathlib.Path for Databricks Workspace."""
+
+    _SUFFIXES = {'.py': Language.PYTHON, '.sql': Language.SQL, '.scala': Language.SCALA, '.R': Language.R}
 
     _ws: WorkspaceClient
     _flavour: _DatabricksFlavour
@@ -269,6 +270,24 @@ class WorkspacePath(Path):
         if "w" in mode:
             return _TextUploadIO(self._ws, self.as_posix())
         raise ValueError(f"invalid mode: {mode}")
+
+    @property
+    def suffix(self):
+        """Return the file extension. If the file is a notebook, return the suffix based on the language."""
+        suffix = super().suffix
+        if suffix:
+            return suffix
+        if not self.is_notebook():
+            return ""
+        for sfx, lang in self._SUFFIXES.items():
+            if self._object_info.language == lang:
+                return sfx
+        return ""
+
+    def __lt__(self, other: pathlib.PurePath):
+        if not isinstance(other, pathlib.PurePath):
+            return NotImplemented
+        return self.as_posix() < other.as_posix()
 
     @cached_property
     def _object_info(self) -> ObjectInfo:
