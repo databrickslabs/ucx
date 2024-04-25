@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import os
 import pathlib
 from unittest.mock import create_autospec
 from typing import BinaryIO
@@ -13,10 +14,13 @@ from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob, BaseRun
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
+from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, Language
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.dependencies import SourceContainer
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
+from databricks.labs.ucx.source_code.files import LocalFile
+from databricks.labs.ucx.source_code.notebook import Notebook, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -139,13 +143,57 @@ def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *ar
     if filename.startswith('./'):
         filename = filename[2:]
     visited[filename] = True
+    source = sources.get(filename, None)
     if filename.find(".py") < 0:
         filename = filename + ".py"
     if filename.find(".txt") < 0:
         filename = filename + ".txt"
     result = create_autospec(BinaryIO)
-    result.__enter__.return_value.read.return_value = sources[filename].encode("utf-8")
+    if source is None:
+        source = sources.get(filename)
+    assert source is not None
+    result.__enter__.return_value.read.return_value = source.encode("utf-8")
     return result
+
+
+def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, bool], *args):
+    dependency = args[0]
+    filename = str(dependency.path)
+    is_package_file = os.path.isfile(dependency.path)
+    if is_package_file:
+        with dependency.path.open("r") as f:
+            source = f.read()
+    else:
+        if filename.startswith('./'):
+            filename = filename[2:]
+        visited[filename] = True
+        source = sources.get(filename, None)
+        if filename.find(".py") < 0:
+            filename = filename + ".py"
+        if filename.find(".txt") < 0:
+            filename = filename + ".txt"
+        if source is None:
+            source = sources.get(filename)
+    assert source is not None
+    if NOTEBOOK_HEADER in source:
+        return Notebook.parse(filename, source, Language.PYTHON)
+    return LocalFile(pathlib.Path(filename), source, Language.PYTHON)
+
+
+def _is_notebook_side_effect(sources: dict[str, str], *args):
+    dependency = args[0]
+    filename = str(dependency.path)
+    if filename.startswith('./'):
+        filename = filename[2:]
+    source = sources.get(filename, None)
+    if filename.find(".py") < 0:
+        filename = filename + ".py"
+    if filename.find(".txt") < 0:
+        filename = filename + ".txt"
+    if source is None:
+        source = sources.get(filename)
+    assert source is not None
+    return NOTEBOOK_HEADER in source
 
 
 def workspace_client_mock(
@@ -178,3 +226,16 @@ def table_mapping_mock(tables: list[str] | None = None):
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = _id_list(TableToMigrate, tables)
     return table_mapping
+
+
+def whitelist_mock():
+    wls = create_autospec(Whitelist)
+    wls.compatibility.return_value = None
+    return wls
+
+
+def locate_site_packages() -> pathlib.Path:
+    project_path = pathlib.Path(os.path.dirname(__file__)).parent.parent
+    python_lib_path = pathlib.Path(project_path, ".venv", "lib")
+    actual_python = next(file for file in os.listdir(str(python_lib_path)) if file.startswith("python3."))
+    return pathlib.Path(python_lib_path, actual_python, "site-packages")

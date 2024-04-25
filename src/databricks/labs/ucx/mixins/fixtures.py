@@ -697,7 +697,7 @@ def make_cluster(ws, make_random):
                 kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
             kwargs["custom_tags"] = {"ResourceClass": "SingleNode"}
         if "instance_pool_id" not in kwargs:
-            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
+            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
 
         return ws.clusters.create(
             cluster_name=cluster_name,
@@ -738,7 +738,7 @@ def make_instance_pool(ws, make_random):
         if instance_pool_name is None:
             instance_pool_name = f"sdk-{make_random(4)}"
         if node_type_id is None:
-            node_type_id = ws.clusters.select_node_type(local_disk=True)
+            node_type_id = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         return ws.instance_pools.create(instance_pool_name, node_type_id, **kwargs)
 
     yield from factory("instance pool", create, lambda item: ws.instance_pools.delete(item.instance_pool_id))
@@ -761,7 +761,7 @@ def make_job(ws, make_random, make_notebook):
                         description=make_random(4),
                         new_cluster=compute.ClusterSpec(
                             num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                             spark_version=ws.clusters.select_spark_version(latest=True),
                             spark_conf=task_spark_conf,
                         ),
@@ -776,7 +776,7 @@ def make_job(ws, make_random, make_notebook):
                         description=make_random(4),
                         new_cluster=compute.ClusterSpec(
                             num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True),
+                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                             spark_version=ws.clusters.select_spark_version(latest=True),
                         ),
                         notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
@@ -817,7 +817,7 @@ def make_pipeline(ws, make_random, make_notebook):
         if "clusters" not in kwargs:
             kwargs["clusters"] = [
                 pipelines.PipelineCluster(
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                     label="default",
                     num_workers=1,
                     custom_tags={
@@ -961,7 +961,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
-    def create(
+    def create(  # pylint: disable=too-many-locals,too-many-arguments
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
@@ -972,6 +972,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         external_csv: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
+        hiveserde_ddl: str | None = None,
+        storage_override: str | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1021,6 +1023,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         if tbl_properties:
             str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
+
+        if hiveserde_ddl:
+            ddl = hiveserde_ddl
+            data_source_format = None
+            table_type = TableType.EXTERNAL
+            storage_location = storage_override
 
         sql_backend.execute(ddl)
         table_info = TableInfo(
@@ -1216,3 +1224,24 @@ def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     return new_mounted_location
+
+
+@pytest.fixture
+def make_storage_dir(ws, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.mkdirs('{path}')")
+        else:
+            ws.dbfs.mkdirs(path)
+        return path
+
+    def remove(path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{path}', recurse=True)")
+        else:
+            ws.dbfs.delete(path, recursive=True)
+
+    yield from factory("make_storage_dir", create, remove)

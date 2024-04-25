@@ -151,6 +151,9 @@ class IamRoleMigration:
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[CredentialValidationResult]:
 
         iam_list = self._generate_migration_list(include_names)
+        if len(iam_list) == 0:
+            logger.info("No IAM Role to migrate")
+            return []
 
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC storage credentials, please review and confirm."
@@ -166,7 +169,7 @@ class IamRoleMigration:
                 continue
 
             self._resource_permissions.update_uc_role_trust_policy(
-                iam.role_arn, storage_credential.aws_iam_role.external_id
+                iam.role_name, storage_credential.aws_iam_role.external_id
             )
 
             execution_result.append(self._storage_credential_manager.validate(iam))
@@ -174,7 +177,7 @@ class IamRoleMigration:
         if execution_result:
             results_file = self.save(execution_result)
             logger.info(
-                f"Completed migration from IAM Role to UC Storage credentials"
+                f"Completed migration from IAM Role to UC Storage credentials. "
                 f"Please check {results_file} for validation results"
             )
         else:

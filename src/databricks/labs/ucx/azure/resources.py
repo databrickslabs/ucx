@@ -15,7 +15,10 @@ from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 from databricks.labs.ucx.assessment.crawlers import logger
 
 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
-_ROLES = {"STORAGE_BLOB_DATA_READER": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"}
+_ROLES = {
+    "STORAGE_BLOB_DATA_READER": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
+    "STORAGE_BLOB_DATA_CONTRIBUTOR": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+}
 
 
 @dataclass

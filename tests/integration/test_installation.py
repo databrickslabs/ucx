@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import os.path
@@ -11,6 +12,7 @@ from databricks.labs.blueprint.installer import RawState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
+from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
@@ -147,7 +149,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
     spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
     assert policy_definition["spark_version"]["value"] == spark_version
-    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True)
+    assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
     if ws.config.is_azure:
         assert (
             policy_definition["azure_attributes.availability"]["value"]
@@ -170,11 +172,14 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
 
     installation_ctx.deployed_workflows.run_workflow("remove-workspace-local-backup-groups")
 
-    @retried(on=[NotFound], timeout=timedelta(seconds=120))
-    def wait():
-        ws.groups.get(ws_group_a.id)
+    # The API needs a moment to delete a group, i.e. until the group is not found anymore
+    @retried(on=[KeyError], timeout=timedelta(minutes=2))
+    def get_group(group_id: str):
+        ws.groups.get(group_id)
+        raise KeyError(f"Group is not deleted: {group_id}")
 
-    wait()
+    with pytest.raises(NotFound):
+        get_group(ws_group_a.id)
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
@@ -196,8 +201,20 @@ def test_uninstallation(ws, sql_backend, installation_ctx):
     installation_ctx.workspace_installation.uninstall()
     with pytest.raises(NotFound):
         ws.workspace.get_status(installation_ctx.workspace_installation.folder)
-    with pytest.raises(InvalidParameterValue):
+    with pytest.raises(NotFound):
         ws.jobs.get(job_id=assessment_job_id)
+    with pytest.raises(NotFound):
+        sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
+
+
+def test_uninstallation_after_warehouse_is_deleted(ws, installation_ctx):
+    """A warehouse might be deleted (manually), the uninstallation should reset the warehouse."""
+    non_existing_warehouse_id = "00aa00aa00a00a00"
+    config = dataclasses.replace(installation_ctx.config, warehouse_id=non_existing_warehouse_id)
+    sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
+    installation_ctx = installation_ctx.replace(sql_backend=sql_backend, config=config)
+
+    installation_ctx.workspace_installation.uninstall()
     with pytest.raises(NotFound):
         sql_backend.execute(f"show tables from hive_metastore.{installation_ctx.inventory_database}")
 
@@ -330,6 +347,7 @@ def test_check_inventory_database_exists(ws, installation_ctx):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job(
     ws,
     installation_ctx,
@@ -375,6 +393,7 @@ def test_table_migration_job(
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
+@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job_cluster_override(
     ws,
     installation_ctx,

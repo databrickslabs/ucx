@@ -186,7 +186,7 @@ class AzureResourcePermissions:
         )
         try:
             self._apply_storage_permission(
-                uber_principal.client.object_id, "STORAGE_BLOB_DATA_READER", *storage_account_info
+                uber_principal.client.object_id, "STORAGE_BLOB_DATA_CONTRIBUTOR", *storage_account_info
             )
             self._installation.save(config)
             self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)

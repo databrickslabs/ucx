@@ -8,7 +8,6 @@ from typing import TypeVar, Generic
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -23,8 +22,6 @@ class MatchingVisitor(ast.NodeVisitor):
     def matched_nodes(self):
         return self._matched_nodes
 
-    # visit_Call follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Call(self, node: ast.Call):
         if self._node_type is not ast.Call:
             return
@@ -34,15 +31,11 @@ class MatchingVisitor(ast.NodeVisitor):
         except NotImplementedError as e:
             logger.warning(f"Missing implementation: {e.args[0]}")
 
-    # visit_Import follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Import(self, node: ast.Import):
         if self._node_type is not ast.Import:
             return
         self._matched_nodes.append(node)
 
-    # visit_ImportFrom follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_ImportFrom(self, node: ast.ImportFrom):
         if self._node_type is not ast.ImportFrom:
             return
@@ -100,15 +93,11 @@ class SysPathVisitor(ast.NodeVisitor):
     def appended_paths(self):
         return self._appended_paths
 
-    # visit_Import follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
             if alias.name in {"sys", "os"}:
                 self._aliases[alias.name] = alias.asname or alias.name
 
-    # visit_ImportFrom follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_ImportFrom(self, node: ast.ImportFrom):
         interesting_aliases = [("sys", "path"), ("os", "path"), ("os.path", "abspath")]
         interesting_alias = next((t for t in interesting_aliases if t[0] == node.module), None)
@@ -119,8 +108,6 @@ class SysPathVisitor(ast.NodeVisitor):
                 self._aliases[f"{node.module}.{interesting_alias[1]}"] = alias.asname or alias.name
                 break
 
-    # visit_Call follows NodeVisitor requirements, which clash with python naming conventions
-    # pylint: disable=invalid-name
     def visit_Call(self, node: ast.Call):
         # check for 'sys.path.append'
         if not self._match_aliases(node.func, ["sys", "path", "append"]):
@@ -271,16 +258,16 @@ class PythonLinter(Linter):
         return linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
 
     @staticmethod
-    def list_import_sources(linter: ASTLinter) -> list[str]:
+    def list_import_sources(linter: ASTLinter) -> list[tuple[str, ast.AST]]:
         nodes = linter.locate(ast.Import, [])
-        files = [alias.name for node in nodes for alias in node.names]
+        tuples = [(alias.name, node) for node in nodes for alias in node.names]
         nodes = linter.locate(ast.ImportFrom, [])
-        files.extend(node.module for node in nodes)
+        tuples.extend((node.module, node) for node in nodes)
         nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
-        files.extend(node.args[0].value for node in nodes)
+        tuples.extend((node.args[0].value, node) for node in nodes)
         nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
-        files.extend(node.args[0].value for node in nodes)
-        return files
+        tuples.extend((node.args[0].value, node) for node in nodes)
+        return tuples
 
     @staticmethod
     def list_appended_sys_paths(linter: ASTLinter) -> list[SysPath]:

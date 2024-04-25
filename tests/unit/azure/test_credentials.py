@@ -11,7 +11,7 @@ from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
-    AzureManagedIdentity,
+    AzureManagedIdentityResponse,
     AzureServicePrincipal,
     StorageCredentialInfo,
     ValidateStorageCredentialResponse,
@@ -100,7 +100,8 @@ def side_effect_create_storage_credential(name, azure_service_principal, comment
     )
 
 
-def side_effect_validate_storage_credential(storage_credential_name, url, read_only):  # pylint: disable=unused-argument
+def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
+    _ = url
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "none" in storage_credential_name:
@@ -131,7 +132,7 @@ def credential_manager(ws):
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/example-role-name")),
         StorageCredentialInfo(
-            azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
+            azure_managed_identity=AzureManagedIdentityResponse("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
         StorageCredentialInfo(
             name="included_test",

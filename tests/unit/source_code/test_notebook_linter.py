@@ -2,8 +2,7 @@ import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
 from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
 
 index = MigrationIndex([])
@@ -39,6 +38,14 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                     start_col=0,
                     end_line=4,
                     end_col=1024,
+                ),
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
+                    start_line=14,
+                    start_col=8,
+                    end_line=14,
+                    end_col=43,
                 ),
                 Deprecation(
                     code='dbfs-usage',
@@ -83,6 +90,14 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 
 """,
             [
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
+                    start_line=5,
+                    start_col=8,
+                    end_line=5,
+                    end_col=43,
+                ),
                 Deprecation(
                     code='dbfs-usage',
                     message='Deprecated file system path in call to: /mnt/things/e/f/g',
@@ -155,6 +170,30 @@ SELECT * FROM delta.`/mnt/...` WHERE foo > 6
 MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """,
             [
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of default dbfs: references is deprecated: /mnt/foo/bar',
+                    start_line=15,
+                    start_col=0,
+                    end_line=15,
+                    end_col=34,
+                ),
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of direct filesystem references is deprecated: dbfs:/mnt/foo/bar',
+                    start_line=16,
+                    start_col=0,
+                    end_line=16,
+                    end_col=39,
+                ),
+                Deprecation(
+                    code='direct-filesystem-access',
+                    message='The use of direct filesystem references is deprecated: dbfs://mnt/foo/bar',
+                    start_line=17,
+                    start_col=0,
+                    end_line=17,
+                    end_col=40,
+                ),
                 Advisory(
                     code='dbfs-usage',
                     message='Possible deprecated file system path: dbfs:/...',
@@ -276,15 +315,211 @@ def test_notebook_linter(lang, source, expected):
     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
     # Hence SQL statement advice offsets can be wrong because of comments and statements
     # over multiple lines.
-    langs = Languages(index)
-    linter = NotebookLinter.from_source(langs, source, lang)
+    linter = NotebookLinter.from_source(index, source, lang)
     assert linter is not None
     gathered = list(linter.lint())
     assert gathered == expected
 
 
 def test_notebook_linter_name():
-    langs = Languages(index)
     source = """-- Databricks notebook source"""
-    linter = NotebookLinter.from_source(langs, source, languages.Language.SQL)
+    linter = NotebookLinter.from_source(index, source, languages.Language.SQL)
     assert linter.name() == "notebook-linter"
+
+
+@pytest.mark.parametrize(
+    "lang, source, expected",
+    [
+        (
+            languages.Language.SQL,
+            """-- Databricks notebook source
+-- MAGIC %md
+-- MAGIC #Test notebook for Use tracking in Notebooks
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that changes the DB
+
+USE different_db
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables
+
+SELECT * FROM  testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that changes the DB to one we migrate from
+
+USE old
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables
+
+SELECT * FROM  testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables
+
+SELECT * FROM  stuff LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A Python cell that uses calls to change the USE
+-- MAGIC %python
+-- MAGIC # This is a Python cell that uses calls to change the USE...
+
+spark.sql("use different_db")
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references DBFS
+
+SELECT * FROM testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references DBFS
+
+SELECT * FROM old.testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that changes the DB to the default
+
+USE default
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references DBFS
+
+SELECT * FROM testtable LIMIT 10
+
+-- COMMAND ----------
+-- DBTITLE 1,A SQL cell that references tables 
+
+MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
+    """,
+            [
+                Deprecation(
+                    code='table-migrate',
+                    message='Table different_db.testtable is migrated to cata2.newspace.table in Unity Catalog',
+                    start_line=9,
+                    start_col=0,
+                    end_line=9,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table old.testtable is migrated to cata3.newspace.table in Unity Catalog',
+                    start_line=19,
+                    start_col=0,
+                    end_line=19,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table old.stuff is migrated to brand.new.things in Unity Catalog',
+                    start_line=24,
+                    start_col=0,
+                    end_line=24,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table different_db.testtable is migrated to ' 'cata2.newspace.table in Unity Catalog',
+                    start_line=36,
+                    start_col=0,
+                    end_line=36,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table old.testtable is migrated to cata3.newspace.table in Unity Catalog',
+                    start_line=41,
+                    start_col=0,
+                    end_line=41,
+                    end_col=1024,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table default.testtable is migrated to cata.nondefault.table in Unity Catalog',
+                    start_line=51,
+                    start_col=0,
+                    end_line=51,
+                    end_col=1024,
+                ),
+            ],
+        ),
+        (
+            languages.Language.PYTHON,
+            """# Databricks notebook source
+--- MAGIC %md
+-- MAGIC #Test notebook for Use tracking in Notebooks
+
+# COMMAND ----------
+
+display(spark.table('people')) # we are looking at default.people table
+
+# COMMAND ----------
+
+# MAGIC %sql USE something
+
+# COMMAND ----------
+
+display(spark.table('persons')) # we are looking at something.persons table
+
+# COMMAND ----------
+
+spark.sql('USE whatever')
+
+# COMMAND ----------
+
+display(spark.table('kittens')) # we are looking at whatever.kittens table
+
+# COMMAND ----------
+
+spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table.""",
+            [
+                Deprecation(
+                    code='table-migrate',
+                    message='Table people is migrated to cata4.nondefault.newpeople ' 'in Unity Catalog',
+                    start_line=6,
+                    start_col=8,
+                    end_line=6,
+                    end_col=29,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table persons is migrated to cata4.newsomething.persons ' 'in Unity Catalog',
+                    start_line=14,
+                    start_col=8,
+                    end_line=14,
+                    end_col=30,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table kittens is migrated to cata4.felines.toms in Unity ' 'Catalog',
+                    start_line=22,
+                    start_col=8,
+                    end_line=22,
+                    end_col=30,
+                ),
+                Deprecation(
+                    code='table-migrate',
+                    message='Table numbers is migrated to cata4.counting.numbers in ' 'Unity Catalog',
+                    start_line=26,
+                    start_col=0,
+                    end_line=26,
+                    end_col=38,
+                ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from ' 'Parquet to Delta',
+                    start_line=26,
+                    start_col=0,
+                    end_line=26,
+                    end_col=38,
+                ),
+            ],
+        ),
+    ],
+)
+def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected):
+    linter = NotebookLinter.from_source(extended_test_index, source, lang)
+    assert linter is not None
+    advices = list(linter.lint())
+    assert advices == expected

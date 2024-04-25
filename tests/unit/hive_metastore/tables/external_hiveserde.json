@@ -4,7 +4,8 @@
     "database": "db1_src",
     "name": "external_src",
     "object_type": "EXTERNAL",
-    "table_format": "XML"
+    "table_format": "HIVE",
+    "location": "dbfs:/mnt/test/table1"
   },
   "rule": {
     "workspace_name": "workspace",

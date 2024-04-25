@@ -14,6 +14,28 @@ from databricks.labs.ucx.source_code.base import (
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
+class AstHelper:
+    @staticmethod
+    def get_full_function_name(node):
+        if isinstance(node.func, ast.Attribute):
+            return AstHelper._get_value(node.func)
+
+        if isinstance(node.func, ast.Name):
+            return node.func.id
+
+        return None
+
+    @staticmethod
+    def _get_value(node):
+        if isinstance(node.value, ast.Name):
+            return node.value.id + '.' + node.attr
+
+        if isinstance(node.value, ast.Attribute):
+            return AstHelper._get_value(node.value) + '.' + node.attr
+
+        return None
+
+
 @dataclass
 class Matcher(ABC):
     method_name: str
@@ -21,11 +43,14 @@ class Matcher(ABC):
     max_args: int
     table_arg_index: int
     table_arg_name: str | None = None
+    call_context: dict[str, set[str]] | None = None
 
     def matches(self, node: ast.AST):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
-            return False
-        return self._get_table_arg(node) is not None
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and self._get_table_arg(node) is not None
+        )
 
     @abstractmethod
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
@@ -39,8 +64,25 @@ class Matcher(ABC):
         if len(node.args) > 0:
             return node.args[self.table_arg_index] if self.min_args <= len(node.args) <= self.max_args else None
         assert self.table_arg_name is not None
+        if not node.keywords:
+            return None
         arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
         return arg.value if arg is not None else None
+
+    def _check_call_context(self, node: ast.Call) -> bool:
+        assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
+        func_name = node.func.attr
+        qualified_name = AstHelper.get_full_function_name(node)
+
+        # Check if the call_context is None as that means all calls are checked
+        if self.call_context is None:
+            return True
+
+        # Get the qualified names from the call_context dictionary
+        qualified_names = self.call_context.get(func_name)
+
+        # Check if the qualified name is in the set of qualified names that are allowed
+        return qualified_name in qualified_names if qualified_names else False
 
 
 @dataclass
@@ -78,19 +120,8 @@ class TableNameMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if isinstance(table_arg, ast.Constant):
-            dst = self._find_dest(index, table_arg.value)
-            if dst is not None:
-                yield Deprecation(
-                    code='table-migrate',
-                    message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
-                    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno or 0,
-                    end_col=node.end_col_offset or 0,
-                )
-        else:
+
+        if not isinstance(table_arg, ast.Constant):
             assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
             yield Advisory(
                 code='table-migrate',
@@ -100,17 +131,35 @@ class TableNameMatcher(Matcher):
                 end_line=node.end_lineno or 0,
                 end_col=node.end_col_offset or 0,
             )
+            return
+
+        dst = self._find_dest(index, table_arg.value, from_table.schema)
+        if dst is None:
+            return
+
+        yield Deprecation(
+            code='table-migrate',
+            message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
+            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+            start_line=node.lineno,
+            start_col=node.col_offset,
+            end_line=node.end_lineno or 0,
+            end_col=node.end_col_offset or 0,
+        )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
         table_arg = self._get_table_arg(node)
         assert isinstance(table_arg, ast.Constant)
-        dst = self._find_dest(index, table_arg.value)
+        dst = self._find_dest(index, table_arg.value, from_table.schema)
         if dst is not None:
             table_arg.value = dst.destination()
 
     @staticmethod
-    def _find_dest(index: MigrationIndex, value: str):
+    def _find_dest(index: MigrationIndex, value: str, schema: str):
         parts = value.split(".")
+        # Ensure that unqualified table references use the current schema
+        if len(parts) == 1:
+            return index.get(schema, parts[0])
         return None if len(parts) != 2 else index.get(parts[0], parts[1])
 
 
@@ -132,7 +181,62 @@ class ReturnValueMatcher(Matcher):
         )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
-        raise NotImplementedError("Should never get there!")
+        # No transformations to apply
+        return
+
+
+@dataclass
+class DirectFilesystemAccessMatcher(Matcher):
+    _DIRECT_FS_REFS = {
+        "s3a://",
+        "s3n://",
+        "s3://",
+        "wasb://",
+        "wasbs://",
+        "abfs://",
+        "abfss://",
+        "dbfs:/",
+        "hdfs://",
+        "file:/",
+    }
+
+    def matches(self, node: ast.AST):
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and self._get_table_arg(node) is not None
+        )
+
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+        table_arg = self._get_table_arg(node)
+
+        if not isinstance(table_arg, ast.Constant):
+            return
+
+        if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
+            yield Deprecation(
+                code='direct-filesystem-access',
+                message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
+            return
+
+        if table_arg.value.startswith("/") and self._check_call_context(node):
+            yield Deprecation(
+                code='direct-filesystem-access',
+                message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
+
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+        # No transformations to apply
+        return
 
 
 class SparkMatchers:
@@ -190,6 +294,37 @@ class SparkMatchers:
             TableNameMatcher("register", 1, 2, 0, "name"),
         ]
 
+        direct_fs_access_matchers = [
+            DirectFilesystemAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
+            DirectFilesystemAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
+            DirectFilesystemAccessMatcher("rm", 1, 1, 0, call_context={"rm": {"dbutils.fs.rm"}}),
+            DirectFilesystemAccessMatcher("head", 1, 1, 0, call_context={"head": {"dbutils.fs.head"}}),
+            DirectFilesystemAccessMatcher("put", 1, 2, 0, call_context={"put": {"dbutils.fs.put"}}),
+            DirectFilesystemAccessMatcher("mkdirs", 1, 1, 0, call_context={"mkdirs": {"dbutils.fs.mkdirs"}}),
+            DirectFilesystemAccessMatcher("mv", 1, 2, 0, call_context={"mv": {"dbutils.fs.mv"}}),
+            DirectFilesystemAccessMatcher("text", 1, 3, 0),
+            DirectFilesystemAccessMatcher("csv", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("json", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("orc", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("parquet", 1, 1000, 0),
+            DirectFilesystemAccessMatcher("save", 0, 1000, -1, "path"),
+            DirectFilesystemAccessMatcher("load", 0, 1000, -1, "path"),
+            DirectFilesystemAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
+            DirectFilesystemAccessMatcher("addFile", 1, 3, 0),
+            DirectFilesystemAccessMatcher("binaryFiles", 1, 2, 0),
+            DirectFilesystemAccessMatcher("binaryRecords", 1, 2, 0),
+            DirectFilesystemAccessMatcher("dump_profiles", 1, 1, 0),
+            DirectFilesystemAccessMatcher("hadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("newAPIHadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("pickleFile", 1, 3, 0),
+            DirectFilesystemAccessMatcher("saveAsHadoopFile", 1, 8, 0),
+            DirectFilesystemAccessMatcher("saveAsNewAPIHadoopFile", 1, 7, 0),
+            DirectFilesystemAccessMatcher("saveAsPickleFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("saveAsSequenceFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("saveAsTextFile", 1, 2, 0),
+            DirectFilesystemAccessMatcher("load_from_path", 1, 1, 0),
+        ]
+
         # nothing to migrate in UserDefinedFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedFunction.html
         # nothing to migrate in UserDefinedTableFunction, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UserDefinedTableFunction.html
         self._matchers = {}
@@ -200,6 +335,7 @@ class SparkMatchers:
             + spark_dataframereader_matchers
             + spark_dataframewriter_matchers
             + spark_udtfregistration_matchers
+            + direct_fs_access_matchers
         ):
             self._matchers[matcher.method_name] = matcher
 

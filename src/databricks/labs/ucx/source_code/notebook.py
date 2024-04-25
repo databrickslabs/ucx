@@ -1,17 +1,21 @@
 from __future__ import annotations  # for type hints
 
-import ast
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
+from collections.abc import Callable
 from enum import Enum
+from pathlib import Path
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language, ObjectType
+from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, Dependency, SourceContainer
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+from databricks.labs.ucx.source_code.dependencies import (
+    DependencyGraph,
+    DependencyProblem,
+)
+from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +63,7 @@ class Cell(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         raise NotImplementedError()
 
 
@@ -76,19 +80,8 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph):
-        linter = ASTLinter.parse(self._original_code)
-        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        for call in calls:
-            assert isinstance(call, ast.Call)
-            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(path, ast.Constant):
-                dependency = Dependency(ObjectType.NOTEBOOK, path.value.strip("'").strip('"'))
-                parent.register_dependency(dependency)
-        names = PythonLinter.list_import_sources(linter)
-        for name in names:
-            dependency = Dependency(None, name)
-            parent.register_dependency(dependency)
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+        parent.build_graph_from_python_source(self._original_code, problem_collector)
 
 
 class RCell(Cell):
@@ -100,7 +93,7 @@ class RCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         pass  # not in scope
 
 
@@ -113,7 +106,7 @@ class ScalaCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         pass  # TODO
 
 
@@ -131,7 +124,7 @@ class SQLCell(Cell):
             sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         pass  # not in scope
 
 
@@ -144,7 +137,7 @@ class MarkdownCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         pass  # not in scope
 
 
@@ -157,16 +150,35 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
-        for line in lines:
+        for idx, line in enumerate(lines):
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command) :].strip()
-                parent.register_dependency(Dependency(ObjectType.NOTEBOOK, path.strip('"')))
+                path = line[start + len(command) :]
+                path = path.strip().strip("'").strip('"')
+                if len(path) == 0:
+                    continue
+                problems: list[DependencyProblem] = []
+                parent.register_notebook(Path(path), problems.append)
+                start_line = self._original_offset + idx + 1
+                for problem in problems:
+                    problem = problem.replace(
+                        start_line=start_line, start_col=0, end_line=start_line, end_col=len(line)
+                    )
+                    problem_collector(problem)
                 return
-        raise ValueError("Missing notebook path in %run command")
+        start_line = self._original_offset + 1
+        problem = DependencyProblem(
+            'dependency-check',
+            "Missing notebook path in %run command",
+            start_line=start_line,
+            start_col=0,
+            end_line=start_line,
+            end_col=len(self._original_code),
+        )
+        problem_collector(problem)
 
     def migrate_notebook_path(self):
         pass
@@ -181,11 +193,11 @@ class ShellCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
-        pass
+        pass  # nothing to do
 
 
 class PipCell(Cell):
@@ -197,7 +209,7 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph):
+    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
@@ -243,6 +255,8 @@ class CellLanguage(Enum):
 
     @classmethod
     def of_language(cls, language: Language) -> CellLanguage:
+        # TODO: Should this not raise a ValueError if the language is not found?
+        #  It also  causes a GeneratorExit exception to be raised. Maybe an explicit loop is better.
         return next((cl for cl in CellLanguage if cl.language == language))
 
     @classmethod
@@ -373,10 +387,6 @@ class Notebook(SourceContainer):
         self._ends_with_lf = ends_with_lf
 
     @property
-    def object_type(self) -> ObjectType:
-        return ObjectType.NOTEBOOK
-
-    @property
     def path(self) -> str:
         return self._path
 
@@ -405,6 +415,8 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+        problems: list[DependencyProblem] = []
         for cell in self._cells:
-            cell.build_dependency_graph(graph)
+            cell.build_dependency_graph(parent, problems.append)
+        parent.add_problems(problems)

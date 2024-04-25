@@ -28,7 +28,7 @@ def common():
 
     w.cluster_policies.list.return_value = [policy]
     w.clusters.select_spark_version = lambda **_: "14.2.x-scala2.12"
-    w.clusters.select_node_type = lambda local_disk: "Standard_F4s"
+    w.clusters.select_node_type = lambda **_: "Standard_F4s"
     w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     prompts = MockPrompts(
         {
@@ -210,7 +210,7 @@ def test_update_job_policy():
                 '123',
                 new_cluster=ClusterSpec(
                     num_workers=1,
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                     spark_version=ws.clusters.select_spark_version(latest=True),
                 ),
             )

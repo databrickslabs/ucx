@@ -292,24 +292,31 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
             include_databases=self.created_databases,
         )
 
-    def save_tables(self):
+    def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
-        return self.sql_backend.save_table(
-            f"{self.inventory_database}.tables",
-            [
+        default_table_format = "HIVE" if is_hiveserde else ""
+        tables_to_save = []
+        for table in self._tables:
+            if not table.catalog_name:
+                continue
+            if not table.schema_name:
+                continue
+            if not table.name:
+                continue
+            table_type = table.table_type.value if table.table_type else ""
+            table_format = table.data_source_format.value if table.data_source_format else default_table_format
+            tables_to_save.append(
                 Table(
                     catalog=table.catalog_name,
                     database=table.schema_name,
                     name=table.name,
-                    object_type=str(table.table_type.value or ""),
-                    table_format=table.data_source_format.value if table.data_source_format is not None else "",
+                    object_type=table_type,
+                    table_format=table_format,
                     location=str(table.storage_location or ""),
                     view_text=table.view_definition,
                 )
-                for table in self._tables
-            ],
-            Table,
-        )
+            )
+        return self.sql_backend.save_table(f"{self.inventory_database}.tables", tables_to_save, Table)
 
     def save_mounts(self):
         return self.sql_backend.save_table(
@@ -631,37 +638,102 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     ctx.workspace_installation.uninstall()
 
 
-@pytest.fixture
-def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip
-) -> tuple[dict[str, TableInfo], SchemaInfo]:
-    # create external and managed tables to be migrated
-    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[str, TableInfo]:
+    tables: dict[str, TableInfo] = {}
+
+    parquet_table_name = f"parquet_serde_{random}"
+    parquet_ddl = f"CREATE TABLE hive_metastore.{schema.name}.{parquet_table_name} (id INT, region STRING) PARTITIONED BY (region) STORED AS PARQUETFILE LOCATION '{table_base_dir}/{parquet_table_name}'"
+    tables[parquet_table_name] = context.make_table(
+        schema_name=schema.name,
+        name=parquet_table_name,
+        hiveserde_ddl=parquet_ddl,
+        storage_override=f"{table_base_dir}/{parquet_table_name}",
+    )
+
+    orc_table_name = f"orc_serde_{random}"
+    orc_ddl = f"CREATE TABLE hive_metastore.{schema.name}.{orc_table_name} (id INT, region STRING) PARTITIONED BY (region) STORED AS ORC LOCATION '{table_base_dir}/{orc_table_name}'"
+    tables[orc_table_name] = context.make_table(
+        schema_name=schema.name,
+        name=orc_table_name,
+        hiveserde_ddl=orc_ddl,
+        storage_override=f"{table_base_dir}/{orc_table_name}",
+    )
+
+    avro_table_name = f"avro_serde_{random}"
+    avro_ddl = f"""CREATE TABLE hive_metastore.{schema.name}.{avro_table_name} (id INT, region STRING) 
+                        ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
+                        STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
+                                  OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
+                        TBLPROPERTIES ('avro.schema.literal'='{{
+                            "namespace": "org.apache.hive", 
+                            "name": "first_schema", 
+                            "type": "record",
+                            "fields": [
+                                {{ "name":"id", "type":"int" }},
+                                {{ "name":"region", "type":"string" }}
+                            ] }}') 
+                        LOCATION '{table_base_dir}/{avro_table_name}'
+                    """
+    tables[avro_table_name] = context.make_table(
+        schema_name=schema.name,
+        name=avro_table_name,
+        hiveserde_ddl=avro_ddl,
+        storage_override=f"{table_base_dir}/{avro_table_name}",
+    )
+    return tables
+
+
+def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo]:
     tables: dict[str, TableInfo] = {
-        "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
-        "src_external_table": installation_ctx.make_table(schema_name=schema.name, external_csv=make_mounted_location),
+        "src_managed_table": context.make_table(schema_name=schema.name),
+        "src_external_table": context.make_table(schema_name=schema.name, external_csv=external_csv),
     }
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
-    tables["src_view1"] = installation_ctx.make_table(
+    tables["src_view1"] = context.make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view1_text,
         view=True,
     )
     src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
-    tables["src_view2"] = installation_ctx.make_table(
+    tables["src_view2"] = context.make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view2_text,
         view=True,
     )
+    return tables
+
+
+@pytest.fixture
+def prepare_tables_for_migration(
+    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
+) -> tuple[dict[str, TableInfo], SchemaInfo]:
+    # Here we use pytest indirect parametrization, so the test function can pass arguments to this fixture and the
+    # arguments will be available in the request.param. If the argument is "hiveserde", we will prepare hiveserde
+    # tables, otherwise we will prepare regular tables.
+    # see documents here for details https://docs.pytest.org/en/8.1.x/example/parametrize.html#indirect-parametrization
+    scenario = request.param
+    is_hiveserde = scenario == "hiveserde"
+    random = make_random(5).lower()
+    # create external and managed tables to be migrated
+    if is_hiveserde:
+        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
+        table_base_dir = make_storage_dir(
+            path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
+        )
+        tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
+    else:
+        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
+        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+
     # create destination catalog and schema
     dst_catalog = make_catalog()
     dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
     migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
     installation_ctx.with_table_mapping_rules(migrate_rules)
     installation_ctx.with_dummy_resource_permission()
-    installation_ctx.save_tables()
+    installation_ctx.save_tables(is_hiveserde=is_hiveserde)
     installation_ctx.save_mounts()
     installation_ctx.with_dummy_grants_and_tacls()
     return tables, dst_schema

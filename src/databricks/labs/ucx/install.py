@@ -24,7 +24,14 @@ from databricks.labs.blueprint.wheels import (
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
-from databricks.sdk.errors import AlreadyExists, BadRequest, InvalidParameterValue, NotFound, PermissionDenied
+from databricks.sdk.errors import (
+    AlreadyExists,
+    BadRequest,
+    InvalidParameterValue,
+    NotFound,
+    PermissionDenied,
+    ResourceDoesNotExist,
+)
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
     CreateWarehouseRequestWarehouseType,
@@ -112,7 +119,6 @@ def extract_major_minor(version_string):
 
 
 class WorkspaceInstaller(WorkspaceContext):
-
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -263,7 +269,7 @@ class WorkspaceInstaller(WorkspaceContext):
             logger.debug(f"Cannot find previous installation: {err}")
         return self._configure_new_installation(default_config)
 
-    def replace_config(self, **changes: Any):
+    def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
         """
         Persist the list of workspaces where UCX is successfully installed in the config
         """
@@ -273,6 +279,8 @@ class WorkspaceInstaller(WorkspaceContext):
             self.installation.save(new_config)
         except (PermissionDenied, NotFound, ValueError):
             logger.warning(f"Failed to replace config for {self.workspace_client.config.host}")
+            new_config = None
+        return new_config
 
     def _apply_upgrades(self):
         try:
@@ -285,7 +293,7 @@ class WorkspaceInstaller(WorkspaceContext):
             default_config = self._prompt_for_new_installation()
         HiveMetastoreLineageEnabler(self.workspace_client).apply(self.prompts, self._is_account_install)
         self._check_inventory_database_exists(default_config.inventory_database)
-        warehouse_id = self._configure_warehouse()
+        warehouse_id = self.configure_warehouse()
         policy_id, instance_profile, spark_conf_dict, instance_pool_id = self.policy_installer.create(
             default_config.inventory_database
         )
@@ -343,7 +351,7 @@ class WorkspaceInstaller(WorkspaceContext):
             return [x.strip() for x in selected_databases.split(",")]
         return None
 
-    def _configure_warehouse(self) -> str:
+    def configure_warehouse(self) -> str:
         def warehouse_type(_):
             return _.warehouse_type.value if not _.enable_serverless_compute else "SERVERLESS"
 
@@ -508,6 +516,7 @@ class WorkspaceInstallation(InstallationMixin):
         except NotFound:
             logger.error(f"Check if {self._installation.install_folder()} is present")
             return
+        self._check_and_fix_if_warehouse_does_not_exists()
         self._remove_database()
         self._remove_jobs()
         self._remove_warehouse()
@@ -569,6 +578,16 @@ class WorkspaceInstallation(InstallationMixin):
         self._ws.jobs.run_now(job_id)
         if self._prompts.confirm(f"Open {step} Job url that just triggered ? {job_url}"):
             webbrowser.open(job_url)
+
+    def _check_and_fix_if_warehouse_does_not_exists(self):
+        try:
+            self._ws.warehouses.get(self._config.warehouse_id)
+        except ResourceDoesNotExist:
+            logger.critical(f"warehouse with id {self._config.warehouse_id} does not exists anymore")
+            installer = WorkspaceInstaller(self._ws).replace(product_info=self._product_info, prompts=self._prompts)
+            warehouse_id = installer.configure_warehouse()
+            self._config = installer.replace_config(warehouse_id=warehouse_id)
+            self._sql_backend = StatementExecutionBackend(self._ws, self._config.warehouse_id)
 
 
 class AccountInstaller(AccountContext):
