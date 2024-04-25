@@ -47,6 +47,8 @@ from databricks.labs.ucx.cli import (
     migrate_external_hiveserde_tables_in_place,
 )
 from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.fixture
@@ -458,5 +460,17 @@ def test_migrate_tables(ws):
 
 
 def test_migrate_external_hiveserde_tables_in_place(ws):
-    migrate_external_hiveserde_tables_in_place(ws)
+    tables_crawler = create_autospec(TablesCrawler)
+    table = Table(
+        catalog="hive_metastore",
+        database="test",
+        name="hiveserde",
+        object_type="UNKNOWN",
+        table_format="HIVE"
+    )
+    tables_crawler.snapshot.return_value = [table]
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+
+    migrate_external_hiveserde_tables_in_place(ws, ctx=ctx)
+
     ws.jobs.run_now.assert_called_with(789)
