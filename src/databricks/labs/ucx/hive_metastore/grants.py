@@ -349,7 +349,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
 class AwsACL:
     # adding this profile file name here to avoid circular references with aws/access.py
-    INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
+    INSTANCE_PROFILES_FILE_NAME: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
         self,
@@ -400,7 +400,7 @@ class AwsACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._installation.load(list[AWSRoleAction], filename=self.INSTANCE_PROFILES_FILE_NAMES)
+        permission_mappings = self._installation.load(list[AWSRoleAction], filename=self.INSTANCE_PROFILES_FILE_NAME)
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (

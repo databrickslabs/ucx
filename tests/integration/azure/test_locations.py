@@ -27,7 +27,7 @@ def save_delete_location(ws, name):
 
 
 @pytest.mark.skip
-def test_run(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
+def test_run(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     locations = [
         ExternalLocation("abfss://uctest@ziyuanqintest.dfs.core.windows.net/one", 1),
         ExternalLocation("abfss://uctest@ziyuanqintest.dfs.core.windows.net/two", 2),
@@ -68,7 +68,7 @@ def test_run(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.principal_acl,
+        az_cli_ctx.principal_acl,
     )
     try:
         location_migration.run()
@@ -83,7 +83,7 @@ def test_run(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
 
 
 @pytest.mark.skip
-def test_read_only_location(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
+def test_read_only_location(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     locations = [ExternalLocation("abfss://ucx1@ziyuanqintest.dfs.core.windows.net/", 1)]
     sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
     location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
@@ -114,7 +114,7 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema, runtime_c
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.principal_acl,
+        az_cli_ctx.principal_acl,
     )
     try:
         location_migration.run()
@@ -125,7 +125,7 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema, runtime_c
 
 
 @pytest.mark.skip
-def test_missing_credential(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
+def test_missing_credential(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     locations = [
         ExternalLocation("abfss://ucx3@ziyuanqintest.dfs.core.windows.net/one", 1),
         ExternalLocation("abfss://ucx3@ziyuanqintest.dfs.core.windows.net/two", 2),
@@ -159,7 +159,7 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema, runtime_c
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.principal_acl,
+        az_cli_ctx.principal_acl,
     )
     leftover_loc = location_migration.run()
 
@@ -168,7 +168,7 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema, runtime_c
 
 
 @pytest.mark.skip
-def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
+def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     """Customer may already create external location with url that is a sub path of the table prefix hive_metastore/locations.py extracted.
     This test case is to verify the overlapping location will be detected and reported.
     """
@@ -207,7 +207,7 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, runtime
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.principal_acl,
+        az_cli_ctx.principal_acl,
     )
     try:
         leftover_loc_urls = location_migration.run()
