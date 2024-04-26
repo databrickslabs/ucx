@@ -179,6 +179,12 @@ class WorkspacePath(Path):
     def _make_child_relpath(self, part):
         # used in dir walking
         path = self._flavour.join(self._parts + [part])
+        # self._flavour.join duplicates leading '/' (possibly a python bug)
+        # but we can't override join in _DatabricksFlavour because it's built-in
+        # and if we remove the leading '/' part then we don't get any
+        # so let's just do a slow but safe sanity check afterward
+        if os.sep == path[0] == path[1]:
+            path = path[1:]
         return WorkspacePath(self._ws, path)
 
     def _parse_args(self, args):  # pylint: disable=arguments-differ
@@ -314,3 +320,9 @@ class WorkspacePath(Path):
 
     def is_notebook(self):
         return self._object_info.object_type == ObjectType.NOTEBOOK
+
+    def __eq__(self, other):
+        return isinstance(other, Path) and self.as_posix() == other.as_posix()
+
+    def __hash__(self):
+        return Path.__hash__(self)
