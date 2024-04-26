@@ -69,9 +69,7 @@ class LocalFileLoader(DependencyLoader):
 
         fullpath = self.full_path(dependency.path)
         assert fullpath is not None
-        with fullpath.open(mode="r", encoding="utf-8") as stream:
-            source = stream.read()
-            return LocalFile(fullpath, source, Language.PYTHON)
+        return LocalFile(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
 
     def is_file(self, path: Path) -> bool:
         return self.full_path(path) is not None
