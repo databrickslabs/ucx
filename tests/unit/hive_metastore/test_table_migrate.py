@@ -70,6 +70,8 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+
     assert (
         "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs DEEP CLONE hive_metastore.db1_src.managed_dbfs;"
         in backend.queries
@@ -118,6 +120,8 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_NON_DELTA)
 
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+
     assert (
         "CREATE TABLE IF NOT EXISTS ucx_default.db1_dst.managed_dbfs "
         "AS SELECT * FROM hive_metastore.db1_src.managed_dbfs" in backend.queries
@@ -157,6 +161,8 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+
     assert len(backend.queries) == 0
 
 
@@ -183,6 +189,8 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
         principal_grants,
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
+
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
     assert backend.queries == [
         "SYNC TABLE ucx_default.db1_dst.external_dst FROM hive_metastore.db1_src.external_src;",
@@ -218,6 +226,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     )
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
     assert "SYNC command failed to migrate" in caplog.text
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -304,6 +313,9 @@ def test_migrate_external_hiveserde_table_in_place(
         mounts_crawler=mount_crawler,
         hiveserde_in_place_migrate=hiveserde_in_place_migrate,
     )
+
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+
     if migrated:
         assert expected_value in backend.queries
     else:
@@ -354,6 +366,7 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
     table_migrate.migrate_tables(what=what, mounts_crawler=mounts_crawler)
 
     assert expected_query in backend.queries
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
@@ -401,6 +414,7 @@ def test_migrate_already_upgraded_table_should_produce_no_queries(ws):
     table_migrate.migrate_tables(what=What.EXTERNAL_SYNC)
 
     assert len(backend.queries) == 0
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
@@ -428,6 +442,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
     table_migrate.migrate_tables(what=What.UNKNOWN)
 
     assert len(backend.queries) == 0
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def test_migrate_view_should_produce_proper_queries(ws):
@@ -472,6 +487,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     assert src in backend.queries
     dst = f"ALTER VIEW ucx_default.db1_dst.view_dst SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     assert dst in backend.queries
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def test_migrate_view_with_columns(ws):
@@ -510,11 +526,12 @@ def test_migrate_view_with_columns(ws):
 
     create = "CREATE OR REPLACE VIEW IF NOT EXISTS ucx_default.db1_dst.view_dst (a, b) AS SELECT * FROM ucx_default.db1_dst.new_managed_dbfs"
     assert create in backend.queries
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     table_crawler = create_autospec(TablesCrawler)
-    grant_crawler = create_autospec(GrantsCrawler)
+    grant_crawler = create_autospec(GrantsCrawler)  # pylint: disable=mock-no-usage
     client = workspace_client_mock()
     client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     client.schemas.list.return_value = [
@@ -601,7 +618,7 @@ def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     group_manager = GroupManager(backend, client, "inventory_database")
     table_mapping = table_mapping_mock()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
-    principal_grants = create_autospec(PrincipalACL)
+    principal_grants = create_autospec(PrincipalACL)  # pylint: disable=mock-no-usage
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
@@ -686,6 +703,10 @@ def test_no_migrated_tables(ws):
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     table_migrate.revert_migrated_tables("test_schema1", "test_table1")
     ws.catalogs.list.assert_called()
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+    table_crawler.snapshot.assert_called()
+    table_mapping.get_tables_to_migrate.assert_called()
+    grant_crawler.snapshot.assert_not_called()
 
 
 def test_revert_report(ws, capsys):
@@ -727,6 +748,10 @@ def test_empty_revert_report(ws):
     )
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert not table_migrate.print_revert_report(delete_managed=False)
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+    table_crawler.snapshot.assert_called()
+    table_mapping.get_tables_to_migrate.assert_called()
+    grant_crawler.snapshot.assert_not_called()
 
 
 def test_is_upgraded(ws):
@@ -757,6 +782,10 @@ def test_is_upgraded(ws):
     table_migrate.migrate_tables(what=What.DBFS_ROOT_DELTA)
     assert table_migrate.is_migrated("schema1", "table1")
     assert not table_migrate.is_migrated("schema1", "table2")
+    table_crawler.snapshot.assert_not_called()
+    table_mapping.get_tables_to_migrate.assert_called()
+    grant_crawler.snapshot.assert_not_called()
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def test_table_status():
@@ -861,6 +890,8 @@ def test_table_status_reset():
     assert backend.queries == [
         "DELETE FROM hive_metastore.ucx.migration_status",
     ]
+    table_crawler.snapshot.assert_not_called()
+    client.catalogs.list.assert_not_called()
 
 
 def test_table_status_seen_tables(caplog):
@@ -921,6 +952,7 @@ def test_table_status_seen_tables(caplog):
     }
     assert "Catalog deleted_cat no longer exists. Skipping checking its migration status." in caplog.text
     assert "Schema cat1.deleted_schema no longer exists. Skipping checking its migration status." in caplog.text
+    table_crawler.snapshot.assert_not_called()
 
 
 GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "table", "view")
@@ -984,6 +1016,8 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     migration_status_refresher.index.return_value = migration_index
 
     table_migrate.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+    principal_grants.get_interactive_cluster_grants.assert_called()
 
     assert "GRANT SELECT ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" in backend.queries
     assert "GRANT MODIFY ON TABLE ucx_default.db1_dst.managed_dbfs TO `account group`" not in backend.queries
@@ -1097,6 +1131,9 @@ def test_migrate_views_should_be_properly_sequenced(ws):
         migration_status_refresher,
         principal_grants,
     )
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+    table_crawler.snapshot.assert_not_called()
+    grant_crawler.snapshot.assert_not_called()
     tasks = table_migrate.migrate_tables(what=What.VIEW)
     table_keys = [task.args[0].src.key for task in tasks]
     assert table_keys.index("hive_metastore.db1_src.v1_src") > table_keys.index("hive_metastore.db1_src.v3_src")

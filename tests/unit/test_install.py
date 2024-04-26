@@ -210,12 +210,13 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
     )
     install_state = InstallState.from_installation(mock_installation)
+    wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
         install_state,
         ws,
-        create_autospec(WheelsV2),
+        wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
         [],
@@ -240,6 +241,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
             raise e.errs[0]
 
     assert "Kindly uninstall and reinstall UCX" in str(failure.value)
+    wheels.upload_to_wsfs.assert_not_called()
 
 
 def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
@@ -261,6 +263,8 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
     assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
+    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_dbfs.assert_called_once()
 
 
 def test_write_protected_dbfs(ws, tmp_path, mock_installation):
@@ -334,6 +338,8 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
     assert 'main' in job_clusters
     assert 'tacl' in job_clusters
     assert job_clusters["main"].new_cluster.policy_id == "123"
+    wheels.upload_to_dbfs.assert_called_once()
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_jobs):
@@ -620,12 +626,13 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         }
     )
     install_state = InstallState.from_installation(mock_installation)
+    wheels = create_autospec(WheelsV2)
     workflows_installer = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
         install_state,
         ws,
-        create_autospec(WheelsV2),
+        wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
         [],
@@ -643,6 +650,8 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
     workspace_installation.run()
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README')
+    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_dbfs.assert_called_once()
 
 
 def test_query_metadata(ws):
@@ -676,6 +685,10 @@ def test_remove_database(ws):
     workspace_installation.uninstall()
 
     assert sql_backend.queries == ['DROP SCHEMA IF EXISTS hive_metastore.ucx CASCADE']
+    ws.jobs.delete.assert_not_called()
+    ws.cluster_policies.delete.assert_called_once()
+    installation.remove.assert_called_once()
+    workflow_installer.create_jobs.assert_not_called()
 
 
 def test_remove_jobs_no_state(ws):
@@ -690,12 +703,13 @@ def test_remove_jobs_no_state(ws):
     installation = create_autospec(Installation)
     config = WorkspaceConfig(inventory_database='ucx')
     install_state = InstallState.from_installation(installation)
+    wheels = create_autospec(WheelsV2)
     workflows_installer = WorkflowsDeployment(
         config,
         installation,
         install_state,
         ws,
-        create_autospec(WheelsV2),
+        wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
         [],
@@ -707,6 +721,8 @@ def test_remove_jobs_no_state(ws):
     workspace_installation.uninstall()
 
     ws.jobs.delete.assert_not_called()
+    installation.remove.assert_called_once()
+    wheels.upload_to_wsfs.assert_not_called()
 
 
 def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_jobs):
@@ -722,12 +738,13 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
     config = WorkspaceConfig(inventory_database='ucx')
     installation = mock_installation_with_jobs
     install_state = InstallState.from_installation(installation)
+    wheels = create_autospec(WheelsV2)
     workflows_installer = WorkflowsDeployment(
         config,
         installation,
         install_state,
         ws,
-        create_autospec(WheelsV2),
+        wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
         [],
@@ -748,6 +765,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         assert 'Already deleted: assessment job_id=123.' in caplog.messages
 
     mock_installation_with_jobs.assert_removed()
+    wheels.upload_to_wsfs.assert_not_called()
 
 
 def test_remove_warehouse(ws):
@@ -777,6 +795,8 @@ def test_remove_warehouse(ws):
     workspace_installation.uninstall()
 
     ws.warehouses.delete.assert_called_once()
+    installation.remove.assert_called_once()
+    workflows_installer.create_jobs.assert_not_called()
 
 
 def test_not_remove_warehouse_with_a_different_prefix(ws):
@@ -806,6 +826,8 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     workspace_installation.uninstall()
 
     ws.warehouses.delete.assert_not_called()
+    workflows_installer.create_jobs.assert_not_called()
+    installation.remove.assert_called_once()
 
 
 def test_remove_secret_scope(ws, caplog):
@@ -830,6 +852,7 @@ def test_remove_secret_scope(ws, caplog):
     )
     workspace_installation.uninstall()
     ws.secrets.delete_scope.assert_called_with('ucx')
+    workflows_installer.create_jobs.assert_not_called()
 
 
 def test_remove_secret_scope_no_scope(ws, caplog):
@@ -856,6 +879,9 @@ def test_remove_secret_scope_no_scope(ws, caplog):
     with caplog.at_level('ERROR'):
         workspace_installation.uninstall()
         assert 'Secret scope already deleted' in caplog.messages
+
+    ws.secrets.delete_scope.assert_called_with('ucx')
+    workflows_installer.create_jobs.assert_not_called()
 
 
 def test_remove_cluster_policy_not_exists(ws, caplog):
@@ -885,6 +911,9 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
         workspace_installation.uninstall()
         assert 'UCX Policy already deleted' in caplog.messages
 
+    installation.remove.assert_called_once()
+    workflows_installer.create_jobs.assert_not_called()
+
 
 def test_remove_warehouse_not_exists(ws, caplog):
     ws.warehouses.delete.side_effect = InvalidParameterValue("warehouse id 123 not found")
@@ -913,6 +942,9 @@ def test_remove_warehouse_not_exists(ws, caplog):
     with caplog.at_level('ERROR'):
         workspace_installation.uninstall()
         assert 'Error accessing warehouse details' in caplog.messages
+
+    installation.remove.assert_called_once()
+    workflows_installer.create_jobs.assert_not_called()
 
 
 def test_repair_run(ws, mocker, mock_installation_with_jobs):
@@ -1265,6 +1297,8 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
     )
     workspace_installation.run()
+    wheels.upload_to_wsfs.assert_called_once()
+    ws.jobs.run_now.assert_not_called()
 
 
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
@@ -1278,17 +1312,20 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
             },
         }
     )
+    wheels = create_autospec(WheelsV2)
     install = WorkspaceInstaller(ws).replace(
         prompts=any_prompt,
         installation=existing_installation,
         product_info=PRODUCT_INFO,
         sql_backend=MockBackend(),
-        wheels=create_autospec(WheelsV2),
+        wheels=wheels,
     )
 
     install.run(
         verify_timeout=timedelta(seconds=60),
     )
+
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
@@ -1303,12 +1340,13 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
             },
         }
     )
+    wheels = create_autospec(WheelsV2)
     install = WorkspaceInstaller(ws).replace(
         prompts=any_prompt,
         installation=existing_installation,
         product_info=PRODUCT_INFO,
         sql_backend=MockBackend(),
-        wheels=create_autospec(WheelsV2),
+        wheels=wheels,
     )
 
     install.run(
@@ -1316,6 +1354,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     )
 
     existing_installation.assert_file_uploaded('logs/README.md')
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 def test_fresh_install(ws, mock_installation):
@@ -1362,12 +1401,13 @@ def test_fresh_install(ws, mock_installation):
 def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     sql_backend = MockBackend()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
+    wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation_extra_jobs,
         install_state,
         ws,
-        create_autospec(WheelsV2),
+        wheels,
         PRODUCT_INFO,
         timedelta(seconds=1),
         [],
@@ -1386,6 +1426,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
 
     workspace_installation.run()
     ws.jobs.delete.assert_called_with("123")
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 def test_get_existing_installation_global(ws, mock_installation):
@@ -1593,6 +1634,8 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
         workspace_installation.create_jobs(any_prompt)
     assert "Current user is not a workspace admin" in str(failure.value)
 
+    wheels.upload_to_wsfs.assert_called_once()
+
 
 @pytest.mark.parametrize(
     "result_state,expected",
@@ -1735,6 +1778,7 @@ def test_account_installer(ws):
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
     account_installer.install_on_account()
+    ws.workspace.upload.assert_called()
     # should have 4 uploaded call, 2 for config.yml, 2 for workspace.json
     assert ws.workspace.upload.call_count == 4
 
@@ -1744,7 +1788,7 @@ def mock_ws():
     def get_status(path: str):
         raise NotFound(path)
 
-    workspace_client = create_autospec(WorkspaceClient)
+    workspace_client = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
     workspace_client.workspace.get_status = get_status
 
     return workspace_client

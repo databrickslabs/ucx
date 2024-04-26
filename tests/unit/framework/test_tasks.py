@@ -25,7 +25,7 @@ Test3"""
 
 
 def test_task_cloud():
-    ws = create_autospec(WorkspaceClient)
+    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
     ws.config.is_aws = True
     ws.config.is_azure = False
     ws.config.is_gcp = False

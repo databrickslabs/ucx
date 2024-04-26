@@ -127,6 +127,8 @@ def test_create_acc_groups_should_throw_exception(acc_client):
     with pytest.raises(ValueError):
         account_workspaces.create_account_level_groups(MockPrompts({}), [123])
 
+    ws.groups.list.assert_not_called()
+
 
 def test_create_acc_groups_should_filter_system_groups(acc_client):
     acc_client.workspaces.list.return_value = [
@@ -540,8 +542,9 @@ def test_assign_metastore(acc_client):
     acc_client.workspaces.get.return_value = Workspace(workspace_id=123456, aws_region="us-west-2")
     ws = create_autospec(WorkspaceClient)
     acc_client.get_workspace_client.return_value = ws
-    default_namespace = ws.settings.default_namespace
-    default_namespace.get.return_value = DefaultNamespaceSetting(etag="123", namespace=StringMessage("hive_metastore"))
+    ws.settings.default_namespace.get.return_value = DefaultNamespaceSetting(
+        etag="123", namespace=StringMessage("hive_metastore")
+    )
     account_metastores = AccountMetastores(acc_client)
     prompts = MockPrompts({"Multiple metastores found, please select one*": "0", "Please select a workspace:*": "0"})
 
@@ -552,17 +555,17 @@ def test_assign_metastore(acc_client):
     # multiple metastores & default catalog name, need to choose one
     account_metastores.assign_metastore(prompts, "123456", "", "main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
-    default_namespace.update.assert_called_with(
+    ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
         field_mask="namespace.value",
         setting=DefaultNamespaceSetting(etag="123", namespace=StringMessage("main")),
     )
 
     # default catalog not found, still get etag
-    default_namespace.get.side_effect = NotFound(details=[{"metadata": {"etag": "not_found"}}])
+    ws.settings.default_namespace.get.side_effect = NotFound(details=[{"metadata": {"etag": "not_found"}}])
     account_metastores.assign_metastore(prompts, "123456", "", "main")
     acc_client.metastore_assignments.create.assert_called_with(123456, "123")
-    default_namespace.update.assert_called_with(
+    ws.settings.default_namespace.update.assert_called_with(
         allow_missing=True,
         field_mask="namespace.value",
         setting=DefaultNamespaceSetting(etag="not_found", namespace=StringMessage("main")),

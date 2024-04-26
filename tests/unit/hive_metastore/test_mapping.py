@@ -56,6 +56,8 @@ def test_current_tables_empty_fails():
     with pytest.raises(ValueError):
         list(table_mapping.current_tables(tables_crawler, "a", "b"))
 
+    ws.tables.get.assert_not_called()
+
 
 def test_current_tables_some_rules():
     ws = create_autospec(WorkspaceClient)
@@ -84,6 +86,8 @@ def test_current_tables_some_rules():
     assert rule.as_uc_table_key == "b.foo.bar"
     assert rule.as_hms_table_key == "hive_metastore.foo.bar"
 
+    ws.tables.get.assert_not_called()
+
 
 def test_save_mapping():
     ws = create_autospec(WorkspaceClient)
@@ -108,6 +112,8 @@ def test_save_mapping():
     workspace_info.current.return_value = "foo-bar"
 
     table_mapping.save(tables_crawler, workspace_info)
+
+    ws.tables.get.assert_not_called()
 
     installation.assert_file_written(
         'mapping.csv',
@@ -136,6 +142,8 @@ def test_load_mapping_not_found():
     with pytest.raises(ValueError):
         table_mapping.load()
 
+    ws.tables.get.assert_not_called()
+
 
 def test_load_mapping():
     ws = create_autospec(WorkspaceClient)
@@ -160,6 +168,8 @@ def test_load_mapping():
 
     rules = table_mapping.load()
 
+    ws.tables.get.assert_not_called()
+
     assert [
         Rule(
             workspace_name="foo-bar",
@@ -178,6 +188,7 @@ def test_skip_happy_path(caplog):
     installation = MockInstallation()
     mapping = TableMapping(installation, ws, sbe)
     mapping.skip_table(schema="schema", table="table")
+    ws.tables.get.assert_not_called()
     sbe.execute.assert_called_with(f"ALTER TABLE schema.table SET TBLPROPERTIES('{mapping.UCX_SKIP_PROPERTY}' = true)")
     assert len(caplog.records) == 0
     mapping.skip_schema(schema="schema")
@@ -192,6 +203,7 @@ def test_skip_missing_schema(caplog):
     sbe.execute.side_effect = NotFound("[SCHEMA_NOT_FOUND]")
     mapping = TableMapping(installation, ws, sbe)
     mapping.skip_schema(schema="schema")
+    ws.tables.get.assert_not_called()
     assert [rec.message for rec in caplog.records if "schema not found" in rec.message.lower()]
 
 
@@ -202,6 +214,7 @@ def test_skip_missing_table(caplog):
     sbe.execute.side_effect = NotFound("[TABLE_OR_VIEW_NOT_FOUND]")
     mapping = TableMapping(installation, ws, sbe)
     mapping.skip_table('foo', table="table")
+    ws.tables.get.assert_not_called()
     assert [rec.message for rec in caplog.records if "table not found" in rec.message.lower()]
 
 
@@ -590,6 +603,8 @@ def test_database_not_exists_when_checking_inscope(caplog):
     )
     table_mapping = TableMapping(installation, client, backend)
     table_mapping.get_tables_to_migrate(tables_crawler)
+    client.tables.get.assert_not_called()
+    tables_crawler.snapshot.assert_called_once()
     assert (
         "Schema hive_metastore.deleted_schema no longer exists. Skipping its properties check and migration."
         in caplog.text

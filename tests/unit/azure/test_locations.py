@@ -20,22 +20,17 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.unit.azure import azure_api_client
 
 
-@pytest.fixture
-def ws():
-    return create_autospec(WorkspaceClient)
-
-
 def location_migration_for_test(ws, mock_backend, mock_installation):
     azurerm = AzureResources(azure_api_client(), azure_api_client())
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
+    azure_resource_permissions = AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler)
+    external_locations_migration = ExternalLocationsMigration(ws, location_crawler, azure_resource_permissions, azurerm)
+    return external_locations_migration
 
-    return ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler), azurerm
-    )
 
-
-def test_run_service_principal(ws):
+def test_run_service_principal():
     """test run with service principal based storage credentials"""
+    ws = create_autospec(WorkspaceClient)
 
     # mock crawled HMS external locations
     mock_backend = MockBackend(
@@ -112,8 +107,9 @@ def test_run_service_principal(ws):
     )
 
 
-def test_skip_unsupported_location(ws, caplog):
+def test_skip_unsupported_location(caplog):
     # mock crawled HMS external locations with two unsupported locations adl and wasbs
+    ws = create_autospec(WorkspaceClient)
     mock_backend = MockBackend(
         rows={
             r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
@@ -186,8 +182,9 @@ def test_skip_unsupported_location(ws, caplog):
     assert "Skip unsupported location: wasbs://container2@test.dfs.core.windows.net" in caplog.text
 
 
-def test_run_managed_identity(ws, mocker):
+def test_run_managed_identity():
     """test run with managed identity based storage credentials"""
+    ws = create_autospec(WorkspaceClient)
 
     # mock crawled HMS external locations
     mock_backend = MockBackend(
@@ -276,8 +273,9 @@ def create_side_effect(location_name, *args, **kwargs):  # pylint: disable=unuse
             raise InvalidParameterValue("Other InvalidParameterValue exception")
 
 
-def test_location_failed_to_read(ws):
+def test_location_failed_to_read():
     """If read-only location is empty, READ permission check will fail with PermissionDenied"""
+    ws = create_autospec(WorkspaceClient)
 
     # mock crawled HMS external locations
     mock_backend = MockBackend(
@@ -343,8 +341,9 @@ def test_location_failed_to_read(ws):
     )
 
 
-def test_overlapping_locations(ws, caplog):
+def test_overlapping_locations(caplog):
     caplog.set_level(logging.INFO)
+    ws = create_autospec(WorkspaceClient)
 
     # mock crawled HMS external locations
     mock_backend = MockBackend(
@@ -406,9 +405,11 @@ def test_overlapping_locations(ws, caplog):
     assert "overlaps with an existing external location" in caplog.text
 
 
-def test_corner_cases_with_missing_fields(ws, caplog, mocker):
+def test_corner_cases_with_missing_fields(caplog, mocker):
     """test corner cases with: missing credential name, missing application_id"""
     caplog.set_level(logging.INFO)
+
+    ws = create_autospec(WorkspaceClient)
 
     # mock crawled HMS external locations
     mock_backend = MockBackend(
