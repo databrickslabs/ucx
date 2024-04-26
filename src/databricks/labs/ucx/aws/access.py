@@ -13,6 +13,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.compute import Policy
 
+
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSResources,
@@ -21,6 +22,7 @@ from databricks.labs.ucx.assessment.aws import (
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
@@ -28,7 +30,7 @@ class AWSResourcePermissions:
     UC_ROLES_FILE_NAMES: typing.ClassVar[str] = "uc_roles_access.csv"
     INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         installation: Installation,
         ws: WorkspaceClient,
@@ -36,6 +38,7 @@ class AWSResourcePermissions:
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
         schema: str,
+        principal_acl: PrincipalACL,
         aws_account_id=None,
         kms_key=None,
     ):
@@ -48,6 +51,7 @@ class AWSResourcePermissions:
         self._aws_account_id = aws_account_id
         self._kms_key = kms_key
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
+        self._principal_acl = principal_acl
 
     def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         # Get the missing paths
@@ -275,6 +279,7 @@ class AWSResourcePermissions:
                 external_location_name, path, credential_dict[role_arn], skip_validation=True
             )
             external_location_num += 1
+        self._principal_acl.apply_location_acl()
 
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
         instance_profile_arn = self._aws_resources.get_instance_profile(instance_profile_name)

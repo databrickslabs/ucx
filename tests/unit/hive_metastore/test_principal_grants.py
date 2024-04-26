@@ -435,3 +435,146 @@ def test_interactive_cluster_aws(ws, installation):
     actual_grants = grants.get_interactive_cluster_grants()
     for grant in expected_grants:
         assert grant in actual_grants
+
+def test_run_validate_test_acl_no_principal(ws):
+    """test run with service principal based storage credentials"""
+
+    # mock crawled HMS external locations
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container1@test.dfs.core.windows.net/one/", 1),
+            ]
+        }
+    )
+
+    # mock listing storage credentials
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            name="credential_sp1",
+            azure_service_principal=AzureServicePrincipal(
+                "directory_id_1",
+                "application_id_1",
+                "test_secret",
+            ),
+        )
+    ]
+
+    # mock listing UC external locations, no HMS external location will be matched
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
+
+    # mock installation with permission mapping
+    mock_installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://container1@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                }
+            ],
+        }
+    )
+    cluster_locations = {
+        'cluster1': {
+            'abfss://container2@test.dfs.core.windows.net': 'WRITE_FILES',
+            'abfss://container1@test.dfs.core.windows.net': 'WRITE_FILES',
+        }
+    }
+    principal_acl = create_autospec(PrincipalACL)
+    principal_acl.l = cluster_locations
+    principals = []
+    principal_acl.get_cluster_principal_mapping.return_value = principals
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
+    location_migration.run()
+    ws.grants.update.assert_not_called()
+
+
+def test_run_validate_test_acl(ws):
+    """test run with service principal based storage credentials"""
+
+    # mock crawled HMS external locations
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container1@test.dfs.core.windows.net/one/", 1),
+                ("abfss://container2@test.dfs.core.windows.net/", 2),
+            ]
+        }
+    )
+
+    # mock listing storage credentials
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(
+            name="credential_sp1",
+            azure_service_principal=AzureServicePrincipal(
+                "directory_id_1",
+                "application_id_1",
+                "test_secret",
+            ),
+        ),
+        StorageCredentialInfo(
+            name="credential_sp2",
+            azure_service_principal=AzureServicePrincipal("directory_id_2", "application_id_2", "test_secret"),
+            read_only=True,
+        ),
+    ]
+
+    # mock listing UC external locations, no HMS external location will be matched
+    ws.external_locations.list.return_value = [
+        ExternalLocationInfo(name="loc1", url="abfss://container1@test.dfs.core.windows.net"),
+        ExternalLocationInfo(name="loc2", url="abfss://container2@test.dfs.core.windows.net"),
+    ]
+
+    # mock installation with permission mapping
+    mock_installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv": [
+                {
+                    'prefix': 'abfss://container1@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+                {
+                    'prefix': 'abfss://container2@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_2',
+                    'principal': 'credential_sp2',
+                    'privilege': 'READ_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+            ],
+        }
+    )
+    azure_acl = create_autospec(AzureACL)
+    cluster_locations = {
+        'cluster1': {
+            'abfss://container2@test.dfs.core.windows.net': 'WRITE_FILES',
+            'abfss://container1@test.dfs.core.windows.net': 'WRITE_FILES',
+        },
+        'cluster2': {'abfss://container2@test.dfs.core.windows.net': 'WRITE_FILES'},
+    }
+    azure_acl.get_eligible_locations_principals.return_value = cluster_locations
+    principal_acl = create_autospec(PrincipalACL)
+    principals = {'cluster1': ['user1'], 'cluster2': ['user2', 'spn1']}
+    principal_acl.get_cluster_principal_mapping.side_effect = lambda cluster_id: principals[cluster_id]
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
+    location_migration.run()
+    permissions = [
+        Privilege.CREATE_EXTERNAL_TABLE,
+        Privilege.CREATE_EXTERNAL_VOLUME,
+        Privilege.READ_FILES,
+    ]
+    calls = [
+        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='user1')]),
+        call(SecurableType.EXTERNAL_LOCATION, 'loc2', changes=[PermissionsChange(add=permissions, principal='user1')]),
+        call(SecurableType.EXTERNAL_LOCATION, 'loc2', changes=[PermissionsChange(add=permissions, principal='user2')]),
+        call(SecurableType.EXTERNAL_LOCATION, 'loc2', changes=[PermissionsChange(add=permissions, principal='spn1')]),
+    ]
+    ws.grants.update.assert_has_calls(calls, any_order=True)

@@ -13,7 +13,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend, env_or_skip):
+def run_migration(ws, sql_backend, env_or_skip, runtime_ctx):
     def inner(credentials: set[str], read_only=False) -> list[CredentialValidationResult]:
         installation = MockInstallation(
             {
@@ -30,7 +30,16 @@ def run_migration(ws, sql_backend, env_or_skip):
 
         aws = AWSResources(env_or_skip("AWS_DEFAULT_PROFILE"))
         location = ExternalLocations(ws, sql_backend, "inventory_schema")
-        resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, location, "inventory_schema")
+        resource_permissions = AWSResourcePermissions(
+            installation,
+            ws,
+            sql_backend,
+            aws,
+            location,
+            "inventory_schema",
+            runtime_ctx.aws_acl,
+            runtime_ctx.principal_acl,
+        )
 
         instance_profile_migration = IamRoleMigration(installation, ws, resource_permissions, CredentialManager(ws))
 

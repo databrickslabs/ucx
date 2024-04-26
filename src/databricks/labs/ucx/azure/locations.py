@@ -3,11 +3,10 @@ from urllib.parse import urlparse
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue, PermissionDenied
-from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.grants import AzureACL, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 
 
 logger = logging.getLogger(__name__)
@@ -20,14 +19,12 @@ class ExternalLocationsMigration:
         hms_locations: ExternalLocations,
         resource_permissions: AzureResourcePermissions,
         azurerm: AzureResources,
-        azure_acl: AzureACL,
         principal_acl: PrincipalACL,
     ):
         self._ws = ws
         self._hms_locations = hms_locations
         self._resource_permissions = resource_permissions
         self._azurerm = azurerm
-        self._azure_acl = azure_acl
         self._principal_acl = principal_acl
 
     def _app_id_credential_name_mapping(self) -> tuple[dict[str, str], dict[str, str]]:
@@ -177,7 +174,7 @@ class ExternalLocationsMigration:
                 migrated_loc_urls.append(migrated_loc_url)
 
         leftover_loc_urls = [url for url in missing_loc_urls if url not in migrated_loc_urls]
-        self._apply_location_acl()
+        self._principal_acl.apply_location_acl()
         if leftover_loc_urls:
             logger.info(
                 "External locations below are not created in UC. You may check following cases and rerun this command:"
@@ -193,42 +190,3 @@ class ExternalLocationsMigration:
 
         logger.info("All UC external location are created.")
         return leftover_loc_urls
-
-    def _apply_location_acl(
-        self,
-    ):
-        # Gets all the external location created either before or as part of ucx command
-        # Check the interactive cluster and the principals mapped to it
-        # identifies the spn configured for the interactive cluster
-        # identifies any location the spn have access to (read or write)
-        # applies create_external_table, create_external_volume and read_files permission for all location
-        # to the principals of the cluster
-
-        logger.info("Applying permission for external location for existing eligible interactive cluster users")
-        # get the eligible location mapped for each interactive cluster
-        cluster_locations = self._azure_acl.get_eligible_locations_principals()
-        for cluster_id, locations in cluster_locations.items():
-            # get interactive cluster users
-            principals = self._principal_acl.get_cluster_principal_mapping(cluster_id)
-            if len(principals) == 0:
-                continue
-            for location_url, _ in locations.items():
-                # get the location name for the given url
-                location_name = self._get_location_name(location_url)
-                for principal in principals:
-                    permissions = [
-                        Privilege.CREATE_EXTERNAL_TABLE,
-                        Privilege.CREATE_EXTERNAL_VOLUME,
-                        Privilege.READ_FILES,
-                    ]
-                    self._ws.grants.update(
-                        SecurableType.EXTERNAL_LOCATION,
-                        location_name,
-                        changes=[PermissionsChange(add=permissions, principal=principal)],
-                    )
-
-    def _get_location_name(self, location_url: str):
-        for location in self._ws.external_locations.list():
-            if location.url == location_url:
-                return location.name
-        return None

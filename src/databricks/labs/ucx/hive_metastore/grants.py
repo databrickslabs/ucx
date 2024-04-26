@@ -1,4 +1,5 @@
 import logging
+import typing
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -9,7 +10,14 @@ from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist, NotFound
-from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
+from databricks.sdk.service.catalog import (
+    ExternalLocationInfo,
+    SchemaInfo,
+    TableInfo,
+    Privilege,
+    PermissionsChange,
+    SecurableType,
+)
 from databricks.sdk.service.compute import ClusterSource, DataSecurityMode
 
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
@@ -17,7 +25,6 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
-from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
@@ -39,6 +46,12 @@ logger = logging.getLogger(__name__)
 class ClusterLocationMapping:
     cluster_id: str
     locations: dict[str, str]
+
+
+@dataclass
+class LocationACL:
+    location_name: str
+    principal: str
 
 
 @dataclass(frozen=True)
@@ -341,6 +354,8 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
 
 class AwsACL:
+    INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
+
     def __init__(
         self,
         ws: WorkspaceClient,
@@ -390,9 +405,7 @@ class AwsACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._installation.load(
-            list[AWSRoleAction], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES
-        )
+        permission_mappings = self._installation.load(list[AWSRoleAction], filename=self.INSTANCE_PROFILES_FILE_NAMES)
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (
@@ -612,3 +625,43 @@ class PrincipalACL:
             if acl.service_principal_name is not None:
                 principal_list.append(acl.service_principal_name)
         return principal_list
+
+    def apply_location_acl(
+        self,
+    ):
+        # Check the interactive cluster and the principals mapped to it
+        # identifies the spn or instance profile configured for the interactive cluster
+        # identifies any location the spn/instance profile have access to (read or write)
+        # applies create_external_table, create_external_volume and read_files permission for all location
+        # to the principal
+        logger.info(
+            "Applying permission for external location (CREATE EXTERNAL TABLE, "
+            "CREATE EXTERNAL VOLUME and READ_FILES for existing eligible interactive cluster users"
+        )
+        # get the eligible location mapped for each interactive cluster
+        permissions = [
+            Privilege.CREATE_EXTERNAL_TABLE,
+            Privilege.CREATE_EXTERNAL_VOLUME,
+            Privilege.READ_FILES,
+        ]
+        for cluster_id, locations in self._cluster_locations.items():
+            # get interactive cluster users
+            principals = self.get_cluster_principal_mapping(cluster_id)
+            if len(principals) == 0:
+                continue
+            for location_url, _ in locations.items():
+                # get the location name for the given url
+                location_name = self._get_location_name(location_url)
+                for principal in principals:
+                    self._ws.grants.update(
+                        SecurableType.EXTERNAL_LOCATION,
+                        location_name,
+                        changes=[PermissionsChange(add=permissions, principal=principal)],
+                    )
+        logger.info("Applied all the permission on external location")
+
+    def _get_location_name(self, location_url: str):
+        for location in self._ws.external_locations.list():
+            if location.url == location_url:
+                return location.name
+        return None

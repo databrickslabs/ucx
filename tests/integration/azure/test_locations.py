@@ -68,7 +68,6 @@ def test_run(caplog, ws, sql_backend, inventory_schema, runtime_ctx):
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.azure_acl,
         runtime_ctx.principal_acl,
     )
     try:
@@ -115,7 +114,6 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema, runtime_c
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.azure_acl,
         runtime_ctx.principal_acl,
     )
     try:
@@ -161,7 +159,6 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema, runtime_c
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.azure_acl,
         runtime_ctx.principal_acl,
     )
     leftover_loc = location_migration.run()
@@ -210,7 +207,6 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, runtime
         location_crawler,
         AzureResourcePermissions(installation, ws, azurerm, location_crawler),
         azurerm,
-        runtime_ctx.azure_acl,
         runtime_ctx.principal_acl,
     )
     try:

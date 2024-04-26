@@ -23,7 +23,7 @@ def test_get_uc_compatible_roles(ws, env_or_skip, make_random):
     assert compat_roles
 
 
-def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend):
+def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, runtime_ctx):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     rand = make_random(5).lower()
     sql_backend.save_table(
@@ -49,6 +49,8 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
         inventory_schema,
+        runtime_ctx.aws_acl,
+        runtime_ctx.principal_acl,
         account_id,
     )
     aws_permissions.create_external_locations(location_init=f"UCX_LOCATION_{rand}")
@@ -62,7 +64,9 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     assert external_location[0].credential_name == f"ucx_{rand}"
 
 
-def test_create_uber_instance_profile(ws, env_or_skip, make_random, inventory_schema, sql_backend, make_cluster_policy):
+def test_create_uber_instance_profile(
+    ws, env_or_skip, make_random, inventory_schema, sql_backend, make_cluster_policy, runtime_ctx
+):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     aws = AWSResources(profile)
     account_id = aws.validate_connection().get("Account")
@@ -81,6 +85,8 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, inventory_sc
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
         inventory_schema,
+        runtime_ctx.aws_acl,
+        runtime_ctx.principal_acl,
         account_id,
     )
     aws_permissions.create_uber_principal(
