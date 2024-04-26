@@ -153,7 +153,3 @@ def test_hiveserde_table_ctas_migration_job(
             assert ws.tables.get(f"{dst_schema.catalog_name}.{dst_schema.name}.{table.name}").name
         except NotFound:
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
-
-# Change cluster policy there to use a DBR15+ version, then run the assessment job
-def test_running_real_assessment_job_non_lts_version(ws, installation_ctx, make_cluster_policy):
-    raise NotImplemented

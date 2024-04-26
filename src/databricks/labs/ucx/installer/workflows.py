@@ -399,8 +399,8 @@ class WorkflowsDeployment(InstallationMixin):
         self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
-    def create_jobs(self):
-        remote_wheel = self._wheels.upload_to_wsfs()
+    def create_jobs(self, prompts):
+        remote_wheel = self._upload_wheel(prompts)
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -522,6 +522,19 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
 
+    def _upload_wheel(self, prompts: Prompts):
+        with self._wheels:
+            try:
+                self._wheels.upload_to_dbfs()
+            except PermissionDenied as err:
+                if not prompts:
+                    raise RuntimeWarning("no Prompts instance found") from err
+                logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
+                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, prompts.choice_from_dict)
+                self._config.override_clusters = configure_cluster_overrides.configure()
+                self._installation.save(self._config)
+            return self._wheels.upload_to_wsfs()
+
     def _upload_wheel_runner(self, remote_wheel: str):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
         code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
@@ -622,12 +635,7 @@ class WorkflowsDeployment(InstallationMixin):
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
-        if jobs_task.job_cluster_key is not None and "table_migration" in jobs_task.job_cluster_key:
-            # Shared mode cluster cannot use dbfs, need to use WSFS
-            libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
-        else:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1098
-            libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
+        libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         named_parameters = {
             "config": f"/Workspace{self._config_file}",
             "workflow": workflow,
