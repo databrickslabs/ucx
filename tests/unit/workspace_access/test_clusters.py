@@ -26,6 +26,8 @@ def test_map_cluster_to_uc(caplog):
     with caplog.at_level('INFO'):
         cluster.map_cluster_to_uc(cluster_id="123", cluster_details=cluster_details)
         assert 'Editing the cluster of cluster: 123 with access_mode as DataSecurityMode.SINGLE_USER' in caplog.messages
+    ws.clusters.edit.assert_called_once()
+    ws.clusters.list.assert_not_called()
 
 
 def test_map_cluster_to_uc_shared(caplog):
@@ -57,6 +59,8 @@ def test_map_cluster_to_uc_shared(caplog):
         assert (
             'Editing the cluster of cluster: 123 with access_mode as DataSecurityMode.USER_ISOLATION' in caplog.messages
         )
+    ws.clusters.edit.assert_called_once()
+    ws.clusters.list.assert_not_called()
 
 
 def test_list_clusters():
@@ -72,6 +76,8 @@ def test_list_clusters():
     cluster_list = cluster.list_cluster()
     assert cluster_list[0].cluster_id == "123"
     assert len(cluster_list) == 1
+    ws.clusters.edit.assert_not_called()
+    ws.clusters.list.assert_called_once()
 
 
 def test_map_cluster_to_uc_error(caplog):
@@ -84,6 +90,8 @@ def test_map_cluster_to_uc_error(caplog):
     with caplog.at_level('INFO'):
         cluster.map_cluster_to_uc(cluster_id="123", cluster_details=cluster_details)
         assert 'skipping cluster remapping: Data security Mode is None for the cluster 123' in caplog.messages
+    ws.clusters.edit.assert_not_called()
+    ws.clusters.list.assert_not_called()
 
 
 def test_revert_map_cluster_to_uc(caplog):
@@ -95,6 +103,8 @@ def test_revert_map_cluster_to_uc(caplog):
     )
     cluster = ClusterAccess(installation, ws, prompts)
     cluster.revert_cluster_remap(cluster_ids="123", total_cluster_ids=["123"])
+    ws.clusters.edit.assert_called_once()
+    ws.clusters.list.assert_not_called()
 
 
 def test_revert_all_cluster_to_uc(caplog):
@@ -106,6 +116,8 @@ def test_revert_all_cluster_to_uc(caplog):
     with caplog.at_level('INFO'):
         cluster.revert_cluster_remap(cluster_ids="<ALL>", total_cluster_ids=["123", "234"])
         assert "Reverting the configurations for the cluster ['123', '234']" in caplog.messages
+    ws.clusters.edit.assert_not_called()
+    ws.clusters.list.assert_not_called()
 
 
 def test_revert_cluster_to_uc_empty_cluster(caplog):
@@ -122,3 +134,5 @@ def test_revert_cluster_to_uc_empty_cluster(caplog):
             'skipping cluster remapping: cluster Id is not present in the config file for the cluster:123'
             in caplog.messages
         )
+    ws.clusters.edit.assert_not_called()
+    ws.clusters.list.assert_not_called()

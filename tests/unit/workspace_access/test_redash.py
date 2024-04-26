@@ -239,6 +239,7 @@ def test_apply_permissions_no_relevant_items(migration_state):
         ),
     )
     task = sup.get_apply_task(item, migration_state)
+    ws.dbsql_permissions.set.assert_not_called()
     assert not task
 
 
@@ -722,6 +723,7 @@ def test_verify_task_should_fail_if_acl_empty():
 
     with pytest.raises(ValueError):
         sup.get_verify_task(item)
+    ws.dbsql_permissions.set.assert_not_called()
 
 
 def test_verify_task_should_fail_if_acl_missing():

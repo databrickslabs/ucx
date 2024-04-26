@@ -32,11 +32,17 @@ def test_save_spn_permissions_no_external_table(caplog):
     location = ExternalLocations(w, backend, "ucx")
     installation = MockInstallation()
     azure_resources = create_autospec(AzureResources)
-    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.save_spn_permissions()
     msg = "There are no external table present with azure storage account. Please check if assessment job is run"
     assert [rec.message for rec in caplog.records if msg in rec.message]
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_not_called()
 
 
 def test_save_spn_permissions_no_external_tables():
@@ -49,6 +55,12 @@ def test_save_spn_permissions_no_external_tables():
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_not_called()
 
 
 def test_save_spn_permissions_no_azure_storage_account():
@@ -63,6 +75,12 @@ def test_save_spn_permissions_no_azure_storage_account():
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resources.storage_accounts.return_value = []
     assert not azure_resource_permission.save_spn_permissions()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_not_called()
 
 
 def test_save_spn_permissions_valid_azure_storage_account():
@@ -111,6 +129,12 @@ def test_save_spn_permissions_valid_azure_storage_account():
     ]
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     azure_resource_permission.save_spn_permissions()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_not_called()
     installation.assert_file_written(
         'azure_storage_account_info.csv',
         [
@@ -153,6 +177,16 @@ def test_create_global_spn_no_policy():
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     with pytest.raises(ValueError):
         azure_resource_permission.create_uber_principal(prompts)
+    azure_resources.storage_accounts.assert_not_called()
+    azure_resources.create_or_update_access_connector.assert_not_called()
+    azure_resources.role_assignments.assert_not_called()
+    azure_resources.containers.assert_not_called()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_called_once()
 
 
 def test_create_global_spn_spn_present():
@@ -175,6 +209,16 @@ def test_create_global_spn_spn_present():
     prompts = MockPrompts({"Enter a name for the uber service principal to be created*": "UCXServicePrincipal"})
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_uber_principal(prompts)
+    azure_resources.storage_accounts.assert_not_called()
+    azure_resources.create_or_update_access_connector.assert_not_called()
+    azure_resources.role_assignments.assert_not_called()
+    azure_resources.containers.assert_not_called()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_called_once()
 
 
 def test_create_global_spn_no_storage():
@@ -198,6 +242,16 @@ def test_create_global_spn_no_storage():
     azure_resources = create_autospec(AzureResources)
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     assert not azure_resource_permission.create_uber_principal(prompts)
+    azure_resources.storage_accounts.assert_not_called()
+    azure_resources.create_or_update_access_connector.assert_not_called()
+    azure_resources.role_assignments.assert_not_called()
+    azure_resources.containers.assert_not_called()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_called_once()
 
 
 def test_create_global_spn_cluster_policy_not_found():
@@ -224,6 +278,12 @@ def test_create_global_spn_cluster_policy_not_found():
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
     with pytest.raises(NotFound):
         azure_resource_permission.create_uber_principal(prompts)
+    w.cluster_policies.get.assert_called_once()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_called_with("ucx")
+    w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_called_once()
 
 
 def test_create_global_spn():
@@ -302,6 +362,10 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
 
     azure_resource_permission.create_access_connectors_for_storage_accounts()
+
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
     assert (
         "There are no external table present with azure storage account. Please check if assessment job is run"
         in caplog.messages
@@ -345,6 +409,11 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector():
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
 
     access_connectors = azure_resource_permission.create_access_connectors_for_storage_accounts()
+
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+
     assert len(access_connectors) == 1
     assert access_connectors[0].name == "ac-test"
 
@@ -388,3 +457,7 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
     with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx"):
         azure_resource_permission.create_access_connectors_for_storage_accounts()
         assert any("STORAGE_BLOB_DATA_CONTRIBUTOR" in message for message in caplog.messages)
+
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()

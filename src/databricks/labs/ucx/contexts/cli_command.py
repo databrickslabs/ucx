@@ -162,7 +162,6 @@ class WorkspaceContext(CliContext):
     def iam_role_migration(self):
         return IamRoleMigration(
             self.installation,
-            self.workspace_client,
             self.aws_resource_permissions,
             self.iam_credential_manager,
         )
