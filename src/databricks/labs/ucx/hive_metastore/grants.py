@@ -638,7 +638,7 @@ class PrincipalACL:
             principals = self._get_cluster_principal_mapping(cluster_id)
             if len(principals) == 0:
                 continue
-            for location_url, _ in locations.items():
+            for location_url in locations.keys():
                 # get the location name for the given url
                 location_name = self._get_location_name(location_url)
                 if location_name is None:
