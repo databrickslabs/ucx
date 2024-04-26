@@ -18,11 +18,6 @@ def mock_backend():
     return MockBackend()
 
 
-@pytest.fixture
-def mock_ws():
-    return create_autospec(WorkspaceClient)
-
-
 def test_inventory_table_manager_init(mock_backend):
     permission_manager = PermissionManager(mock_backend, "test_database", [])
 
@@ -81,7 +76,7 @@ def test_load_all_no_rows_present():
         permission_manager.load_all()
 
 
-def test_manager_inventorize(mock_ws, mock_backend, mocker):
+def test_manager_inventorize(mock_backend, mocker):
     some_crawler = mocker.Mock()
     some_crawler.get_crawler_tasks = lambda: [lambda: None, lambda: Permissions("a", "b", "c"), lambda: None]
     permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
@@ -93,7 +88,7 @@ def test_manager_inventorize(mock_ws, mock_backend, mocker):
     )
 
 
-def test_manager_inventorize_ignore_error(mock_ws, mock_backend, mocker):
+def test_manager_inventorize_ignore_error(mock_backend, mocker):
     def raise_error():
         raise DatabricksError(
             "Model serving is not enabled for your shard. "
@@ -226,7 +221,7 @@ def test_manager_verify():
 
     # has to be set, as it's going to be appended through multiple threads
     items = set()
-    mock_verifier = create_autospec(AclSupport)
+    mock_verifier = create_autospec(AclSupport)  # pylint: disable=mock-no-usage
     mock_verifier.object_types = lambda: {"clusters"}
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: lambda: items.add(f"{item.object_id} {item.object_id}")
@@ -265,7 +260,7 @@ def test_manager_verify_not_supported_type():
         }
     )
 
-    mock_verifier = create_autospec(AclSupport)
+    mock_verifier = create_autospec(AclSupport)  # pylint: disable=mock-no-usage
     mock_verifier.object_types = lambda: {"not_supported"}
     permission_manager = PermissionManager(sql_backend, "test_database", [mock_verifier])
 
@@ -300,7 +295,7 @@ def test_manager_verify_no_tasks():
         }
     )
 
-    mock_verifier = create_autospec(AclSupport)
+    mock_verifier = create_autospec(AclSupport)  # pylint: disable=mock-no-usage
     mock_verifier.object_types = lambda: {"clusters"}
     # this emulates a real verifier and call to an API
     mock_verifier.get_verify_task = lambda item: None
@@ -311,10 +306,11 @@ def test_manager_verify_no_tasks():
     assert result
 
 
-def test_manager_apply_experimental_no_tasks(mock_ws, caplog):
-
+def test_manager_apply_experimental_no_tasks(caplog):
+    ws = create_autospec(WorkspaceClient)
     group_migration_state = MigrationState([])
 
     with caplog.at_level("INFO"):
-        group_migration_state.apply_to_groups_with_different_names(mock_ws)
+        group_migration_state.apply_to_groups_with_different_names(ws)
         assert "No valid groups selected, nothing to do." in caplog.messages
+    ws.permission_migration.migrate_permissions.assert_not_called()

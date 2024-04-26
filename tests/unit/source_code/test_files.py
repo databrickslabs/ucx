@@ -4,19 +4,20 @@ from unittest.mock import Mock, create_autospec
 
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
 from databricks.labs.ucx.source_code.languages import Languages
 
 
 def test_files_fix_ignores_unsupported_extensions():
-    languages = create_autospec(Languages)
+    languages = Languages(MigrationIndex([]))
     files = LocalFileMigrator(languages)
     path = Path('unsupported.ext')
     assert not files.apply(path)
 
 
 def test_files_fix_ignores_unsupported_language():
-    languages = create_autospec(Languages)
+    languages = Languages(MigrationIndex([]))
     files = LocalFileMigrator(languages)
     files._extensions[".py"] = None  # pylint: disable=protected-access
     path = Path('unsupported.py')
@@ -24,7 +25,7 @@ def test_files_fix_ignores_unsupported_language():
 
 
 def test_files_fix_reads_supported_extensions():
-    languages = create_autospec(Languages)
+    languages = Languages(MigrationIndex([]))
     files = LocalFileMigrator(languages)
     path = Path(__file__)
     assert not files.apply(path)

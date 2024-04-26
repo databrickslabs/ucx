@@ -3,6 +3,7 @@ from unittest.mock import create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo, ObjectType
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.dependencies import (
     Dependency,
 )
@@ -13,24 +14,28 @@ from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
 
 def test_apply_invalid_object_fails():
     ws = create_autospec(WorkspaceClient)
-    languages = create_autospec(Languages)
+    languages = Languages(MigrationIndex([]))
     migrator = NotebookMigrator(ws, languages)
     object_info = ObjectInfo(language=Language.PYTHON)
     assert not migrator.apply(object_info)
+    ws.workspace.download.assert_not_called()
+    ws.workspace.upload.assert_not_called()
 
 
 def test_revert_invalid_object_fails():
     ws = create_autospec(WorkspaceClient)
-    languages = create_autospec(Languages)
+    languages = Languages(MigrationIndex([]))
     migrator = NotebookMigrator(ws, languages)
     object_info = ObjectInfo(language=Language.PYTHON)
     assert not migrator.revert(object_info)
+    ws.workspace.download.assert_not_called()
+    ws.workspace.upload.assert_not_called()
 
 
 def test_revert_restores_original_code():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.return_value.__enter__.return_value.read.return_value = b'original_code'
-    languages = create_autospec(Languages)
+    languages = Languages(MigrationIndex([]))
     migrator = NotebookMigrator(ws, languages)
     object_info = ObjectInfo(path='path', language=Language.PYTHON)
     migrator.revert(object_info)

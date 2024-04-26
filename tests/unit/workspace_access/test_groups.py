@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.labs.lsql.backends import MockBackend, SqlBackend
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
@@ -884,7 +884,7 @@ def test_state():
 
 
 def test_validate_group_diff_membership():
-    backend = create_autospec(SqlBackend)
+    backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
@@ -930,7 +930,7 @@ def test_validate_group_diff_membership():
 
 
 def test_validate_group_diff_membership_no_members():
-    backend = create_autospec(SqlBackend)
+    backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
@@ -967,7 +967,7 @@ def test_validate_group_diff_membership_no_members():
 
 
 def test_validate_group_diff_membership_no_account_group_found():
-    backend = create_autospec(SqlBackend)
+    backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
@@ -1092,6 +1092,8 @@ def test_migration_state_with_filtered_group():
     grp_membership = GroupManager(
         backend, ws, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
     ).get_migration_state()
+
+    ws.groups.list.assert_not_called()
 
     assert len(grp_membership.groups) == 1
     assert grp_membership.groups == [

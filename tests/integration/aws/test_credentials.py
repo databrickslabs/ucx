@@ -39,7 +39,7 @@ def run_migration(ws, sql_backend, env_or_skip, runtime_ctx):
             runtime_ctx.principal_acl,
         )
 
-        instance_profile_migration = IamRoleMigration(installation, ws, resource_permissions, CredentialManager(ws))
+        instance_profile_migration = IamRoleMigration(installation, resource_permissions, CredentialManager(ws))
 
         return instance_profile_migration.run(
             MockPrompts({"Above IAM roles will be migrated to UC storage credentials *": "Yes"}),

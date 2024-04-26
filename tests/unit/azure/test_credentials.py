@@ -40,11 +40,6 @@ from tests.unit import DEFAULT_CONFIG
 
 
 @pytest.fixture
-def ws():
-    return create_autospec(WorkspaceClient)
-
-
-@pytest.fixture
 def installation():
     return MockInstallation(
         DEFAULT_CONFIG
@@ -128,7 +123,8 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
 
 
 @pytest.fixture
-def credential_manager(ws):
+def credential_manager():
+    ws = create_autospec(WorkspaceClient)
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/example-role-name")),
         StorageCredentialInfo(
@@ -249,16 +245,16 @@ def test_validate_storage_credentials_failed_operation(credential_manager):
 
 
 @pytest.fixture
-def sp_migration(ws, installation, credential_manager):
+def sp_migration(installation, credential_manager):
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
-
-    arp = AzureResourcePermissions(
-        installation, ws, create_autospec(AzureResources), create_autospec(ExternalLocations)
-    )
-
+    # pylint: disable=mock-no-usage
+    azure_resources = create_autospec(AzureResources)
+    external_locations = create_autospec(ExternalLocations)
     sp_crawler = create_autospec(AzureServicePrincipalCrawler)
+    arp = AzureResourcePermissions(installation, ws, azure_resources, external_locations)
     sp_crawler.snapshot.return_value = [
         AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
         AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1"),
@@ -276,8 +272,13 @@ def sp_migration(ws, installation, credential_manager):
         (GetSecretResponse(value=base64.b64encode("Olá, Mundo".encode("iso-8859-1")).decode("iso-8859-1")), 0),
     ],
 )
-def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migrated):
-    ws.secrets.get_secret.return_value = secret_bytes_value
+def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated):
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = secret_bytes_value
 
     prompts = MockPrompts(
         {
@@ -288,16 +289,26 @@ def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migr
     assert len(sp_migration.run(prompts)) == num_migrated
 
 
-def test_read_secret_value_none(ws, sp_migration):
-    ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
+def test_read_secret_value_none(sp_migration):
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
     prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
     with pytest.raises(AssertionError):
         sp_migration.run(prompts)
 
 
-def test_read_secret_read_exception(caplog, ws, sp_migration):
+def test_read_secret_read_exception(caplog, sp_migration):
     caplog.set_level(logging.INFO)
-    ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
 
     prompts = MockPrompts(
         {
@@ -310,8 +321,9 @@ def test_read_secret_read_exception(caplog, ws, sp_migration):
     assert re.search(r"removed on the backend: .*", caplog.text)
 
 
-def test_print_action_plan(caplog, ws, sp_migration):
+def test_print_action_plan(caplog, sp_migration):
     caplog.set_level(logging.INFO)
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
@@ -333,7 +345,8 @@ def test_print_action_plan(caplog, ws, sp_migration):
     assert False, "Action plan is not logged"
 
 
-def test_run_without_confirmation(ws, sp_migration):
+def test_run_without_confirmation(sp_migration):
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
@@ -347,7 +360,7 @@ def test_run_without_confirmation(ws, sp_migration):
     assert sp_migration.run(prompts) == []
 
 
-def test_run(ws, installation, sp_migration):
+def test_run(installation, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",

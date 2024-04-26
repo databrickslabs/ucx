@@ -113,13 +113,11 @@ class IamRoleMigration:
     def __init__(
         self,
         installation: Installation,
-        ws: WorkspaceClient,
         resource_permissions: AWSResourcePermissions,
         storage_credential_manager: CredentialManager,
     ):
         self._output_file = "aws_iam_role_migration_result.csv"
         self._installation = installation
-        self._ws = ws
         self._resource_permissions = resource_permissions
         self._storage_credential_manager = storage_credential_manager
 

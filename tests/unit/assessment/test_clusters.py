@@ -142,7 +142,7 @@ def test_try_fetch():
 
 def test_no_isolation_clusters():
     ws = workspace_client_mock(cluster_ids=['no-isolation'])
-    sql_backend = create_autospec(SqlBackend)
+    sql_backend = MockBackend()
     crawler = ClustersCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
@@ -151,7 +151,7 @@ def test_no_isolation_clusters():
 
 def test_unsupported_clusters():
     ws = workspace_client_mock(cluster_ids=['legacy-passthrough'])
-    sql_backend = create_autospec(SqlBackend)
+    sql_backend = MockBackend()
     crawler = ClustersCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
     assert len(result_set) == 1
@@ -163,7 +163,7 @@ def test_policy_crawler():
         policy_ids=['single-user-with-spn', 'single-user-with-spn-policyid', 'single-user-with-spn-no-sparkversion'],
     )
 
-    sql_backend = create_autospec(SqlBackend)
+    sql_backend = MockBackend()
     crawler = PoliciesCrawler(ws, sql_backend, "ucx")
     result_set = list(crawler.snapshot())
     failures = json.loads(result_set[0].failures)

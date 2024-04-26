@@ -99,16 +99,11 @@ def backend():
 
 
 @pytest.fixture
-def mock_aws():
-    return create_autospec(AWSResources)
-
-
-@pytest.fixture
 def locations(mock_ws, backend):
     return ExternalLocations(mock_ws, backend, "ucx")
 
 
-def test_create_external_locations(mock_ws, installation_multiple_roles, mock_aws, backend, locations):
+def test_create_external_locations(mock_ws, installation_multiple_roles, backend, locations):
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
             id="1",
@@ -121,11 +116,12 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, mock_aw
             aws_iam_role=AwsIamRoleResponse("arn:aws:iam::12345:role/uc-rolex"),
         ),
     ]
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         installation_multiple_roles,
         mock_ws,
         backend,
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
@@ -136,9 +132,10 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, mock_aw
         call(mock.ANY, 's3://BUCKETX/FOLDERX', 'credx', skip_validation=True),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
+    aws.get_role_policy.assert_not_called()
 
 
-def test_create_external_locations_skip_existing(mock_ws, mock_aws, backend, locations):
+def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     install = create_autospec(Installation)
     install.load.return_value = [
         AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
@@ -159,18 +156,20 @@ def test_create_external_locations_skip_existing(mock_ws, mock_aws, backend, loc
     mock_ws.external_locations.list.return_value = [
         ExternalLocationInfo(name="UCX_FOO_1", url="s3://BUCKETX/FOLDERX", credential_name="credx"),
     ]
+    aws = create_autospec(AWSResources)
 
     aws_resource_permissions = AWSResourcePermissions(
-        install, mock_ws, backend, mock_aws, locations, create_autospec(PrincipalACL)
+        install, mock_ws, backend, aws, locations, create_autospec(PrincipalACL)
     )
     aws_resource_permissions.create_external_locations(location_init="UCX_FOO")
     calls = [
         call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
     ]
     mock_ws.external_locations.create.assert_has_calls(calls, any_order=True)
+    aws.get_role_policy.assert_not_called()
 
 
-def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installation, mock_aws, backend, locations):
+def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installation, backend, locations):
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     cluster_policy = Policy(
         policy_id="foo",
@@ -180,19 +179,20 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
         ),
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
-    mock_aws.get_instance_profile.return_value = instance_profile_arn
+    aws = create_autospec(AWSResources)
+    aws.get_instance_profile.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         backend,
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
     aws_resource_permissions.create_uber_principal(prompts)
-    mock_aws.put_role_policy.assert_called_with(
+    aws.put_role_policy.assert_called_with(
         'role1',
         'UCX_MIGRATION_POLICY_ucx',
         {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2', 's3://BUCKETX/FOLDERX'},
@@ -201,20 +201,21 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     )
 
 
-def test_create_uber_principal_existing_role(mock_ws, mock_installation, mock_aws, backend, locations):
+def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend, locations):
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
-    mock_aws.get_instance_profile.return_value = instance_profile_arn
+    aws = create_autospec(AWSResources)
+    aws.get_instance_profile.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         backend,
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
@@ -225,23 +226,24 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, mock_aw
     )
 
 
-def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, mock_aws, backend, locations):
+def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, backend, locations):
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
-    mock_aws.role_exists.return_value = False
+    aws = create_autospec(AWSResources)
+    aws.role_exists.return_value = False
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
-    mock_aws.create_migration_role.return_value = instance_profile_arn
-    mock_aws.create_instance_profile.return_value = instance_profile_arn
-    mock_aws.get_instance_profile.return_value = instance_profile_arn
+    aws.create_migration_role.return_value = instance_profile_arn
+    aws.create_instance_profile.return_value = instance_profile_arn
+    aws.get_instance_profile.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         backend,
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
@@ -253,67 +255,66 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, mock
     )
 
 
-def test_create_uber_principal_no_storage(mock_ws, mock_installation, mock_aws, locations):
+def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations):
     cluster_policy = Policy(
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     locations = ExternalLocations(mock_ws, MockBackend(), "ucx")
     prompts = MockPrompts({})
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         MockBackend(),
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
     assert not aws_resource_permissions.create_uber_principal(prompts)
+    aws.list_attached_policies_in_role.assert_not_called()
+    aws.get_role_policy.assert_not_called()
 
 
-def test_create_uc_role_single(mock_ws, installation_single_role, mock_aws, backend, locations):
+def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         installation_single_role,
         mock_ws,
         backend,
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
     aws_resource_permissions.create_uc_roles_cli()
-    assert mock_aws.create_uc_role.assert_called_with('UC_ROLE') is None
+    aws.create_uc_role.assert_called_with('UC_ROLE')
     assert (
-        mock_aws.put_role_policy.assert_called_with(
+        aws.put_role_policy.assert_called_with(
             'UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None
         )
         is None
     )
 
 
-def test_create_uc_role_multiple(mock_ws, installation_single_role, mock_aws, backend, locations):
+def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, locations):
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         installation_single_role,
         mock_ws,
         backend,
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
     aws_resource_permissions.create_uc_roles_cli(single_role=False)
-    assert call('UC_ROLE-1') in mock_aws.create_uc_role.call_args_list
-    assert call('UC_ROLE-2') in mock_aws.create_uc_role.call_args_list
-    assert (
-        call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None)
-        in mock_aws.put_role_policy.call_args_list
-    )
-    assert (
-        call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None)
-        in mock_aws.put_role_policy.call_args_list
-    )
+    aws.create_uc_role.assert_has_calls([call('UC_ROLE-1'), call('UC_ROLE-2')], any_order=True)
+    assert call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None) in aws.put_role_policy.call_args_list
+    assert call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None) in aws.put_role_policy.call_args_list
 
 
-def test_get_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations):
-    mock_aws.get_role_policy.side_effect = [
+def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
                 resource_type="s3",
@@ -353,12 +354,12 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations
         [],
         [],
     ]
-    mock_aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
-    mock_aws.list_attached_policies_in_role.return_value = [
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
         "arn:aws:iam::aws:policy/Policy1",
         "arn:aws:iam::aws:policy/Policy2",
     ]
-    mock_aws.list_all_uc_roles.return_value = [
+    aws.list_all_uc_roles.return_value = [
         AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
     ]
 
@@ -366,7 +367,7 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations
         mock_installation,
         mock_ws,
         MockBackend(),
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
@@ -421,34 +422,41 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations
     )
 
 
-def test_instance_profiles_empty_mapping(mock_ws, mock_installation, mock_aws, locations, caplog):
+def test_instance_profiles_empty_mapping(mock_ws, mock_installation, locations, caplog):
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         MockBackend(),
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
     aws_resource_permissions.save_instance_profile_permissions()
     assert 'No mapping was generated.' in caplog.messages
+    aws.list_role_policies.assert_called_once()
+    aws.list_role_policies.assert_called_once()
+    aws.list_attached_policies_in_role.assert_called_once_with('role1')
 
 
-def test_uc_roles_empty_mapping(mock_ws, mock_installation, mock_aws, locations, caplog):
+def test_uc_roles_empty_mapping(mock_ws, mock_installation, locations, caplog):
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
         MockBackend(),
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
     aws_resource_permissions.save_uc_compatible_roles()
     assert 'No mapping was generated.' in caplog.messages
+    aws.list_all_uc_roles.assert_called_once()
 
 
-def test_save_instance_profile_permissions(mock_ws, mock_installation, mock_aws, locations):
-    mock_aws.get_role_policy.side_effect = [
+def test_save_instance_profile_permissions(mock_ws, mock_installation, locations):
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
                 resource_type="s3",
@@ -488,8 +496,8 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, mock_aws,
         [],
         [],
     ]
-    mock_aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
-    mock_aws.list_attached_policies_in_role.return_value = [
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
         "arn:aws:iam::aws:policy/Policy1",
         "arn:aws:iam::aws:policy/Policy2",
     ]
@@ -498,7 +506,7 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, mock_aws,
         mock_installation,
         mock_ws,
         MockBackend(),
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )
@@ -547,8 +555,9 @@ def test_save_instance_profile_permissions(mock_ws, mock_installation, mock_aws,
     )
 
 
-def test_save_uc_compatible_roles(mock_ws, mock_installation, mock_aws, locations):
-    mock_aws.get_role_policy.side_effect = [
+def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
+    aws = create_autospec(AWSResources)
+    aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
                 resource_type="s3",
@@ -588,12 +597,12 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, mock_aws, location
         [],
         [],
     ]
-    mock_aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
-    mock_aws.list_attached_policies_in_role.return_value = [
+    aws.list_role_policies.return_value = ["Policy1", "Policy2", "Policy3"]
+    aws.list_attached_policies_in_role.return_value = [
         "arn:aws:iam::aws:policy/Policy1",
         "arn:aws:iam::aws:policy/Policy2",
     ]
-    mock_aws.list_all_uc_roles.return_value = [
+    aws.list_all_uc_roles.return_value = [
         AWSRole(path='/', role_name='uc-role1', role_id='12345', arn='arn:aws:iam::12345:role/uc-role1')
     ]
 
@@ -601,7 +610,7 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, mock_aws, location
         mock_installation,
         mock_ws,
         MockBackend(),
-        mock_aws,
+        aws,
         locations,
         create_autospec(PrincipalACL),
     )

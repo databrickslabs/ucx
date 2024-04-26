@@ -354,6 +354,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_in
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, LocalNotebookLoader()))
     builder.build_local_file_dependency_graph(Path("root1.run.py.txt"))
     assert builder.problems == [DependencyProblem('dependency-check', 'File not found: root1.run.py.txt')]
+    file_loader.load_dependency.assert_not_called()
 
 
 def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empty_index):
@@ -369,3 +370,4 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empt
     builder = DependencyGraphBuilder(DependencyResolver(whi, site_packages, file_loader, notebook_loader))
     builder.build_notebook_dependency_graph(Path("root2.run.py.txt"))
     assert builder.problems == [DependencyProblem('dependency-check', 'Notebook not found: root2.run.py.txt')]
+    file_loader.load_dependency.assert_not_called()
