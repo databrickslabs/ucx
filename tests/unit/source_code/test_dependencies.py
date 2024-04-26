@@ -312,7 +312,7 @@ def test_dependency_graph_builder_visits_site_packages(empty_index):
     whitelist = Whitelist.parse(datas[0])
     paths = ["import-site-package.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    provider = SysPathProvider.initialize(_samples_path(SourceContainer))
+    provider = SysPathProvider.from_pathlike_string(_samples_path(SourceContainer))
     file_loader = TestFileLoader(provider, sources)
     site_packages_path = locate_site_packages()
     site_packages = SitePackages.parse(site_packages_path)
