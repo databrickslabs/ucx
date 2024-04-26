@@ -35,8 +35,7 @@ class BaseDependencyResolver(abc.ABC):
     def next_resolver(self):
         return self._next_resolver
 
-    @next_resolver.setter
-    def next_resolver(self, resolver: DependencyResolver):
+    def set_next_resolver(self, resolver: DependencyResolver):
         self._next_resolver = resolver
 
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
@@ -170,7 +169,7 @@ class DependencyResolver:
         self._resolver = StubResolver()
 
     def push(self, resolver: BaseDependencyResolver):
-        resolver.next_resolver = self._resolver
+        resolver.set_next_resolver(self._resolver)
         self._resolver = resolver
 
     def pop(self) -> BaseDependencyResolver:
