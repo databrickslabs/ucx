@@ -48,8 +48,6 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         sql_backend,
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
-        inventory_schema,
-        runtime_ctx.aws_acl,
         runtime_ctx.principal_acl,
         account_id,
     )
@@ -84,8 +82,6 @@ def test_create_uber_instance_profile(
         sql_backend,
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
-        inventory_schema,
-        runtime_ctx.aws_acl,
         runtime_ctx.principal_acl,
         account_id,
     )

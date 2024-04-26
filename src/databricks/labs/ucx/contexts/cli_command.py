@@ -154,7 +154,6 @@ class WorkspaceContext(CliContext):
             self.sql_backend,
             self.aws_resources,
             self.external_locations,
-            self.inventory_database,
             self.principal_acl,
             self.named_parameters.get("aws_account_id"),
             self.named_parameters.get("kms_key"),

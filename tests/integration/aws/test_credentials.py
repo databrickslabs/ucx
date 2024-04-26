@@ -36,8 +36,6 @@ def run_migration(ws, sql_backend, env_or_skip, runtime_ctx):
             sql_backend,
             aws,
             location,
-            "inventory_schema",
-            runtime_ctx.aws_acl,
             runtime_ctx.principal_acl,
         )
 

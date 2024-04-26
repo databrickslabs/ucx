@@ -43,12 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ClusterLocationMapping:
-    cluster_id: str
-    locations: dict[str, str]
-
-
-@dataclass
 class LocationACL:
     location_name: str
     principal: str
@@ -354,6 +348,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
 
 class AwsACL:
+    # adding this profile file name here to avoid circular references with aws/access.py
     INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
@@ -626,9 +621,7 @@ class PrincipalACL:
                 principal_list.append(acl.service_principal_name)
         return principal_list
 
-    def apply_location_acl(
-        self,
-    ):
+    def apply_location_acl(self):
         # Check the interactive cluster and the principals mapped to it
         # identifies the spn or instance profile configured for the interactive cluster
         # identifies any location the spn/instance profile have access to (read or write)
@@ -639,11 +632,7 @@ class PrincipalACL:
             "CREATE EXTERNAL VOLUME and READ_FILES for existing eligible interactive cluster users"
         )
         # get the eligible location mapped for each interactive cluster
-        permissions = [
-            Privilege.CREATE_EXTERNAL_TABLE,
-            Privilege.CREATE_EXTERNAL_VOLUME,
-            Privilege.READ_FILES,
-        ]
+        permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
         for cluster_id, locations in self._cluster_locations.items():
             # get interactive cluster users
             principals = self._get_cluster_principal_mapping(cluster_id)
@@ -652,6 +641,8 @@ class PrincipalACL:
             for location_url, _ in locations.items():
                 # get the location name for the given url
                 location_name = self._get_location_name(location_url)
+                if location_name is None:
+                    continue
                 for principal in principals:
                     self._ws.grants.update(
                         SecurableType.EXTERNAL_LOCATION,

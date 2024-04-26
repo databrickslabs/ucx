@@ -30,14 +30,13 @@ class AWSResourcePermissions:
     UC_ROLES_FILE_NAMES: typing.ClassVar[str] = "uc_roles_access.csv"
     INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         installation: Installation,
         ws: WorkspaceClient,
         backend: SqlBackend,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
-        schema: str,
         principal_acl: PrincipalACL,
         aws_account_id=None,
         kms_key=None,
@@ -47,7 +46,6 @@ class AWSResourcePermissions:
         self._backend = backend
         self._ws = ws
         self._locations = external_locations
-        self._schema = schema
         self._aws_account_id = aws_account_id
         self._kms_key = kms_key
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
