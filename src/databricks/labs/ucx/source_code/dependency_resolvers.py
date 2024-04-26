@@ -21,7 +21,7 @@ if typing.TYPE_CHECKING:
 class BaseDependencyResolver(abc.ABC):
 
     def __init__(self):
-        self._next_resolver: DependencyResolver | None = None
+        self._next_resolver: BaseDependencyResolver | None = None
         self._problems: list[DependencyProblem] = []
 
     @property
@@ -35,7 +35,7 @@ class BaseDependencyResolver(abc.ABC):
     def next_resolver(self):
         return self._next_resolver
 
-    def set_next_resolver(self, resolver: DependencyResolver):
+    def set_next_resolver(self, resolver: BaseDependencyResolver):
         self._next_resolver = resolver
 
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
@@ -150,8 +150,9 @@ class SitePackagesResolver(BaseDependencyResolver):
 
 class DependencyResolver:
 
-    @staticmethod
+    @classmethod
     def initialize(
+        cls,
         whitelist: Whitelist,
         site_packages: SitePackages,
         file_loader: LocalFileLoader,
@@ -166,7 +167,7 @@ class DependencyResolver:
         return resolver
 
     def __init__(self):
-        self._resolver = StubResolver()
+        self._resolver: BaseDependencyResolver = StubResolver()
 
     def push(self, resolver: BaseDependencyResolver):
         resolver.set_next_resolver(self._resolver)

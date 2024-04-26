@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider

@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest.mock import create_autospec
 
 import pytest
 
@@ -115,7 +114,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     sources = {"path": source}
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, {})
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider
     )
@@ -147,7 +146,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     whitelist = Whitelist.parse(datas[0])
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, {})
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider
     )

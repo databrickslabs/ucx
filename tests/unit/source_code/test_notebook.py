@@ -141,7 +141,7 @@ def test_notebook_builds_leaf_dependency_graph():
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = True
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws), provider
     )
@@ -166,7 +166,7 @@ def test_notebook_builds_depth1_dependency_graph():
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws), provider
     )
@@ -187,7 +187,7 @@ def test_notebook_builds_depth2_dependency_graph():
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws), provider
     )
@@ -209,7 +209,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = True
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws), provider
     )
@@ -231,7 +231,7 @@ def test_notebook_builds_cyclical_dependency_graph():
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws), provider
     )
@@ -252,7 +252,7 @@ def test_notebook_builds_python_dependency_graph():
     loader = create_autospec(LocalFileLoader)
     loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     resolver = DependencyResolver.initialize(
         whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws), provider
     )

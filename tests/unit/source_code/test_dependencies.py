@@ -46,7 +46,7 @@ def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
     file_loader = create_autospec(LocalFileLoader)
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider)
     )
@@ -72,7 +72,7 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
     notebook_loader.is_notebook.return_value = True
     notebook_loader.is_file.return_value = True
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
     )
@@ -87,7 +87,7 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, visited)
     whi = whitelist_mock()
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -113,7 +113,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
     file_loader = create_autospec(LocalFileLoader)
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider)
     )
@@ -143,7 +143,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     notebook_loader.is_notebook.side_effect = is_file_side_effect
     notebook_loader.load_dependency.side_effect = lambda *args: _load_dependency_side_effect(sources, {}, *args)
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
     )
@@ -171,7 +171,7 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
     notebook_loader.is_notebook.side_effect = is_file_side_effect
     notebook_loader.load_dependency.side_effect = lambda *args: _load_dependency_side_effect(sources, {}, *args)
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
     )
@@ -195,7 +195,7 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     file_loader = create_autospec(LocalFileLoader)
     file_loader.is_notebook.return_value = False
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider)
     )
@@ -212,7 +212,7 @@ def test_dependency_graph_builder_visits_recursive_file_dependencies():
     whi = whitelist_mock()
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, visited)
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -227,7 +227,7 @@ def test_dependency_graph_builder_raises_problem_with_unresolved_import():
     whi = whitelist_mock()
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, visited)
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -246,7 +246,7 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argu
     whi = Whitelist()
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, visited)
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -265,7 +265,7 @@ def test_dependency_graph_builder_visits_file_dependencies():
     whi = whitelist_mock()
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, visited)
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -279,7 +279,7 @@ def test_dependency_graph_builder_skips_builtin_dependencies():
     whi = Whitelist()
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, {})
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -299,7 +299,7 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     whitelist = Whitelist.parse(datas[0])
     file_loader = _local_loader_with_side_effects(LocalFileLoader, sources, {})
     site_packages = SitePackages.parse(locate_site_packages())
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -329,7 +329,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_in
     site_packages = SitePackages.parse(locate_site_packages())
     whi = whitelist_mock()
     file_loader = create_autospec(LocalFileLoader)
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
@@ -348,7 +348,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empt
     file_loader = create_autospec(LocalFileLoader)
     notebook_loader = create_autospec(LocalNotebookLoader)
     notebook_loader.is_notebook.return_value = False
-    provider = create_autospec(SysPathProvider)
+    provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
         DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
     )
