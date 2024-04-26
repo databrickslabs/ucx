@@ -92,6 +92,9 @@ def test_create_bad_location():
     catalog_schema = prepare_test(ws)
     with pytest.raises(NotFound):
         catalog_schema.create_all_catalogs_schemas(mock_prompts)
+    ws.catalogs.create.assert_not_called()
+    ws.catalogs.list.assert_called_once()
+    ws.schemas.create.assert_not_called()
 
 
 def test_no_catalog_storage():
@@ -111,6 +114,8 @@ def test_catalog_schema_acl():
     catalog_schema.create_all_catalogs_schemas(
         mock_prompts,
     )
+    ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
+    ws.catalogs.create.assert_called_once_with("catalog2", comment="Created by UCX")
     queries = [
         'GRANT USE SCHEMA ON DATABASE catalog1.schema3 TO `user1`',
         'GRANT USE SCHEMA ON DATABASE catalog2.schema2 TO `user1`',

@@ -77,6 +77,6 @@ def run_workflow(mocker):
 
 @pytest.fixture
 def acc_client():
-    acc = create_autospec(AccountClient)
+    acc = create_autospec(AccountClient)  # pylint: disable=mock-no-usage
     acc.config = Config(host="https://accounts.cloud.databricks.com", account_id="123", token="123")
     return acc

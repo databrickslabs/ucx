@@ -428,6 +428,7 @@ def test_revert_cluster_remap_empty(ws, caplog):
     ws = create_autospec(WorkspaceClient)
     revert_cluster_remap(ws, prompts)
     assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages
+    ws.workspace.list.assert_called_once()
 
 
 def test_relay_logs(ws, caplog):
