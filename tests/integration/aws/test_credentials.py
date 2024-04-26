@@ -32,7 +32,7 @@ def run_migration(ws, sql_backend, env_or_skip):
         location = ExternalLocations(ws, sql_backend, "inventory_schema")
         resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, location, "inventory_schema")
 
-        instance_profile_migration = IamRoleMigration(installation, ws, resource_permissions, CredentialManager(ws))
+        instance_profile_migration = IamRoleMigration(installation, resource_permissions, CredentialManager(ws))
 
         return instance_profile_migration.run(
             MockPrompts({"Above IAM roles will be migrated to UC storage credentials *": "Yes"}),

@@ -26,11 +26,6 @@ def installation():
     return MockInstallation(DEFAULT_CONFIG)
 
 
-@pytest.fixture
-def ws():
-    return create_autospec(WorkspaceClient)
-
-
 def side_effect_create_aws_storage_credential(name, aws_iam_role, comment, read_only):
     return StorageCredentialInfo(
         name=name, aws_iam_role=AwsIamRoleResponse(role_arn=aws_iam_role.role_arn), comment=comment, read_only=read_only
@@ -38,7 +33,8 @@ def side_effect_create_aws_storage_credential(name, aws_iam_role, comment, read_
 
 
 @pytest.fixture
-def credential_manager(ws):
+def credential_manager():
+    ws = create_autospec(WorkspaceClient)
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
             aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/example-role-name")
@@ -85,7 +81,7 @@ def test_create_storage_credentials(credential_manager):
 
 
 @pytest.fixture
-def instance_profile_migration(ws, installation, credential_manager):
+def instance_profile_migration(installation, credential_manager):
     def generate_instance_profiles(num_instance_profiles: int):
         arp = create_autospec(AWSResourcePermissions)
         arp.load_uc_compatible_roles.return_value = [
@@ -97,13 +93,12 @@ def instance_profile_migration(ws, installation, credential_manager):
             )
             for i in range(num_instance_profiles)
         ]
-
-        return IamRoleMigration(installation, ws, arp, credential_manager)
+        return IamRoleMigration(installation, arp, credential_manager)
 
     return generate_instance_profiles
 
 
-def test_print_action_plan(caplog, ws, instance_profile_migration, credential_manager):
+def test_print_action_plan(caplog, instance_profile_migration, credential_manager):
     caplog.set_level(logging.INFO)
 
     prompts = MockPrompts({"Above IAM roles will be migrated to UC storage credentials*": "Yes"})
@@ -118,20 +113,21 @@ def test_print_action_plan(caplog, ws, instance_profile_migration, credential_ma
     assert False, "Action plan is not logged"
 
 
-def test_migrate_credential_failed_creation(caplog, ws, instance_profile_migration):
+def test_migrate_credential_failed_creation(caplog, instance_profile_migration):
     caplog.set_level(logging.ERROR)
     prompts = MockPrompts(
         {
             "Above IAM roles will be migrated to UC storage credentials*": "Yes",
         }
     )
+    ws = create_autospec(WorkspaceClient)
     ws.storage_credentials.create.return_value = StorageCredentialInfo(aws_iam_role=None)
     ws.storage_credentials.create.side_effect = None
     instance_profile_migration(1).run(prompts)
     assert "Failed to create storage credential for IAM role: arn:aws:iam::123456789012:role/prefix0" in caplog.messages
 
 
-def test_run_without_confirmation(ws, instance_profile_migration):
+def test_run_without_confirmation(instance_profile_migration):
     prompts = MockPrompts(
         {
             "Above IAM roles will be migrated to UC storage credentials*": "No",
@@ -142,18 +138,18 @@ def test_run_without_confirmation(ws, instance_profile_migration):
 
 
 @pytest.mark.parametrize("num_instance_profiles", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-def test_run(ws, instance_profile_migration, num_instance_profiles: int):
+def test_run(instance_profile_migration, num_instance_profiles: int):
     prompts = MockPrompts({"Above IAM roles will be migrated to UC storage credentials*": "Yes"})
     migration = instance_profile_migration(num_instance_profiles)
     results = migration.run(prompts)
     assert len(results) == num_instance_profiles
 
 
-def test_run_no_credential_to_migrate(caplog, ws, installation, credential_manager):
+def test_run_no_credential_to_migrate(caplog, installation, credential_manager):
     caplog.set_level(logging.INFO)
     arp = create_autospec(AWSResourcePermissions)
     arp.load_uc_compatible_roles.return_value = []
-    migration = IamRoleMigration(installation, ws, arp, credential_manager)
+    migration = IamRoleMigration(installation, arp, credential_manager)
     migration.run(MockPrompts({}))
     assert "No IAM Role to migrate" in caplog.messages
 

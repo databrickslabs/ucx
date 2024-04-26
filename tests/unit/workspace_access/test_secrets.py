@@ -92,6 +92,7 @@ def test_secret_scopes_apply_failed():
     with pytest.raises(TimeoutError) as e:
         sup._applier_task("test", "db-temp-test", expected_permission)
     assert "Timed out after" in str(e.value)
+    ws.secrets.put_acl.assert_called_once()
 
 
 def test_secret_scopes_apply_incorrect():
@@ -248,6 +249,8 @@ def test_verify_task_should_fail_if_principal_not_given():
 
     with pytest.raises(AssertionError):
         task()
+    ws.secrets.list_acls.assert_not_called()
+    ws.secrets.put_acl.assert_not_called()
 
 
 def test_verify_task_should_fail_if_permission_not_given():
@@ -270,3 +273,6 @@ def test_verify_task_should_fail_if_permission_not_given():
 
     with pytest.raises(AssertionError):
         task()
+
+    ws.secrets.list_acls.assert_not_called()
+    ws.secrets.put_acl.assert_not_called()
