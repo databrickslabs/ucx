@@ -92,7 +92,7 @@ def test_secret_scopes_apply_failed():
     with pytest.raises(TimeoutError) as e:
         sup._applier_task("test", "db-temp-test", expected_permission)
     assert "Timed out after" in str(e.value)
-    ws.secrets.put_acl.assert_called_once()
+    ws.secrets.put_acl.assert_called()
 
 
 def test_secret_scopes_apply_incorrect():

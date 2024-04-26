@@ -273,8 +273,12 @@ def sp_migration(installation, credential_manager):
     ],
 )
 def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated):
-    ws = create_autospec(WorkspaceClient)
-    ws.secrets.get_secret.return_value = secret_bytes_value
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = secret_bytes_value
 
     prompts = MockPrompts(
         {
@@ -286,8 +290,12 @@ def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated
 
 
 def test_read_secret_value_none(sp_migration):
-    ws = create_autospec(WorkspaceClient)
-    ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
     prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
     with pytest.raises(AssertionError):
         sp_migration.run(prompts)
@@ -295,8 +303,12 @@ def test_read_secret_value_none(sp_migration):
 
 def test_read_secret_read_exception(caplog, sp_migration):
     caplog.set_level(logging.INFO)
-    ws = create_autospec(WorkspaceClient)
-    ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
 
     prompts = MockPrompts(
         {

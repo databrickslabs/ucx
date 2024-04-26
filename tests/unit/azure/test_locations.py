@@ -20,8 +20,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 from tests.unit.azure import azure_api_client
 
 
-def location_migration_for_test(mock_backend, mock_installation):
-    ws = create_autospec(WorkspaceClient)  # pylint: disable=mock-no-usage
+def location_migration_for_test(ws, mock_backend, mock_installation):
     azurerm = AzureResources(azure_api_client(), azure_api_client())
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
     azure_resource_permissions = AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler)
@@ -87,7 +86,7 @@ def test_run_service_principal():
         }
     )
 
-    location_migration = location_migration_for_test(mock_backend, mock_installation)
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
 
     ws.external_locations.create.assert_any_call(
@@ -168,7 +167,7 @@ def test_skip_unsupported_location(caplog):
         }
     )
 
-    location_migration = location_migration_for_test(mock_backend, mock_installation)
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
 
     ws.external_locations.create.assert_called_once_with(
@@ -240,7 +239,7 @@ def test_run_managed_identity():
         }
     )
 
-    location_migration = location_migration_for_test(mock_backend, mock_installation)
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
 
     ws.external_locations.create.assert_any_call(
@@ -325,7 +324,7 @@ def test_location_failed_to_read():
     # make external_locations.create to raise PermissionDenied when first called to create read-only external location.
     ws.external_locations.create.side_effect = create_side_effect
 
-    location_migration = location_migration_for_test(mock_backend, mock_installation)
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
 
     # assert PermissionDenied got re-threw if the exception
     with pytest.raises(PermissionDenied):
@@ -397,7 +396,7 @@ def test_overlapping_locations(caplog):
 
     ws.external_locations.create.side_effect = create_side_effect
 
-    location_migration = location_migration_for_test(mock_backend, mock_installation)
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
 
     # assert InvalidParameterValue got re-threw if it's not caused by overlapping location
     with pytest.raises(InvalidParameterValue):
@@ -406,9 +405,11 @@ def test_overlapping_locations(caplog):
     assert "overlaps with an existing external location" in caplog.text
 
 
-def test_corner_cases_with_missing_fields(ws, caplog, mocker):
+def test_corner_cases_with_missing_fields(caplog, mocker):
     """test corner cases with: missing credential name, missing application_id"""
     caplog.set_level(logging.INFO)
+
+    ws = create_autospec(WorkspaceClient)
 
     # mock crawled HMS external locations
     mock_backend = MockBackend(
@@ -457,7 +458,7 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
         }
     )
 
-    location_migration = location_migration_for_test(mock_backend, mock_installation)
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation)
     location_migration.run()
 
     ws.external_locations.create.assert_not_called()

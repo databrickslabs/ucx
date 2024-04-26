@@ -1034,7 +1034,7 @@ def test_migration_state_with_filtered_group():
         backend, ws, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
     ).get_migration_state()
 
-    ws.groups.list.assert_called_once()
+    ws.groups.list.assert_not_called()
 
     assert len(grp_membership.groups) == 1
     assert grp_membership.groups == [

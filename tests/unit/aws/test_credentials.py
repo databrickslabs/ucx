@@ -120,10 +120,18 @@ def test_migrate_credential_failed_creation(caplog, instance_profile_migration):
             "Above IAM roles will be migrated to UC storage credentials*": "Yes",
         }
     )
-    ws = create_autospec(WorkspaceClient)
-    ws.storage_credentials.create.return_value = StorageCredentialInfo(aws_iam_role=None)
-    ws.storage_credentials.create.side_effect = None
-    instance_profile_migration(1).run(prompts)
+    migration = instance_profile_migration(1)
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    migration._storage_credential_manager._ws.storage_credentials.create.return_value = StorageCredentialInfo(
+        aws_iam_role=None
+    )
+    # pylint: disable-next=protected-access
+    migration._storage_credential_manager._ws.storage_credentials.create.side_effect = None
+    migration.run(prompts)
     assert "Failed to create storage credential for IAM role: arn:aws:iam::123456789012:role/prefix0" in caplog.messages
 
 

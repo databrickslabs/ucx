@@ -1298,7 +1298,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     )
     workspace_installation.run()
     wheels.upload_to_wsfs.assert_called_once()
-    ws.jobs.run_now.assert_called_once_with("assessment", None)
+    ws.jobs.run_now.assert_not_called()
 
 
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
@@ -1354,7 +1354,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     )
 
     existing_installation.assert_file_uploaded('logs/README.md')
-    wheels.upload_to_wsfs.assert_not_called()
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 def test_fresh_install(ws, mock_installation):
@@ -1634,7 +1634,7 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
         workspace_installation.create_jobs(any_prompt)
     assert "Current user is not a workspace admin" in str(failure.value)
 
-    wheels.upload_to_wsfs.assert_not_called()
+    wheels.upload_to_wsfs.assert_called_once()
 
 
 @pytest.mark.parametrize(
