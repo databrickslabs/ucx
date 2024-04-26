@@ -25,9 +25,9 @@ def location_migration_for_test(ws, mock_backend, mock_installation):
     azurerm = AzureResources(azure_api_client(), azure_api_client())
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
     azure_resource_permissions = AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler)
-    table_crawler = create_autospec(TablesCrawler)
-    mount_crawler = create_autospec(Mounts)
-    principal_acl = PrincipalACL(ws, mock_backend, mock_installation, table_crawler, mount_crawler, {})
+    tables_crawler = TablesCrawler(mock_backend, 'ucx')
+    mounts_crawler = Mounts(mock_backend, ws, 'ucx')
+    principal_acl = PrincipalACL(ws, mock_backend, mock_installation, tables_crawler, mounts_crawler, {})
     external_locations_migration = ExternalLocationsMigration(
         ws, location_crawler, azure_resource_permissions, azurerm, principal_acl
     )
