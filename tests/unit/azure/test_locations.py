@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import create_autospec, call
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -11,16 +11,13 @@ from databricks.sdk.service.catalog import (
     AzureServicePrincipal,
     ExternalLocationInfo,
     StorageCredentialInfo,
-    Privilege,
-    SecurableType,
-    PermissionsChange,
 )
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.grants import AzureACL, PrincipalACL
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from tests.unit.azure import azure_api_client
 
 
@@ -470,6 +467,3 @@ def test_corner_cases_with_missing_fields(ws, caplog, mocker):
 
     ws.external_locations.create.assert_not_called()
     assert "External locations below are not created in UC." in caplog.text
-
-
-
