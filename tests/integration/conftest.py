@@ -6,7 +6,7 @@ import logging
 from dataclasses import replace
 from functools import partial, cached_property
 from datetime import timedelta
-
+import shutil
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -31,7 +31,7 @@ from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocations, ExternalLocation
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
@@ -171,7 +171,7 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
     def __init__(
         self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
     ):
-        super().__init__()
+        RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
@@ -325,6 +325,17 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
             Mount,
         )
 
+    def save_locations(self):
+        if self.workspace_client.config.is_azure:
+            locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
+        if self.workspace_client.config.is_aws:
+            locations = [ExternalLocation("s3://labs-things/a", 1)]
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.external_locations",
+            locations,
+            ExternalLocation,
+        )
+
     def with_dummy_grants_and_tacls(self):
         # inject dummy group and table acl to avoid crawling which will slow down tests like test_table_migration_job
         self.sql_backend.save_table(
@@ -427,9 +438,21 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAzureCliTest(WorkspaceContext):
-    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str], make_schema_fixture):
-        super().__init__(_ws, {})
+class LocalAzureCliTest(TestRuntimeContext, WorkspaceContext):
+    def __init__(
+        self,
+        _ws: WorkspaceClient,
+        env_or_skip_fixture: Callable[[str], str],
+        make_schema_fixture,
+        make_table_fixture,
+        make_udf_fixture,
+        make_group_fixture,
+    ):
+
+        WorkspaceContext.__init__(self, _ws, {})
+        TestRuntimeContext.__init__(
+            self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
+        )
         self._env_or_skip = env_or_skip_fixture
         self._make_schema = make_schema_fixture
 
@@ -445,76 +468,44 @@ class LocalAzureCliTest(WorkspaceContext):
     def azure_subscription_id(self):
         return self._env_or_skip("TEST_SUBSCRIPTION_ID")
 
-    @cached_property
-    def config(self) -> WorkspaceConfig:
-        return WorkspaceConfig(
-            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
-            inventory_database=self.inventory_database,
-            connect=self.workspace_client.config,
-            renamed_group_prefix=f'tmp-{self.inventory_database}-',
+
+@pytest.fixture
+def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend, make_table, make_group, make_udf):
+    ctx = LocalAzureCliTest(ws, env_or_skip, make_schema, make_table, make_udf, make_group)
+    return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
+
+
+class LocalAwsCliTest(TestRuntimeContext, WorkspaceContext):
+    def __init__(
+        self,
+        _ws: WorkspaceClient,
+        env_or_skip_fixture: Callable[[str], str],
+        make_schema_fixture,
+        make_table_fixture,
+        make_udf_fixture,
+        make_group_fixture,
+    ):
+
+        WorkspaceContext.__init__(self, _ws, {})
+        TestRuntimeContext.__init__(
+            self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
         )
+        self._env_or_skip = env_or_skip_fixture
+        self._make_schema = make_schema_fixture
 
     @cached_property
-    def installation(self):
-        return MockInstallation()
-
-    @cached_property
-    def external_locations(self):
-        return ExternalLocations(self.workspace_client, self.sql_backend, self.inventory_database)
-
-    @cached_property
-    def workspace_client(self) -> WorkspaceClient:
-        return self._ws
-
-    @cached_property
-    def inventory_database(self) -> str:
-        return self._make_schema(catalog_name="hive_metastore").name
-
-    def with_dummy_resource_permission(self):
-        # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
-        if self.workspace_client.config.is_azure:
-            self.with_azure_storage_permissions(
-                [
-                    StoragePermissionMapping(
-                        prefix=self._env_or_skip("TEST_MOUNT_CONTAINER"),
-                        client_id='dummy_application_id',
-                        principal='principal_1',
-                        privilege='WRITE_FILES',
-                        type='Application',
-                        directory_id='directory_id_ss1',
-                    )
-                ]
-            )
-        if self.workspace_client.config.is_aws:
-            self.with_aws_storage_permissions(
-                [
-                    AWSRoleAction(
-                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-                        's3',
-                        'WRITE_FILES',
-                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
-                    )
-                ]
-            )
-
-    def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
-        self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
-
-    def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
-        self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
-
-    def save_locations(self):
-        locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
-        return self.sql_backend.save_table(
-            f"{self.inventory_database}.external_locations",
-            locations,
-            ExternalLocation,
-        )
+    def aws_cli_run_command(self):
+        if not self.is_aws:
+            pytest.skip("Aws only")
+        if not shutil.which("aws"):
+            pytest.skip("Local test only")
+        return True
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip, make_schema):
-    return LocalAzureCliTest(ws, env_or_skip, make_schema)
+def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend, make_table, make_group, make_udf):
+    ctx = LocalAwsCliTest(ws, env_or_skip, make_schema, make_table, make_udf, make_group)
+    return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
 class TestInstallationContext(TestRuntimeContext):

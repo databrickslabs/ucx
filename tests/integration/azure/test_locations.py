@@ -218,7 +218,6 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_
 
 
 def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster, az_cli_ctx, env_or_skip):
-
     az_cli_ctx.with_dummy_resource_permission()
     az_cli_ctx.save_locations()
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
@@ -235,13 +234,13 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
         permissions = ws.grants.get(
             SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=user.user_name
         )
-        expected_permission = PrivilegeAssignment(
+        expected_azure_permission = PrivilegeAssignment(
             principal=user.user_name,
             privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
         )
-        assert expected_permission in permissions.privilege_assignments
+        assert expected_azure_permission in permissions.privilege_assignments
     except NotFound:
-        permissions = [
+        remove_azure_permissions = [
             Privilege.CREATE_EXTERNAL_TABLE,
             Privilege.CREATE_EXTERNAL_VOLUME,
             Privilege.READ_FILES,
@@ -249,5 +248,5 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
         ws.grants.update(
             SecurableType.EXTERNAL_LOCATION,
             env_or_skip("TEST_A_LOCATION"),
-            changes=[PermissionsChange(remove=permissions, principal=user.user_name)],
+            changes=[PermissionsChange(remove=remove_azure_permissions, principal=user.user_name)],
         )
