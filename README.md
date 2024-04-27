@@ -375,7 +375,8 @@ flowchart TB
       create_table_mapping[create-table-mapping] --> create_catalogs_schemas[create-catalogs-schemas]
       create_uber_principal[create-uber-principal]
       principal_prefix_access[principal-prefix-access] --> migrate_credentials[migrate-credentials]
-      migrate_credentials --> migrate_locations[migrate-locations]
+      migrate_credentials --> validate-external-locations[validate-external-locations]
+      validate-external-locations --> migrate_locations[migrate-locations]
       migrate_locations --> create_catalogs_schemas
     end
     
