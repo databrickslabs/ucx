@@ -6,7 +6,6 @@ from databricks.sdk.service.catalog import AwsIamRoleRequest
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
-from databricks.sdk.errors.platform import NotFound
 
 from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -138,7 +137,7 @@ def test_create_external_location_validate_acl(
             privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
         )
         assert expected_aws_permission in permissions.privilege_assignments
-    except NotFound:
+    finally:
         remove_aws_permissions = [
             Privilege.CREATE_EXTERNAL_TABLE,
             Privilege.CREATE_EXTERNAL_VOLUME,

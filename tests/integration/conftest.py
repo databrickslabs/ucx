@@ -201,22 +201,32 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
                 ]
             )
         if self.workspace_client.config.is_aws:
-            self.with_aws_storage_permissions(
-                [
-                    AWSRoleAction(
-                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-                        's3',
-                        'WRITE_FILES',
-                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
-                    )
-                ]
-            )
+            instance_profile_mapping = [
+                AWSRoleAction(
+                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
+                    's3',
+                    'WRITE_FILES',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                )
+            ]
+            uc_roles_mapping = [
+                AWSRoleAction(
+                    self._env_or_skip("TEST_EXT_LOCATION_INSTANCE_PROFILE"),
+                    's3',
+                    'WRITE_FILES',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                )
+            ]
+            self.with_aws_storage_permissions(instance_profile_mapping, uc_roles_mapping)
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
 
-    def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
-        self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
+    def with_aws_storage_permissions(
+        self, instance_profile_mapping: list[AWSRoleAction], uc_roles_mapping: list[AWSRoleAction]
+    ):
+        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
+        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
@@ -494,12 +504,20 @@ class LocalAwsCliTest(TestRuntimeContext, WorkspaceContext):
         self._make_schema = make_schema_fixture
 
     @cached_property
+    def installation(self):
+        return Installation(self.workspace_client, self.product_info.product_name())
+
+    @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
             pytest.skip("Aws only")
         if not shutil.which("aws"):
             pytest.skip("Local test only")
         return True
+
+    @cached_property
+    def aws_profile(self):
+        return self._env_or_skip("AWS_PROFILE")
 
 
 @pytest.fixture
