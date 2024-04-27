@@ -88,6 +88,13 @@ def sync_workspace_info(a: AccountClient):
     ctx = AccountContext(a)
     ctx.account_workspaces.sync_workspace_info()
 
+@ucx.command(is_account=True)
+def aggregate_ucx_output(a: AccountClient):
+    """upload workspace config to all workspaces in the account where ucx is installed"""
+    logger.info(f"Account ID: {a.config.account_id}")
+    ctx = AccountContext(a)
+    print(ctx.account_workspaces._workspaces())
+
 
 @ucx.command(is_account=True)
 def create_account_groups(
