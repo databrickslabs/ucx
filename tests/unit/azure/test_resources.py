@@ -85,6 +85,21 @@ def test_role_assignments_container():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
+def test_role_assignments_custom_storage():
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
+    resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+    role_assignments = list(azure_resource.role_assignments(resource_id))
+    assert len(role_assignments) == 2
+    for role_assignment in role_assignments:
+        assert role_assignment.role_name == "custom_role_001"
+        assert role_assignment.principal == Principal(
+            "appIduser2", "disNameuser2", "Iduser2", "Application", "0000-0000"
+        )
+        assert str(role_assignment.scope) == resource_id
+        assert role_assignment.resource == AzureResource(resource_id)
+
+
 def test_create_service_principal():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)

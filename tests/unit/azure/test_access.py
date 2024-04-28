@@ -119,12 +119,16 @@ def test_save_spn_permissions_valid_azure_storage_account():
             scope=AzureResource(f'{containers}/container1'),
             principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
             role_name='Storage Blob Data Contributor',
+            role_type='BuiltInRole',
+            role_permissions=[],
         ),
         AzureRoleAssignment(
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
             role_name='Button Clicker',
+            role_type='BuiltInRole',
+            role_permissions=[],
         ),
     ]
     azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
@@ -151,6 +155,118 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
+                'type': 'Application',
+                'directory_id': '0000-0000',
+            },
+        ],
+    )
+
+
+def test_save_spn_permissions_custom_role_valid_azure_storage_account():
+    w = create_autospec(WorkspaceClient)
+    rows = {
+        "SELECT \\* FROM ucx.external_locations": [
+            ["s3://bucket1/folder1", "1"],
+            ["abfss://container1@storage1.dfs.core.windows.net/folder1", "1"],
+        ]
+    }
+    backend = MockBackend(rows=rows)
+    location = ExternalLocations(w, backend, "ucx")
+    installation = MockInstallation()
+    azure_resources = create_autospec(AzureResources)
+    storage_accounts = '/subscriptions/abc/providers/Microsoft.Storage/storageAccounts'
+    containers = f'{storage_accounts}/storage1/blobServices/default/containers'
+    azure_resources.storage_accounts.return_value = [
+        StorageAccount(
+            id=AzureResource(f'{storage_accounts}/storage1'),
+            name="storage1",
+            location="westeu",
+        ),
+        StorageAccount(
+            id=AzureResource(f'{storage_accounts}/storage2'),
+            name="storage2",
+            location="westeu",
+        ),
+    ]
+    azure_resources.containers.return_value = [
+        AzureResource(f'{containers}/container1'),
+        AzureResource(f'{containers}/container2'),
+    ]
+    azure_resources.role_assignments.return_value = [
+        AzureRoleAssignment(
+            resource=AzureResource(f'{containers}/container1'),
+            scope=AzureResource(f'{containers}/container1'),
+            principal=Principal('a', 'b', 'c', 'Application', '0000-0000'),
+            role_name='Custom_role_1',
+            role_type='CustomRole',
+            role_permissions=[
+                "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+                "Microsoft.Storage/storageAccounts/blobServices/containers/write",
+                "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+                "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+                "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+            ],
+        ),
+        AzureRoleAssignment(
+            resource=AzureResource(f'{storage_accounts}/storage1'),
+            scope=AzureResource(f'{storage_accounts}/storage1'),
+            principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
+            role_name='Custom_role_2',
+            role_type='CustomRole',
+            role_permissions=[
+                "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+                "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
+            ],
+        ),
+        AzureRoleAssignment(
+            resource=AzureResource(f'{storage_accounts}/storage1'),
+            scope=AzureResource(f'{storage_accounts}/storage1'),
+            principal=Principal('d', 'e', 'f', 'Application', '0000-0000'),
+            role_name='Custom_role_2',
+            role_type='CustomRole',
+            role_permissions=["Microsoft.Authorization/*"],
+        ),
+    ]
+    azure_resource_permission = AzureResourcePermissions(installation, w, azure_resources, location)
+    azure_resource_permission.save_spn_permissions()
+    w.cluster_policies.get.assert_not_called()
+    w.secrets.get_secret.assert_not_called()
+    w.secrets.create_scope.assert_not_called()
+    w.secrets.put_secret.assert_not_called()
+    w.cluster_policies.edit.assert_not_called()
+    w.get_workspace_id.assert_not_called()
+    installation.assert_file_written(
+        'azure_storage_account_info.csv',
+        [
+            {
+                'client_id': 'a',
+                'prefix': 'abfss://container1@storage1.dfs.core.windows.net/',
+                'principal': 'b',
+                'privilege': 'WRITE_FILES',
+                'type': 'Application',
+                'directory_id': '0000-0000',
+            },
+            {
+                'client_id': 'd',
+                'prefix': 'abfss://container1@storage1.dfs.core.windows.net/',
+                'principal': 'e',
+                'privilege': 'READ_FILES',
+                'type': 'Application',
+                'directory_id': '0000-0000',
+            },
+            {
+                'client_id': 'a',
+                'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
+                'principal': 'b',
+                'privilege': 'WRITE_FILES',
+                'type': 'Application',
+                'directory_id': '0000-0000',
+            },
+            {
+                'client_id': 'd',
+                'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
+                'principal': 'e',
+                'privilege': 'READ_FILES',
                 'type': 'Application',
                 'directory_id': '0000-0000',
             },

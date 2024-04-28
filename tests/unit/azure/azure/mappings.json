@@ -128,10 +128,108 @@
         }
       ]
     },
+    "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4/providers/Microsoft.Authorization/roleAssignments": {
+      "value": [
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "customroleid001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+          },
+          "id": "custrol1"
+        },
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "inv001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+          },
+          "id": "custrol2"
+        },
+        {
+          "properties": {
+            "principalId": "user2",
+            "roleDefinitionId": "inv001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+          },
+          "id": "custrol2"
+        },
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "User",
+            "roleDefinitionId": "inv001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+          },
+          "id": "custrol2"
+        },
+        {
+          "properties": {
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "customroleid001",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+          },
+          "id": "custrol1"
+        },
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "scope": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
+          },
+          "id": "custrol1"
+        },
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "customroleid001"
+          },
+          "id": "custrol1"
+        },
+        {
+          "properties": {
+            "principalId": "user2",
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": "customroleid001",
+            "scope": "/"
+          },
+          "id": "custrol1"
+        }
+      ]
+    },
     "id002": {
       "id": "role2",
       "properties": {
         "roleName": "Storage Blob Data Owner"
+      }
+    },
+    "inv001": {
+      "id": "inv001",
+      "properties": {}
+    },
+    "customroleid001": {
+      "id": "customroleid001",
+      "properties": {
+        "roleName": "custom_role_001",
+        "type": "CustomRole",
+        "permissions": [
+          {
+            "actions": [
+              "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/write"
+            ],
+            "notActions": [],
+            "dataActions": [
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write"
+            ],
+            "notDataActions": []
+          }
+        ]
       }
     },
     "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/containers/container1/providers/Microsoft.Authorization/roleAssignments": {
