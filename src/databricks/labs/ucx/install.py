@@ -197,8 +197,11 @@ class WorkspaceInstaller(WorkspaceContext):
 
     def _prompt_for_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
+        default_database = "ucx"
+        if self.policy_installer.has_ext_hms():
+            default_database = f"ucx_{self.workspace_client.get_workspace_id()}"
         inventory_database = self.prompts.question(
-            "Inventory Database stored in hive_metastore", default="ucx", valid_regex=r"^\w+$"
+            "Inventory Database stored in hive_metastore", default=default_database, valid_regex=r"^\w+$"
         )
         log_level = self.prompts.question("Log level", default="INFO").upper()
         num_threads = int(self.prompts.question("Number of threads", default="8", valid_number=True))

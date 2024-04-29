@@ -460,3 +460,47 @@ def test_cluster_policy_instance_pool():
         definition=json.dumps(policy_expected),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
+
+
+def test_has_ext_hms():
+    ws, prompts = common()
+    ws.config.is_aws = False
+    ws.config.is_azure = True
+    ws.config.is_gcp = False
+    policy_definition = {
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
+        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
+    }
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(policy_definition),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+    policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
+    assert policy_installer.has_ext_hms() is True
+
+    ws.cluster_policies.list.return_value = []
+    endpoint_conf = [
+        EndpointConfPair(None, None),
+        EndpointConfPair("random", None),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionURL", "url"),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionUserName", "user1"),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionPassword", "pwd"),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionDriverName", "SQLServerDriver"),
+        EndpointConfPair("spark.sql.hive.metastore.version", "0.13"),
+        EndpointConfPair("spark.sql.hive.metastore.jars", "jar1"),
+    ]
+
+    ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=endpoint_conf
+    )
+    policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
+    assert policy_installer.has_ext_hms() is True

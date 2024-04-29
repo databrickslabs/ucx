@@ -22,6 +22,15 @@ class ClusterPolicyInstaller:
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
 
+    def has_ext_hms(self) -> bool:
+        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+        if len(policies_with_external_hms) > 0:
+            return True
+        warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
+        if warehouse_config is not None:
+            return True
+        return False
+
     def create(self, inventory_database: str) -> tuple[str, str, dict, str | None]:
         instance_profile = ""
         spark_conf_dict = {}
