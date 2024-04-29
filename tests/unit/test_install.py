@@ -1767,20 +1767,19 @@ def test_user_workspace_installer(mock_ws):
 
 def test_save_config_ext_hms(ws, mock_installation):
     ws.get_workspace_id.return_value = 12345678
-    policy_definition = {
+    cluster_policy = {
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
         "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
         "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
-        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
     }
     ws.cluster_policies.list.return_value = [
         Policy(
             policy_id="id1",
             name="foo",
-            definition=json.dumps(policy_definition),
+            definition=json.dumps(cluster_policy),
             description="Custom cluster policy for Unity Catalog Migration (UCX)",
         )
     ]

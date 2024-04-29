@@ -106,6 +106,8 @@ def _load_list(cls: type, filename: str):
 def _id_list(cls: type, ids=None):
     if not ids:
         return []
+    if cls is Policy:
+        return [_cluster_policy(_) for _ in ids]
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_fixture(f'{_FOLDERS[cls]}/{_}.json') for _ in ids})
     return [installation.load(cls, filename=_) for _ in ids]
 
@@ -123,7 +125,7 @@ def _cluster_policy(policy_id: str):
     fixture = _load_fixture(f"{_FOLDERS[Policy]}/{policy_id}.json")
     definition = json.dumps(fixture["definition"])
     overrides = json.dumps(fixture["policy_family_definition_overrides"])
-    return Policy(description=definition, policy_family_definition_overrides=overrides)
+    return Policy(name=policy_id, definition=definition, policy_family_definition_overrides=overrides)
 
 
 def _pipeline(pipeline_id: str):

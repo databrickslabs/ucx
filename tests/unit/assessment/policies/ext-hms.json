@@ -1,0 +1,35 @@
+{
+  "definition": {
+    "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {
+      "type": "fixed",
+      "value": "url",
+      "hidden": "true"
+    },
+    "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {
+      "type": "fixed",
+      "value": "user1",
+      "hidden": "true"
+    },
+    "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {
+      "type": "fixed",
+      "value": "pwd",
+      "hidden": "true"
+    },
+    "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {
+      "type": "fixed",
+      "value": "SQLServerDriver",
+      "hidden": "true"
+    },
+    "spark_conf.spark.sql.hive.metastore.version": {
+      "type": "fixed",
+      "value": "0.13",
+      "hidden": "true"
+    },
+    "spark_conf.spark.sql.hive.metastore.jars": {
+      "type": "fixed",
+      "value": "jar1",
+      "hidden": "true"
+    }
+  },
+  "policy_family_definition_overrides": {}
+}
