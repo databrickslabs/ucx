@@ -113,11 +113,10 @@ def _id_list(cls: type, ids=None):
         for _ in ids:
             raw_json = _load_fixture(f'{_FOLDERS[cls]}/{_}.json')
             # need special handling for reading definition & overrides
-            policy = dataclasses.replace(
+            policy: Policy = dataclasses.replace(
                 installation.load(cls, filename=_),
                 definition=json.dumps(raw_json["definition"]),
-                policy_family_definition_overrides=json.dumps(
-                    raw_json["policy_family_definition_overrides"])
+                policy_family_definition_overrides=json.dumps(raw_json["policy_family_definition_overrides"]),
             )
             output.append(policy)
         return output
@@ -211,13 +210,13 @@ def _is_notebook_side_effect(sources: dict[str, str], *args):
 
 
 def workspace_client_mock(
-        cluster_ids: list[str] | None = None,
-        pipeline_ids: list[str] | None = None,
-        job_ids: list[str] | None = None,
-        jobruns_ids: list[str] | None = None,
-        policy_ids: list[str] | None = None,
-        warehouse_config="single-config",
-        secret_exists=True,
+    cluster_ids: list[str] | None = None,
+    pipeline_ids: list[str] | None = None,
+    job_ids: list[str] | None = None,
+    jobruns_ids: list[str] | None = None,
+    policy_ids: list[str] | None = None,
+    warehouse_config="single-config",
+    secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
