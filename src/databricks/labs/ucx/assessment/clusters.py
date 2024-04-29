@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, BadRequest
 from databricks.sdk.service.compute import (
     ClusterDetails,
     ClusterSource,
@@ -88,7 +88,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
                     return data
 
             return None
-        except NotFound:
+        except (NotFound, BadRequest):
             return None
 
     def _check_cluster_init_script(self, init_scripts: list[InitScriptInfo], source: str) -> list[str]:
