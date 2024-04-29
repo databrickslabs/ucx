@@ -169,7 +169,7 @@ class RunCell(Cell):
                 return
         start_line = self._original_offset + 1
         problem = DependencyProblem(
-            'dependency-check',
+            'invalid-%run-cell',
             "Missing notebook path in %run command",
             start_line=start_line,
             start_col=0,

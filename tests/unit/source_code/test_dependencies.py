@@ -120,7 +120,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
     builder.build_notebook_dependency_graph(Path("root1.run.py.txt"))
     assert list(builder.problems) == [
         DependencyProblem(
-            'dependency-check', 'Notebook not found: leaf2.py.txt', Path("root1.run.py.txt"), 19, 0, 19, 21
+            'notebook-not-found', 'Notebook not found: leaf2.py.txt', Path("root1.run.py.txt"), 19, 0, 19, 21
         )
     ]
 
@@ -149,7 +149,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     )
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
-        DependencyProblem('dependency-check', 'Notebook not found: leaf3.py.txt', Path(paths[0]), 1, 0, 1, 38)
+        DependencyProblem('notebook-not-found', 'Notebook not found: leaf3.py.txt', Path(paths[0]), 1, 0, 1, 38)
     ]
 
 
@@ -178,7 +178,7 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
         DependencyProblem(
-            'dependency-check', "Can't check dependency not provided as a constant", Path(paths[0]), 2, 0, 2, 35
+            'dependency-not-constant', "Can't check dependency not provided as a constant", Path(paths[0]), 2, 0, 2, 35
         )
     ]
 
@@ -201,7 +201,9 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     )
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
-        DependencyProblem('dependency-check', 'Missing notebook path in %run command', Path("leaf6.py.txt"), 5, 0, 5, 4)
+        DependencyProblem(
+            'invalid-%run-cell', 'Missing notebook path in %run command', Path("leaf6.py.txt"), 5, 0, 5, 4
+        )
     ]
 
 
@@ -234,7 +236,7 @@ def test_dependency_graph_builder_raises_problem_with_unresolved_import():
     builder.build_local_file_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
         DependencyProblem(
-            'dependency-check', 'Could not locate import: some_library', Path("root7.py.txt"), 1, 0, 1, 19
+            'import-not-found', 'Could not locate import: some_library', Path("root7.py.txt"), 1, 0, 1, 19
         )
     ]
 
@@ -253,7 +255,13 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argu
     builder.build_local_file_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
         DependencyProblem(
-            'dependency-check', "Can't check dependency not provided as a constant", Path(paths[0]), 14, 13, 14, 50
+            'dependency-not-constant',
+            "Can't check dependency not provided as a constant",
+            Path(paths[0]),
+            14,
+            13,
+            14,
+            50,
         )
     ]
 
@@ -334,7 +342,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_in
         DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
     )
     builder.build_local_file_dependency_graph(Path("root1.run.py.txt"))
-    assert list(builder.problems) == [DependencyProblem('dependency-check', 'File not found: root1.run.py.txt')]
+    assert list(builder.problems) == [DependencyProblem('file-not-found', 'File not found: root1.run.py.txt')]
     file_loader.load_dependency.assert_not_called()
 
 
@@ -353,5 +361,5 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empt
         DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
     )
     builder.build_notebook_dependency_graph(Path("root2.run.py.txt"))
-    assert list(builder.problems) == [DependencyProblem('dependency-check', 'Notebook not found: root2.run.py.txt')]
+    assert list(builder.problems) == [DependencyProblem('notebook-not-found', 'Notebook not found: root2.run.py.txt')]
     file_loader.load_dependency.assert_not_called()

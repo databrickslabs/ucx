@@ -209,7 +209,7 @@ class DependencyResolver:
         problems: list[DependencyProblem] = []
         dependency = self._resolver.resolve_notebook(path, problems.append)
         if dependency is None:
-            problem = DependencyProblem('dependency-check', f"Notebook not found: {path.as_posix()}")
+            problem = DependencyProblem('notebook-not-found', f"Notebook not found: {path.as_posix()}")
             problems.append(problem)
         if problem_collector:
             for problem in problems:
@@ -224,7 +224,7 @@ class DependencyResolver:
         problems: list[DependencyProblem] = []
         dependency = self._resolver.resolve_local_file(path, problems.append)
         if dependency is None:
-            problem = DependencyProblem('dependency-check', f"File not found: {path.as_posix()}")
+            problem = DependencyProblem('file-not-found', f"File not found: {path.as_posix()}")
             problems.append(problem)
         if problem_collector:
             for problem in problems:
@@ -239,7 +239,7 @@ class DependencyResolver:
         problems: list[DependencyProblem] = []
         dependency = self._resolver.resolve_import(name, problems.append)
         if dependency is None:
-            problem = DependencyProblem('dependency-check', f"Could not locate import: {name}")
+            problem = DependencyProblem('import-not-found', f"Could not locate import: {name}")
             problems.append(problem)
         if problem_collector:
             for problem in problems:

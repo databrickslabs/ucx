@@ -54,7 +54,7 @@ class LocalFile(SourceContainer):
                 parent.add_problems(call_problems)
                 continue
             problem = DependencyProblem(
-                code='dependency-check',
+                code='dependency-not-constant',
                 message="Can't check dependency not provided as a constant",
                 source_path=self._path,
                 start_line=call.lineno,

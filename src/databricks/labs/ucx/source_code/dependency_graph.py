@@ -173,7 +173,7 @@ class DependencyGraph:
                     problem_collector(problem)
             else:
                 problem = DependencyProblem(
-                    code='dependency-check',
+                    code='dependency-not-constant',
                     message="Can't check dependency not provided as a constant",
                     start_line=call.lineno,
                     start_col=call.col_offset,
