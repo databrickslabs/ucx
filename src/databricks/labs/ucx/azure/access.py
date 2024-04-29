@@ -64,11 +64,19 @@ class AzureResourcePermissions:
         }
 
     def _get_permission_level(self, permission_to_match: str) -> Privilege | None:
+        # If string contains '*', construct a pattern with wildcard
+        if '*' in permission_to_match:
+            parts = re.escape(permission_to_match).split(r'\*')
+            pattern = '^' + parts[0] + '.*' + parts[1] + '$'
+        # If string doesn't contain '*', construct a pattern to match exactly
+        else:
+            pattern = '^' + re.escape(permission_to_match) + '$'
+        permission_compiled = re.compile(pattern)
         for each_level, privilege_level in self._permission_levels.items():
             # Check for storage blob permission with regex to account for star pattern
-            match = re.search(permission_to_match, each_level)
-            # If a write permission is found, no need to check for read permissions
+            match = permission_compiled.match(each_level)
             if match:
+                # If a write permission is found, no need to check for read permissions
                 return privilege_level
         return None
 
@@ -76,13 +84,12 @@ class AzureResourcePermissions:
         # If both read and write privileges are found, only write privilege will be considered
         higher_privilege = None
         for each_permission in role_permissions:
-            if each_permission.startswith('Microsoft.Storage'):
-                privileges = self._get_permission_level(each_permission)
-                if privileges and privileges == Privilege.READ_FILES:
-                    higher_privilege = Privilege.READ_FILES
-                elif privileges and privileges == Privilege.WRITE_FILES:
-                    higher_privilege = Privilege.WRITE_FILES
-                    break
+            privileges = self._get_permission_level(each_permission)
+            if privileges and privileges == Privilege.READ_FILES:
+                higher_privilege = Privilege.READ_FILES
+            elif privileges and privileges == Privilege.WRITE_FILES:
+                higher_privilege = Privilege.WRITE_FILES
+                break
         return higher_privilege
 
     def _get_role_privilege(self, role_assignment: AzureRoleAssignment) -> Privilege | None:

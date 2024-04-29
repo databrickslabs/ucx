@@ -145,6 +145,13 @@ class AzureRoleAssignment:
 
 
 @dataclass
+class AzureRoleDetails:
+    role_name: str | None
+    role_type: str
+    role_permissions: list
+
+
+@dataclass
 class AccessConnector:
     id: AzureResource
     name: str
@@ -272,7 +279,7 @@ class AzureResources:
         self._mgmt = azure_mgmt
         self._graph = azure_graph
         self._include_subscriptions = include_subscriptions
-        self._role_definitions = {}  # type: dict[str, dict[str, str | list[str] | None]]
+        self._role_definitions = {}  # type: dict[str, AzureRoleDetails]
         self._principals: dict[str, Principal | None] = {}
 
     def _get_subscriptions(self) -> Iterable[AzureSubscription]:
@@ -438,11 +445,11 @@ class AzureResources:
         if not scope:
             return None
         role_details = self._role_name(role_definition_id)
-        if not role_details['roleName']:
+        role_name = role_details.role_name
+        if not role_name:
             return None
-        role_name = str(role_details['roleName'])
-        role_type = str(role_details['roleType'])
-        role_permissions = role_details['rolePermissions'] if isinstance(role_details['rolePermissions'], list) else []
+        role_type = role_details.role_type
+        role_permissions = role_details.role_permissions
         principal = self._get_principal(principal_id)
         if not principal:
             return None
@@ -457,17 +464,13 @@ class AzureResources:
             role_permissions=role_permissions,
         )
 
-    def _role_name(self, role_definition_id) -> dict[str, str | list[str] | None]:
+    def _role_name(self, role_definition_id) -> AzureRoleDetails:
         if role_definition_id not in self._role_definitions:
             role_definition = self._mgmt.get(role_definition_id, "2022-04-01")
             definition_properties = role_definition.get("properties", {})
             role_name: str = definition_properties.get("roleName")
             if not role_name:
-                return {
-                    'roleName': None,
-                    'roleType': None,
-                    'rolePermissions': [],
-                }
+                return AzureRoleDetails(role_name=None, role_type='BuiltInRole', role_permissions=[])
             role_type: str = definition_properties.get("type", "BuiltInRole")
             role_permissions = []
             if role_type == 'CustomRole':
@@ -476,12 +479,9 @@ class AzureResources:
                     role_permissions = each_role_permissions.get("actions", []) + each_role_permissions.get(
                         "dataActions", []
                     )
-            role_dict: dict[str, str | list[str] | None] = {
-                'roleName': role_name,
-                'roleType': role_type,
-                'rolePermissions': role_permissions,
-            }
-            self._role_definitions[role_definition_id] = role_dict
+            self._role_definitions[role_definition_id] = AzureRoleDetails(
+                role_name=role_name, role_type=role_type, role_permissions=role_permissions
+            )
         return self._role_definitions[role_definition_id]
 
     def managed_identity_client_id(
