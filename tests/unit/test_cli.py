@@ -16,7 +16,6 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.cli import (
     alias,
@@ -105,11 +104,6 @@ def ws():
         statement_id='123',
     )
     return workspace_client
-
-
-@pytest.fixture
-def mock_iam_role_creation():
-    return create_autospec(IamRoleCreation)
 
 
 def test_workflow(ws, caplog):
@@ -491,8 +485,6 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
 def test_create_missing_principal_aws(ws):
     aws_resource_permissions = create_autospec(AWSResourcePermissions)
     ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
-    iam_role = create_autospec(IamRoleCreation)
-    ctx.iam_create_uc_roles.return_value = iam_role
     prompts = MockPrompts({'.*': 'yes'})
     create_missing_principals(ws, prompts=prompts, ctx=ctx)
     aws_resource_permissions.create_uc_roles.assert_called_once()
