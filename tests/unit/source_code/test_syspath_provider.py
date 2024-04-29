@@ -26,6 +26,20 @@ def test_provider_pushes():
     assert [path.as_posix() for path in paths] == ["this", "is", "what", "on", "earth"]
 
 
+def test_provider_inserts():
+    provider = SysPathProvider.from_pathlike_string("what:on:earth")
+    provider.insert(1, Path("is"))
+    paths = list(provider.paths)
+    assert [path.as_posix() for path in paths] == ["what", "is", "on", "earth"]
+
+
+def test_provider_removes():
+    provider = SysPathProvider.from_pathlike_string("what:is:on:earth")
+    provider.remove(1)
+    paths = list(provider.paths)
+    assert [path.as_posix() for path in paths] == ["what", "on", "earth"]
+
+
 def test_provider_pops():
     provider = SysPathProvider.from_pathlike_string("what:on:earth")
     popped = provider.pop()

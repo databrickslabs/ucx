@@ -20,6 +20,12 @@ class SysPathProvider:
     def push(self, path: Path):
         self._paths.insert(0, path)
 
+    def insert(self, index: int, path: Path):
+        self._paths.insert(index, path)
+
+    def remove(self, index: int):
+        del self._paths[index]
+
     def pop(self) -> Path:
         result = self._paths[0]
         del self._paths[0]
