@@ -4,16 +4,16 @@ from unittest.mock import create_autospec
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
-from databricks.labs.ucx.source_code.dependencies import (
+from databricks.labs.ucx.source_code.dependency_graph import (
     DependencyGraphBuilder,
-    DependencyProblem,
 )
+from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
 from databricks.labs.ucx.source_code.dependency_loaders import (
-    SourceContainer,
     LocalFileLoader,
     LocalNotebookLoader,
     WorkspaceNotebookLoader,
 )
+from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
 from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider

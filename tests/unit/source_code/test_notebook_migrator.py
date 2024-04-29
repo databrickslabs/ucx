@@ -4,7 +4,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.dependencies import (
+from databricks.labs.ucx.source_code.dependency_graph import (
     Dependency,
 )
 from databricks.labs.ucx.source_code.languages import Languages

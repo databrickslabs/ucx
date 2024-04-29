@@ -8,20 +8,15 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 
 from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.dependencies import Dependency
+from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 
+from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
+from databricks.labs.ucx.source_code.dependency_graph import Dependency
+from databricks.labs.ucx.source_code.notebook import Notebook
 
 if typing.TYPE_CHECKING:
-    from databricks.labs.ucx.source_code.site_packages import SitePackage
-    from databricks.labs.ucx.source_code.dependencies import DependencyGraph
-
-
-class SourceContainer(abc.ABC):
-
-    @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
-        raise NotImplementedError()
+    from databricks.labs.ucx.source_code.dependency_graph import DependencyGraph
 
 
 class StubContainer(SourceContainer):
@@ -42,6 +37,8 @@ class DependencyLoader(abc.ABC):
 
 
 # a DependencyLoader that simply wraps a pre-existing SourceContainer
+
+
 class WrappingLoader(DependencyLoader):
 
     def __init__(self, source_container: SourceContainer):
@@ -63,10 +60,6 @@ class LocalFileLoader(DependencyLoader):
         self._syspath_provider = syspath_provider
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        # the below is required to avoid cyclic import
-        # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.files import LocalFile
-
         fullpath = self.full_path(dependency.path)
         assert fullpath is not None
         return LocalFile(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
@@ -100,22 +93,6 @@ class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
     pass
 
 
-class SitePackageContainer(SourceContainer):
-
-    def __init__(self, file_loader: LocalFileLoader, site_package: SitePackage, syspath_provider: SysPathProvider):
-        self._file_loader = file_loader
-        self._site_package = site_package
-        self._syspath_provider = syspath_provider
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
-        for module_path in self._site_package.module_paths:
-            self._syspath_provider.push(module_path.parent)
-            try:
-                parent.register_dependency(Dependency(self._file_loader, module_path))
-            finally:
-                self._syspath_provider.pop()
-
-
 class WorkspaceNotebookLoader(NotebookLoader):
 
     def __init__(self, ws: WorkspaceClient):
@@ -132,10 +109,6 @@ class WorkspaceNotebookLoader(NotebookLoader):
         return self._load_notebook(object_info)
 
     def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
-        # local import to avoid cyclic dependency
-        # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.notebook import Notebook
-
         assert object_info.path is not None
         assert object_info.language is not None
         source = self._load_source(object_info)

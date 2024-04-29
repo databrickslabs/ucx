@@ -2,19 +2,19 @@ from __future__ import annotations  # for type hints
 
 import ast
 import logging
+import typing
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import (
-    DependencyGraph,
-    DependencyProblem,
-)
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
+from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
+from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebook import CellLanguage
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 
+if typing.TYPE_CHECKING:
+    from databricks.labs.ucx.source_code.dependency_graph import DependencyGraph
 
 logger = logging.getLogger(__name__)
 

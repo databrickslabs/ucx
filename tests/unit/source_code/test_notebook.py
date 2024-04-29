@@ -7,10 +7,11 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.dependencies import (
+from databricks.labs.ucx.source_code.dependency_graph import (
     DependencyGraph,
 )
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalFileLoader, WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.dependency_loaders import LocalFileLoader, WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
 from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.python_linter import PythonLinter

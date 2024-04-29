@@ -6,8 +6,10 @@ from collections.abc import Callable, Iterable
 
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.dependencies import Dependency, DependencyProblem
-from databricks.labs.ucx.source_code.dependency_loaders import SitePackageContainer, WrappingLoader, StubContainer
+from databricks.labs.ucx.source_code.dependency_graph import Dependency
+from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
+from databricks.labs.ucx.source_code.dependency_loaders import WrappingLoader, StubContainer
+from databricks.labs.ucx.source_code.dependency_containers import SitePackageContainer
 from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
@@ -169,7 +171,7 @@ class SitePackagesResolver(BaseDependencyResolver):
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         site_package = self._site_packages[name]
         if site_package is not None:
-            container = SitePackageContainer(self._file_loader, site_package, self._syspath_provider)
+            container = SitePackageContainer(self._file_loader, site_package)
             return Dependency(WrappingLoader(container), Path(name))
         return super().resolve_import(name, problem_collector)
 

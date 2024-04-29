@@ -12,11 +12,9 @@ from sqlglot import parse as parse_sql
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.dependencies import (
-    DependencyGraph,
-    DependencyProblem,
-)
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
+from databricks.labs.ucx.source_code.dependency_graph import DependencyGraph
+from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
+from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
 
 
 logger = logging.getLogger(__name__)
