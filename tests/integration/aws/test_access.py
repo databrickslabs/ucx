@@ -9,6 +9,7 @@ from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Pri
 
 from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
+from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -45,16 +46,19 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         read_only=False,
     )
     installation = Installation(ws, rand)
+    external_location = ExternalLocations(ws, sql_backend, inventory_schema)
     aws_permissions = AWSResourcePermissions(
         installation,
         ws,
         sql_backend,
         aws,
-        ExternalLocations(ws, sql_backend, inventory_schema),
+        external_location,
+        inventory_schema,
         aws_cli_ctx.principal_acl,
         account_id,
     )
-    aws_permissions.create_external_locations(location_init=f"UCX_LOCATION_{rand}")
+    external_location_migration = AWSExternalLocationsMigration(ws, external_location, aws_permissions)
+    external_location_migration.run(location_init=f"UCX_LOCATION_{rand}")
     external_location = [
         external_location
         for external_location in list(ws.external_locations.list())

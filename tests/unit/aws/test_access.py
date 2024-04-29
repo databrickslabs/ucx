@@ -25,6 +25,7 @@ from databricks.labs.ucx.assessment.aws import (
 )
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
+from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from tests.unit import DEFAULT_CONFIG
@@ -124,6 +125,9 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
         ),
     ]
     aws = create_autospec(AWSResources)
+    aws_resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, backend, aws, locations)
+    external_locations_migration = AWSExternalLocationsMigration(mock_ws, locations, aws_resource_permissions)
+    external_locations_migration.run()
     principal_acl = create_autospec(PrincipalACL)
     aws_resource_permissions = AWSResourcePermissions(
         installation_multiple_roles,
@@ -167,9 +171,9 @@ def test_create_external_locations_skip_existing(mock_ws, backend, locations):
     ]
     aws = create_autospec(AWSResources)
     principal_acl = create_autospec(PrincipalACL)
-
-    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, backend, aws, locations, principal_acl)
-    aws_resource_permissions.create_external_locations(location_init="UCX_FOO")
+    aws_resource_permissions = AWSResourcePermissions(install, mock_ws, backend, aws, locations)
+    external_locations_migration = AWSExternalLocationsMigration(mock_ws, locations, aws_resource_permissions)
+    external_locations_migration.run(location_prefix="UCX_FOO")
     calls = [
         call("UCX_FOO_2", 's3://BUCKET1/FOLDER1', 'cred1', skip_validation=True),
     ]

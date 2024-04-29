@@ -13,7 +13,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.compute import Policy
 
-
 from databricks.labs.ucx.assessment.aws import (
     AWSInstanceProfile,
     AWSResources,

@@ -335,7 +335,7 @@ def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, *
     if ctx.is_azure:
         return ctx.azure_external_locations_migration.run()
     if ctx.is_aws:
-        return ctx.aws_resource_permissions.create_external_locations()
+        return ctx.aws_external_locations_migration.run()
     raise ValueError("Unsupported cloud provider")
 
 

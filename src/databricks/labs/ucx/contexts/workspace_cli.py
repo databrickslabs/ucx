@@ -11,6 +11,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreatio
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import StorageCredentialManager, ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
@@ -108,6 +109,14 @@ class WorkspaceContext(CliContext):
             self.azure_resource_permissions,
             self.azure_resources,
             self.principal_acl,
+        )
+
+    @cached_property
+    def aws_external_locations_migration(self):
+        return AWSExternalLocationsMigration(
+            self.workspace_client,
+            self.external_locations,
+            self.aws_resource_permissions,
         )
 
     @cached_property
