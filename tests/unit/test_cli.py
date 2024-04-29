@@ -488,3 +488,11 @@ def test_create_missing_principal_aws(ws):
     prompts = MockPrompts({'.*': 'yes'})
     create_missing_principals(ws, prompts=prompts, ctx=ctx)
     aws_resource_permissions.create_uc_roles.assert_called_once()
+
+
+def test_create_missing_principal_azure(ws, caplog):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=True)
+    prompts = MockPrompts({'.*': 'yes'})
+    with pytest.raises(ValueError) as failure:
+        create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    assert str(failure.value) == "Unsupported cloud provider"
