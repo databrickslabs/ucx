@@ -495,7 +495,7 @@ def test_create_missing_principal_aws_not_approved(ws):
     ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
     prompts = MockPrompts({'.*': 'No'})
     create_missing_principals(ws, prompts=prompts, ctx=ctx)
-    assert not aws_resource_permissions.create_uc_roles.called
+    aws_resource_permissions.create_uc_roles.assert_not_called()
 
 
 def test_create_missing_principal_azure(ws, caplog):
