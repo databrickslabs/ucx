@@ -20,9 +20,13 @@ if typing.TYPE_CHECKING:
 
 class BaseDependencyResolver(abc.ABC):
 
-    def __init__(self):
-        self._next_resolver: BaseDependencyResolver | None = None
+    def __init__(self, next_resolver: BaseDependencyResolver | None):
+        self._next_resolver = next_resolver
         self._problems: list[DependencyProblem] = []
+
+    @abc.abstractmethod
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        raise NotImplementedError()
 
     @property
     def problems(self):
@@ -34,9 +38,6 @@ class BaseDependencyResolver(abc.ABC):
     @property
     def next_resolver(self):
         return self._next_resolver
-
-    def set_next_resolver(self, resolver: BaseDependencyResolver):
-        self._next_resolver = resolver
 
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         assert self._next_resolver is not None
@@ -54,6 +55,13 @@ class BaseDependencyResolver(abc.ABC):
 
 
 class StubResolver(BaseDependencyResolver):
+
+    def __init__(self):
+        super().__init__(None)
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        raise NotImplementedError("Should never happen!")
+
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         return None
 
@@ -68,9 +76,12 @@ class StubResolver(BaseDependencyResolver):
 
 class NotebookResolver(BaseDependencyResolver):
 
-    def __init__(self, notebook_loader: NotebookLoader):
-        super().__init__()
+    def __init__(self, notebook_loader: NotebookLoader, next_resolver: BaseDependencyResolver | None = None):
+        super().__init__(next_resolver)
         self._notebook_loader = notebook_loader
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return NotebookResolver(self._notebook_loader, resolver)
 
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         if self._notebook_loader.is_notebook(path):
@@ -80,9 +91,12 @@ class NotebookResolver(BaseDependencyResolver):
 
 class LocalFileResolver(BaseDependencyResolver):
 
-    def __init__(self, file_loader: LocalFileLoader):
-        super().__init__()
+    def __init__(self, file_loader: LocalFileLoader, next_resolver: BaseDependencyResolver | None = None):
+        super().__init__(next_resolver)
         self._file_loader = file_loader
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return LocalFileResolver(self._file_loader, resolver)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
     def resolve_local_file(
@@ -101,9 +115,12 @@ class LocalFileResolver(BaseDependencyResolver):
 
 class WhitelistResolver(BaseDependencyResolver):
 
-    def __init__(self, whitelist: Whitelist):
-        super().__init__()
+    def __init__(self, whitelist: Whitelist, next_resolver: BaseDependencyResolver | None = None):
+        super().__init__(next_resolver)
         self._whitelist = whitelist
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return WhitelistResolver(self._whitelist, resolver)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
@@ -134,11 +151,20 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class SitePackagesResolver(BaseDependencyResolver):
 
-    def __init__(self, site_packages: SitePackages, file_loader: LocalFileLoader, syspath_provider: SysPathProvider):
-        super().__init__()
+    def __init__(
+        self,
+        site_packages: SitePackages,
+        file_loader: LocalFileLoader,
+        syspath_provider: SysPathProvider,
+        next_resolver: BaseDependencyResolver | None = None,
+    ):
+        super().__init__(next_resolver)
         self._site_packages = site_packages
         self._file_loader = file_loader
         self._syspath_provider = syspath_provider
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return SitePackagesResolver(self._site_packages, self._file_loader, self._syspath_provider, resolver)
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         site_package = self._site_packages[name]
@@ -170,8 +196,7 @@ class DependencyResolver:
         self._resolver: BaseDependencyResolver = StubResolver()
 
     def push(self, resolver: BaseDependencyResolver):
-        resolver.set_next_resolver(self._resolver)
-        self._resolver = resolver
+        self._resolver = resolver.with_next_resolver(self._resolver)
 
     def pop(self) -> BaseDependencyResolver:
         resolver = self._resolver
