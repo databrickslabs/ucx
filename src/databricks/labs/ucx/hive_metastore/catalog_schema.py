@@ -53,7 +53,7 @@ class CatalogSchema:
             new_grants.append(
                 dataclasses.replace(
                     db_grant,
-                    # replace source database with taget UC database
+                    # replace source database with target UC database
                     database=src_trg_schema_mapping[db_grant.database]['target_schema'],
                     # replace hive_metastore with target UC catalog
                     catalog=src_trg_schema_mapping[db_grant.database]['target_catalog'],
