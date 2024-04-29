@@ -107,6 +107,11 @@ def ws():
     return workspace_client
 
 
+@pytest.fixture
+def mock_iam_role_creation():
+    return create_autospec(IamRoleCreation)
+
+
 def test_workflow(ws, caplog):
     workflows(ws)
     assert "Fetching deployed jobs..." in caplog.messages
