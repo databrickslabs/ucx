@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest import mock
 from unittest.mock import MagicMock, call, create_autospec
 
@@ -88,6 +89,11 @@ def installation_multiple_roles():
             ]
         }
     )
+
+
+@pytest.fixture
+def installation_no_roles():
+    return MockInstallation(DEFAULT_CONFIG | {"uc_roles_access.csv": []})
 
 
 @pytest.fixture
@@ -324,6 +330,20 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     assert call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None) in aws.put_role_policy.call_args_list
     assert call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None) in aws.put_role_policy.call_args_list
     principal_acl.apply_location_acl.assert_not_called()
+
+
+def test_create_uc_no_roles(installation_no_roles, mock_aws, caplog):
+    sql_backend = MockBackend(rows={}, fails_on_first={})
+    workspace = create_autospec(WorkspaceClient)
+    external_locations = ExternalLocations(workspace, sql_backend, "ucx")
+    aws_resource_permissions = AWSResourcePermissions(
+        installation_no_roles, workspace, sql_backend, mock_aws, external_locations, "ucx"
+    )
+    role_creation = IamRoleCreation(installation_no_roles, workspace, aws_resource_permissions)
+    with caplog.at_level(logging.INFO):
+        role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
+        assert ['No IAM Role created'] == caplog.messages
+        assert not mock_aws.create_uc_role.called
 
 
 def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):

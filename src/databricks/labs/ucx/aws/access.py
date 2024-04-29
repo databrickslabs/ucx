@@ -59,7 +59,7 @@ class AWSResourcePermissions:
         # If single_role is True, create a single role and policy for all the missing S3 prefixes
         # If single_role is False, create a role and policy for each missing S3 prefix
         roles: list[AWSUCRoleCandidate] = []
-        missing_paths = self.identify_missing_paths()
+        missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
         for missing_path in missing_paths:
             match = re.match(AWSResources.S3_PATH_REGEX, missing_path)
@@ -68,10 +68,8 @@ class AWSResourcePermissions:
         if single_role:
             roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes)))
         else:
-            role_id = 1
-            for s3_prefix in sorted(list(s3_prefixes)):
-                roles.append(AWSUCRoleCandidate(f"{role_name}_{role_id}", policy_name, [s3_prefix]))
-                role_id += 1
+            for idx, s3_prefix in enumerate(sorted(list(s3_prefixes))):
+                roles.append(AWSUCRoleCandidate(f"{role_name}_{idx+1}", policy_name, [s3_prefix]))
         return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
@@ -172,7 +170,7 @@ class AWSResourcePermissions:
                 )
         return policy_actions
 
-    def identify_missing_paths(self):
+    def _identify_missing_paths(self):
         external_locations = self._locations.snapshot()
         compatible_roles = self.load_uc_compatible_roles()
         missing_paths = set()

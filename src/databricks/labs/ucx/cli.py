@@ -281,7 +281,11 @@ def principal_prefix_access(w: WorkspaceClient, ctx: WorkspaceContext | None = N
 
 @ucx.command
 def create_missing_principals(
-    w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None, **named_parameters
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    single_role: bool = False,
+    **named_parameters,
 ):
     """No supported for Azure.
     For AWS, this command identifies all the S3 locations that are missing a UC compatible role and creates them.
@@ -289,7 +293,7 @@ def create_missing_principals(
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
     if ctx.is_aws:
-        return ctx.iam_create_uc_roles.run(prompts)
+        return ctx.iam_create_uc_roles.run(prompts, single_role=single_role)
     raise ValueError("Unsupported cloud provider")
 
 
