@@ -198,6 +198,8 @@ class WorkspaceInstaller(WorkspaceContext):
     def _prompt_for_new_installation(self) -> WorkspaceConfig:
         logger.info("Please answer a couple of questions to configure Unity Catalog migration")
         default_database = "ucx"
+        # if a workspace is configured to use external hive metastore, the majority of the time that metastore will be
+        # shared with other workspaces. we need to add the suffix to ensure uniqueness of the inventory database
         if self.policy_installer.has_ext_hms():
             default_database = f"ucx_{self.workspace_client.get_workspace_id()}"
         inventory_database = self.prompts.question(
