@@ -40,7 +40,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
                 },
                 {
                     'catalog_name': 'catalog2',
-                    'dst_schema': 'schema2',
+                    'dst_schema': 'schema3',
                     'dst_table': 'table2',
                     'src_schema': 'schema2',
                     'src_table': 'table2',
@@ -70,7 +70,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     grants = [
         Grant('user1', 'SELECT', 'catalog1', 'schema3', 'table'),
         Grant('user1', 'MODIFY', 'catalog2', 'schema2', 'table'),
-        Grant('user1', 'SELECT', 'catalog2', 'schema2', 'table2'),
+        Grant('user1', 'SELECT', 'catalog2', 'schema3', 'table2'),
         Grant('user1', 'USAGE', 'hive_metastore', 'schema3'),
         Grant('user1', 'USAGE', 'hive_metastore', 'schema2'),
     ]
@@ -151,9 +151,10 @@ def test_catalog_schema_acl():
     queries = [
         'GRANT USE SCHEMA ON DATABASE catalog1.schema3 TO `user1`',
         'GRANT USE SCHEMA ON DATABASE catalog2.schema2 TO `user1`',
+        'GRANT USE SCHEMA ON DATABASE catalog2.schema3 TO `user1`',
         'GRANT USE CATALOG ON CATALOG catalog1 TO `user1`',
         'GRANT USE CATALOG ON CATALOG catalog2 TO `user1`',
     ]
-    assert len(backend.queries) == 4
+    assert len(backend.queries) == len(queries)
     for query in queries:
         assert query in backend.queries
