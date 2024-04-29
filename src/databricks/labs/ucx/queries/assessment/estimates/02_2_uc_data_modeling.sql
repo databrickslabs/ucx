@@ -10,7 +10,6 @@ SELECT
       ELSE 'Not migrated'
   END AS upgraded_status,
   concat_ws('.', migration_status.dst_catalog, migration_status.dst_schema, migration_status.dst_table) AS upgraded_to_table_name,
-  migration_status.update_ts AS upgraded_timestamp,
   tables.view_text,
   tables.storage_properties,
   tables.is_partitioned
