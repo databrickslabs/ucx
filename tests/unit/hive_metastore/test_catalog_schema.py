@@ -71,6 +71,8 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
         Grant('user1', 'SELECT', 'catalog1', 'schema3', 'table'),
         Grant('user1', 'MODIFY', 'catalog2', 'schema2', 'table'),
         Grant('user1', 'SELECT', 'catalog2', 'schema2', 'table2'),
+        Grant('user1', 'MODIFY', 'catalog1', 'schema2', 'table3'),
+        Grant('user1', 'SELECT', 'catalog3', 'schema3', 'table1'),
         Grant('user1', 'USAGE', 'hive_metastore', 'schema3'),
         Grant('user1', 'USAGE', 'hive_metastore', 'schema2'),
     ]
