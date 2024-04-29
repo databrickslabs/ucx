@@ -7,7 +7,7 @@ SELECT
   tables.location,
   CASE
       WHEN migration_status.dst_table IS NOT NULL THEN 'Migrated'
-      ELSE 'Not migrated'
+      ELSE 'Stayed in place'
   END AS upgraded_status,
   concat_ws('.', migration_status.dst_catalog, migration_status.dst_schema, migration_status.dst_table) AS upgraded_to_table_name,
   tables.view_text,
