@@ -1,6 +1,6 @@
+import dataclasses
 import logging
 from pathlib import PurePath
-import dataclasses
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import SqlBackend
