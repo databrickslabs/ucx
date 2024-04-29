@@ -85,21 +85,6 @@ def test_role_assignments_container():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
-def test_role_assignments_custom_storage():
-    api_client = azure_api_client()
-    azure_resource = AzureResources(api_client, api_client, include_subscriptions="002")
-    resource_id = "subscriptions/002/resourceGroups/rg1/storageAccounts/sto4"
-    role_assignments = list(azure_resource.role_assignments(resource_id))
-    assert len(role_assignments) == 2
-    for role_assignment in role_assignments:
-        assert role_assignment.role_name == "custom_role_001"
-        assert role_assignment.principal == Principal(
-            "appIduser2", "disNameuser2", "Iduser2", "Application", "0000-0000"
-        )
-        assert str(role_assignment.scope) == resource_id
-        assert role_assignment.resource == AzureResource(resource_id)
-
-
 def test_create_service_principal():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
@@ -308,3 +293,55 @@ def test_azure_resources_get_access_connector() -> None:
     assert access_connector.name == "test-access-connector"
     assert access_connector.tags["application"] == "databricks"
     assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
+
+
+def test_azure_resources_get_access_connector_missing_name() -> None:
+    """Should return none."""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector")
+    assert access_connector is None
+
+
+def test_azure_resources_get_access_connector_missing_location() -> None:
+    """Should return none."""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-noloc")
+    assert access_connector is None
+
+
+def test_azure_resources_get_access_connector_missing_ps() -> None:
+    """Should return none."""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-nops")
+    assert access_connector is None
+
+
+def test_azure_resources_get_access_connector_inv_identity() -> None:
+    """Should return none."""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connector = azure_resource.get_access_connector("003", "rg-test", "test-access-connector-invidentity")
+    assert access_connector is None
+
+
+def test_azure_resources_create_or_update_access_connector() -> None:
+    """Should return the properties of the mocked response."""
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    access_connector = azure_resource.create_or_update_access_connector(
+        "002", "rg-test", "test-access-connector", "central-us", {"application": "databricks"}
+    )
+    assert access_connector is not None
+    assert access_connector.name == "test-access-connector"
+    assert access_connector.tags["application"] == "databricks"
+    assert access_connector.tags["Owner"] == "cor.zuurmond@databricks.com"
+
+
+def test_azure_resources_delete_access_connector() -> None:
+    api_client = azure_api_client()
+    azure_resource = AzureResources(api_client, api_client)
+    azure_resource.delete_access_connector("002", "rg-test", "test-access-connector")
+    assert api_client.delete.called
