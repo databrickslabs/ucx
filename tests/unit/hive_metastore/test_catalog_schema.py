@@ -78,7 +78,8 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     return CatalogSchema(ws, table_mapping, principal_acl, backend)
 
 
-def test_create():
+def test_create_all_catalogs_schemas_creates_catalogs():
+    """Catalog 2 and 3 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "s3://foo/bar"})
 
@@ -90,9 +91,21 @@ def test_create():
         call("catalog3", storage_root="s3://foo/bar", comment="Created by UCX"),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
-    ws.schemas.create.assert_any_call("schema3", "catalog1", comment="Created by UCX")
-    ws.schemas.create.assert_any_call("schema2", "catalog2", comment="Created by UCX")
-    ws.schemas.create.assert_any_call("schema3", "catalog3", comment="Created by UCX")
+
+
+@pytest.mark.parametrize(
+    "catalog,schema",
+    [("catalog1", "schema2"), ("catalog1", "schema3"), ("catalog2", "schema2"), ("catalog3", "schema3")],
+)
+def test_create_all_catalogs_schemas_creates_schemas(catalog: str, schema: str):
+    """Non-existing schemas should be created."""
+    ws = create_autospec(WorkspaceClient)
+    mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": "metastore"})
+
+    catalog_schema = prepare_test(ws)
+    catalog_schema.create_all_catalogs_schemas(mock_prompts)
+
+    ws.schemas.create.assert_any_call(schema, catalog, comment="Created by UCX")
 
 
 def test_create_sub_location():
