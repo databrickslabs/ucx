@@ -187,23 +187,21 @@ class DependencyResolver:
         notebook_loader: NotebookLoader,
         syspath_provider: SysPathProvider,
     ) -> DependencyResolver:
-        resolver = DependencyResolver()
-        resolver.push(NotebookResolver(notebook_loader))
-        resolver.push(SitePackagesResolver(site_packages, file_loader, syspath_provider))
-        resolver.push(WhitelistResolver(whitelist))
-        resolver.push(LocalFileResolver(file_loader))
-        return resolver
+        return DependencyResolver(
+            [
+                NotebookResolver(notebook_loader),
+                SitePackagesResolver(site_packages, file_loader, syspath_provider),
+                WhitelistResolver(whitelist),
+                LocalFileResolver(file_loader),
+            ]
+        )
 
-    def __init__(self):
-        self._resolver: BaseDependencyResolver = StubResolver()
-
-    def push(self, resolver: BaseDependencyResolver):
-        self._resolver = resolver.with_next_resolver(self._resolver)
-
-    def pop(self) -> BaseDependencyResolver:
-        resolver = self._resolver
-        self._resolver = resolver.next_resolver
-        return resolver
+    def __init__(self, resolvers: list[BaseDependencyResolver]):
+        previous: BaseDependencyResolver = StubResolver()
+        for resolver in resolvers:
+            resolver = resolver.with_next_resolver(previous)
+            previous = resolver
+        self._resolver: BaseDependencyResolver = previous
 
     def resolve_notebook(
         self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
