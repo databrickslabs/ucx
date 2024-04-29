@@ -1,3 +1,4 @@
+import collections
 import dataclasses
 import logging
 from pathlib import PurePath
@@ -50,32 +51,20 @@ class CatalogSchema:
         # filter on grants to only get database level grants
         database_grants = [grant for grant in grants if grant.table is None and grant.view is None]
         for db_grant in database_grants:
-            new_grants.append(
-                dataclasses.replace(
-                    db_grant,
-                    # replace source database with target UC database
-                    database=src_trg_schema_mapping[db_grant.database]['target_schema'],
-                    # replace hive_metastore with target UC catalog
-                    catalog=src_trg_schema_mapping[db_grant.database]['target_catalog'],
-                )
-            )
+            for target_catalog, target_schema in src_trg_schema_mapping[db_grant.database]:
+                new_grants.append(dataclasses.replace(db_grant, catalog=target_catalog, database=target_schema))
         for grant in new_grants:
             catalog_grants.add(dataclasses.replace(grant, database=None))
         new_grants.extend(catalog_grants)
         return new_grants
 
-    def _get_database_source_target_mapping(self) -> dict[str, dict]:
-        """generate a dictionary of source database in hive_metastore and its
-        mapping of target UC catalog and schema from the table mappings."""
-        src_trg_schema_mapping: dict[str, dict] = {}
+    def _get_database_source_target_mapping(self) -> dict[str, set[tuple[str, str]]]:
+        """Generate a dictionary of source database in hive_metastore and its
+        mapping of target UC catalog and schema combinations from the table mappings."""
+        src_trg_schema_mapping: dict[str, set[tuple[str, str]]] = collections.defaultdict(set)
         table_mappings = self._table_mapping.load()
-        for mappings in table_mappings:
-            if mappings.src_schema not in src_trg_schema_mapping:
-                src_trg_schema_mapping[mappings.src_schema] = {
-                    'target_catalog': mappings.catalog_name,
-                    'target_schema': mappings.dst_schema,
-                }
-                continue
+        for table_mapping in table_mappings:
+            src_trg_schema_mapping[table_mapping.src_schema].add((table_mapping.catalog_name, table_mapping.dst_schema))
         return src_trg_schema_mapping
 
     def _create_catalog_validate(self, catalog, prompts: Prompts):
