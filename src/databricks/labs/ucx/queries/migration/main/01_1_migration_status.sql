@@ -1,5 +1,5 @@
 -- viz type=table, name=Migration status, search_by=table_name,upgraded_status, columns=table_name,object_type,table_format,location,upgraded_status,upgraded_to_table_name,view_text,storage_properties,is_partitioned
--- widget title=Migration status, row=0, col=0, size_x=4, size_y=8
+-- widget title=Migration status, row=1, col=2, size_x=4, size_y=8
 SELECT
   concat_ws('.', tables.`catalog`, tables.`database`, tables.name) AS table_name,
   tables.object_type,
