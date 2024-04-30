@@ -34,6 +34,7 @@ def test_replace_installation():
                     'principal': "oneenv-adls",
                     'privilege': "WRITE_FILES",
                     'type': "Application",
+                    'default_network_action': 'Allow',
                 },
                 {
                     'prefix': 'abfss://ucx2@ziyuanqintest.dfs.core.windows.net/',
@@ -41,6 +42,7 @@ def test_replace_installation():
                     'principal': "ziyuan-user-assigned-mi",
                     'privilege': "WRITE_FILES",
                     'type': "ManagedIdentity",
+                    'default_network_action': 'Allow',
                 },
             ],
         }
