@@ -260,7 +260,9 @@ class ServicePrincipalMigration(SecretsMixin):
         else:
             sp_results = []
 
-        plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
+        plan_confirmed = prompts.confirm(
+            "[RECOMMENDED] Please confirm to create an access connector with managed identity for each storage account."
+        )
         if plan_confirmed:
             ac_results = self._create_access_connectors_for_storage_accounts()
         else:

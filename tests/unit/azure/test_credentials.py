@@ -290,7 +290,7 @@ def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
     assert len(sp_migration.run(prompts)) == num_migrated
@@ -320,7 +320,7 @@ def test_read_secret_read_exception(caplog, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -338,7 +338,7 @@ def test_print_action_plan(caplog, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -360,7 +360,7 @@ def test_run_without_confirmation(sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -371,7 +371,7 @@ def test_run(installation, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
