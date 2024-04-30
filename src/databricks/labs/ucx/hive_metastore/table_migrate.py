@@ -29,6 +29,7 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewToMigrate,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
+from databricks.sdk.errors.platform import BadRequest
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +311,10 @@ class TablesMigrator:
                 logger.warning(f"Cannot identify UC grant for {src.kind} {rule.as_uc_table_key}. Skipping.")
                 continue
             logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
-            self._backend.execute(acl_migrate_sql)
+            try:
+                self._backend.execute(acl_migrate_sql)
+            except BadRequest as e:
+                logger.error(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e.details}")
         return True
 
     def _table_already_migrated(self, target) -> bool:
