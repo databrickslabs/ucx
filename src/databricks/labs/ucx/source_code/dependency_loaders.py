@@ -93,8 +93,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
 
 
 class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
-    # see https://github.com/databrickslabs/ucx/issues/1499
-    # pylint: disable=stuff
+
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         fullpath = self.full_path(dependency.path)
         assert fullpath is not None
