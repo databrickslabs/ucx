@@ -144,7 +144,6 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             acl_listing,
             include_object_permissions=self.config.include_object_permissions,
-            include_group_names=self.config.include_group_names,
         )
 
     @cached_property
