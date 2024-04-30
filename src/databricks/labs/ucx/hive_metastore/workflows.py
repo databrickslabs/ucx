@@ -36,6 +36,11 @@ class TableMigration(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
+    @job_task(dashboard="migration_main", depends_on=[migrate_views])
+    def migration_report(self, ctx: RuntimeContext):
+        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
+        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
 
 class MigrateHiveSerdeTablesInPlace(Workflow):
     def __init__(self):
@@ -60,6 +65,11 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         It is dependent on the migration of the tables.
         """
         ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+
+    @job_task(dashboard="migration_main", depends_on=[migrate_views])
+    def migration_report(self, ctx: RuntimeContext):
+        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
+        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
 class MigrateExternalTablesCTAS(Workflow):
@@ -94,6 +104,11 @@ class MigrateExternalTablesCTAS(Workflow):
         """
         ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
 
+    @job_task(dashboard="migration_main", depends_on=[migrate_views])
+    def migration_report(self, ctx: RuntimeContext):
+        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
+        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
 
 class MigrateTablesInMounts(Workflow):
     def __init__(self):
@@ -105,3 +120,8 @@ class MigrateTablesInMounts(Workflow):
         captured during the assessment. It will store the results under the `tables` table
         located under the assessment."""
         ctx.tables_in_mounts.snapshot()
+
+    @job_task(dashboard="migration_main", depends_on=[scan_tables_in_mounts_experimental])
+    def migration_report(self, ctx: RuntimeContext):
+        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
+        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
