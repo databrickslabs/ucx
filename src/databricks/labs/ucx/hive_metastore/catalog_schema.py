@@ -8,6 +8,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
@@ -51,20 +52,22 @@ class CatalogSchema:
         # filter on grants to only get database level grants
         database_grants = [grant for grant in grants if grant.table is None and grant.view is None]
         for db_grant in database_grants:
-            for target_catalog, target_schema in src_trg_schema_mapping[db_grant.database]:
-                new_grants.append(dataclasses.replace(db_grant, catalog=target_catalog, database=target_schema))
+            for schema in src_trg_schema_mapping[db_grant.database]:
+                new_grants.append(dataclasses.replace(db_grant, catalog=schema.catalog_name, database=schema.name))
         for grant in new_grants:
             catalog_grants.add(dataclasses.replace(grant, database=None))
         new_grants.extend(catalog_grants)
         return new_grants
 
-    def _get_database_source_target_mapping(self) -> dict[str, set[tuple[str, str]]]:
+    def _get_database_source_target_mapping(self) -> dict[str, list[SchemaInfo]]:
         """Generate a dictionary of source database in hive_metastore and its
         mapping of target UC catalog and schema combinations from the table mappings."""
-        src_trg_schema_mapping: dict[str, set[tuple[str, str]]] = collections.defaultdict(set)
+        src_trg_schema_mapping: dict[str, list[SchemaInfo]] = collections.defaultdict(list)
         table_mappings = self._table_mapping.load()
         for table_mapping in table_mappings:
-            src_trg_schema_mapping[table_mapping.src_schema].add((table_mapping.catalog_name, table_mapping.dst_schema))
+            schema = SchemaInfo(catalog_name=table_mapping.catalog_name, name=table_mapping.dst_schema)
+            if schema not in src_trg_schema_mapping[table_mapping.src_schema]:
+                src_trg_schema_mapping[table_mapping.src_schema].append(schema)
         return src_trg_schema_mapping
 
     def _create_catalog_validate(self, catalog, prompts: Prompts):
