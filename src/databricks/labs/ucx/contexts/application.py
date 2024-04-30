@@ -170,7 +170,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def secret_scope_acl_support(self):
         # Secret ACLs are not used much in tests, so skipping include_object_permissions
-        return SecretScopesSupport(self.workspace_client)
+        return SecretScopesSupport(self.workspace_client, include_group_names=self.config.include_group_names)
 
     @cached_property
     def legacy_table_acl_support(self):
