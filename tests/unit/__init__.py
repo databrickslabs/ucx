@@ -1,4 +1,5 @@
 import base64
+import dataclasses
 import json
 import logging
 import os
@@ -107,6 +108,18 @@ def _id_list(cls: type, ids=None):
     if not ids:
         return []
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_fixture(f'{_FOLDERS[cls]}/{_}.json') for _ in ids})
+    if cls is Policy:
+        output = []
+        for _ in ids:
+            raw_json = _load_fixture(f'{_FOLDERS[cls]}/{_}.json')
+            # need special handling for reading definition & overrides
+            policy: Policy = dataclasses.replace(
+                installation.load(cls, filename=_),
+                definition=json.dumps(raw_json["definition"]),
+                policy_family_definition_overrides=json.dumps(raw_json["policy_family_definition_overrides"]),
+            )
+            output.append(policy)
+        return output
     return [installation.load(cls, filename=_) for _ in ids]
 
 
