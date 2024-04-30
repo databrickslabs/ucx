@@ -380,3 +380,23 @@ def test_run(installation, sp_migration):
             }
         ],
     )
+
+
+def test_run_warning_non_allow_network_configuration(installation, sp_migration, caplog):
+    """The user should be warned when a network configuration is not 'Allow'"""
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+        }
+    )
+
+    expected_message = (
+        "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration, "
+        "which might cause connectivity issues. We recommend using access connectors with managed identities instead "
+        "(confirm with prompt below)."
+    )
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):
+        sp_migration.run(prompts)
+        assert any(expected_message in message for message in caplog.messages)
