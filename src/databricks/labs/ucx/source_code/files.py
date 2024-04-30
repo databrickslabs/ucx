@@ -222,3 +222,31 @@ class SysPathProvider:
     @property
     def paths(self) -> Iterable[Path]:
         yield from self._paths
+
+
+class LocalFileLinter:
+
+    def __init__(self, languages: Languages):
+        self._languages = languages
+        # TODO: Needs to support local notebooks, as well as pure python files
+        self._extensions = {".py": Language.PYTHON}
+
+    def lint(self, path: Path) -> bool:
+        if path.is_dir():
+            for child_path in path.iterdir():
+                self.lint(child_path)
+            return True
+        return self._lint_file(path)
+
+    def _lint_file(self, path: Path) -> bool:
+        if path.suffix not in self._extensions:
+            return False
+        language = self._extensions[path.suffix]
+        if not language:
+            return False
+        logger.info(f"Analysing {path}")
+        with path.open("r") as f:
+            code = f.read()
+            for advice in self._languages.linter(language).lint(code):
+                logger.info(f"Found: {advice}")
+            return True
