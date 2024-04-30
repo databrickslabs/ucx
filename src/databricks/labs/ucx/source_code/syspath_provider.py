@@ -1,3 +1,4 @@
+import os
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -16,17 +17,18 @@ class SysPathProvider:
 
     def __init__(self, paths: list[Path]):
         self._paths = paths
+        self._cwds = [Path(os.getcwd())]
 
-    def push(self, path: Path):
+    def push_path(self, path: Path):
         self._paths.insert(0, path)
 
-    def insert(self, index: int, path: Path):
+    def insert_path(self, index: int, path: Path):
         self._paths.insert(index, path)
 
-    def remove(self, index: int):
+    def remove_path(self, index: int):
         del self._paths[index]
 
-    def pop(self) -> Path:
+    def pop_path(self) -> Path:
         result = self._paths[0]
         del self._paths[0]
         return result
@@ -34,3 +36,15 @@ class SysPathProvider:
     @property
     def paths(self) -> Iterable[Path]:
         yield from self._paths
+
+    def push_cwd(self, path: Path):
+        self._cwds.append(path)
+
+    def pop_cwd(self):
+        result = self._cwds[0]
+        del self._cwds[0]
+        return result
+
+    @property
+    def cwd(self):
+        return self._cwds[-1] if len(self._cwds) > 0 else Path(os.getcwd())
