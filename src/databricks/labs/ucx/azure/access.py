@@ -64,7 +64,7 @@ class AzureResourcePermissions:
         }
 
     def _get_permission_level(self, permission_to_match: str) -> Privilege | None:
-        # If string contains '*', construct a pattern with wildcard
+        # String might contain '*', check for wildcard match
         pattern = re.sub(r'\*', '.*', permission_to_match)
         permission_compiled = re.compile(pattern)
         for each_level, privilege_level in self._permission_levels.items():
