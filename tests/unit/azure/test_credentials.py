@@ -353,7 +353,7 @@ def test_run_without_confirmation(sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
-            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
         }
     )
 
