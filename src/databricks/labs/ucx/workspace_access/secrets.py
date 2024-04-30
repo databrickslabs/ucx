@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class SecretScopesSupport(AclSupport):
-    def __init__(
-        self, ws: WorkspaceClient, verify_timeout: timedelta | None = None, include_group_names: list[str] | None = None
-    ):
+    def __init__(self, ws: WorkspaceClient,
+                 verify_timeout: timedelta | None = None,
+                 include_group_names: list[str] | None = None
+                 ):
         self._ws = ws
         if verify_timeout is None:
             verify_timeout = timedelta(minutes=2)
@@ -32,8 +33,7 @@ class SecretScopesSupport(AclSupport):
         def _crawler_task(scope: workspace.SecretScope):
             assert scope.name is not None
             all_acls = self._ws.secrets.list_acls(scope.name)
-            if self._include_group_names is not None:
-                acl_items = [item for item in all_acls if item.principal not in self._include_group_names]
+            acl_items = [item for item in all_acls if item.principal not in self._include_group_names]
             return Permissions(
                 object_id=scope.name,
                 object_type="secrets",
