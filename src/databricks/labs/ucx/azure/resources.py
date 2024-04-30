@@ -582,7 +582,3 @@ class AzureResources:
         """
         url = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Databricks/accessConnectors/{name}"
         self._mgmt.delete(url, api_version="2023-05-01")
-
-    def storage_account_firewall_rules(self, storage_account_id: str) -> list[FirewallRule]:
-        """Get the storage account fire wall rules."""
-        return []
