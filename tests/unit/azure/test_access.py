@@ -146,6 +146,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
                 'type': 'Application',
+                'default_network_action': 'Allow',
                 'directory_id': '0000-0000',
             },
             {
@@ -154,6 +155,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
                 'type': 'Application',
+                'default_network_action': 'Allow',
                 'directory_id': '0000-0000',
             },
         ],
