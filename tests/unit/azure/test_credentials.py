@@ -51,7 +51,6 @@ def installation():
                     'principal': 'principal_1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
-                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -60,7 +59,6 @@ def installation():
                     'principal': 'principal_read',
                     'privilege': 'READ_FILES',
                     'type': 'Application',
-                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -69,7 +67,6 @@ def installation():
                     'principal': 'principal_write',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
-                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_2',
                 },
                 {
@@ -78,7 +75,6 @@ def installation():
                     'principal': 'principal_overlap',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
-                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_2',
                 },
                 {
@@ -87,7 +83,6 @@ def installation():
                     'principal': 'managed_identity',
                     'privilege': 'WRITE_FILES',
                     'type': 'ManagedIdentity',
-                    'default_network_action': 'Allow',
                 },
             ],
         }
@@ -169,8 +164,7 @@ def test_create_storage_credentials(credential_manager):
             "principal_write",
             "WRITE_FILES",
             "Application",
-            "Allow",
-            "directory_id_1",
+            directory_id="directory_id_1",
         ),
         "test",
     )
@@ -181,8 +175,7 @@ def test_create_storage_credentials(credential_manager):
             "principal_read",
             "READ_FILES",
             "Application",
-            "Allow",
-            "directory_id_1",
+            directory_id="directory_id_1",
         ),
         "test",
     )

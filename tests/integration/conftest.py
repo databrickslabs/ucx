@@ -198,7 +198,6 @@ class CommonUtils:
                         principal='principal_1',
                         privilege='WRITE_FILES',
                         type='Application',
-                        default_network_action='Allow',
                         directory_id='directory_id_ss1',
                     )
                 ]
