@@ -31,6 +31,7 @@ class StoragePermissionMapping:
     principal: str
     privilege: str
     type: str
+    default_network_action: str  # "Deny" or "Allow"
     # Need this directory_id/tenant_id when create UC storage credentials using service principal
     directory_id: str | None = None
 
@@ -72,6 +73,7 @@ class AzureResourcePermissions:
                         principal=role_assignment.principal.display_name,
                         privilege=privilege,
                         type=role_assignment.principal.type,
+                        default_network_action=storage.default_network_action,
                         directory_id=role_assignment.principal.directory_id,
                     )
                 )
