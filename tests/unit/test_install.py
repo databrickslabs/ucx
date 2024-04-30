@@ -1301,6 +1301,39 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     ws.jobs.run_now.assert_not_called()
 
 
+def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
+    ws.jobs.run_now = mocker.Mock()
+    mocker.patch("webbrowser.open")
+    sql_backend = MockBackend()
+    prompts = MockPrompts(
+        {
+            r".*": "",
+            r"Do you want to trigger assessment job ?.*": "yes",
+            r"Open assessment Job url that just triggered ?.*": "yes",
+        }
+    )
+    config = WorkspaceConfig(inventory_database="ucx", policy_id='123', trigger_job=True)
+    wheels = create_autospec(WheelsV2)
+    installation = mock_installation
+    install_state = InstallState.from_installation(installation)
+    workflows_installer = WorkflowsDeployment(
+        config,
+        installation,
+        install_state,
+        ws,
+        wheels,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+        Workflows.all().tasks(),
+    )
+    workspace_installation = WorkspaceInstallation(
+        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+    )
+    workspace_installation.run()
+    wheels.upload_to_wsfs.assert_called_once()
+    ws.jobs.run_now.assert_called_once()
+
+
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     existing_installation = MockInstallation(
         {
