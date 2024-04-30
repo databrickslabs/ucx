@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from functools import partial
 import re
+from collections.abc import ValuesView
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -98,28 +99,33 @@ class AzureResourcePermissions:
             privilege = self._levels[role_assignment.role_name]
         return privilege
 
-    def _map_storage(self, storage: StorageAccount) -> list[StoragePermissionMapping]:
+    def _map_storage(self, storage: StorageAccount) -> ValuesView[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.name}")
-        out = []
+        principal_spm_mapping: dict[str, StoragePermissionMapping] = {}
         for container in self._azurerm.containers(storage.id):
             for role_assignment in self._azurerm.role_assignments(str(container)):
+                # Skip the role assignments that already have WRITE_FILES privilege
+                spm_mapping_key = f"{container.container}_{role_assignment.principal.client_id}"
+                if (
+                    spm_mapping_key in principal_spm_mapping
+                    and principal_spm_mapping[spm_mapping_key].privilege == Privilege.WRITE_FILES.value
+                ):
+                    continue
                 # one principal may be assigned multiple roles with overlapping dataActions, hence appearing
                 # here in duplicates. hence, role name -> permission level is not enough for the perfect scenario.
                 returned_privilege = self._get_role_privilege(role_assignment)
                 if not returned_privilege:
                     continue
                 privilege = returned_privilege.value
-                out.append(
-                    StoragePermissionMapping(
-                        prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
-                        client_id=role_assignment.principal.client_id,
-                        principal=role_assignment.principal.display_name,
-                        privilege=privilege,
-                        type=role_assignment.principal.type,
-                        directory_id=role_assignment.principal.directory_id,
-                    )
+                principal_spm_mapping[spm_mapping_key] = StoragePermissionMapping(
+                    prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
+                    client_id=role_assignment.principal.client_id,
+                    principal=role_assignment.principal.display_name,
+                    privilege=privilege,
+                    type=role_assignment.principal.type,
+                    directory_id=role_assignment.principal.directory_id,
                 )
-        return out
+        return principal_spm_mapping.values()
 
     def save_spn_permissions(self) -> str | None:
         used_storage_accounts = self._get_storage_accounts()
