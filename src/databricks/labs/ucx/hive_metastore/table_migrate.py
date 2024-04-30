@@ -29,7 +29,7 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewToMigrate,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
-from databricks.sdk.errors.platform import BadRequest
+from databricks.sdk.errors.platform import BadRequest, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -313,8 +313,8 @@ class TablesMigrator:
             logger.debug(f"Migrating acls on {rule.as_uc_table_key} using SQL query: {acl_migrate_sql}")
             try:
                 self._backend.execute(acl_migrate_sql)
-            except BadRequest as e:
-                logger.error(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e.details}")
+            except (BadRequest, NotFound) as e:
+                logger.warning(f"Failed to migrate ACL for {src.key} to {rule.as_uc_table_key}: {e}")
         return True
 
     def _table_already_migrated(self, target) -> bool:

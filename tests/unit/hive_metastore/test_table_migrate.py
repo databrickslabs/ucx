@@ -959,7 +959,8 @@ GRANTS = MockBackend.rows("principal", "action_type", "catalog", "database", "ta
 
 
 def test_migrate_acls_should_produce_proper_queries(ws, caplog):
-    errors = {}
+    # all grants succeed except for one
+    errors = {"GRANT SELECT ON VIEW ucx_default.db1_dst.view_dst TO `account group`": "TABLE_OR_VIEW_NOT_FOUND: error"}
     rows = {
         'SELECT \\* FROM hive_metastore.inventory_database.grants': GRANTS[
             ("workspace_group", "SELECT", "", "db1_src", "managed_dbfs", ""),
@@ -1031,6 +1032,10 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     assert "GRANT MODIFY ON VIEW ucx_default.db1_dst.view_dst TO `account group`" not in backend.queries
 
     assert "Cannot identify UC grant" in caplog.text
+    assert (
+        "Failed to migrate ACL for hive_metastore.db1_src.view_src to ucx_default.db1_dst.view_dst: "
+        "TABLE_OR_VIEW_NOT_FOUND: error"
+    ) in caplog.text
 
 
 def test_migrate_principal_acls_should_produce_proper_queries(ws):
