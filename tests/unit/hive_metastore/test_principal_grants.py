@@ -169,6 +169,7 @@ def installation():
                     'principal': 'principal_1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_ss1',
                 },
                 {
@@ -177,6 +178,7 @@ def installation():
                     'principal': 'principal_1',
                     'privilege': 'READ_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_ss1',
                 },
                 {
@@ -185,6 +187,7 @@ def installation():
                     'principal': 'principal_1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_ss1',
                 },
             ],
