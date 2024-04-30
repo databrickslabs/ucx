@@ -234,8 +234,17 @@ class ServicePrincipalMigration(SecretsMixin):
 
         execution_result = []
         for spn in sp_list_with_secret:
+            if spn.permission_mapping.default_network_action != "Allow":
+                logger.warning(
+                    f"Service principal '{spn.permission_mapping.principal}' accesses storage account "
+                    f"'{spn.permission_mapping.prefix}' with non-Allow network configuration, which might cause "
+                    "connectivity issues. We recommend using access connectors with managed identities instead "
+                    "(confirm with prompt below)."
+                )
+
             self._storage_credential_manager.create_with_client_secret(spn)
             execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
+
         return execution_result
 
     def _create_access_connectors_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
