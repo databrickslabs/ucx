@@ -158,14 +158,11 @@ class GlobalContext(abc.ABC):
             self.workspace_client,
             acl_listing,
             include_object_permissions=self.config.include_object_permissions,
-            include_group_names=self.config.include_group_names,
         )
 
     @cached_property
     def scim_entitlements_support(self):
-        return ScimSupport(self.workspace_client,
-                           include_object_permissions=self.config.include_object_permissions,
-                           include_group_names=self.config.include_group_names)
+        return ScimSupport(self.workspace_client, include_object_permissions=self.config.include_object_permissions)
 
     @cached_property
     def secret_scope_acl_support(self):
@@ -178,7 +175,6 @@ class GlobalContext(abc.ABC):
             self.grants_crawler,
             self.sql_backend,
             include_object_permissions=self.config.include_object_permissions,
-            include_group_names=self.config.include_group_names,
         )
 
     @cached_property

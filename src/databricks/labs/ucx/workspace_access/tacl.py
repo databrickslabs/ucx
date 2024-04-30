@@ -22,13 +22,11 @@ class TableAclSupport(AclSupport):
         sql_backend: SqlBackend,
         verify_timeout: timedelta | None = timedelta(minutes=1),
         include_object_permissions: list[str] | None = None,
-        include_group_names: list[str] | None = None,
     ):
         self._grants_crawler = grants_crawler
         self._sql_backend = sql_backend
         self._verify_timeout = verify_timeout
         self._include_object_permissions = include_object_permissions
-        self._include_group_names = include_group_names
 
     def get_crawler_tasks(self) -> Iterator[Callable[..., Permissions | None]]:
         # Table ACL permissions (grant/revoke and ownership) are not atomic. When granting the permissions,
@@ -69,8 +67,6 @@ class TableAclSupport(AclSupport):
             yield functools.partial(inner, object_type=object_type, object_id=object_id, grant=grant)
 
     def _from_reduced(self, object_type: str, object_id: str, principal: str, action_type: str):
-        if self._include_group_names is not None and principal not in self._include_group_names:
-            return None
         match object_type:
             case "TABLE":
                 catalog, database, table = object_id.split(".")

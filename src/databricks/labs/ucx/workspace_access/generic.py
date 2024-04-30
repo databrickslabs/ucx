@@ -254,14 +254,14 @@ class GenericPermissionsSupport(AclSupport):
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
             permissions = self._ws.permissions.get(object_type, object_id)
-            if self._include_group_names is None or permissions.access_control_list is None:
+            if permissions.access_control_list is None:
+                return permissions
+            if self._include_group_names is None:
                 return permissions
             # return only acls that are in the include_group_names
             included_acl = [
                 acl for acl in permissions.access_control_list if acl.group_name in self._include_group_names
             ]
-            if len(included_acl) == 0:
-                return None
             return iam.ObjectPermissions(
                 object_type=permissions.object_type, object_id=permissions.object_id, access_control_list=included_acl
             )

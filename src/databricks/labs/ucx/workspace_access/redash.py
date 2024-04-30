@@ -56,14 +56,12 @@ class RedashPermissionsSupport(AclSupport):
         # More details here: https://databricks.atlassian.net/browse/ES-992619
         verify_timeout: timedelta | None = timedelta(minutes=11),
         include_object_permissions: list[str] | None = None,
-        include_group_names: list[str] | None = None,
     ):
         self._ws = ws
         self._listings = listings
         self._set_permissions_timeout = set_permissions_timeout
         self._verify_timeout = verify_timeout
         self._include_object_permissions = include_object_permissions
-        self._include_group_names = include_group_names
 
     @staticmethod
     def _is_item_relevant(item: Permissions, migration_state: MigrationState) -> bool:
@@ -102,18 +100,7 @@ class RedashPermissionsSupport(AclSupport):
 
     def _safe_get_dbsql_permissions(self, object_type: sql.ObjectTypePlural, object_id: str) -> sql.GetResponse | None:
         try:
-            permissions = self._ws.dbsql_permissions.get(object_type, object_id)
-            if self._include_group_names is None or permissions.access_control_list is None:
-                return permissions
-            # return only acls that are in the include_group_names
-            included_acl = [
-                acl for acl in permissions.access_control_list if acl.group_name in self._include_group_names
-            ]
-            if len(included_acl) == 0:
-                return None
-            return sql.GetResponse(
-                object_type=permissions.object_type, object_id=permissions.object_id, access_control_list=included_acl
-            )
+            return self._ws.dbsql_permissions.get(object_type, object_id)
         except NotFound:
             logger.warning(f"removed on backend: {object_type} {object_id}")
             return None
