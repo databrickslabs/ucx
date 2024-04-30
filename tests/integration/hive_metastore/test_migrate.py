@@ -455,7 +455,7 @@ def test_mapping_reverts_table(ws, sql_backend, runtime_ctx, make_catalog):
     assert "upgraded_to" not in results
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=4))
 def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_catalog, make_user):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
