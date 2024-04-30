@@ -37,9 +37,10 @@ class LocalFile(SourceContainer):
             logger.warning(f"Unsupported language: {self._language.language}")
             return
         syspath_provider.push_cwd(self.path.parent)
-        self._build_dependency_graph(parent, syspath_provider)
+        self._build_dependency_graph(parent)
+        syspath_provider.pop_cwd()
 
-    def _build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
+    def _build_dependency_graph(self, parent: DependencyGraph) -> None:
         # TODO replace the below with parent.build_graph_from_python_source
         # can only be done after https://github.com/databrickslabs/ucx/issues/1287
         linter = ASTLinter.parse(self._original_code)

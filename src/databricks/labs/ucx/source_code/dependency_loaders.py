@@ -81,7 +81,8 @@ class LocalFileLoader(DependencyLoader):
 
     def is_notebook(self, path: Path) -> bool:
         fullpath = self.full_path(path)
-        assert fullpath is not None
+        if fullpath is None:
+            return False
         with fullpath.open(mode="r", encoding="utf-8") as stream:
             line = stream.readline()
             return NOTEBOOK_HEADER in line

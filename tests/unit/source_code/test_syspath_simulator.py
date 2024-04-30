@@ -12,13 +12,14 @@ from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, Visiti
 
 @pytest.mark.parametrize(
     "source, expected",
-    [ (["walk-sys-path", "siblings", "sibling1_notebook"], 2),
-      (["walk-sys-path", "parent-child", "in_parent_folder_notebook"], 3),
-      (["walk-sys-path", "child-parent", "child-folder", "in_child_folder_notebook"], 3),
-      (["walk-sys-path", "parent-grand-child", "in_parent_folder_notebook"], 3),
-      (["walk-sys-path", "child-grand-parent", "child-folder", "child-folder", "in_grand_child_folder_notebook"], 3)
-
-      ])
+    [
+        (["walk-sys-path", "siblings", "sibling1_notebook"], 2),
+        (["walk-sys-path", "parent-child", "in_parent_folder_notebook"], 3),
+        (["walk-sys-path", "child-parent", "child-folder", "in_child_folder_notebook"], 3),
+        (["walk-sys-path", "parent-grand-child", "in_parent_folder_notebook"], 3),
+        (["walk-sys-path", "child-grand-parent", "child-folder", "child-folder", "in_grand_child_folder_notebook"], 3),
+    ],
+)
 def test_locates_notebooks(source: list[str], expected: int):
     visited: dict[str, bool] = {}
     elems = [_samples_path(SourceContainer)]
@@ -36,10 +37,7 @@ def test_locates_notebooks(source: list[str], expected: int):
     assert len(visited) == expected
 
 
-@pytest.mark.parametrize(
-    "source, expected",
-    [ (["walk-sys-path", "siblings", "sibling1_file.py"], 2)
-      ])
+@pytest.mark.parametrize("source, expected", [(["walk-sys-path", "siblings", "sibling1_file.py"], 2)])
 def test_locates_files(source: list[str], expected: int):
     visited: dict[str, bool] = {}
     elems = [_samples_path(SourceContainer)]
@@ -55,4 +53,3 @@ def test_locates_files(source: list[str], expected: int):
     )
     builder.build_local_file_dependency_graph(file_path)
     assert len(visited) == expected
-

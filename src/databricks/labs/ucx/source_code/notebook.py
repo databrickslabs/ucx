@@ -155,7 +155,7 @@ class RunCell(Cell):
         for idx, line in enumerate(lines):
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command):]
+                path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
                 if len(path) == 0:
                     continue
