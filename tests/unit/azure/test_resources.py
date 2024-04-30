@@ -111,6 +111,7 @@ def test_apply_storage_permission():
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
+        default_network_action="Allow",
     )
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
     path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
@@ -132,6 +133,7 @@ def test_apply_storage_permission_no_access():
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
+        default_network_action="Allow",
     )
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
@@ -160,6 +162,7 @@ def test_apply_storage_permission_assignment_present():
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
+        default_network_action="Allow",
     )
     azure_resource = AzureResources(api_client, api_client)
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
