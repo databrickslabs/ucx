@@ -21,7 +21,7 @@ if typing.TYPE_CHECKING:
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
         pass
 
 
@@ -70,6 +70,9 @@ class LocalFileLoader(DependencyLoader):
     def full_path(self, path: Path) -> Path | None:
         if path.is_file():
             return path
+        child = Path(self._syspath_provider.cwd, path)
+        if child.is_file():
+            return child
         for parent in self._syspath_provider.paths:
             child = Path(parent, path)
             if child.is_file():
@@ -90,7 +93,11 @@ class NotebookLoader(DependencyLoader, abc.ABC):
 
 class LocalNotebookLoader(NotebookLoader, LocalFileLoader):
     # see https://github.com/databrickslabs/ucx/issues/1499
-    pass
+    # pylint: disable=stuff
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        fullpath = self.full_path(dependency.path)
+        assert fullpath is not None
+        return Notebook.parse(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
 
 
 class WorkspaceNotebookLoader(NotebookLoader):
@@ -112,7 +119,7 @@ class WorkspaceNotebookLoader(NotebookLoader):
         assert object_info.path is not None
         assert object_info.language is not None
         source = self._load_source(object_info)
-        return Notebook.parse(object_info.path, source, object_info.language)
+        return Notebook.parse(Path(object_info.path), source, object_info.language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
         assert object_info.path is not None

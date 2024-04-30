@@ -52,7 +52,7 @@ class NotebookMigrator:
                 cell.migrated_code = migrated_code
                 changed = True
         if changed:
-            self._ws.workspace.upload(notebook.path + ".bak", notebook.original_code.encode("utf-8"))
-            self._ws.workspace.upload(notebook.path, notebook.to_migrated_code().encode("utf-8"))
+            self._ws.workspace.upload(notebook.path.as_posix() + ".bak", notebook.original_code.encode("utf-8"))
+            self._ws.workspace.upload(notebook.path.as_posix(), notebook.to_migrated_code().encode("utf-8"))
             # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
         return changed

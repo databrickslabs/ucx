@@ -5,6 +5,7 @@ import logging
 import typing
 from pathlib import Path
 
+from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
@@ -27,7 +28,11 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    @property
+    def path(self):
+        return self._path
+
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return

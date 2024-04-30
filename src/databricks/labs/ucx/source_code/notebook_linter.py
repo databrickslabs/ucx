@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from pathlib import Path
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice
@@ -19,7 +20,7 @@ class NotebookLinter:
     @classmethod
     def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
         langs = Languages(index)
-        notebook = Notebook.parse("", source, default_language)
+        notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
         return cls(langs, notebook)
 

@@ -48,7 +48,7 @@ def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider), provider
     )
     builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
     assert len(visited) == len(paths)
@@ -74,7 +74,7 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider), provider
     )
     builder.build_notebook_dependency_graph(Path("root4.py.txt"))
     assert len(visited) == len(paths)
@@ -89,7 +89,8 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     builder.build_local_file_dependency_graph(Path(paths[0]))
     assert len(visited) == len(paths)
@@ -115,7 +116,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider), provider
     )
     builder.build_notebook_dependency_graph(Path("root1.run.py.txt"))
     assert list(builder.problems) == [
@@ -145,7 +146,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider), provider
     )
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
@@ -173,7 +174,7 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider), provider
     )
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
@@ -197,7 +198,7 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, WorkspaceNotebookLoader(ws), provider), provider
     )
     builder.build_notebook_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
@@ -216,7 +217,8 @@ def test_dependency_graph_builder_visits_recursive_file_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     builder.build_local_file_dependency_graph(Path("root6.py.txt"))
     assert len(visited) == len(paths)
@@ -231,7 +233,8 @@ def test_dependency_graph_builder_raises_problem_with_unresolved_import():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     builder.build_local_file_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
@@ -250,7 +253,8 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argu
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     builder.build_local_file_dependency_graph(Path(paths[0]))
     assert list(builder.problems) == [
@@ -275,7 +279,8 @@ def test_dependency_graph_builder_visits_file_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     builder.build_local_file_dependency_graph(Path("root5.py.txt"))
     assert len(visited) == len(paths)
@@ -289,7 +294,8 @@ def test_dependency_graph_builder_skips_builtin_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     child = graph.locate_dependency(Path("os"))
@@ -309,7 +315,8 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     site_packages = SitePackages.parse(locate_site_packages())
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert not graph.locate_dependency(Path("databricks"))
@@ -325,7 +332,8 @@ def test_dependency_graph_builder_visits_site_packages(empty_index):
     site_packages_path = locate_site_packages()
     site_packages = SitePackages.parse(site_packages_path)
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whitelist, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     graph = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
     assert graph.locate_dependency(Path(site_packages_path, "certifi/core.py"))
@@ -339,7 +347,8 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_in
     file_loader = create_autospec(LocalFileLoader)
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, LocalNotebookLoader(provider), provider),
+        provider,
     )
     builder.build_local_file_dependency_graph(Path("root1.run.py.txt"))
     assert list(builder.problems) == [DependencyProblem('file-not-found', 'File not found: root1.run.py.txt')]
@@ -358,7 +367,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empt
     notebook_loader.is_notebook.return_value = False
     provider = SysPathProvider.from_pathlike_string("")
     builder = DependencyGraphBuilder(
-        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider)
+        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider), provider
     )
     builder.build_notebook_dependency_graph(Path("root2.run.py.txt"))
     assert list(builder.problems) == [DependencyProblem('notebook-not-found', 'Notebook not found: root2.run.py.txt')]

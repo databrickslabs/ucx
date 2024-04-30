@@ -9,8 +9,9 @@ from pathlib import Path
 
 from sqlglot import ParseError as SQLParseError
 from sqlglot import parse as parse_sql
-from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
+from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.dependency_graph import DependencyGraph
 from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
@@ -154,7 +155,7 @@ class RunCell(Cell):
         for idx, line in enumerate(lines):
             start = line.index(command)
             if start >= 0:
-                path = line[start + len(command) :]
+                path = line[start + len(command):]
                 path = path.strip().strip("'").strip('"')
                 if len(path) == 0:
                     continue
@@ -370,14 +371,14 @@ class CellLanguage(Enum):
 class Notebook(SourceContainer):
 
     @staticmethod
-    def parse(path: str, source: str, default_language: Language) -> Notebook:
+    def parse(path: Path, source: str, default_language: Language) -> Notebook:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
         if cells is None:
-            raise ValueError(f"Could not parse Notebook: {path}")
+            raise ValueError(f"Could not parse Notebook: {path.as_posix()}")
         return Notebook(path, source, default_language, cells, source.endswith('\n'))
 
-    def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
+    def __init__(self, path: Path, source: str, language: Language, cells: list[Cell], ends_with_lf):
         self._path = path
         self._source = source
         self._language = language
@@ -385,7 +386,7 @@ class Notebook(SourceContainer):
         self._ends_with_lf = ends_with_lf
 
     @property
-    def path(self) -> str:
+    def path(self) -> Path:
         return self._path
 
     @property
@@ -413,8 +414,10 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
+        syspath_provider.push_cwd(self.path.parent)
         problems: list[DependencyProblem] = []
         for cell in self._cells:
             cell.build_dependency_graph(parent, problems.append)
         parent.add_problems(problems)
+        syspath_provider.pop_cwd()

@@ -9,6 +9,7 @@ from typing import BinaryIO
 
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
+from databricks.labs.ucx.source_code.dependency_graph import Dependency
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
@@ -19,7 +20,7 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, 
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
-from databricks.labs.ucx.source_code.dependency_loaders import LocalFileLoader
+from databricks.labs.ucx.source_code.dependency_loaders import LocalFileLoader, LocalNotebookLoader
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.notebook import Notebook
 from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
@@ -196,7 +197,7 @@ def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, boo
             source = sources.get(filename)
     assert source is not None
     if NOTEBOOK_HEADER in source:
-        return Notebook.parse(filename, source, Language.PYTHON)
+        return Notebook.parse(pathlib.Path(filename), source, Language.PYTHON)
     return LocalFile(pathlib.Path(filename), source, Language.PYTHON)
 
 
@@ -267,6 +268,33 @@ class TestFileLoader(LocalFileLoader):
         if filename.find(".txt") < 0:
             filename = filename + ".txt"
         return filename in self._sources
+
+
+class VisitingFileLoader(LocalFileLoader):
+    __test__ = False
+
+    def __init__(self, syspath_provider: SysPathProvider, visited: dict[str, bool]):
+        super().__init__(syspath_provider)
+        self._visited = visited
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        container = super().load_dependency(dependency)
+        if isinstance(container, LocalFile):
+            self._visited[container.path.as_posix()] = True
+        return container
+
+
+class VisitingNotebookLoader(LocalNotebookLoader):
+
+    def __init__(self, syspath_provider: SysPathProvider, visited: dict[str, bool]):
+        super().__init__(syspath_provider)
+        self._visited = visited
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        container = super().load_dependency(dependency)
+        if isinstance(container, Notebook):
+            self._visited[container.path.as_posix()] = True
+        return container
 
 
 def workspace_client_mock(

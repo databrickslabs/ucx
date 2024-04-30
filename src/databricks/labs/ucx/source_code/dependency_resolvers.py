@@ -86,7 +86,7 @@ class NotebookResolver(BaseDependencyResolver):
         return NotebookResolver(self._notebook_loader, resolver)
 
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        if self._notebook_loader.is_notebook(path):
+        if self._notebook_loader.is_file(path) and self._notebook_loader.is_notebook(path):
             return Dependency(self._notebook_loader, path)
         return super().resolve_notebook(path, problem_collector)
 
