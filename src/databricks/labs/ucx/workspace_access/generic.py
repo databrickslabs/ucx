@@ -71,11 +71,13 @@ class GenericPermissionsSupport(AclSupport):
         listings: list[Listing],
         verify_timeout: timedelta | None = timedelta(minutes=1),
         include_object_permissions: list[str] | None = None,
+        include_group_names: list[str] | None = None,
     ):
         self._ws = ws
         self._listings = listings
         self._verify_timeout = verify_timeout
         self._include_object_permissions = include_object_permissions
+        self._include_group_names = include_group_names
 
     def get_crawler_tasks(self):
         if self._include_object_permissions:
@@ -251,7 +253,18 @@ class GenericPermissionsSupport(AclSupport):
     @retried(on=[InternalError], timeout=timedelta(minutes=5))
     def _safe_get_permissions(self, object_type: str, object_id: str) -> iam.ObjectPermissions | None:
         try:
-            return self._ws.permissions.get(object_type, object_id)
+            permissions = self._ws.permissions.get(object_type, object_id)
+            if permissions.access_control_list is None:
+                return permissions
+            if self._include_group_names is None:
+                return permissions
+            # return only acls that are in the include_group_names
+            included_acl = [
+                acl for acl in permissions.access_control_list if acl.group_name in self._include_group_names
+            ]
+            return iam.ObjectPermissions(
+                object_type=permissions.object_type, object_id=permissions.object_id, access_control_list=included_acl
+            )
         except PermissionDenied:
             logger.warning(f"permission denied: {object_type} {object_id}")
             return None
