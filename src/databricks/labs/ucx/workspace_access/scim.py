@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 class ScimSupport(AclSupport):
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            verify_timeout: timedelta | None = timedelta(minutes=1),
-            include_object_permissions: list[str] | None = None,
-            include_group_names: list[str] | None = None,
+        self,
+        ws: WorkspaceClient,
+        verify_timeout: timedelta | None = timedelta(minutes=1),
+        include_object_permissions: list[str] | None = None,
+        include_group_names: list[str] | None = None,
     ):
         self._ws = ws
         self._verify_timeout = verify_timeout
@@ -150,7 +150,7 @@ class ScimSupport(AclSupport):
         return retried_check(group_id, value, property_name)
 
     def _safe_patch_group(
-            self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
+        self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
     ):
         try:
             return self._ws.groups.patch(group_id, operations=operations, schemas=schemas)
