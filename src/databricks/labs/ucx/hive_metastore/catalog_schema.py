@@ -1,6 +1,6 @@
 import collections
-import dataclasses
 import logging
+from dataclasses import replace
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
@@ -53,9 +53,9 @@ class CatalogSchema:
         database_grants = [grant for grant in grants if grant.table is None and grant.view is None]
         for db_grant in database_grants:
             for schema in src_trg_schema_mapping[db_grant.database]:
-                new_grants.append(dataclasses.replace(db_grant, catalog=schema.catalog_name, database=schema.name))
+                new_grants.append(replace(db_grant, catalog=schema.catalog_name, database=schema.name))
         for grant in new_grants:
-            catalog_grants.add(dataclasses.replace(grant, database=None))
+            catalog_grants.add(replace(grant, database=None))
         new_grants.extend(catalog_grants)
         return new_grants
 
