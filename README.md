@@ -422,6 +422,7 @@ More details can be found in the [design of table migration](docs/table_upgrade.
 - [`migrate-locations`](#migrate-locations-command) - Create missing external locations in the Unity Catalog. 
 - [`create-catalogs-schemas`](#create-catalogs-schemas-command) - Create missing catalogs and schemas in the Unity Catalog. The candidate catalogs and schemas is based on `mapping.csv`
 - [`create-uber-principal`](#create-uber-principal-command) - Create an Uber Principal with access to all storages used in the workspace. This principal will be used by the workflow job cluster to migrate all the tables in the workspace.
+- [`migrate-tables`](#migrate-tables-command) - Kick off the tables migration workflows.
 
 [`create-table-mapping`](#create-table-mapping-command) and [`create-uber-principal`](#create-uber-principal-command) are required to run the workflow. While other commands are optional, as long as the UC storage credentials, external locations, catalogs and schemas needed for successful migration are created.
 
@@ -430,20 +431,22 @@ To control the scope of the table migration, consider utilizing a combination of
 See more details in [Table migration commands](#table-migration-commands)
 
 ### Table Migration Workflow Tasks
-- `migrate_dbfs_root_delta_tables` - Migrate delta tables from the DBFS root using deep clone, along with legacy table ACL migrated if any.
-- `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command, along with legacy table ACL migrated if any.
+There are 3 main table migration workflows, targeting different table types. All table migration workflows are designed to migrate legacy table ACLs if existed, as well as downstream views that depend on the migrated tables.
+- `migrate-tables` - Migrate DBFS root Delta tables & external tables using SYNC
+  - `migrate_dbfs_root_delta_tables` - Migrate Delta tables from the DBFS root using deep clone.
+  - `migrate_external_tables_sync` - Migrate external tables using [`SYNC`](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-aux-sync.html) command. This does not create copy of the tables.
+- `migrate-external-hiveserde-tables-in-place-experimental` - Experimental in-place migration of HiveSerde tables. HiveSerDe tables include ParquetHiveSerDe, OrcSerde, AvroSerDe, LazySimpleSerDe, JsonSerDe, OpenCSVSerde tables.
+  - `migrate_external_hiveserde_tables_in_place_experimental` - Migrate HiveSerde tables in place.
 - Following workflows/tasks are on the roadmap and being developed:
-  - Migrate view
-  - Migrate tables using CTAS
-  - Optionally and experimentally in place migrate ParquetHiveSerDe, OrcSerde, AvroSerDe, LazySimpleSerDe, JsonSerDe, OpenCSVSerde tables.
+  - Migrate tables using CTAS 
   - Experimentally migrate Delta and Parquet data found in dbfs mount but not registered as Hive Metastore table into UC tables.
 
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
-- If your delta tables in DBFS root have large number of files, consider:
-  - Setting higher Min and Max workers for auto-scale when being asked during the UCX installation. More nodes/cores in the cluster means more concurrency for calling cloud storage api to copy files when deep cloning the delta tables.
-  - Setting higher "Parallelism for migrating dbfs root delta tables with deep clone" (default 200) when being asked during the UCX installation. This controls the number of Spark task/partition to be created for deep clone.
-- Consider create an instance pool, and set the instance pool id when being asked during the UCX installation. This instance pool will be put into the cluster policy used by all UCX workflows job clusters.
+- If your Delta tables in DBFS root have a large number of files, consider:
+  - Setting higher `Min` and `Max workers for auto-scale` when being asked during the UCX installation. More cores in the cluster means more concurrency for calling cloud storage API to copy files when deep cloning the Delta tables.
+  - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
+- Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
 
 [[back to top](#databricks-labs-ucx)]
@@ -621,7 +624,7 @@ the workspace, so that you can migrate all the tables. If you already have the p
 Ask your Databricks Account admin to run the [`sync-workspace-info` command](#sync-workspace-info-command) to sync the
 workspace information with the UCX installations. Once the workspace information is synced, you can run the 
 [`create-table-mapping` command](#create-table-mapping-command) to align your tables with the Unity Catalog,
-[create catalogs and schemas](#create-catalogs-schemas-command) and start the migration. During multiple runs of
+[create catalogs and schemas](#create-catalogs-schemas-command) and start the migration using [`migrate-tables` command](#migrate-tables-command). During multiple runs of
 the table migration workflow, you can use the [`revert-migrated-tables` command](#revert-migrated-tables-command) to 
 revert the tables that were migrated in the previous run. You can also skip the tables that you don't want to migrate 
 using the [`skip` command](#skip-command).
@@ -768,30 +771,14 @@ Once you're done with table migration, proceed to the [code migration](#code-mig
 databricks labs ucx skip --schema X [--table Y]  
 ```
 
-Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
+Anytime after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
 This command allows users to skip certain schemas or tables during the [table migration](#table-migration-workflow) process.
 The command takes `--schema` and optionally `--table` flags to specify the schema and table to skip. If no `--table` flag 
 is provided, all tables in the specified HMS database are skipped.
-This command is useful to temporarily disable migration on a particular schema or table.
+This command is useful to temporarily disable migration of a particular schema or table.
 
 Once you're done with table migration, proceed to the [code migration](#code-migration-commands).
-
-[[back to top](#databricks-labs-ucx)]
-
-## `revert-migrated-tables` command
-
-```text
-databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]  
-```
-
-Anywhere after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
-
-This command removes the `upgraded_from` property on a migrated table for re-migration in the [table migration](#table-migration-workflow) process. 
-This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
-to debug issues related to table migration.
-
-Go back to the [`create-table-mapping` command](#create-table-mapping-command) after you're done with this command.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -802,6 +789,35 @@ databricks labs ucx create-catalogs-schemas
 ```
 After [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command to have the required UC catalogs and schemas created.
 This command is supposed to be run before migrating tables to UC using [table migration workflow](#table-migration-workflow).
+
+[[back to top](#databricks-labs-ucx)]
+
+## `migrate-tables` command
+
+```text
+databricks labs ucx migrate-tables
+```
+
+Anytime after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
+
+This command kicks off the [table migration](#table-migration-workflow) process. It triggers the `migrate-tables` workflow, 
+and if there are HiveSerDe tables detected, prompt whether to trigger the `migrate-external-hiveserde-tables-in-place-experimental` workflow.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `revert-migrated-tables` command
+
+```text
+databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]  
+```
+
+Anytime after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
+
+This command removes the `upgraded_from` property on a migrated table for re-migration in the [table migration](#table-migration-workflow) process. 
+This command is useful for developers and administrators who want to revert the migration of a table. It can also be used 
+to debug issues related to table migration.
+
+Go back to the [`create-table-mapping` command](#create-table-mapping-command) after you're done with this command.
 
 [[back to top](#databricks-labs-ucx)]
 
