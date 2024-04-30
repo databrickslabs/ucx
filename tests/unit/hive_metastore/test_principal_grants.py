@@ -43,7 +43,7 @@ def ws():
         ExternalLocationInfo(url="abfss://container1@storage3.dfs.core.windows.net/folder3", name='loc3'),
         ExternalLocationInfo(url="s3://storage5/folder5", name='loc1'),
         ExternalLocationInfo(url="s3://storage2/folder2", name='loc2'),
-        ExternalLocationInfo(url="s3://storage3/folder3", name='loc3'),
+        ExternalLocationInfo(url="s3://storage3/folder3"),
     ]
 
     permissions = {
@@ -69,6 +69,16 @@ def ws():
             ],
         ),
         'cluster3': iam.ObjectPermissions(object_id='cluster2', object_type="clusters"),
+        'cluster4': iam.ObjectPermissions(
+            object_id='cluster4',
+            object_type="clusters",
+            access_control_list=[
+                iam.AccessControlResponse(
+                    service_principal_name='spn1',
+                    all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
+                ),
+            ],
+        ),
     }
     w.permissions.get.side_effect = lambda _, object_id: permissions[object_id]
 
@@ -182,6 +192,12 @@ def installation():
                 {
                     'resource_path': 's3://storage5/*',
                     'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                    'privilege': 'WRITE_FILES',
+                    'resource_type': 's3',
+                },
+                {
+                    'resource_path': 's3://storage3/*',
+                    'role_arn': 'arn:aws:iam::12345:instance-profile/role2',
                     'privilege': 'WRITE_FILES',
                     'resource_type': 's3',
                 },
@@ -374,7 +390,7 @@ def test_get_eligible_locations_principals_aws_no_matching_locations(ws, install
             cluster_id='cluster1',
             cluster_source=ClusterSource.UI,
             data_security_mode=DataSecurityMode.NONE,
-            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role2"),
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role3"),
         ),
     ]
 
@@ -462,6 +478,22 @@ def test_apply_location_acl_no_principal_aws(ws, installation):
             cluster_source=ClusterSource.UI,
             data_security_mode=DataSecurityMode.NONE,
             aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+    location_acl = principal_acl(ws, installation, [])
+    location_acl.apply_location_acl()
+    ws.grants.update.assert_not_called()
+
+
+def test_apply_location_acl_no_location_name(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id='cluster4',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role2"),
         ),
     ]
     location_acl = principal_acl(ws, installation, [])
