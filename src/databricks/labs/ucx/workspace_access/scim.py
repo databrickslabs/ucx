@@ -26,15 +26,17 @@ logger = logging.getLogger(__name__)
 
 class ScimSupport(AclSupport):
     def __init__(
-        self,
-        ws: WorkspaceClient,
-        verify_timeout: timedelta | None = timedelta(minutes=1),
-        include_object_permissions: list[str] | None = None,
+            self,
+            ws: WorkspaceClient,
+            verify_timeout: timedelta | None = timedelta(minutes=1),
+            include_object_permissions: list[str] | None = None,
+            include_group_names: list[str] | None = None,
     ):
         self._ws = ws
         self._verify_timeout = verify_timeout
         self._include_object_permissions = include_object_permissions
         self._snapshot = {}
+        self._include_group_names = include_group_names
         # TODO: we may need to inject GroupManager here for proper group listing
         for group in self._ws.groups.list(attributes="id,displayName,meta,roles,entitlements"):
             if not group.display_name:
@@ -96,9 +98,10 @@ class ScimSupport(AclSupport):
                 entitlements.add(entitlement.value)
         return roles, entitlements
 
-    @staticmethod
-    def _crawler_task(group: iam.Group, property_name: str):
+    def _crawler_task(self, group: iam.Group, property_name: str):
         assert group.id is not None
+        if self._include_group_names is not None and group.display_name not in self._include_group_names:
+            return None
         return Permissions(
             object_id=group.id,
             object_type=property_name,
@@ -147,7 +150,7 @@ class ScimSupport(AclSupport):
         return retried_check(group_id, value, property_name)
 
     def _safe_patch_group(
-        self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
+            self, group_id: str, operations: list[Patch] | None = None, schemas: list[PatchSchema] | None = None
     ):
         try:
             return self._ws.groups.patch(group_id, operations=operations, schemas=schemas)
