@@ -5,7 +5,7 @@ from unittest.mock import Mock, create_autospec
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileLinter
 from databricks.labs.ucx.source_code.languages import Languages
 
 
@@ -71,3 +71,48 @@ def test_files_walks_directory():
     files.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
+
+
+def test_files_lint_ignores_unsupported_extensions():
+    languages = Languages(MigrationIndex([]))
+    files = LocalFileLinter(languages)
+    path = Path('unsupported.ext')
+    assert not files.lint(path)
+
+
+def test_files_lint_ignores_unsupported_language():
+    languages = Languages(MigrationIndex([]))
+    files = LocalFileLinter(languages)
+    files._extensions[".py"] = None  # pylint: disable=protected-access
+    path = Path('unsupported.py')
+    assert not files.lint(path)
+
+
+def test_files_lint_reads_supported_extensions():
+    languages = Languages(MigrationIndex([]))
+    files = LocalFileLinter(languages)
+    path = Path(__file__)
+    results = files.lint(path)
+    assert not results
+
+
+def test_files_lint_supported_language_no_diagnostics():
+    languages = create_autospec(Languages)
+    languages.linter(Language.PYTHON).lint.return_value = []
+    files = LocalFileLinter(languages)
+    path = Path(__file__)
+    files.lint(path)
+    languages.fixer.assert_not_called()
+
+
+def test_files_lint_walks_directory():
+    languages = create_autospec(Languages)
+    languages.linter(Language.PYTHON).lint.return_value = [Mock()]
+    mock_linter = Mock()
+    mock_linter.lint.return_value = []
+    languages.linter.return_value = mock_linter
+    files = LocalFileLinter(languages)
+    path = Path(__file__).parent
+    files.lint(path)
+    languages.linter.assert_called_with(Language.PYTHON)
+    assert languages.linter.call_count > 1

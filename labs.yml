@@ -173,6 +173,9 @@ commands:
   - name: migrate-local-code
     description: (Experimental) Migrate files in the current directory to be more compatible with Unity Catalog.
 
+  - name:  lint-local-code
+    description: (Experimental) Lint files in the current directory to highlight incompatibilities with Unity Catalog.
+
   - name: show-all-metastores
     is_account_level: true
     description: Show all metastores available in the same region as the specified workspace

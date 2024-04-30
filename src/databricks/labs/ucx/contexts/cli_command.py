@@ -19,7 +19,7 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, LocalNotebookLoader
-from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileLinter
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,10 @@ class WorkspaceContext(CliContext):
     @cached_property
     def local_file_migrator(self):
         return LocalFileMigrator(self.languages)
+
+    @cached_property
+    def local_file_linter(self):
+        return LocalFileLinter(self.languages)
 
     @cached_property
     def cluster_access(self):

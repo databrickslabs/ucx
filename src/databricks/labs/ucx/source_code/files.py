@@ -244,9 +244,12 @@ class LocalFileLinter:
         language = self._extensions[path.suffix]
         if not language:
             return False
+        advised = False
         logger.info(f"Analysing {path}")
+        linter = self._languages.linter(language)
         with path.open("r") as f:
             code = f.read()
-            for advice in self._languages.linter(language).lint(code):
+            for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
-            return True
+                advised = True
+            return advised

@@ -447,7 +447,7 @@ def lint_local_code(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext 
     working_directory = Path.cwd()
     if not prompts.confirm("Do you want to run UC linting on all files in the current directory?"):
         return
-    ctx.local_file_migrator.lint(working_directory)
+    ctx.local_file_linter.lint(working_directory)
 
 
 if __name__ == "__main__":
