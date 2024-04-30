@@ -1,6 +1,16 @@
 {
   "policy_id": "single-user-with-spn-policyid",
-  "definition": "{\"spark_version\": {\"type\": \"unlimited\",\"defaultValue\": \"auto:latest-ml\"},\"spark_conf.fs.azure.account.auth.type\": {\"type\": \"fixed\", \"value\": \"OAuth\", \"hidden\": true}}",
+  "definition": {
+    "spark_version": {
+      "type": "unlimited",
+      "defaultValue": "auto:latest-ml"
+    },
+    "spark_conf.fs.azure.account.auth.type": {
+      "type": "fixed",
+      "value": "OAuth",
+      "hidden": true
+    }
+  },
   "policy_family_definition_overrides": {
     "spark_conf.fs.azure.account.auth.type": {
       "type": "fixed",
