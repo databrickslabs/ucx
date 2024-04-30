@@ -55,11 +55,19 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
                     'workspace_name': 'workspace',
                 },
                 {
+                    'catalog_name': 'catalog2',
+                    'dst_schema': 'schema2',
+                    'dst_table': 'table1',
+                    'src_schema': 'schema2',
+                    'src_table': 'abfss://container@msft/path/dest2',
+                    'workspace_name': 'workspace',
+                },
+                {
                     'catalog_name': 'catalog3',
                     'dst_schema': 'schema3',
                     'dst_table': 'table1',
                     'src_schema': 'schema1',
-                    'src_table': 'abfss://container@msft/path/dest2',
+                    'src_table': 'abfss://container@msft/path/dest3',
                     'workspace_name': 'workspace',
                 },
             ]
