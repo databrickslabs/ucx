@@ -78,6 +78,7 @@ def test_run_service_principal():
                     'principal': 'credential_sp1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -86,6 +87,7 @@ def test_run_service_principal():
                     'principal': 'credential_sp2',
                     'privilege': 'READ_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
             ],
@@ -151,6 +153,7 @@ def test_skip_unsupported_location(caplog):
                     'principal': 'credential_sp1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -159,6 +162,7 @@ def test_skip_unsupported_location(caplog):
                     'principal': 'credential_sp1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -167,6 +171,7 @@ def test_skip_unsupported_location(caplog):
                     'principal': 'credential_sp1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
             ],
@@ -233,6 +238,7 @@ def test_run_managed_identity():
                     'principal': 'credential_system_assigned_mi',
                     'privilege': 'WRITE_FILES',
                     'type': 'ManagedIdentity',
+                    'default_network_action': 'Allow',
                 },
                 {
                     'prefix': 'abfss://container5@test.dfs.core.windows.net/',
@@ -240,6 +246,7 @@ def test_run_managed_identity():
                     'principal': 'credential_user_assigned_mi',
                     'privilege': 'READ_FILES',
                     'type': 'ManagedIdentity',
+                    'default_network_action': 'Allow',
                 },
             ],
         }
@@ -313,6 +320,7 @@ def test_location_failed_to_read():
                     'principal': 'credential_sp2',
                     'privilege': 'READ_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -321,6 +329,7 @@ def test_location_failed_to_read():
                     'principal': 'credential_sp2',
                     'privilege': 'READ_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
             ],
@@ -386,6 +395,7 @@ def test_overlapping_locations(caplog):
                     'principal': 'credential_sp1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
                 {
@@ -394,6 +404,7 @@ def test_overlapping_locations(caplog):
                     'principal': 'credential_sp1',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'directory_id_1',
                 },
             ],
@@ -458,6 +469,7 @@ def test_corner_cases_with_missing_fields(caplog, mocker):
                     'principal': 'dummy',
                     'privilege': 'WRITE_FILES',
                     'type': 'Application',
+                    'default_network_action': 'Allow',
                     'directory_id': 'dummy',
                 },
             ],
