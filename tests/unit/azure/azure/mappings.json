@@ -273,6 +273,41 @@
             "lastModifiedAt": "0001-01-01T00:00:00+00:00"
         }
       }]
+    },
+    "/subscriptions/003/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector": {
+      "id": "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector",
+      "type": "Microsoft.Databricks/accessConnectors",
+      "location": "westeurope",
+      "identity": {
+        "principalId": "test",
+        "tenantId": "test",
+        "type": "SystemAssigned"
+      }
+    },
+    "/subscriptions/003/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector-noloc": {
+      "id": "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector",
+      "name": "test-access-connector",
+      "type": "Microsoft.Databricks/accessConnectors"
+    },
+    "/subscriptions/003/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector-nops": {
+      "id": "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector",
+      "name": "test-access-connector",
+      "type": "Microsoft.Databricks/accessConnectors",
+      "location": "westeurope"
+    },
+    "/subscriptions/003/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector-invidentity": {
+      "id": "/subscriptions/002/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/test-access-connector",
+      "name": "test-access-connector",
+      "type": "Microsoft.Databricks/accessConnectors",
+      "location": "westeurope",
+      "identity": {
+        "principalId": "test",
+        "tenantId": "test",
+        "type": "Invalid"
+      },
+      "properties": {
+        "provisioningState": "Succeeded"
+      }
     }
   }
 ]

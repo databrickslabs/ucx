@@ -1,10 +1,8 @@
 import json
-from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import iam
 from databricks.sdk.service.compute import ClusterSpec, GetInstancePool, Policy
@@ -15,18 +13,17 @@ from databricks.sdk.service.sql import (
 )
 
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
+from tests.unit import workspace_client_mock
 
 
 def common():
-    w = create_autospec(WorkspaceClient)
-    policy = Policy(
+    w = workspace_client_mock(policy_ids=["ext-hms"])
+    w.cluster_policies.create.return_value = Policy(
         policy_id="foo1",
         name="Unity Catalog Migration (ucx) (me@example.com)",
         definition=json.dumps({}),
     )
-    w.cluster_policies.create.return_value = policy
 
-    w.cluster_policies.list.return_value = [policy]
     w.clusters.select_spark_version = lambda **_: "14.2.x-scala2.12"
     w.clusters.select_node_type = lambda **_: "Standard_F4s"
     w.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
@@ -42,7 +39,14 @@ def common():
 
 def test_cluster_policy_definition_present_reuse():
     ws, prompts = common()
+    policy = Policy(
+        policy_id="foo1",
+        name="Unity Catalog Migration (ucx) (me@example.com)",
+        definition=json.dumps({}),
+    )
+    ws.cluster_policies.create.return_value = policy
 
+    ws.cluster_policies.list.return_value = [policy]
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, _, _, _ = policy_installer.create('ucx')
     assert policy_id is not None
@@ -54,24 +58,7 @@ def test_cluster_policy_definition_azure_hms():
     ws.config.is_aws = False
     ws.config.is_azure = True
     ws.config.is_gcp = False
-    policy_definition = {
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
-        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
-        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
-        "aws_attributes.instance_profile_arn": {"value": "role_arn_1"},
-    }
 
-    ws.cluster_policies.list.return_value = [
-        Policy(
-            policy_id="id1",
-            name="foo",
-            definition=json.dumps(policy_definition),
-            description="Custom cluster policy for Unity Catalog Migration (UCX)",
-        )
-    ]
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, _, _, _ = policy_installer.create('ucx')
     policy_definition_actual = {
@@ -136,23 +123,6 @@ def test_cluster_policy_definition_gcp():
     ws.config.is_aws = False
     ws.config.is_azure = False
     ws.config.is_gcp = True
-    policy_definition = {
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
-        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
-        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
-        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
-    }
-
-    ws.cluster_policies.list.return_value = [
-        Policy(
-            policy_id="id1",
-            name="foo",
-            definition=json.dumps(policy_definition),
-            description="Custom cluster policy for Unity Catalog Migration (UCX)",
-        )
-    ]
 
     policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
     policy_id, instance_profile, _, _ = policy_installer.create('ucx')
@@ -460,3 +430,31 @@ def test_cluster_policy_instance_pool():
         definition=json.dumps(policy_expected),
         description="Custom cluster policy for Unity Catalog Migration (UCX)",
     )
+
+
+def test_has_ext_hms():
+    ws, prompts = common()
+    ws.config.is_aws = False
+    ws.config.is_azure = True
+    ws.config.is_gcp = False
+
+    policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
+    assert policy_installer.has_ext_hms() is True
+
+    ws.cluster_policies.list.return_value = []
+    endpoint_conf = [
+        EndpointConfPair(None, None),
+        EndpointConfPair("random", None),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionURL", "url"),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionUserName", "user1"),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionPassword", "pwd"),
+        EndpointConfPair("spark.hadoop.javax.jdo.option.ConnectionDriverName", "SQLServerDriver"),
+        EndpointConfPair("spark.sql.hive.metastore.version", "0.13"),
+        EndpointConfPair("spark.sql.hive.metastore.jars", "jar1"),
+    ]
+
+    ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=endpoint_conf
+    )
+    policy_installer = ClusterPolicyInstaller(MockInstallation(), ws, prompts)
+    assert policy_installer.has_ext_hms() is True
