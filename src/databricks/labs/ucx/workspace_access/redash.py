@@ -73,7 +73,7 @@ class RedashPermissionsSupport(AclSupport):
     def get_crawler_tasks(self):
         if self._include_object_permissions:
             for item in StaticListing(self._include_object_permissions, self.object_types()):
-                yield partial(self._crawler_task, item.object_id, item.object_type)
+                yield partial(self._crawler_task, item.object_id, sql.ObjectTypePlural(item.object_type))
             return
         for listing in self._listings:
             for item in listing:
