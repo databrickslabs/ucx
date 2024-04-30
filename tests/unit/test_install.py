@@ -1301,6 +1301,39 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
     ws.jobs.run_now.assert_not_called()
 
 
+def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
+    ws.jobs.run_now = mocker.Mock()
+    mocker.patch("webbrowser.open")
+    sql_backend = MockBackend()
+    prompts = MockPrompts(
+        {
+            r".*": "",
+            r"Do you want to trigger assessment job ?.*": "yes",
+            r"Open assessment Job url that just triggered ?.*": "yes",
+        }
+    )
+    config = WorkspaceConfig(inventory_database="ucx", policy_id='123', trigger_job=True)
+    wheels = create_autospec(WheelsV2)
+    installation = mock_installation
+    install_state = InstallState.from_installation(installation)
+    workflows_installer = WorkflowsDeployment(
+        config,
+        installation,
+        install_state,
+        ws,
+        wheels,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+        Workflows.all().tasks(),
+    )
+    workspace_installation = WorkspaceInstallation(
+        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+    )
+    workspace_installation.run()
+    wheels.upload_to_wsfs.assert_called_once()
+    ws.jobs.run_now.assert_called_once()
+
+
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     existing_installation = MockInstallation(
         {
@@ -1807,3 +1840,57 @@ def test_user_workspace_installer(mock_ws):
     workspace_installer = WorkspaceInstaller(mock_ws, {'UCX_FORCE_INSTALL': 'user'})
     # installation folder should start with /Users/
     assert workspace_installer.install_state.install_folder().startswith("/Users/")
+
+
+def test_save_config_ext_hms(ws, mock_installation):
+    ws.get_workspace_id.return_value = 12345678
+    cluster_policy = {
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionUserName": {"value": "user1"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionPassword": {"value": "pwd"},
+        "spark_conf.spark.hadoop.javax.jdo.option.ConnectionDriverName": {"value": "SQLServerDriver"},
+        "spark_conf.spark.sql.hive.metastore.version": {"value": "0.13"},
+        "spark_conf.spark.sql.hive.metastore.jars": {"value": "jar1"},
+    }
+    ws.cluster_policies.list.return_value = [
+        Policy(
+            policy_id="id1",
+            name="foo",
+            definition=json.dumps(cluster_policy),
+            description="Custom cluster policy for Unity Catalog Migration (UCX)",
+        )
+    ]
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",  # specify names
+            r"Comma-separated list of databases to migrate.*": "db1,db2",
+            r".*": "",
+        }
+    )
+    ws.workspace.get_status = not_found
+    install = WorkspaceInstaller(ws).replace(
+        prompts=prompts,
+        installation=mock_installation,
+        product_info=PRODUCT_INFO,
+    )
+    install.configure()
+
+    mock_installation.assert_file_written(
+        'config.yml',
+        {
+            'version': 2,
+            'default_catalog': 'ucx_default',
+            'include_databases': ['db1', 'db2'],
+            'inventory_database': 'ucx_12345678',
+            'log_level': 'INFO',
+            'num_threads': 8,
+            'min_workers': 1,
+            'max_workers': 10,
+            'policy_id': 'foo',
+            'renamed_group_prefix': 'db-temp-',
+            'warehouse_id': 'abc',
+            'workspace_start_path': '/',
+            'num_days_submit_runs_history': 30,
+        },
+    )
