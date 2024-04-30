@@ -259,8 +259,18 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
         AzureRoleAssignment(
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
-            principal=Principal('p', 'q', 'r', 'Application', '0000-0000'),
+            principal=Principal('v', 'w', 'x', 'Application', '0000-0000'),
             role_name='Custom_role_6',
+            role_type='CustomRole',
+            role_permissions=[
+                "Microsoft.Storage/storageAccounts/*/containers/*",
+            ],
+        ),
+        AzureRoleAssignment(
+            resource=AzureResource(f'{storage_accounts}/storage1'),
+            scope=AzureResource(f'{storage_accounts}/storage1'),
+            principal=Principal('p', 'q', 'r', 'Application', '0000-0000'),
+            role_name='Custom_role_7',
             role_type='CustomRole',
             role_permissions=[
                 "Microsoft.Authorization/*",
@@ -270,11 +280,12 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
             resource=AzureResource(f'{storage_accounts}/storage1'),
             scope=AzureResource(f'{storage_accounts}/storage1'),
             principal=Principal('s', 't', 'u', 'Application', '0000-0000'),
-            role_name='Custom_role_6',
+            role_name='Custom_role_8',
             role_type='CustomRole',
             role_permissions=[
                 "Microsoft.Storage/storageAccounts/*/read",
                 "*/write",
+                "Microsoft.Storage/storageAccounts/*/containers/*",
                 "Microsoft.Authorization/*",
             ],
         ),
@@ -331,6 +342,14 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
                 'directory_id': '0000-0000',
             },
             {
+                'client_id': 'v',
+                'prefix': 'abfss://container1@storage1.dfs.core.windows.net/',
+                'principal': 'w',
+                'privilege': 'WRITE_FILES',
+                'type': 'Application',
+                'directory_id': '0000-0000',
+            },
+            {
                 'client_id': 's',
                 'prefix': 'abfss://container1@storage1.dfs.core.windows.net/',
                 'principal': 't',
@@ -374,6 +393,14 @@ def test_save_spn_permissions_custom_role_valid_azure_storage_account():
                 'client_id': 'm',
                 'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
                 'principal': 'n',
+                'privilege': 'WRITE_FILES',
+                'type': 'Application',
+                'directory_id': '0000-0000',
+            },
+            {
+                'client_id': 'v',
+                'prefix': 'abfss://container2@storage1.dfs.core.windows.net/',
+                'principal': 'w',
                 'privilege': 'WRITE_FILES',
                 'type': 'Application',
                 'directory_id': '0000-0000',
