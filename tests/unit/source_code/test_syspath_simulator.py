@@ -35,3 +35,24 @@ def test_locates_notebooks(source: list[str], expected: int):
     builder.build_notebook_dependency_graph(notebook_path)
     assert len(visited) == expected
 
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [ (["walk-sys-path", "siblings", "sibling1_file.py"], 2)
+      ])
+def test_locates_files(source: list[str], expected: int):
+    visited: dict[str, bool] = {}
+    elems = [_samples_path(SourceContainer)]
+    elems.extend(source)
+    file_path = Path(*elems)
+    whi = whitelist_mock()
+    provider = SysPathProvider.from_sys_path()
+    file_loader = VisitingFileLoader(provider, visited)
+    notebook_loader = VisitingNotebookLoader(provider, visited)
+    site_packages = SitePackages.parse(locate_site_packages())
+    builder = DependencyGraphBuilder(
+        DependencyResolver.initialize(whi, site_packages, file_loader, notebook_loader, provider), provider
+    )
+    builder.build_local_file_dependency_graph(file_path)
+    assert len(visited) == expected
+
