@@ -1,10 +1,10 @@
 import json
 import logging
+import re
 import uuid
+from collections.abc import ValuesView
 from dataclasses import dataclass
 from functools import partial
-import re
-from collections.abc import ValuesView
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -16,9 +16,9 @@ from databricks.sdk.service.catalog import Privilege
 from databricks.labs.ucx.azure.resources import (
     AccessConnector,
     AzureResources,
+    AzureRoleAssignment,
     PrincipalSecret,
     StorageAccount,
-    AzureRoleAssignment,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
@@ -71,8 +71,8 @@ class AzureResourcePermissions:
         for each_level, privilege_level in self._permission_levels.items():
             # Check for storage blob permission with regex to account for star pattern
             match = permission_compiled.match(each_level)
+            # If a match is found, return the privilege level, no need to check for lower levels
             if match:
-                # If a write permission is found, no need to check for read permissions
                 return privilege_level
         return None
 
@@ -81,7 +81,7 @@ class AzureResourcePermissions:
         higher_privilege = None
         for each_permission in role_permissions:
             privilege = self._get_permission_level(each_permission)
-            if not privilege:
+            if privilege is None:
                 continue
             # WRITE_FILES is the higher permission, don't need to check further
             if privilege == Privilege.WRITE_FILES:
