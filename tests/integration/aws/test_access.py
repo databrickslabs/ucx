@@ -111,7 +111,12 @@ def test_create_uber_instance_profile(
 
 
 def test_create_external_location_validate_acl(
-    make_cluster_permissions, ws, make_user, make_cluster, aws_cli_ctx, env_or_skip
+    make_cluster_permissions,
+    ws,
+    make_user,
+    make_cluster,
+    aws_cli_ctx,
+    env_or_skip,
 ):
     aws_cli_ctx.with_dummy_resource_permission()
     aws_cli_ctx.save_locations()

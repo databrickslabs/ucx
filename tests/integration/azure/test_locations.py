@@ -11,7 +11,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
 
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
-from .. import get_azure_spark_conf
+from ..conftest import get_azure_spark_conf
 
 _SPARK_CONF = get_azure_spark_conf()
 
@@ -63,10 +63,11 @@ def test_run(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
     location_migration = ExternalLocationsMigration(
         ws,
         location_crawler,
-        AzureResourcePermissions(installation, ws, azurerm, location_crawler),
+        azure_resource_permissions,
         azurerm,
         az_cli_ctx.principal_acl,
     )
@@ -108,11 +109,12 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema, az_cli_ct
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
 
     location_migration = ExternalLocationsMigration(
         ws,
         location_crawler,
-        AzureResourcePermissions(installation, ws, azurerm, location_crawler),
+        azure_resource_permissions,
         azurerm,
         az_cli_ctx.principal_acl,
     )
@@ -153,11 +155,11 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema, az_cli_ct
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
-
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
     location_migration = ExternalLocationsMigration(
         ws,
         location_crawler,
-        AzureResourcePermissions(installation, ws, azurerm, location_crawler),
+        azure_resource_permissions,
         azurerm,
         az_cli_ctx.principal_acl,
     )
@@ -201,11 +203,11 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
-
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
     location_migration = ExternalLocationsMigration(
         ws,
         location_crawler,
-        AzureResourcePermissions(installation, ws, azurerm, location_crawler),
+        azure_resource_permissions,
         azurerm,
         az_cli_ctx.principal_acl,
     )

@@ -122,6 +122,20 @@ def make_group_pair(make_random, make_group):
     return inner
 
 
+def get_azure_spark_conf():
+    return {
+        "spark.databricks.cluster.profile": "singleNode",
+        "spark.master": "local[*]",
+        "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
+        "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
+        ".azurebfs.oauth2.ClientCredsTokenProvider",
+        "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
+        "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
+        "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
+        ".microsoftonline.com/directory_12345/oauth2/token",
+    }
+
+
 class StaticTablesCrawler(TablesCrawler):
     def __init__(self, sb: SqlBackend, schema: str, tables: list[TableInfo]):
         super().__init__(sb, schema)
@@ -167,7 +181,7 @@ class StaticMountCrawler(Mounts):
         return self._mounts
 
 
-class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-methods
+class TestContext(RuntimeContext):  # pylint: disable=too-many-public-methods
     def __init__(
         self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
     ):
@@ -444,11 +458,11 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
 
 @pytest.fixture
 def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
+    ctx = TestContext(make_table, make_schema, make_udf, make_group, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAzureCliTest(TestRuntimeContext, WorkspaceContext):
+class LocalAzureCliTest(TestContext, WorkspaceContext):
     def __init__(
         self,
         _ws: WorkspaceClient,
@@ -460,7 +474,7 @@ class LocalAzureCliTest(TestRuntimeContext, WorkspaceContext):
     ):
 
         WorkspaceContext.__init__(self, _ws, {})
-        TestRuntimeContext.__init__(
+        TestContext.__init__(
             self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
         )
         self._env_or_skip = env_or_skip_fixture
@@ -485,7 +499,7 @@ def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend, make_table, make_group
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAwsCliTest(TestRuntimeContext, WorkspaceContext):
+class LocalAwsCliTest(TestContext, WorkspaceContext):
     def __init__(
         self,
         _ws: WorkspaceClient,
@@ -497,7 +511,7 @@ class LocalAwsCliTest(TestRuntimeContext, WorkspaceContext):
     ):
 
         WorkspaceContext.__init__(self, _ws, {})
-        TestRuntimeContext.__init__(
+        TestContext.__init__(
             self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
         )
         self._env_or_skip = env_or_skip_fixture
@@ -526,7 +540,7 @@ def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend, make_table, make_grou
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestInstallationContext(TestRuntimeContext):
+class TestInstallationContext(TestContext):
     def __init__(
         self,
         make_table_fixture,
