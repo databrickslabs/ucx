@@ -228,18 +228,15 @@ class ServicePrincipalMigration(SecretsMixin):
         return self._installation.save(migration_results, filename=self._output_file)
 
     def _migrate_service_principals(
-        self, include_names: set[str] | None = None
+        self, sp_migration_infos: list[ServicePrincipalMigrationInfo]
     ) -> list[StorageCredentialValidationResult]:
-        sp_list_with_secret = self._generate_migration_list(include_names)
-
         execution_result = []
-        for spn in sp_list_with_secret:
+        for spn in sp_migration_infos:
             if spn.permission_mapping.default_network_action != "Allow":
                 logger.warning(
                     f"Service principal '{spn.permission_mapping.principal}' accesses storage account "
                     f"'{spn.permission_mapping.prefix}' with non-Allow network configuration, which might cause "
-                    "connectivity issues. We recommend using access connectors with managed identities instead "
-                    "(confirm with prompt below)."
+                    "connectivity issues. "
                 )
 
             self._storage_credential_manager.create_with_client_secret(spn)
@@ -256,7 +253,8 @@ class ServicePrincipalMigration(SecretsMixin):
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
         )
         if plan_confirmed:
-            sp_results = self._migrate_service_principals(include_names)
+            sp_migration_infos = self._generate_migration_list(include_names)
+            sp_results = self._migrate_service_principals(sp_migration_infos)
         else:
             sp_results = []
 
