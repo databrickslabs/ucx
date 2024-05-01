@@ -28,14 +28,18 @@ The Hive Metastore migration process will upgrade the following Assets:
 - External Tables
 - Views
 
-We don't expect this process to be a "one and done" process. This typically is an iterative process and may require a
-few runs.
-
-We suggest to keep track of the migration and provide the user a continuous feedback of the progress and status of the
-upgrade.
-
-The migration process will be set as a job that can be invoked multiple times.
+We don't expect this process to be a "one and done" process. The table migration typically is an iterative process
+and may require a few runs. The migration process is implemented within a workflow that can be invoked multiple times.
 Each time it will upgrade tables it can and report the ones it can't.
+
+[[back to top](#table-upgrade)]
+
+# Migration dashboard
+
+We keep track of the migration and provide the user continuous feedback of the progress and status of the
+upgrade. This feedback is presented in the migration dashboard:
+
+![report](migration-report.png)
 
 [[back to top](#table-upgrade)]
 

@@ -162,7 +162,13 @@ def created_job_tasks(workspace_client: MagicMock, name: str) -> dict[str, jobs.
 @pytest.fixture
 def mock_installation():
     return MockInstallation(
-        {'state.json': {'resources': {'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'}}}}
+        {
+            'state.json': {
+                'resources': {
+                    'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def', 'migration_main': 'ghi'}
+                }
+            }
+        }
     )
 
 
