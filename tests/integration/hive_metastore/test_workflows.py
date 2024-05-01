@@ -1,10 +1,6 @@
-import os
-import sys
-from dataclasses import replace
 from datetime import timedelta
 
 import pytest
-from databricks.labs.blueprint.installer import RawState
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
