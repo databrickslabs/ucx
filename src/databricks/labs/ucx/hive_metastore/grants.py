@@ -1,5 +1,4 @@
 import logging
-import typing
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -25,6 +24,7 @@ from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
 )
+from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import (
     AzureResourcePermissions,
     StoragePermissionMapping,
@@ -348,8 +348,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
 
 class AwsACL:
-    # adding this profile file name here to avoid circular references with aws/access.py
-    FILE_NAME: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
         self,
@@ -400,7 +398,9 @@ class AwsACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._installation.load(list[AWSRoleAction], filename=self.FILE_NAME)
+        permission_mappings = self._installation.load(
+            list[AWSRoleAction], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES
+        )
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (
@@ -417,8 +417,8 @@ class AwsACL:
             cluster_locations[cluster_id] = eligible_locations
         return cluster_locations
 
+    @staticmethod
     def _get_external_locations(
-        self,
         role_name: str,
         external_locations: list[ExternalLocationInfo],
         permission_mappings: list[AWSRoleAction],

@@ -471,14 +471,14 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestWorkspaceContext(CommonUtils, WorkspaceContext):
+class TestWorkspaceContext(WorkspaceContext, CommonUtils):
     def __init__(
         self,
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
     ):
-        WorkspaceContext.__init__(self, ws_fixture, {})
+        super().__init__(ws_fixture)
         CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
 
     @cached_property
@@ -504,7 +504,7 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
 
 class LocalAzureCliTest(TestWorkspaceContext):
     def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
-        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
 
     @cached_property
     def azure_cli_authenticated(self):
@@ -527,7 +527,7 @@ def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
 
 class LocalAwsCliTest(TestWorkspaceContext):
     def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
-        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
 
     @cached_property
     def aws_cli_run_command(self):

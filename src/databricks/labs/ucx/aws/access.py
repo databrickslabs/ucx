@@ -21,8 +21,6 @@ from databricks.labs.ucx.assessment.aws import (
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
-from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
 class AWSResourcePermissions:
@@ -35,7 +33,6 @@ class AWSResourcePermissions:
         ws: WorkspaceClient,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
-        principal_acl: PrincipalACL,
         aws_account_id=None,
         kms_key=None,
     ):
@@ -45,8 +42,6 @@ class AWSResourcePermissions:
         self._locations = external_locations
         self._aws_account_id = aws_account_id
         self._kms_key = kms_key
-        self._filename = self.INSTANCE_PROFILES_FILE_NAMES
-        self._principal_acl = principal_acl
 
     def list_uc_roles(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         """
@@ -188,43 +183,6 @@ class AWSResourcePermissions:
             missing_paths.add(external_location.location)
         return missing_paths
 
-    @staticmethod
-    def _identify_missing_external_locations(
-        external_locations: Iterable[ExternalLocation],
-        existing_paths: list[str],
-        compatible_roles: list[AWSRoleAction],
-    ) -> set[tuple[str, str]]:
-        # Get recommended external locations
-        # Get existing external locations
-        # Get list of paths from get_uc_compatible_roles
-        # Identify recommended external location paths that don't have an external location and return them
-        missing_paths = set()
-        for external_location in external_locations:
-            existing = False
-            for path in existing_paths:
-                if path in external_location.location:
-                    existing = True
-                    continue
-            if existing:
-                continue
-            new_path = PurePath(external_location.location)
-            matching_role = None
-            for role in compatible_roles:
-                if new_path.match(role.resource_path + "/*"):
-                    matching_role = role.role_arn
-                    continue
-            if matching_role:
-                missing_paths.add((external_location.location, matching_role))
-
-        return missing_paths
-
-    def _get_existing_credentials_dict(self):
-        credentials = self._ws.storage_credentials.list()
-        credentials_dict = {}
-        for credential in credentials:
-            credentials_dict[credential.aws_iam_role.role_arn] = credential.name
-        return credentials_dict
-
     def _get_cluster_policy(self, policy_id: str | None) -> Policy:
         if not policy_id:
             msg = "Cluster policy not found in UCX config"
@@ -256,33 +214,6 @@ class AWSResourcePermissions:
         }
 
         self._ws.cluster_policies.edit(str(policy.policy_id), str(policy.name), definition=json.dumps(definition_dict))
-
-    def create_external_locations(self, location_init="UCX_location"):
-        # For each path find out the role that has access to it
-        # Find out the credential that is pointing to this path
-        # Create external location for the path using the credential identified
-        credential_dict = self._get_existing_credentials_dict()
-        external_locations = self._locations.snapshot()
-        existing_external_locations = self._ws.external_locations.list()
-        existing_paths = [external_location.url for external_location in existing_external_locations]
-        compatible_roles = self.load_uc_compatible_roles()
-        missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
-        external_location_names = [external_location.name for external_location in existing_external_locations]
-        external_location_num = 1
-        for path, role_arn in missing_paths:
-            if role_arn not in credential_dict:
-                logger.error(f"Missing credential for role {role_arn} for path {path}")
-                continue
-            while True:
-                external_location_name = f"{location_init}_{external_location_num}"
-                if external_location_name not in external_location_names:
-                    break
-                external_location_num += 1
-            self._ws.external_locations.create(
-                external_location_name, path, credential_dict[role_arn], skip_validation=True
-            )
-            external_location_num += 1
-        self._principal_acl.apply_location_acl()
 
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
         instance_profile_arn = self._aws_resources.get_instance_profile(instance_profile_name)

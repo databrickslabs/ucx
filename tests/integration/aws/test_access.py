@@ -52,10 +52,14 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         ws,
         aws,
         external_location,
-        aws_cli_ctx.principal_acl,
         account_id,
     )
-    external_location_migration = AWSExternalLocationsMigration(ws, external_location, aws_permissions)
+    external_location_migration = AWSExternalLocationsMigration(
+        ws,
+        external_location,
+        aws_permissions,
+        aws_cli_ctx.principal_acl,
+    )
     external_location_migration.run(location_prefix=f"UCX_LOCATION_{rand}")
     external_location = [
         external_location
@@ -132,9 +136,9 @@ def test_create_external_location_validate_acl(
         permission_level=PermissionLevel.CAN_RESTART,
         user_name=cluster_user.user_name,
     )
-    location_migration = aws_cli_ctx.aws_resource_permissions
+    location_migration = aws_cli_ctx.aws_external_locations_migration
     try:
-        location_migration.create_external_locations()
+        location_migration.run()
         permissions = ws.grants.get(
             SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=cluster_user.user_name
         )
