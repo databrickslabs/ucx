@@ -237,7 +237,9 @@ class TestContext(RuntimeContext):  # pylint: disable=too-many-public-methods
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
 
     def with_aws_storage_permissions(
-        self, instance_profile_mapping: list[AWSRoleAction], uc_roles_mapping: list[AWSRoleAction]
+        self,
+        instance_profile_mapping: list[AWSRoleAction],
+        uc_roles_mapping: list[AWSRoleAction],
     ):
         self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
         self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
