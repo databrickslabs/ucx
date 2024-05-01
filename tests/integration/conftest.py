@@ -185,7 +185,7 @@ class TestContext(RuntimeContext):  # pylint: disable=too-many-public-methods
     def __init__(
         self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
     ):
-        RuntimeContext.__init__(self)
+        super().__init__()
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
