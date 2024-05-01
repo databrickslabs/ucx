@@ -607,7 +607,10 @@ class PrincipalACL:
     def _get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
         # gets all the users,groups,spn which have access to the clusters and returns a dataclass of that mapping
         principal_list = []
-        cluster_permission = self._ws.permissions.get("clusters", cluster_id)
+        try:
+            cluster_permission = self._ws.permissions.get("clusters", cluster_id)
+        except ResourceDoesNotExist:
+            return []
         if cluster_permission.access_control_list is None:
             return []
         for acl in cluster_permission.access_control_list:

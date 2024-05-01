@@ -10,22 +10,28 @@ from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import AclItem
 
-from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions
+from databricks.labs.ucx.workspace_access.base import AclSupport, Permissions, StaticListing
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
 logger = logging.getLogger(__name__)
 
 
 class SecretScopesSupport(AclSupport):
-    def __init__(self, ws: WorkspaceClient, verify_timeout: timedelta | None = None):
+    def __init__(
+        self,
+        ws: WorkspaceClient,
+        verify_timeout: timedelta | None = None,
+        # this parameter is for testing scenarios only - [{object_type}:{object_id}]
+        # it will use StaticListing class to return only object ids that has the same object type
+        include_object_permissions: list[str] | None = None,
+    ):
         self._ws = ws
         if verify_timeout is None:
             verify_timeout = timedelta(minutes=2)
         self._verify_timeout = verify_timeout
+        self._include_object_permissions = include_object_permissions
 
     def get_crawler_tasks(self):
-        scopes = self._ws.secrets.list_scopes()
-
         def _crawler_task(scope: workspace.SecretScope):
             assert scope.name is not None
             acl_items = self._ws.secrets.list_acls(scope.name)
@@ -35,6 +41,12 @@ class SecretScopesSupport(AclSupport):
                 raw=json.dumps([item.as_dict() for item in acl_items]),
             )
 
+        if self._include_object_permissions:
+            for item in StaticListing(self._include_object_permissions, self.object_types()):
+                yield partial(_crawler_task, workspace.SecretScope(name=item.object_id))
+            return
+
+        scopes = self._ws.secrets.list_scopes()
         for scope in scopes:
             yield partial(_crawler_task, scope)
 
