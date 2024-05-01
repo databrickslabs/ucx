@@ -239,7 +239,7 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
             privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
         )
         assert expected_azure_permission in permissions.privilege_assignments
-    except NotFound:
+    finally:
         remove_azure_permissions = [
             Privilege.CREATE_EXTERNAL_TABLE,
             Privilege.CREATE_EXTERNAL_VOLUME,
