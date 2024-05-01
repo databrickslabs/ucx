@@ -21,34 +21,40 @@ class AWSExternalLocationsMigration:
         aws_resource_permissions: AWSResourcePermissions,
     ):
         self._ws = ws
-        self._locations = external_locations
+        self._external_locations = external_locations
         self._aws_resource_permissions = aws_resource_permissions
 
-    def run(self, location_init="UCX_location"):
+    def run(self, location_prefix="UCX_location"):
         # For each path find out the role that has access to it
         # Find out the credential that is pointing to this path
         # Create external location for the path using the credential identified
         credential_dict = self._get_existing_credentials_dict()
-        external_locations = self._locations.snapshot()
+        external_locations = self._external_locations.snapshot()
         existing_external_locations = self._ws.external_locations.list()
         existing_paths = [external_location.url for external_location in existing_external_locations]
         compatible_roles = self._aws_resource_permissions.load_uc_compatible_roles()
         missing_paths = self._identify_missing_external_locations(external_locations, existing_paths, compatible_roles)
-        external_location_names = [external_location.name for external_location in existing_external_locations]
-        external_location_num = 1
         for path, role_arn in missing_paths:
             if role_arn not in credential_dict:
                 logger.error(f"Missing credential for role {role_arn} for path {path}")
                 continue
-            while True:
-                external_location_name = f"{location_init}_{external_location_num}"
-                if external_location_name not in external_location_names:
-                    break
-                external_location_num += 1
             self._ws.external_locations.create(
-                external_location_name, path, credential_dict[role_arn], skip_validation=True
+                self._generate_external_location_name(location_prefix),
+                path,
+                credential_dict[role_arn],
+                skip_validation=True,
             )
+
+    def _generate_external_location_name(self, location_prefix: str):
+        external_location_num = 1
+        existing_external_locations = self._ws.external_locations.list()
+        external_location_names = [external_location.name for external_location in existing_external_locations]
+        while True:
+            external_location_name = f"{location_prefix}_{external_location_num}"
+            if external_location_name not in external_location_names:
+                break
             external_location_num += 1
+        return external_location_name
 
     @staticmethod
     def _identify_missing_external_locations(

@@ -149,7 +149,6 @@ class WorkspaceContext(CliContext):
         return AWSResourcePermissions(
             self.installation,
             self.workspace_client,
-            self.sql_backend,
             self.aws_resources,
             self.external_locations,
             self.principal_acl,

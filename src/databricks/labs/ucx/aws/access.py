@@ -8,7 +8,6 @@ from pathlib import PurePath
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
 from databricks.sdk.service.compute import Policy
@@ -34,7 +33,6 @@ class AWSResourcePermissions:
         self,
         installation: Installation,
         ws: WorkspaceClient,
-        backend: SqlBackend,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
         principal_acl: PrincipalACL,
@@ -43,7 +41,6 @@ class AWSResourcePermissions:
     ):
         self._installation = installation
         self._aws_resources = aws_resources
-        self._backend = backend
         self._ws = ws
         self._locations = external_locations
         self._aws_account_id = aws_account_id
@@ -52,11 +49,13 @@ class AWSResourcePermissions:
         self._principal_acl = principal_acl
 
     def list_uc_roles(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
-        # Get the missing paths
-        # Identify the S3 prefixes
-        # Create the roles and policies for the missing S3 prefixes
-        # If single_role is True, create a single role and policy for all the missing S3 prefixes
-        # If single_role is False, create a role and policy for each missing S3 prefix
+        """
+        Get the missing paths
+        Identify the S3 prefixes
+        Create the roles and policies for the missing S3 prefixes
+        If single_role is True, create a single role and policy for all the missing S3 prefixes
+        If single_role is False, create a role and policy for each missing S3 prefix
+        """
         roles: list[AWSUCRoleCandidate] = []
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
