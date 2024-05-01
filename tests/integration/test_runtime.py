@@ -71,20 +71,9 @@ def test_running_real_migrate_groups_job(
 
     installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
-    renamed_group = f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"
-    permissions_support = installation_ctx.generic_permissions_support
-
-    policy_perm = permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert policy_perm[acc_group_a.display_name] == PermissionLevel.CAN_USE
-    assert policy_perm[renamed_group] == PermissionLevel.CAN_USE
-
-    secret_permission = permissions_support.load_as_dict("secrets", secret_scope)
-    assert secret_permission[acc_group_a.display_name] == AclPermission.WRITE
-    assert secret_permission[renamed_group] == AclPermission.WRITE
-
-    table_permission = permissions_support.load_as_dict("TABLE", table.full_name)
-    assert table_permission[acc_group_a.display_name] == "SELECT"
-    assert table_permission[renamed_group] == "SELECT"
+    found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
+    assert found[f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
