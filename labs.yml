@@ -46,9 +46,9 @@ commands:
   - name: report-account-compatibility
     is_account_level: true
     description: aggregation of UCX output of multiple workspaces in the account. 
-      If include_workspace_ids is not provided, it will use all workspaces present in the account.
+      If --workspace-ids is not provided, it will use all workspaces present in the account.
     flags:
-      - name: include-workspace-ids
+      - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
   - name: manual-workspace-info

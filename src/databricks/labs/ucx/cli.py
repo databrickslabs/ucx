@@ -95,7 +95,7 @@ def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = 
     """upload workspace config to all workspaces in the account where ucx is installed"""
     if not ctx:
         ctx = AccountContext(a, named_parameters)
-    ctx.account_workspaces.aggregate_report()
+    ctx.account_aggregate.readiness_report()
 
 
 @ucx.command(is_account=True)
