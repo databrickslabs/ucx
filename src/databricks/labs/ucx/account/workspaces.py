@@ -1,4 +1,8 @@
+import collections
+import json
 import logging
+from dataclasses import dataclass
+from functools import cached_property
 from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
@@ -18,7 +22,11 @@ class AccountWorkspaces:
         self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
 
     def _workspaces(self):
-        return self._ac.workspaces.list()
+        for workspace in self._ac.workspaces.list():
+            if self._include_workspace_ids and workspace.workspace_id not in self._include_workspace_ids:
+                logger.debug(f"Skipping {workspace.workspace_name} ({workspace.workspace_id}): not in include list")
+                continue
+            yield workspace
 
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         return self._ac.get_workspace_client(workspace)
@@ -28,6 +36,7 @@ class AccountWorkspaces:
         Return a list of WorkspaceClient for each configured workspace in the account
         :return: list[WorkspaceClient]
         """
+        # TODO: move _can_administer() from account installer over here
         if workspaces is None:
             workspaces = self._workspaces()
         clients = []
