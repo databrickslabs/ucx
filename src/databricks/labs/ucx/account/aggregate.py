@@ -46,7 +46,9 @@ class AccountAggregate:
 
                 # view is defined in src/databricks/labs/ucx/queries/views/objects.sql
                 for row in ctx.sql_backend.fetch(f'SELECT * FROM {ctx.config.inventory_database}.objects'):
-                    objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
+                    objects.append(
+                        AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures))
+                    )
             except NotInstalled:
                 logger.warning(f"Workspace {ctx.workspace_client.get_workspace_id()} does not have UCX installed")
         return objects
@@ -67,7 +69,3 @@ class AccountAggregate:
                 incompatible_objects += 1
         compatibility = (1 - incompatible_objects / all_objects if all_objects > 0 else 0) * 100
         logger.info(f"UC compatibility: {compatibility}% ({incompatible_objects}/{all_objects})")
-
-        # TODO: output failures in file
-        # for failure, objects in failures.items():
-        #     logger.info(f"{failure}: {len(objects)} objects")
