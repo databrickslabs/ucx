@@ -235,8 +235,7 @@ class ServicePrincipalMigration(SecretsMixin):
             if spn.permission_mapping.default_network_action != "Allow":
                 logger.warning(
                     f"Service principal '{spn.permission_mapping.principal}' accesses storage account "
-                    f"'{spn.permission_mapping.prefix}' with non-Allow network configuration, which might cause "
-                    "connectivity issues. "
+                    f"'{spn.permission_mapping.prefix}' with non-Allow network configuration"
                 )
 
             self._storage_credential_manager.create_with_client_secret(spn)
@@ -259,14 +258,16 @@ class ServicePrincipalMigration(SecretsMixin):
             if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
                 plan_confirmed = prompts.confirm(
                     "At least one Azure Service Principal accesses a storage account with non-Allow default network "
-                    "configuration, which might connectivity issues. We recommend using Databricks Access Connectors "
-                    "instead (next prompt). Would you like to continue with migrating the service principals?"
+                    "configuration, which might cause connectivity issues. We recommend using Databricks Access "
+                    "Connectors instead (next prompt). Would you like to continue with migrating the service "
+                    "principals?"
                 )
             if plan_confirmed:
                 sp_results = self._migrate_service_principals(sp_migration_infos)
 
         plan_confirmed = prompts.confirm(
-            "[RECOMMENDED] Please confirm to create an access connector with managed identity for each storage account."
+            "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
+            "account."
         )
         ac_results = []
         if plan_confirmed:

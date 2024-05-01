@@ -413,8 +413,7 @@ def test_run_warning_non_allow_network_configuration(installation, sp_migration,
     )
 
     expected_message = (
-        "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration, "
-        "which might cause connectivity issues."
+        "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration"
     )
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):
