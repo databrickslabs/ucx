@@ -2,37 +2,11 @@ from __future__ import annotations
 
 import abc
 import ast
-import typing
-from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable, Iterable
 
-from databricks.labs.ucx.source_code.dependency_problem import DependencyProblem
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
-
-if typing.TYPE_CHECKING:
-    from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
-    from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
-    from databricks.labs.ucx.source_code.dependency_loaders import DependencyLoader
-
-
-class Dependency(abc.ABC):
-
-    def __init__(self, loader: DependencyLoader, path: Path):
-        self._loader = loader
-        self._path = path
-
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    def __hash__(self):
-        return hash(self.path)
-
-    def __eq__(self, other):
-        return isinstance(other, type(self)) and self.path == other.path
-
-    def load(self) -> SourceContainer | None:
-        return self._loader.load_dependency(self)
 
 
 class DependencyGraph:
@@ -193,6 +167,210 @@ class DependencyGraph:
                     end_col=node.end_col_offset or 0,
                 )
                 problem_collector(problem)
+
+
+class Dependency(abc.ABC):
+
+    def __init__(self, loader: DependencyLoader, path: Path):
+        self._loader = loader
+        self._path = path
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def __hash__(self):
+        return hash(self.path)
+
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and self.path == other.path
+
+    def load(self) -> SourceContainer | None:
+        return self._loader.load_dependency(self)
+
+
+class SourceContainer(abc.ABC):
+
+    @abc.abstractmethod
+    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+        raise NotImplementedError()
+
+
+class DependencyLoader(abc.ABC):
+
+    @abc.abstractmethod
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def is_notebook(self, path: Path) -> bool:
+        raise NotImplementedError()
+
+
+class WrappingLoader(DependencyLoader):
+
+    def __init__(self, source_container: SourceContainer):
+        self._source_container = source_container
+
+    def is_notebook(self, path: Path) -> bool:
+        raise NotImplementedError()  # should never happen
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        return self._source_container
+
+
+class BaseDependencyResolver(abc.ABC):
+
+    def __init__(self, next_resolver: BaseDependencyResolver | None):
+        self._next_resolver = next_resolver
+        self._problems: list[DependencyProblem] = []
+
+    @abc.abstractmethod
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        raise NotImplementedError()
+
+    @property
+    def problems(self):
+        return self._problems
+
+    def add_problems(self, problems: list[DependencyProblem]):
+        self._problems.extend(problems)
+
+    @property
+    def next_resolver(self):
+        return self._next_resolver
+
+    def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_notebook(path, problem_collector)
+
+    def resolve_local_file(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
+    ) -> Dependency | None:
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_local_file(path, problem_collector)
+
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_import(name, problem_collector)
+
+
+class StubResolver(BaseDependencyResolver):
+
+    def __init__(self):
+        super().__init__(None)
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        raise NotImplementedError("Should never happen!")
+
+    def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        return None
+
+    def resolve_local_file(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
+    ) -> Dependency | None:
+        return None
+
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        return None
+
+
+class DependencyResolver:
+    def __init__(self, resolvers: list[BaseDependencyResolver]):
+        previous: BaseDependencyResolver = StubResolver()
+        for resolver in resolvers:
+            resolver = resolver.with_next_resolver(previous)
+            previous = resolver
+        self._resolver: BaseDependencyResolver = previous
+
+    def resolve_notebook(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
+        problems: list[DependencyProblem] = []
+        dependency = self._resolver.resolve_notebook(path, problems.append)
+        if dependency is None:
+            problem = DependencyProblem('notebook-not-found', f"Notebook not found: {path.as_posix()}")
+            problems.append(problem)
+        if problem_collector:
+            for problem in problems:
+                problem_collector(problem)
+        else:
+            self.add_problems(problems)
+        return dependency
+
+    def resolve_local_file(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
+        problems: list[DependencyProblem] = []
+        dependency = self._resolver.resolve_local_file(path, problems.append)
+        if dependency is None:
+            problem = DependencyProblem('file-not-found', f"File not found: {path.as_posix()}")
+            problems.append(problem)
+        if problem_collector:
+            for problem in problems:
+                problem_collector(problem)
+        else:
+            self.add_problems(problems)
+        return dependency
+
+    def resolve_import(
+        self, name: str, problem_collector: Callable[[DependencyProblem], None] | None = None
+    ) -> Dependency | None:
+        problems: list[DependencyProblem] = []
+        dependency = self._resolver.resolve_import(name, problems.append)
+        if dependency is None:
+            problem = DependencyProblem('import-not-found', f"Could not locate import: {name}")
+            problems.append(problem)
+        if problem_collector:
+            for problem in problems:
+                problem_collector(problem)
+        else:
+            self.add_problems(problems)
+        return dependency
+
+    @property
+    def problems(self) -> Iterable[DependencyProblem]:
+        resolver = self._resolver
+        while resolver is not None:
+            yield from resolver.problems
+            resolver = resolver.next_resolver
+
+    def add_problems(self, problems: list[DependencyProblem]):
+        self._resolver.add_problems(problems)
+
+
+MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
+
+
+@dataclass
+class DependencyProblem:
+    code: str
+    message: str
+    source_path: Path = Path(MISSING_SOURCE_PATH)
+    start_line: int = -1
+    start_col: int = -1
+    end_line: int = -1
+    end_col: int = -1
+
+    def replace(
+        self,
+        code: str | None = None,
+        message: str | None = None,
+        source_path: Path | None = None,
+        start_line: int | None = None,
+        start_col: int | None = None,
+        end_line: int | None = None,
+        end_col: int | None = None,
+    ) -> DependencyProblem:
+        return DependencyProblem(
+            code if code is not None else self.code,
+            message if message is not None else self.message,
+            source_path if source_path is not None else self.source_path,
+            start_line if start_line is not None else self.start_line,
+            start_col if start_col is not None else self.start_col,
+            end_line if end_line is not None else self.end_line,
+            end_col if end_col is not None else self.end_col,
+        )
 
 
 class DependencyGraphBuilder:

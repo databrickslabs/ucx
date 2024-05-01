@@ -18,12 +18,10 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, Language
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.dependency_containers import SourceContainer
-from databricks.labs.ucx.source_code.dependency_loaders import LocalFileLoader
-from databricks.labs.ucx.source_code.files import LocalFile
-from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.syspath_provider import SysPathProvider
+from databricks.labs.ucx.source_code.graph import SourceContainer
+from databricks.labs.ucx.source_code.files import LocalFile, FileLoader, SysPathProvider
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.notebooks.cells import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
@@ -238,7 +236,7 @@ def _is_file_side_effect(sources: dict[str, str], *args):
 
 def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited: dict[str, bool]):
     file_loader = create_autospec(cls)
-    file_loader.is_file.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
+    file_loader.exists.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
     file_loader.is_notebook.return_value = False
     file_loader.full_path.side_effect = lambda *args: _full_path_side_effect(sources, *args)
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
@@ -247,15 +245,15 @@ def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited:
     return file_loader
 
 
-class TestFileLoader(LocalFileLoader):
+class TestFileLoader(FileLoader):
     __test__ = False
 
     def __init__(self, syspath_provider: SysPathProvider, sources: dict[str, str]):
         super().__init__(syspath_provider)
         self._sources = sources
 
-    def is_file(self, path: pathlib.Path):
-        if super().is_file(path):
+    def exists(self, path: pathlib.Path):
+        if super().exists(path):
             return True
         filename = path.as_posix()
         if filename.startswith('./'):
