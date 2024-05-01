@@ -1,7 +1,4 @@
 import logging
-from unittest.mock import create_autospec
-from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.account.aggregate import AccountAggregate
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
