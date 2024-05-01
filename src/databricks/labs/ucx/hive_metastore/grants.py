@@ -349,7 +349,7 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
 class AwsACL:
     # adding this profile file name here to avoid circular references with aws/access.py
-    INSTANCE_PROFILES_FILE_NAME: typing.ClassVar[str] = "aws_instance_profile_info.csv"
+    FILE_NAME: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
         self,
@@ -400,7 +400,7 @@ class AwsACL:
             logger.error(msg)
             raise ResourceDoesNotExist(msg) from None
 
-        permission_mappings = self._installation.load(list[AWSRoleAction], filename=self.INSTANCE_PROFILES_FILE_NAME)
+        permission_mappings = self._installation.load(list[AWSRoleAction], filename=self.FILE_NAME)
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
             msg = (
@@ -625,17 +625,18 @@ class PrincipalACL:
         return principal_list
 
     def apply_location_acl(self):
-        # Check the interactive cluster and the principals mapped to it
-        # identifies the spn or instance profile configured for the interactive cluster
-        # identifies any location the spn/instance profile have access to (read or write)
-        # applies create_external_table, create_external_volume and read_files permission for all location
-        # to the principal
+        """
+        Check the interactive cluster and the principals mapped to it
+        identifies the spn or instance profile configured for the interactive cluster
+        identifies any location the spn/instance profile have access to (read or write)
+        applies create_external_table, create_external_volume and read_files permission for all location
+        to the principal
+        """
         logger.info(
             "Applying permission for external location (CREATE EXTERNAL TABLE, "
             "CREATE EXTERNAL VOLUME and READ_FILES for existing eligible interactive cluster users"
         )
         # get the eligible location mapped for each interactive cluster
-        permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
         for cluster_id, locations in self._cluster_locations.items():
             # get interactive cluster users
             principals = self._get_cluster_principal_mapping(cluster_id)
@@ -646,13 +647,17 @@ class PrincipalACL:
                 location_name = self._get_location_name(location_url)
                 if location_name is None:
                     continue
-                for principal in principals:
-                    self._ws.grants.update(
-                        SecurableType.EXTERNAL_LOCATION,
-                        location_name,
-                        changes=[PermissionsChange(add=permissions, principal=principal)],
-                    )
+                self._update_location_permissions(location_name, principals)
         logger.info("Applied all the permission on external location")
+
+    def _update_location_permissions(self, location_name: str, principals: list[str]):
+        permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
+        changes = [PermissionsChange(add=permissions, principal=principal) for principal in principals]
+        self._ws.grants.update(
+            SecurableType.EXTERNAL_LOCATION,
+            location_name,
+            changes=changes,
+        )
 
     def _get_location_name(self, location_url: str):
         for location in self._ws.external_locations.list():
