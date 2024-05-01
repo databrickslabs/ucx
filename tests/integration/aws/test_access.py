@@ -3,6 +3,9 @@ import json
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.service.catalog import AwsIamRoleRequest
+from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
+from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
 
 from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -23,7 +26,7 @@ def test_get_uc_compatible_roles(ws, env_or_skip, make_random):
     assert compat_roles
 
 
-def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend):
+def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, aws_cli_ctx):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     rand = make_random(5).lower()
     sql_backend.save_table(
@@ -48,7 +51,7 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
         sql_backend,
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
-        inventory_schema,
+        aws_cli_ctx.principal_acl,
         account_id,
     )
     aws_permissions.create_external_locations(location_init=f"UCX_LOCATION_{rand}")
@@ -62,7 +65,9 @@ def test_create_external_location(ws, env_or_skip, make_random, inventory_schema
     assert external_location[0].credential_name == f"ucx_{rand}"
 
 
-def test_create_uber_instance_profile(ws, env_or_skip, make_random, inventory_schema, sql_backend, make_cluster_policy):
+def test_create_uber_instance_profile(
+    ws, env_or_skip, make_random, inventory_schema, sql_backend, make_cluster_policy, aws_cli_ctx
+):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     aws = AWSResources(profile)
     account_id = aws.validate_connection().get("Account")
@@ -80,7 +85,7 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, inventory_sc
         sql_backend,
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
-        inventory_schema,
+        aws_cli_ctx.principal_acl,
         account_id,
     )
     aws_permissions.create_uber_principal(
@@ -103,3 +108,48 @@ def test_create_uber_instance_profile(ws, env_or_skip, make_random, inventory_sc
 
     role_name = AWSInstanceProfile(instance_profile_arn).role_name
     aws.delete_instance_profile(role_name, role_name)
+
+
+def test_create_external_location_validate_acl(
+    make_cluster_permissions,
+    ws,
+    make_user,
+    make_cluster,
+    aws_cli_ctx,
+    env_or_skip,
+):
+    aws_cli_ctx.with_dummy_resource_permission()
+    aws_cli_ctx.save_locations()
+    cluster = make_cluster(
+        single_node=True,
+        data_security_mode=DataSecurityMode.NONE,
+        aws_attributes=AwsAttributes(instance_profile_arn=env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE")),
+    )
+    cluster_user = make_user()
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_RESTART,
+        user_name=cluster_user.user_name,
+    )
+    location_migration = aws_cli_ctx.aws_resource_permissions
+    try:
+        location_migration.create_external_locations()
+        permissions = ws.grants.get(
+            SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=cluster_user.user_name
+        )
+        expected_aws_permission = PrivilegeAssignment(
+            principal=cluster_user.user_name,
+            privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
+        )
+        assert expected_aws_permission in permissions.privilege_assignments
+    finally:
+        remove_aws_permissions = [
+            Privilege.CREATE_EXTERNAL_TABLE,
+            Privilege.CREATE_EXTERNAL_VOLUME,
+            Privilege.READ_FILES,
+        ]
+        ws.grants.update(
+            SecurableType.EXTERNAL_LOCATION,
+            env_or_skip("TEST_A_LOCATION"),
+            changes=[PermissionsChange(remove=remove_aws_permissions, principal=cluster_user.user_name)],
+        )

@@ -6,7 +6,7 @@ import logging
 from dataclasses import replace
 from functools import partial, cached_property
 from datetime import timedelta
-
+import shutil
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -31,7 +31,7 @@ from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
 from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
@@ -122,6 +122,20 @@ def make_group_pair(make_random, make_group):
     return inner
 
 
+def get_azure_spark_conf():
+    return {
+        "spark.databricks.cluster.profile": "singleNode",
+        "spark.master": "local[*]",
+        "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
+        "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
+        ".azurebfs.oauth2.ClientCredsTokenProvider",
+        "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
+        "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
+        "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
+        ".microsoftonline.com/directory_12345/oauth2/token",
+    }
+
+
 class StaticTablesCrawler(TablesCrawler):
     def __init__(self, sb: SqlBackend, schema: str, tables: list[TableInfo]):
         super().__init__(sb, schema)
@@ -167,23 +181,11 @@ class StaticMountCrawler(Mounts):
         return self._mounts
 
 
-class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-methods
-    def __init__(
-        self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
-    ):
-        super().__init__()
-        self._make_table = make_table_fixture
+class CommonUtils:
+    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
         self._make_schema = make_schema_fixture
-        self._make_udf = make_udf_fixture
-        self._make_group = make_group_fixture
         self._env_or_skip = env_or_skip_fixture
-        self._tables: list[TableInfo] = []
-        self._schemas: list[SchemaInfo] = []
-        self._groups: list[Group] = []
-        self._udfs = []
-        self._grants = []
-        # TODO: add methods to pre-populate the following:
-        self._spn_infos = []
+        self._ws = ws_fixture
 
     def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
@@ -201,22 +203,72 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
                 ]
             )
         if self.workspace_client.config.is_aws:
-            self.with_aws_storage_permissions(
-                [
-                    AWSRoleAction(
-                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-                        's3',
-                        'WRITE_FILES',
-                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
-                    )
-                ]
-            )
+            instance_profile_mapping = [
+                AWSRoleAction(
+                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
+                    's3',
+                    'WRITE_FILES',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                )
+            ]
+            uc_roles_mapping = [
+                AWSRoleAction(
+                    self._env_or_skip("TEST_STORAGE_CREDENTIAL"),
+                    's3',
+                    'WRITE_FILES',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                )
+            ]
+            self.with_aws_storage_permissions(instance_profile_mapping, uc_roles_mapping)
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
 
-    def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
-        self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
+    def with_aws_storage_permissions(
+        self,
+        instance_profile_mapping: list[AWSRoleAction],
+        uc_roles_mapping: list[AWSRoleAction],
+    ):
+        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
+        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
+
+    @cached_property
+    def installation(self):
+        return MockInstallation()
+
+    @cached_property
+    def inventory_database(self) -> str:
+        return self._make_schema(catalog_name="hive_metastore").name
+
+    @cached_property
+    def workspace_client(self):
+        return self._ws
+
+
+class TestRuntimeContext(CommonUtils, RuntimeContext):
+    def __init__(
+        self,
+        make_table_fixture,
+        make_schema_fixture,
+        make_udf_fixture,
+        make_group_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+    ):
+        RuntimeContext.__init__(self)
+        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        self._make_table = make_table_fixture
+        self._make_schema = make_schema_fixture
+        self._make_udf = make_udf_fixture
+        self._make_group = make_group_fixture
+        self._env_or_skip = env_or_skip_fixture
+        self._tables: list[TableInfo] = []
+        self._schemas: list[SchemaInfo] = []
+        self._groups: list[Group] = []
+        self._udfs = []
+        self._grants = []
+        # TODO: add methods to pre-populate the following:
+        self._spn_infos = []
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
@@ -353,14 +405,6 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
         )
 
     @cached_property
-    def installation(self):
-        return MockInstallation()
-
-    @cached_property
-    def inventory_database(self) -> str:
-        return self._make_schema(catalog_name="hive_metastore").name
-
-    @cached_property
     def created_databases(self):
         created_databases: set[str] = set()
         for schema_info in self._schemas:
@@ -423,14 +467,44 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
 
 @pytest.fixture
 def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAzureCliTest(WorkspaceContext):
-    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
-        super().__init__(_ws, {})
-        self._env_or_skip = env_or_skip_fixture
+class TestWorkspaceContext(CommonUtils, WorkspaceContext):
+    def __init__(
+        self,
+        make_schema_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+    ):
+        WorkspaceContext.__init__(self, ws_fixture, {})
+        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+
+    @cached_property
+    def config(self) -> WorkspaceConfig:
+        return WorkspaceConfig(
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+            inventory_database=self.inventory_database,
+            connect=self.workspace_client.config,
+            renamed_group_prefix=f'tmp-{self.inventory_database}-',
+        )
+
+    def save_locations(self):
+        if self.workspace_client.config.is_azure:
+            locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
+        if self.workspace_client.config.is_aws:
+            locations = [ExternalLocation("s3://labs-things/a", 1)]
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.external_locations",
+            locations,
+            ExternalLocation,
+        )
+
+
+class LocalAzureCliTest(TestWorkspaceContext):
+    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
+        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
 
     @cached_property
     def azure_cli_authenticated(self):
@@ -446,12 +520,36 @@ class LocalAzureCliTest(WorkspaceContext):
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip):
-    return LocalAzureCliTest(ws, env_or_skip)
+def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
+    ctx = LocalAzureCliTest(make_schema, env_or_skip, ws)
+    return ctx.replace(sql_backend=sql_backend)
+
+
+class LocalAwsCliTest(TestWorkspaceContext):
+    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
+        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+
+    @cached_property
+    def aws_cli_run_command(self):
+        if not self.is_aws:
+            pytest.skip("Aws only")
+        if not shutil.which("aws"):
+            pytest.skip("Local test only")
+        return True
+
+    @cached_property
+    def aws_profile(self):
+        return self._env_or_skip("AWS_PROFILE")
+
+
+@pytest.fixture
+def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
+    ctx = LocalAwsCliTest(make_schema, env_or_skip, ws)
+    return ctx.replace(sql_backend=sql_backend)
 
 
 class TestInstallationContext(TestRuntimeContext):
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         make_table_fixture,
         make_schema_fixture,
@@ -461,9 +559,15 @@ class TestInstallationContext(TestRuntimeContext):
         make_random_fixture,
         make_acc_group_fixture,
         make_user_fixture,
+        ws_fixture,
     ):
         super().__init__(
-            make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
+            make_table_fixture,
+            make_schema_fixture,
+            make_udf_fixture,
+            make_group_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
         )
         self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
@@ -625,14 +729,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_user,
 ):
     ctx = TestInstallationContext(
-        make_table,
-        make_schema,
-        make_udf,
-        make_group,
-        env_or_skip,
-        make_random,
-        make_acc_group,
-        make_user,
+        make_table, make_schema, make_udf, make_group, env_or_skip, make_random, make_acc_group, make_user, ws
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()

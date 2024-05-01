@@ -119,6 +119,7 @@ class WorkspaceContext(CliContext):
             self.external_locations,
             self.azure_resource_permissions,
             self.azure_resources,
+            self.principal_acl,
         )
 
     @cached_property
@@ -154,7 +155,7 @@ class WorkspaceContext(CliContext):
             self.sql_backend,
             self.aws_resources,
             self.external_locations,
-            self.inventory_database,
+            self.principal_acl,
             self.named_parameters.get("aws_account_id"),
             self.named_parameters.get("kms_key"),
         )
