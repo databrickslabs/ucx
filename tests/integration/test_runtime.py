@@ -12,7 +12,6 @@ from databricks.sdk.service import sql
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -40,21 +39,12 @@ def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, 
 def test_running_real_migrate_groups_job(
     ws,
     installation_ctx,
-    make_query,
-    make_query_permissions,
     make_cluster_policy,
     make_cluster_policy_permissions,
     make_secret_scope,
     make_secret_scope_acl,
 ):
     ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
-
-    query = make_query()
-    make_query_permissions(
-        object_id=query.id,
-        permission_level=sql.PermissionLevel.CAN_EDIT,
-        group_name=ws_group_a.display_name,
-    )
 
     cluster_policy = make_cluster_policy()
     make_cluster_policy_permissions(
@@ -72,7 +62,6 @@ def test_running_real_migrate_groups_job(
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
     installation_ctx.__dict__['include_object_permissions'] = [
         f"cluster-policies:{cluster_policy.policy_id}",
-        f"queries:{query.id}",
         f"TABLE:{table.full_name}",
         f"secrets:{secret_scope}",
     ]
@@ -82,9 +71,20 @@ def test_running_real_migrate_groups_job(
 
     installation_ctx.deployed_workflows.run_workflow("migrate-groups")
 
-    found = installation_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
-    assert found[acc_group_a.display_name] == PermissionLevel.CAN_USE
-    assert found[f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"] == PermissionLevel.CAN_USE
+    renamed_group = f"{installation_ctx.config.renamed_group_prefix}{ws_group_a.display_name}"
+    permissions_support = installation_ctx.generic_permissions_support
+
+    policy_perm = permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert policy_perm[acc_group_a.display_name] == PermissionLevel.CAN_USE
+    assert policy_perm[renamed_group] == PermissionLevel.CAN_USE
+
+    secret_permission = permissions_support.load_as_dict("secrets", secret_scope)
+    assert secret_permission[acc_group_a.display_name] == AclPermission.WRITE
+    assert secret_permission[renamed_group] == AclPermission.WRITE
+
+    table_permission = permissions_support.load_as_dict("TABLE", table.full_name)
+    assert table_permission[acc_group_a.display_name] == "SELECT"
+    assert table_permission[renamed_group] == "SELECT"
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))

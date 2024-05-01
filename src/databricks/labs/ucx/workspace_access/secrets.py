@@ -21,6 +21,8 @@ class SecretScopesSupport(AclSupport):
         self,
         ws: WorkspaceClient,
         verify_timeout: timedelta | None = None,
+        # this parameter is for testing scenarios only - [{object_type}:{object_id}]
+        # it will use StaticListing class to return only object ids that has the same object type
         include_object_permissions: list[str] | None = None,
     ):
         self._ws = ws

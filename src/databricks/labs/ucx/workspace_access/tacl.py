@@ -21,6 +21,8 @@ class TableAclSupport(AclSupport):
         grants_crawler: GrantsCrawler,
         sql_backend: SqlBackend,
         verify_timeout: timedelta | None = timedelta(minutes=1),
+        # this parameter is for testing scenarios only - [{object_type}:{object_id}]
+        # it will use StaticListing class to return only object ids that has the same object type
         include_object_permissions: list[str] | None = None,
     ):
         self._grants_crawler = grants_crawler
