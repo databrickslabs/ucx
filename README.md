@@ -413,6 +413,8 @@ flowchart TB
     class mt_serde_inplace_wf,serde_inplace_mt_task,view_mt_task_inplace roadmap;
     class mt_in_mounts_wf,scan_tables_in_mounts_experimental_task,migrate_tables_in_mounts_experimental roadmap;
 ```
+
+After a UCX table migration is executed, the migration dashboard will be populated with migration status information.
 More details can be found in the [design of table migration](docs/table_upgrade.md)
 
 ### Dependency CLI commands
