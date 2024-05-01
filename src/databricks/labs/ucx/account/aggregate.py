@@ -1,8 +1,11 @@
 import collections
+import json
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from databricks.labs.ucx.account import AccountWorkspaces
+
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +20,15 @@ class AssessmentObject:
 
 class AccountAggregate:
     def __init__(self, account_workspaces: AccountWorkspaces):
-        self.account_workspaces = account_workspaces
+        self._account_workspaces = account_workspaces
 
     @cached_property
     def _workspace_contexts(self):
-        # this is the intended way to import WorkspaceContext, otherwise it will cause a circular import
-        from databricks.labs.ucx.contexts.cli_command import WorkspaceContext  # pylint: disable=import-outside-toplevel
+        # pylint: disable-next=import-outside-toplevel
+        from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
 
         contexts = []
-        for workspace_client in self.workspace_clients():
+        for workspace_client in self._account_workspaces.workspace_clients():
             contexts.append(WorkspaceContext(workspace_client))
         return contexts
 
@@ -41,7 +44,7 @@ class AccountAggregate:
                 objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
-    def aggregate_report(self):
+    def readiness_report(self):
         all_objects = 0
         incompatible_objects = 0
         failures = collections.defaultdict(list)
