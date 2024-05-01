@@ -10,7 +10,7 @@ from functools import cached_property
 from typing import Any
 
 import databricks.sdk.errors
-from databricks.labs.blueprint.entrypoint import get_logger
+from databricks.labs.blueprint.entrypoint import get_logger, is_in_debug
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -608,6 +608,7 @@ class AccountInstaller(AccountContext):
         return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
     def _can_administer(self, workspace: Workspace):
+        # TODO: move to AccountWorkspaces
         try:
             # check if user is a workspace admin
             ws = self.account_client.get_workspace_client(workspace)
@@ -629,6 +630,7 @@ class AccountInstaller(AccountContext):
         """
         Get all workspaces that the user has access to
         """
+        # TODO: move to AccountWorkspaces
         accessible_workspaces = []
         for workspace in self.account_client.workspaces.list():
             if self._can_administer(workspace):
@@ -680,7 +682,8 @@ class AccountInstaller(AccountContext):
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
-
+    if is_in_debug():
+        logging.getLogger('databricks').setLevel(logging.DEBUG)
     env = dict(os.environ.items())
     force_install = env.get("UCX_FORCE_INSTALL")
     if force_install == "account":

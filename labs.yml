@@ -43,9 +43,13 @@ commands:
     is_account_level: true
     description: upload workspace config to all workspaces in the account where ucx is installed
 
-  - name: aggregate-ucx-output
+  - name: report-account-compatibility
     is_account_level: true
-    description: aggregation of UCX output of multiple workspaces in the account
+    description: aggregation of UCX output of multiple workspaces in the account. 
+      If include_workspace_ids is not provided, it will use all workspaces present in the account.
+    flags:
+      - name: include-workspace-ids
+        description: List of workspace IDs to create account groups from.
 
   - name: manual-workspace-info
     description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`

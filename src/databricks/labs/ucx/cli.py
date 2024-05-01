@@ -1,5 +1,4 @@
 import json
-import random
 import webbrowser
 from pathlib import Path
 
@@ -91,30 +90,11 @@ def sync_workspace_info(a: AccountClient):
 
 
 @ucx.command(is_account=True)
-def aggregate_ucx_output(a: AccountClient):
+def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
     """upload workspace config to all workspaces in the account where ucx is installed"""
-    logger.info(f"Account ID: {a.config.account_id}")
-    ctx = AccountContext(a)
-
-    # TODO: Add a check for Account Admin role? Else access to workspaces will fail
-    workspaces_list_original = ctx.account_workspaces.get_workspace_list()
-
-    # workspaces_list = random.sample(workspaces_list_original, 5) #just for testing WIP
-    # workspaces_list = workspaces_list_original
-    for workspace in workspaces_list_original:
-        if workspace.workspace_name == "ppai_test_workspace":
-            logger.info(f"Workspace Name: {workspace.workspace_name}")
-
-            workspace_client = ctx.account_workspaces.client_for(workspace)
-            try:
-                ws_ctx = WorkspaceContext(workspace_client)
-                deployed_workflows = ws_ctx.deployed_workflows
-                if not deployed_workflows.validate_step("assessment"):
-                    logger.info(f"NOT RUN")
-                else:
-                    logger.info(f"RUN")
-            except Exception as e:
-                logger.error(f"Error in workspace for {workspace.workspace_name}: {e}")
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_workspaces.aggregate_report()
 
 
 @ucx.command(is_account=True)
