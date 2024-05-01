@@ -2,4 +2,4 @@
 
 # Migration overview
 
-[Quick link to dashboard documentation](https://github.com/databrickslabs/ucx/blob/main/docs/migration.md)
+[Quick link to the table upgrade documentation](https://github.com/databrickslabs/ucx/blob/main/docs/table_upgrade.md)
