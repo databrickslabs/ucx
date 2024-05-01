@@ -52,7 +52,7 @@ class AWSResourcePermissions:
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
         self._principal_acl = principal_acl
 
-    def uc_roles_list(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+    def list_uc_roles(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         # Get the missing paths
         # Identify the S3 prefixes
         # Create the roles and policies for the missing S3 prefixes
@@ -77,7 +77,11 @@ class AWSResourcePermissions:
         for role in roles:
             if self._aws_resources.create_uc_role(role.role_name):
                 self._aws_resources.put_role_policy(
-                    role.role_name, role.policy_name, set(role.resource_paths), self._aws_account_id, self._kms_key
+                    role.role_name,
+                    role.policy_name,
+                    set(role.resource_paths),
+                    self._aws_account_id,
+                    self._kms_key,
                 )
                 roles_created.append(role)
         return roles_created
