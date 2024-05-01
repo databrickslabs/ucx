@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
+from databricks.labs.blueprint.installation import NotInstalled
 
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 @dataclass
@@ -38,16 +40,23 @@ class AccountAggregate:
         # this is theoretically inefficient, but the number of workspaces is expected to be small. If this is a
         # performance bottleneck, we can optimize it later via Threads.strict()
         for ctx in self._workspace_contexts:
-            workspace_id = ctx.workspace_client.get_workspace_id()
-            # view is defined in src/databricks/labs/ucx/queries/views/objects.sql
-            for row in ctx.sql_backend.fetch(f'SELECT * FROM {ctx.config.inventory_database}.objects'):
-                objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
+            try:
+                workspace_id = ctx.workspace_client.get_workspace_id()
+                logger.info(f"Assessing workspace {workspace_id}")
+
+                # view is defined in src/databricks/labs/ucx/queries/views/objects.sql
+                for row in ctx.sql_backend.fetch(f'SELECT * FROM {ctx.config.inventory_database}.objects'):
+                    objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
+            except NotInstalled:
+                logger.warning(f"Workspace {ctx.workspace_client.get_workspace_id()} does not have UCX installed")
         return objects
 
     def readiness_report(self):
+        logger.info("Generating readiness report")
         all_objects = 0
         incompatible_objects = 0
         failures = collections.defaultdict(list)
+
         for obj in self._aggregate_objects:
             all_objects += 1
             has_failures = False
@@ -58,5 +67,7 @@ class AccountAggregate:
                 incompatible_objects += 1
         compatibility = (1 - incompatible_objects / all_objects if all_objects > 0 else 0) * 100
         logger.info(f"UC compatibility: {compatibility}% ({incompatible_objects}/{all_objects})")
-        for failure, objects in failures.items():
-            logger.info(f"{failure}: {len(objects)} objects")
+
+        # TODO: output failures in file
+        # for failure, objects in failures.items():
+        #     logger.info(f"{failure}: {len(objects)} objects")
