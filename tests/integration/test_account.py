@@ -2,7 +2,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.account import AccountWorkspaces
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 
 
 def test_create_account_level_groups(make_ucx_group, make_group, make_user, acc, ws, make_random):

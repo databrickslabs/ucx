@@ -45,7 +45,7 @@ from databricks.labs.ucx.cli import (
     assign_metastore,
     migrate_tables,
 )
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.contexts.cli_command import WorkspaceContext, AccountContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -171,7 +171,8 @@ def test_create_account_groups():
     a.get_workspace_client.return_value = w
     w.get_workspace_id.return_value = None
     prompts = MockPrompts({})
-    create_account_groups(a, prompts, new_workspace_client=lambda: w)
+    ctx = AccountContext(a).replace()
+    create_account_groups(a, prompts, ctx=ctx)
     a.groups.list.assert_called_with(attributes="id")
 
 
@@ -181,8 +182,9 @@ def test_create_account_groups_with_id():
     a.get_workspace_client.return_value = w
     w.get_workspace_id.return_value = None
     prompts = MockPrompts({})
+    ctx = AccountContext(a, {"workspace_ids": "123,456"})
     with pytest.raises(ValueError, match="No workspace ids provided in the configuration found in the account"):
-        create_account_groups(a, prompts, workspace_ids="123,456", new_workspace_client=lambda: w)
+        create_account_groups(a, prompts, ctx=ctx)
 
 
 def test_manual_workspace_info(ws):

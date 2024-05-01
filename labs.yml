@@ -141,10 +141,10 @@ commands:
   - name: create-account-groups
     is_account_level: true
     description: |
-      Creates account level groups for all groups in workspaces provided in workspace_ids.
-      If workspace_ids is not provided, it will use all workspaces present in the account.
+      Creates account level groups for all groups in workspaces provided in --workspace-ids.
+      If --workspace-ids is not provided, it will use all workspaces present in the account.
     flags:
-      - name: workspace_ids
+      - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
   - name: migrate-locations
