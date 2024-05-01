@@ -514,9 +514,11 @@ def test_apply_location_acl_single_spn_azure(ws, installation):
         call(
             SecurableType.EXTERNAL_LOCATION,
             'loc1',
-            changes=[PermissionsChange(add=permissions, principal='foo.bar@imagine.com')],
-        ),
-        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='group1')]),
+            changes=[
+                PermissionsChange(add=permissions, principal='group1'),
+                PermissionsChange(add=permissions, principal='foo.bar@imagine.com'),
+            ],
+        )
     ]
     ws.grants.update.assert_has_calls(calls, any_order=True)
 
