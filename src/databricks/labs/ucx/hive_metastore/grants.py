@@ -399,7 +399,8 @@ class AwsACL:
             raise ResourceDoesNotExist(msg) from None
 
         permission_mappings = self._installation.load(
-            list[AWSRoleAction], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES
+            list[AWSRoleAction],
+            filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES,
         )
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
