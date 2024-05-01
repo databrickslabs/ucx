@@ -8,6 +8,7 @@ from databricks.labs.ucx.azure.resources import (
     AzureResource,
     AzureResources,
     Principal,
+    RawResource,
     StorageAccount,
 )
 
@@ -83,6 +84,20 @@ def test_role_assignments_container():
         )
         assert str(role_assignment.scope) == resource_id
         assert role_assignment.resource == AzureResource(resource_id)
+
+
+@pytest.mark.parametrize("missing_field", ["id", "name", "location", "networkAcls"])
+def test_storage_account_missing_fields(missing_field: str):
+    """A KeyError should be raised when the fields are missing."""
+    raw = {
+        "name": "sto3",
+        "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
+        "location": "westeu",
+        "networkAcls": {"defaultAction": "Deny"},
+    }
+    raw.pop(missing_field)
+    with pytest.raises(KeyError):
+        StorageAccount.from_raw_resource(RawResource(raw))
 
 
 def test_create_service_principal():
