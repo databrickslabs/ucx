@@ -170,7 +170,7 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def iam_create_uc_roles(self):
+    def iam_role_creation(self):
         return IamRoleCreation(
             self.installation,
             self.workspace_client,
