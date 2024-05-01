@@ -9,7 +9,6 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.account import AccountWorkspaces
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
 from databricks.labs.ucx.hive_metastore.tables import What
@@ -92,7 +91,10 @@ def sync_workspace_info(a: AccountClient):
 
 @ucx.command(is_account=True)
 def create_account_groups(
-    a: AccountClient, prompts: Prompts, workspace_ids: str | None = None, new_workspace_client=WorkspaceClient
+    a: AccountClient,
+    prompts: Prompts,
+    ctx: AccountContext | None = None,
+    **named_parameters,
 ):
     """
     Crawl all workspaces configured in workspace_ids, then creates account level groups if a WS local group is not present
@@ -100,19 +102,14 @@ def create_account_groups(
     If workspace_ids is not specified, it will create account groups for all workspaces configured in the account.
 
     The following scenarios are supported, if a group X:
-    - Exist in workspaces A,B,C and it has same members in there, it will be created in the account
+    - Exist in workspaces A,B,C, and it has same members in there, it will be created in the account
     - Exist in workspaces A,B but not in C, it will be created in the account
     - Exist in workspaces A,B,C. It has same members in A,B, but not in C. Then, X and C_X will be created in the
     account
     """
-
-    logger.info(f"Account ID: {a.config.account_id}")
-    if workspace_ids is not None:
-        workspace_id_list = [int(x.strip()) for x in workspace_ids.split(",")]
-    else:
-        workspace_id_list = None
-    workspaces = AccountWorkspaces(a, new_workspace_client)
-    workspaces.create_account_level_groups(prompts, workspace_id_list)
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_workspaces.create_account_level_groups(prompts, ctx.workspace_ids)
 
 
 @ucx.command

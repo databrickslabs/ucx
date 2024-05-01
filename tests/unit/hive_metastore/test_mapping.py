@@ -10,7 +10,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import ResourceConflict
 from databricks.sdk.service.catalog import TableInfo
 
-from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 

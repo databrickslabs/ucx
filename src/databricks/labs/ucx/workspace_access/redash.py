@@ -55,6 +55,8 @@ class RedashPermissionsSupport(AclSupport):
         # The validation step should keep retrying for at least 10 mins until the get api returns the new group name.
         # More details here: https://databricks.atlassian.net/browse/ES-992619
         verify_timeout: timedelta | None = timedelta(minutes=11),
+        # this parameter is for testing scenarios only - [{object_type}:{object_id}]
+        # it will use StaticListing class to return only object ids that has the same object type
         include_object_permissions: list[str] | None = None,
     ):
         self._ws = ws
@@ -73,7 +75,7 @@ class RedashPermissionsSupport(AclSupport):
     def get_crawler_tasks(self):
         if self._include_object_permissions:
             for item in StaticListing(self._include_object_permissions, self.object_types()):
-                yield partial(self._crawler_task, item.object_id, item.object_type)
+                yield partial(self._crawler_task, item.object_id, sql.ObjectTypePlural(item.object_type))
             return
         for listing in self._listings:
             for item in listing:
@@ -191,9 +193,8 @@ class RedashPermissionsSupport(AclSupport):
         retried_check = retry_on_value_error(self._verify)
         return retried_check(object_type, object_id, acl)
 
-    def _prepare_new_acl(
-        self, acl: list[sql.AccessControl], migration_state: MigrationState
-    ) -> list[sql.AccessControl]:
+    @staticmethod
+    def _prepare_new_acl(acl: list[sql.AccessControl], migration_state: MigrationState) -> list[sql.AccessControl]:
         """
         Please note the comment above on how we apply these permissions.
         Permissions are set/replaced and not updated/patched, therefore all existing ACLs need to be collected

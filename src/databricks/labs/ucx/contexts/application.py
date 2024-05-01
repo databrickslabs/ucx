@@ -10,7 +10,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
-from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.aws.credentials import CredentialManager
 from databricks.labs.ucx.config import WorkspaceConfig
@@ -165,8 +165,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def secret_scope_acl_support(self):
-        # Secret ACLs are not used much in tests, so skipping include_object_permissions
-        return SecretScopesSupport(self.workspace_client)
+        return SecretScopesSupport(
+            self.workspace_client, include_object_permissions=self.config.include_object_permissions
+        )
 
     @cached_property
     def legacy_table_acl_support(self):

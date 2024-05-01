@@ -70,6 +70,8 @@ class GenericPermissionsSupport(AclSupport):
         ws: WorkspaceClient,
         listings: list[Listing],
         verify_timeout: timedelta | None = timedelta(minutes=1),
+        # this parameter is for testing scenarios only - [{object_type}:{object_id}]
+        # it will use StaticListing class to return only object ids that has the same object type
         include_object_permissions: list[str] | None = None,
     ):
         self._ws = ws

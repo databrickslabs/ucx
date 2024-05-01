@@ -42,6 +42,28 @@ def test_secret_scopes_crawler():
     assert item.raw == '[{"permission": "MANAGE", "principal": "test"}]'
 
 
+def test_secret_scopes_crawler_include():
+    ws = create_autospec(WorkspaceClient)
+    ws.secrets.list_acls.return_value = [
+        workspace.AclItem(
+            principal="test",
+            permission=workspace.AclPermission.MANAGE,
+        )
+    ]
+
+    sup = SecretScopesSupport(ws=ws, include_object_permissions=["secrets:included"])
+    tasks = list(sup.get_crawler_tasks())
+    assert len(tasks) == 1
+    ws.secrets.list_scopes.assert_not_called()
+
+    _task = tasks[0]
+    item = _task()
+
+    assert item.object_id == "included"
+    assert item.object_type == "secrets"
+    assert item.raw == '[{"permission": "MANAGE", "principal": "test"}]'
+
+
 def test_secret_scopes_apply(migration_state: MigrationState):
     ws = create_autospec(WorkspaceClient)
     sup = SecretScopesSupport(ws=ws)
