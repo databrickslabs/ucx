@@ -181,11 +181,11 @@ class StaticMountCrawler(Mounts):
         return self._mounts
 
 
-class TestContext(RuntimeContext):  # pylint: disable=too-many-public-methods
+class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-methods
     def __init__(
         self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
     ):
-        RuntimeContext.__init__(self)
+        super().__init__()
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
@@ -237,7 +237,9 @@ class TestContext(RuntimeContext):  # pylint: disable=too-many-public-methods
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
 
     def with_aws_storage_permissions(
-        self, instance_profile_mapping: list[AWSRoleAction], uc_roles_mapping: list[AWSRoleAction]
+        self,
+        instance_profile_mapping: list[AWSRoleAction],
+        uc_roles_mapping: list[AWSRoleAction],
     ):
         self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
         self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
@@ -458,11 +460,11 @@ class TestContext(RuntimeContext):  # pylint: disable=too-many-public-methods
 
 @pytest.fixture
 def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
-    ctx = TestContext(make_table, make_schema, make_udf, make_group, env_or_skip)
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAzureCliTest(TestContext, WorkspaceContext):
+class LocalAzureCliTest(TestRuntimeContext, WorkspaceContext):
     def __init__(
         self,
         _ws: WorkspaceClient,
@@ -474,7 +476,7 @@ class LocalAzureCliTest(TestContext, WorkspaceContext):
     ):
 
         WorkspaceContext.__init__(self, _ws, {})
-        TestContext.__init__(
+        TestRuntimeContext.__init__(
             self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
         )
         self._env_or_skip = env_or_skip_fixture
@@ -499,7 +501,7 @@ def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend, make_table, make_group
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAwsCliTest(TestContext, WorkspaceContext):
+class LocalAwsCliTest(TestRuntimeContext, WorkspaceContext):
     def __init__(
         self,
         _ws: WorkspaceClient,
@@ -511,7 +513,7 @@ class LocalAwsCliTest(TestContext, WorkspaceContext):
     ):
 
         WorkspaceContext.__init__(self, _ws, {})
-        TestContext.__init__(
+        TestRuntimeContext.__init__(
             self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
         )
         self._env_or_skip = env_or_skip_fixture
@@ -540,7 +542,7 @@ def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend, make_table, make_grou
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestInstallationContext(TestContext):
+class TestInstallationContext(TestRuntimeContext):
     def __init__(
         self,
         make_table_fixture,
