@@ -283,6 +283,7 @@ def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
@@ -331,6 +332,7 @@ def test_print_action_plan(caplog, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
@@ -364,6 +366,7 @@ def test_run(installation, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
@@ -387,14 +390,14 @@ def test_run_warning_non_allow_network_configuration(installation, sp_migration,
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
     expected_message = (
         "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration, "
-        "which might cause connectivity issues. We recommend using access connectors with managed identities instead "
-        "(confirm with prompt below)."
+        "which might cause connectivity issues."
     )
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):

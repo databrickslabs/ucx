@@ -254,7 +254,15 @@ class ServicePrincipalMigration(SecretsMixin):
         )
         if plan_confirmed:
             sp_migration_infos = self._generate_migration_list(include_names)
-            sp_results = self._migrate_service_principals(sp_migration_infos)
+            plan_confirmed = True
+            if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
+                plan_confirmed = prompts.confirm(
+                    "At least one Azure Service Principal accesses a storage account with non-Allow default network "
+                    "configuration, which might connectivity issues. We recommend using Databricks Access Connectors "
+                    "instead (next prompt). Would you like to continue with migrating the service principals?"
+                )
+            if plan_confirmed:
+                sp_results = self._migrate_service_principals(sp_migration_infos)
         else:
             sp_results = []
 
