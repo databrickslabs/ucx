@@ -8,7 +8,8 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import AccountClient, WorkspaceClient
 
-from databricks.labs.ucx.account import AccountWorkspaces, AccountMetastores
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
+from databricks.labs.ucx.account.metastores import AccountMetastores
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration
@@ -178,8 +179,12 @@ class AccountContext(CliContext):
         return self._ac
 
     @cached_property
+    def workspace_ids(self):
+        return [int(_.strip()) for _ in self.named_parameters.get("workspace_ids", "").split(",") if _]
+
+    @cached_property
     def account_workspaces(self):
-        return AccountWorkspaces(self.account_client)
+        return AccountWorkspaces(self.account_client, self.workspace_ids)
 
     @cached_property
     def account_metastores(self):

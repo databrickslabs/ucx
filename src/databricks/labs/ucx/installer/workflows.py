@@ -13,7 +13,6 @@ from typing import Any
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
@@ -45,7 +44,6 @@ from databricks.sdk.service.workspace import ObjectType
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.logs import PartialLogRecord, parse_logs
 from databricks.labs.ucx.installer.mixins import InstallationMixin
@@ -399,8 +397,8 @@ class WorkflowsDeployment(InstallationMixin):
         self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
-    def create_jobs(self, prompts):
-        remote_wheel = self._upload_wheel(prompts)
+    def create_jobs(self):
+        remote_wheel = self._upload_wheel()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -522,15 +520,8 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
 
-    def _upload_wheel(self, prompts: Prompts):
+    def _upload_wheel(self):
         with self._wheels:
-            try:
-                self._wheels.upload_to_dbfs()
-            except (BadRequest, PermissionDenied) as err:
-                logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
-                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, prompts.choice_from_dict)
-                self._config.override_clusters = configure_cluster_overrides.configure()
-                self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -633,12 +624,7 @@ class WorkflowsDeployment(InstallationMixin):
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
-        if jobs_task.job_cluster_key is not None and "table_migration" in jobs_task.job_cluster_key:
-            # Shared mode cluster cannot use dbfs, need to use WSFS
-            libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
-        else:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1098
-            libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
+        libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         named_parameters = {
             "config": f"/Workspace{self._config_file}",
             "workflow": workflow,

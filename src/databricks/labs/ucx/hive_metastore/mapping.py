@@ -11,7 +11,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
 from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
-from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table

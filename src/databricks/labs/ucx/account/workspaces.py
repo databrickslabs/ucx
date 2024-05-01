@@ -3,43 +3,27 @@ from typing import ClassVar
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
-from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.errors import NotFound, ResourceConflict, PermissionDenied
+from databricks.sdk import WorkspaceClient, Workspace, AccountClient
+from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
-from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.settings import DefaultNamespaceSetting, StringMessage
 
 logger = logging.getLogger(__name__)
 
 
 class AccountWorkspaces:
-    _tlds: ClassVar[dict[str, str]] = {
-        "aws": "cloud.databricks.com",
-        "azure": "azuredatabricks.net",
-        "gcp": "gcp.databricks.com",
-    }
-
     SYNC_FILE_NAME: ClassVar[str] = "workspaces.json"
 
-    def __init__(self, account_client: AccountClient, new_workspace_client=WorkspaceClient):
-        # TODO: new_workspace_client is a design flaw, remove it
-        self._new_workspace_client = new_workspace_client
+    def __init__(self, account_client: AccountClient, include_workspace_ids: list[int] | None = None):
         self._ac = account_client
+        self._include_workspace_ids = include_workspace_ids if include_workspace_ids else []
 
     def _workspaces(self):
         return self._ac.workspaces.list()
 
-    def _get_cloud(self) -> str:
-        if self._ac.config.is_azure:
-            return "azure"
-        if self._ac.config.is_gcp:
-            return "gcp"
-        return "aws"
-
     def client_for(self, workspace: Workspace) -> WorkspaceClient:
         return self._ac.get_workspace_client(workspace)
 
-    def workspace_clients(self, workspaces: list[Workspace] | None) -> list[WorkspaceClient]:
+    def workspace_clients(self, workspaces: list[Workspace] | None = None) -> list[WorkspaceClient]:
         """
         Return a list of WorkspaceClient for each configured workspace in the account
         :return: list[WorkspaceClient]
@@ -96,11 +80,10 @@ class AccountWorkspaces:
             return None
 
     def _get_valid_workspaces_ids(self, workspace_ids: list[int] | None = None) -> list[int]:
-        if not workspace_ids:
-            logger.info("No workspace ids provided, using current workspace instead")
-            return [self._new_workspace_client().get_workspace_id()]
-
         all_workspace_ids = [workspace.workspace_id for workspace in self._workspaces()]
+        if not workspace_ids:
+            return all_workspace_ids
+        # TODO: remove this method and rely on _include_workspace_ids
 
         valid_workspace_ids = []
         for workspace_id in workspace_ids:
@@ -259,87 +242,3 @@ class WorkspaceInfo:
         for installation in Installation.existing(self._ws, 'ucx'):
             installation.save(workspaces, filename=AccountWorkspaces.SYNC_FILE_NAME)
         logger.info("Synchronised workspace id mapping for installations on current workspace")
-
-
-class AccountMetastores:
-    def __init__(
-        self,
-        account_client: AccountClient,
-    ):
-        self._ac = account_client
-
-    def show_all_metastores(self, workspace_id: str | None = None):
-        location = None
-        if workspace_id:
-            logger.info(f"Workspace ID: {workspace_id}")
-            location = self._get_region(int(workspace_id))
-        logger.info("Matching metastores are:")
-        for metastore in self._get_all_metastores(location).keys():
-            logger.info(metastore)
-
-    def assign_metastore(
-        self,
-        prompts: Prompts,
-        str_workspace_id: str | None = None,
-        metastore_id: str | None = None,
-        default_catalog: str | None = None,
-    ):
-        if not str_workspace_id:
-            workspace_choices = self._get_all_workspaces()
-            workspace_id = prompts.choice_from_dict("Please select a workspace:", workspace_choices)
-        else:
-            workspace_id = int(str_workspace_id)
-        if not metastore_id:
-            # search for all matching metastores
-            metastore_choices = self._get_all_metastores(self._get_region(workspace_id))
-            if len(metastore_choices) == 0:
-                raise ValueError(f"No matching metastore found for workspace {workspace_id}")
-            # if there are multiple matches, prompt users to select one
-            if len(metastore_choices) > 1:
-                metastore_id = prompts.choice_from_dict(
-                    "Multiple metastores found, please select one:", metastore_choices
-                )
-            else:
-                metastore_id = list(metastore_choices.values())[0]
-        if metastore_id is not None:
-            self._ac.metastore_assignments.create(workspace_id, metastore_id)
-        # set the default catalog using the default_namespace setting API
-        if default_catalog is not None:
-            self._set_default_catalog(workspace_id, default_catalog)
-
-    def _get_region(self, workspace_id: int) -> str:
-        workspace = self._ac.workspaces.get(workspace_id)
-        if self._ac.config.is_aws:
-            return str(workspace.aws_region)
-        return str(workspace.location)
-
-    def _get_all_workspaces(self) -> dict[str, int]:
-        output = dict[str, int]()
-        for workspace in self._ac.workspaces.list():
-            if workspace.workspace_id:
-                output[f"{workspace.workspace_name} - {workspace.workspace_id}"] = workspace.workspace_id
-        return dict(sorted(output.items()))
-
-    def _get_all_metastores(self, location: str | None = None) -> dict[str, str]:
-        output = dict[str, str]()
-        for metastore in self._ac.metastores.list():
-            if location is None or metastore.region == location:
-                output[f"{metastore.name} - {metastore.metastore_id}"] = str(metastore.metastore_id)
-        return dict(sorted(output.items()))
-
-    def _set_default_catalog(self, workspace_id: int, default_catalog: str):
-        if default_catalog == "":
-            return
-        workspace = self._ac.workspaces.get(int(workspace_id))
-        default_namespace = self._ac.get_workspace_client(workspace).settings.default_namespace
-        # needs to get the etag first, before patching the setting
-        try:
-            etag = default_namespace.get().etag
-        except NotFound as err:
-            # if not found, the etag is returned in the header
-            etag = err.details[0].metadata.get("etag")
-        default_namespace.update(
-            allow_missing=True,
-            field_mask="namespace.value",
-            setting=DefaultNamespaceSetting(etag=etag, namespace=StringMessage(default_catalog)),
-        )
