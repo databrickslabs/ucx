@@ -79,16 +79,21 @@ class TablesMigrator:
         if mounts_crawler:
             mounts = list(mounts_crawler.snapshot())
         if what == What.VIEW:
-            return self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
-        return self._migrate_tables(
-            what,
-            acl_strategy,
-            all_grants_to_migrate,
-            all_migrated_groups,
-            all_principal_grants,
-            mounts,
-            hiveserde_in_place_migrate,
-        )
+            tasks = self._migrate_views(acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants)
+        else:
+            tasks = self._migrate_tables(
+                what,
+                acl_strategy,
+                all_grants_to_migrate,
+                all_migrated_groups,
+                all_principal_grants,
+                mounts,
+                hiveserde_in_place_migrate,
+            )
+        # Refresh migration status
+        self._migration_status_refresher.reset()
+        self._migration_status_refresher.snapshot()
+        return tasks
 
     def _migrate_tables(
         self,
