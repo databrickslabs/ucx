@@ -11,7 +11,6 @@ from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import (
     ProductInfo,
-    Wheels,
     WheelsV2,
     find_project_root,
 )
@@ -244,7 +243,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
     wheels.upload_to_wsfs.assert_not_called()
 
 
-def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
+def test_install_cluster_override_jobs(ws, mock_installation):
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
         WorkspaceConfig(inventory_database='ucx', override_clusters={"main": 'one', "tacl": 'two'}, policy_id='123'),
@@ -257,67 +256,17 @@ def test_install_cluster_override_jobs(ws, mock_installation, any_prompt):
         Workflows.all().tasks(),
     )
 
-    workflows_installation.create_jobs(any_prompt)
+    workflows_installation.create_jobs()
 
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
     assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
     wheels.upload_to_wsfs.assert_called_once()
-    wheels.upload_to_dbfs.assert_called_once()
+    wheels.upload_to_dbfs.assert_not_called()
 
 
-def test_write_protected_dbfs(ws, tmp_path, mock_installation):
-    """Simulate write protected DBFS AND override clusters"""
-    wheels = create_autospec(Wheels)
-    wheels.upload_to_dbfs.side_effect = PermissionDenied(...)
-    wheels.upload_to_wsfs.return_value = "/a/b/c"
-
-    prompts = MockPrompts(
-        {
-            ".*pre-existing HMS Legacy cluster ID.*": "1",
-            ".*pre-existing Table Access Control cluster ID.*": "1",
-            ".*": "",
-        }
-    )
-
-    workflows_installation = WorkflowsDeployment(
-        WorkspaceConfig(inventory_database='ucx', policy_id='123'),
-        mock_installation,
-        InstallState.from_installation(mock_installation),
-        ws,
-        wheels,
-        PRODUCT_INFO,
-        timedelta(seconds=1),
-        Workflows.all().tasks(),
-    )
-
-    workflows_installation.create_jobs(prompts)
-
-    tasks = created_job_tasks(ws, '[MOCK] assessment')
-    assert tasks['assess_jobs'].existing_cluster_id == "2222-999999-nosecuri"
-    assert tasks['crawl_grants'].existing_cluster_id == '3333-999999-legacytc'
-
-    mock_installation.assert_file_written(
-        'config.yml',
-        {
-            'version': 2,
-            'default_catalog': 'ucx_default',
-            'inventory_database': 'ucx',
-            'log_level': 'INFO',
-            'num_days_submit_runs_history': 30,
-            'num_threads': 10,
-            'min_workers': 1,
-            'max_workers': 10,
-            'override_clusters': {'main': '2222-999999-nosecuri', 'tacl': '3333-999999-legacytc'},
-            'policy_id': '123',
-            'renamed_group_prefix': 'ucx-renamed-',
-            'workspace_start_path': '/',
-        },
-    )
-
-
-def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
+def test_writeable_dbfs(ws, tmp_path, mock_installation):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
@@ -331,14 +280,14 @@ def test_writeable_dbfs(ws, tmp_path, mock_installation, any_prompt):
         Workflows.all().tasks(),
     )
 
-    workflows_installation.create_jobs(any_prompt)
+    workflows_installation.create_jobs()
 
     job = created_job(ws, '[MOCK] assessment')
     job_clusters = {_.job_cluster_key: _ for _ in job['job_clusters']}
     assert 'main' in job_clusters
     assert 'tacl' in job_clusters
     assert job_clusters["main"].new_cluster.policy_id == "123"
-    wheels.upload_to_dbfs.assert_called_once()
+    wheels.upload_to_dbfs.assert_not_called()
     wheels.upload_to_wsfs.assert_called_once()
 
 
@@ -651,7 +600,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
 
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/README')
     wheels.upload_to_wsfs.assert_called_once()
-    wheels.upload_to_dbfs.assert_called_once()
+    wheels.upload_to_dbfs.assert_not_called()
 
 
 def test_query_metadata(ws):
@@ -1649,7 +1598,7 @@ def test_check_inventory_database_exists(ws, mock_installation):
         install.configure()
 
 
-def test_user_not_admin(ws, mock_installation, any_prompt):
+def test_user_not_admin(ws, mock_installation):
     ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="group1")])
     wheels = create_autospec(WheelsV2)
     workspace_installation = WorkflowsDeployment(
@@ -1664,7 +1613,7 @@ def test_user_not_admin(ws, mock_installation, any_prompt):
     )
 
     with pytest.raises(PermissionError) as failure:
-        workspace_installation.create_jobs(any_prompt)
+        workspace_installation.create_jobs()
     assert "Current user is not a workspace admin" in str(failure.value)
 
     wheels.upload_to_wsfs.assert_called_once()
