@@ -233,9 +233,23 @@ def test_get_eligible_locations_principals(ws, installation):
 
 def test_interactive_cluster_no_acl(ws, installation):
     ws.config.is_azure = True
+    ws.config.is_aws = False
     cluster_spn = ServicePrincipalClusterMapping(
         'cluster3', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
     )
+    grants = principal_acl(ws, installation, [cluster_spn])
+    actual_grants = grants.get_interactive_cluster_grants()
+    assert len(actual_grants) == 0
+
+
+def test_interactive_cluster_not_found(ws, installation):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    cluster_spn = ServicePrincipalClusterMapping(
+        'cluster1',
+        {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')},
+    )
+    ws.permissions.get.side_effect = ResourceDoesNotExist
     grants = principal_acl(ws, installation, [cluster_spn])
     actual_grants = grants.get_interactive_cluster_grants()
     assert len(actual_grants) == 0
