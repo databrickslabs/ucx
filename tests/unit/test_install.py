@@ -1411,6 +1411,37 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     wheels.upload_to_wsfs.assert_called_once()
 
 
+def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
+    sql_backend = MockBackend()
+    ws.jobs.delete.side_effect = InvalidParameterValue(...)
+    install_state = InstallState.from_installation(mock_installation_extra_jobs)
+    wheels = create_autospec(WheelsV2)
+    workflows_installation = WorkflowsDeployment(
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        mock_installation_extra_jobs,
+        install_state,
+        ws,
+        wheels,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+        [],
+    )
+
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation_extra_jobs,
+        install_state,
+        sql_backend,
+        ws,
+        workflows_installation,
+        any_prompt,
+        PRODUCT_INFO,
+    )
+
+    workspace_installation.run()
+    wheels.upload_to_wsfs.assert_called_once()
+
+
 def test_get_existing_installation_global(ws, mock_installation):
     base_prompts = MockPrompts(
         {
