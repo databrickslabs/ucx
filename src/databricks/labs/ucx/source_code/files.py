@@ -4,18 +4,21 @@ import ast
 import logging
 import sys
 from pathlib import Path
+from collections.abc import Callable, Iterable
 
 from databricks.sdk.service.workspace import Language
 
-from databricks.labs.ucx.source_code.dependencies import (
-    DependencyGraph,
-    DependencyProblem,
-)
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import CellLanguage
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
-
+from databricks.labs.ucx.source_code.graph import (
+    DependencyGraph,
+    SourceContainer,
+    DependencyProblem,
+    DependencyLoader,
+    Dependency,
+    BaseDependencyResolver,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +58,7 @@ class LocalFile(SourceContainer):
                 parent.add_problems(call_problems)
                 continue
             problem = DependencyProblem(
-                code='dependency-check',
+                code='dependency-not-constant',
                 message="Can't check dependency not provided as a constant",
                 source_path=self._path,
                 start_line=call.lineno,
@@ -65,14 +68,8 @@ class LocalFile(SourceContainer):
             )
             parent.add_problems([problem])
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        in_site_packages = "site-packages" in parent.dependency.path.as_posix()
-        sys_module_keys = sys.modules.keys()
         for pair in PythonLinter.list_import_sources(linter):
             import_name = pair[0]
-            # TODO remove HORRIBLE hack until we implement https://github.com/databrickslabs/ucx/issues/1421
-            # if it's a site-package, provide full path until we implement 1421
-            if in_site_packages and import_name not in sys_module_keys:
-                import_name = Path(parent.dependency.path.parent, import_name + ".py").as_posix()
             import_problems: list[DependencyProblem] = []
             parent.register_import(import_name, import_problems.append)
             node = pair[1]
@@ -138,3 +135,90 @@ class LocalFileMigrator:
                 logger.info(f"Overwriting {path}")
                 f.write(code)
                 return True
+
+
+class FileLoader(DependencyLoader):
+
+    def __init__(self, syspath_provider: SysPathProvider):
+        self._syspath_provider = syspath_provider
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        fullpath = self.full_path(dependency.path)
+        assert fullpath is not None
+        return LocalFile(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
+
+    def exists(self, path: Path) -> bool:
+        return self.full_path(path) is not None
+
+    def full_path(self, path: Path) -> Path | None:
+        if path.is_file():
+            return path
+        for parent in self._syspath_provider.paths:
+            child = Path(parent, path)
+            if child.is_file():
+                return child
+        return None
+
+    def is_notebook(self, path: Path) -> bool:
+        fullpath = self.full_path(path)
+        assert fullpath is not None
+        with fullpath.open(mode="r", encoding="utf-8") as stream:
+            line = stream.readline()
+            return NOTEBOOK_HEADER in line
+
+
+class LocalFileResolver(BaseDependencyResolver):
+
+    def __init__(self, file_loader: FileLoader, next_resolver: BaseDependencyResolver | None = None):
+        super().__init__(next_resolver)
+        self._file_loader = file_loader
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return LocalFileResolver(self._file_loader, resolver)
+
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
+    def resolve_local_file(
+        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
+    ) -> Dependency | None:
+        if self._file_loader.exists(path) and not self._file_loader.is_notebook(path):
+            return Dependency(self._file_loader, path)
+        return super().resolve_local_file(path, problem_collector)
+
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        fullpath = self._file_loader.full_path(Path(f"{name}.py"))
+        if fullpath is not None:
+            return Dependency(self._file_loader, fullpath)
+        return super().resolve_import(name, problem_collector)
+
+
+class SysPathProvider:
+
+    @classmethod
+    def from_pathlike_string(cls, syspath: str):
+        paths = syspath.split(':')
+        return SysPathProvider([Path(path) for path in paths])
+
+    @classmethod
+    def from_sys_path(cls):
+        return SysPathProvider([Path(path) for path in sys.path])
+
+    def __init__(self, paths: list[Path]):
+        self._paths = paths
+
+    def push(self, path: Path):
+        self._paths.insert(0, path)
+
+    def insert(self, index: int, path: Path):
+        self._paths.insert(index, path)
+
+    def remove(self, index: int):
+        del self._paths[index]
+
+    def pop(self) -> Path:
+        result = self._paths[0]
+        del self._paths[0]
+        return result
+
+    @property
+    def paths(self) -> Iterable[Path]:
+        yield from self._paths

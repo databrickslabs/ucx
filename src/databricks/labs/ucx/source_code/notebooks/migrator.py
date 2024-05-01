@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ExportFormat, ObjectInfo, ObjectType
+from databricks.sdk.service.workspace import ObjectInfo, ExportFormat, ObjectType
 
+from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import Notebook, RunCell
-from databricks.labs.ucx.source_code.dependencies import (
-    Dependency,
-)
-from databricks.labs.ucx.source_code.dependency_loaders import WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.notebooks.cells import RunCell
+from databricks.labs.ucx.source_code.notebooks.loaders import WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 
 
 class NotebookMigrator:
