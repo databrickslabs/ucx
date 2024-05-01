@@ -24,6 +24,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSRoleAction,
 )
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
+from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from tests.unit import DEFAULT_CONFIG
@@ -294,56 +295,46 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
-    principal_acl = create_autospec(PrincipalACL)
-    aws_resource_permissions = AWSResourcePermissions(
-        installation_single_role,
-        mock_ws,
-        backend,
-        aws,
-        locations,
-        principal_acl,
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, backend, aws, locations, "ucx")
+    role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
+    role_creation.run(MockPrompts({"Above *": "yes"}))
+    aws.list_all_uc_roles.return_value = []
+    assert not aws.create_uc_role.assert_called_with('UC_ROLE')
+    assert not aws.put_role_policy.assert_called_with(
+        'UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None
     )
-    aws_resource_permissions.create_uc_roles_cli()
-    aws.create_uc_role.assert_called_with('UC_ROLE')
-    assert (
-        aws.put_role_policy.assert_called_with(
-            'UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None
-        )
-        is None
-    )
-    principal_acl.apply_location_acl.assert_not_called()
 
 
 def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
-    principal_acl = create_autospec(PrincipalACL)
-    aws_resource_permissions = AWSResourcePermissions(
-        installation_single_role,
-        mock_ws,
-        backend,
-        aws,
-        locations,
-        principal_acl,
-    )
-    aws_resource_permissions.create_uc_roles_cli(single_role=False)
-    aws.create_uc_role.assert_has_calls([call('UC_ROLE-1'), call('UC_ROLE-2')], any_order=True)
-    assert call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None) in aws.put_role_policy.call_args_list
-    assert call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None) in aws.put_role_policy.call_args_list
-    principal_acl.apply_location_acl.assert_not_called()
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, backend, aws, locations, "ucx")
+    role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
+    role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
+    aws.list_all_uc_roles.return_value = []
+    assert call('UC_ROLE_1') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_2') in aws.create_uc_role.call_args_list
+    assert call('UC_ROLE_1', 'UC_POLICY', {'s3://BUCKET1/FOLDER1'}, None, None) in aws.put_role_policy.call_args_list
+    assert call('UC_ROLE_2', 'UC_POLICY', {'s3://BUCKET2/FOLDER2'}, None, None) in aws.put_role_policy.call_args_list
 
 
-def test_create_uc_no_roles(installation_no_roles, mock_aws, caplog):
+def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
     sql_backend = MockBackend(rows={}, fails_on_first={})
-    workspace = create_autospec(WorkspaceClient)
-    external_locations = ExternalLocations(workspace, sql_backend, "ucx")
+    external_locations = ExternalLocations(mock_ws, sql_backend, "ucx")
+    aws = create_autospec(AWSResources)
     aws_resource_permissions = AWSResourcePermissions(
-        installation_no_roles, workspace, sql_backend, mock_aws, external_locations, "ucx"
+        installation_no_roles,
+        mock_ws,
+        sql_backend,
+        aws,
+        external_locations,
+        "ucx",
     )
-    role_creation = IamRoleCreation(installation_no_roles, workspace, aws_resource_permissions)
+    role_creation = IamRoleCreation(installation_no_roles, mock_ws, aws_resource_permissions)
+    aws.list_all_uc_roles.return_value = []
     with caplog.at_level(logging.INFO):
         role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
         assert ['No IAM Role created'] == caplog.messages
-        assert not mock_aws.create_uc_role.called
+        aws.create_uc_role.assert_not_called()
 
 
 def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
