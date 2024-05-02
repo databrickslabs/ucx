@@ -17,7 +17,7 @@ class AstHelper:
         return None
 
     @staticmethod
-    def _get_value(node: ast.Name | ast.Attribute):
+    def _get_value(node: ast.Attribute):
         if isinstance(node.value, ast.Name):
             return node.value.id + '.' + node.attr
 

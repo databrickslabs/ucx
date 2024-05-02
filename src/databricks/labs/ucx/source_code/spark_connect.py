@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.ast import AstHelper
 
 @dataclass
 class SharedClusterMatcher:
-    data_security_mode: DataSecurityMode
+    data_security_mode: DataSecurityMode | None
 
     @abstractmethod
     def _lint(self, node: ast.AST) -> Iterator[Advice]:
@@ -36,7 +36,7 @@ class JvmAccessMatcher(SharedClusterMatcher):
         "_jsparkSession",
     ]
 
-    def _lint(self, node: ast.AST) -> bool:
+    def _lint(self, node: ast.AST) -> Iterator[Advice]:
         if not isinstance(node, ast.Attribute):
             return
         if node.attr not in JvmAccessMatcher._FIELDS:
@@ -72,13 +72,14 @@ class RDDApiMatcher(SharedClusterMatcher):
         "wholeTextFiles",
     ]
 
-    def _lint(self, node: ast.AST) -> bool:
+    def _lint(self, node: ast.AST) -> Iterator[Advice]:
         if not isinstance(node, ast.Call):
             return
         assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
         if node.func.attr not in RDDApiMatcher._SC_METHODS:
             return
-        if not AstHelper.get_full_function_name(node).endswith(f"sc.{node.func.attr}"):
+        function_name = AstHelper.get_full_function_name(node)
+        if not function_name or not function_name.endswith(f"sc.{node.func.attr}"):
             return
         yield Advice(
             code='shared-clusters',
@@ -97,7 +98,7 @@ class SparkSqlContextMatcher(SharedClusterMatcher):
         "sparkContext"
     ]
 
-    def _lint(self, node: ast.AST) -> bool:
+    def _lint(self, node: ast.AST) -> Iterator[Advice]:
         if not isinstance(node, ast.Attribute):
             return
         if node.attr not in SparkSqlContextMatcher._ATTRIBUTES:
