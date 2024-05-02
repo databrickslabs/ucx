@@ -30,7 +30,11 @@ class AssessmentObject:
 
 
 class AccountAggregate:
-    def __init__(self, account_workspaces: AccountWorkspaces, workspace_context_factory: Callable[[WorkspaceClient], WorkspaceContext] = WorkspaceContext):
+    def __init__(
+        self,
+        account_workspaces: AccountWorkspaces,
+        workspace_context_factory: Callable[[WorkspaceClient], WorkspaceContext] = WorkspaceContext,
+    ):
         self._account_workspaces = account_workspaces
         self._workspace_context_factory = workspace_context_factory
 
@@ -56,13 +60,17 @@ class AccountAggregate:
             try:
                 # use already existing code to replace tables in the query, assuming that UCX database is in HMS
                 inventory_database = ctx.config.inventory_database
-                stub_index = MigrationIndex([MigrationStatus(
-                    src_schema=inventory_database,
-                    src_table=table_name,
-                    dst_catalog='hive_metastore',
-                    dst_schema=inventory_database,
-                    dst_table=table_name,
-                )])
+                stub_index = MigrationIndex(
+                    [
+                        MigrationStatus(
+                            src_schema=inventory_database,
+                            src_table=table_name,
+                            dst_catalog='hive_metastore',
+                            dst_schema=inventory_database,
+                            dst_table=table_name,
+                        )
+                    ]
+                )
                 from_table = FromTable(stub_index, CurrentSessionState(schema=inventory_database))
                 logger.info(f"Querying Schema {inventory_database}")
 
@@ -99,4 +107,3 @@ class AccountAggregate:
 
         for failure, objects in failures.items():
             logger.info(f"{failure}: {len(objects)} objects")
-
