@@ -3,6 +3,8 @@ name: acceptance
 on:
   pull_request:
     types: [ opened, synchronize, ready_for_review ]
+  merge_group:
+    types: [ checks_requested ]
 
 permissions:
   id-token: write

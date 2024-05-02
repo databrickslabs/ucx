@@ -3,6 +3,8 @@ name: no-cheat
 on:
   pull_request:
     types: [opened, synchronize]
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   no-pylint-disable:
