@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.syspath import SysPathProvider
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     _load_sources,
@@ -118,7 +118,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
             LocalFileResolver(file_loader),
         ]
     )
-    provider = SysPathProvider.from_sys_path()
+    provider = PathLookup.from_sys_path()
     builder = DependencyGraphBuilder(dependency_resolver, provider)
     builder.build_local_file_dependency_graph(Path("path"))
     problems: list[DependencyProblem] = list(dependency_resolver.problems)
@@ -152,7 +152,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
             LocalFileResolver(file_loader),
         ]
     )
-    provider = SysPathProvider.from_sys_path()
+    provider = PathLookup.from_sys_path()
     builder = DependencyGraphBuilder(dependency_resolver, provider)
     builder.build_local_file_dependency_graph(Path("root9.py.txt"))
     problems: list[DependencyProblem] = list(dependency_resolver.problems)

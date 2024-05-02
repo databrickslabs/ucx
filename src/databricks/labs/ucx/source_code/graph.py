@@ -7,7 +7,7 @@ from pathlib import Path
 from collections.abc import Callable, Iterable
 
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
-from databricks.labs.ucx.source_code.syspath import SysPathProvider
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class DependencyGraph:
@@ -17,7 +17,7 @@ class DependencyGraph:
         dependency: Dependency,
         parent: DependencyGraph | None,
         resolver: DependencyResolver,
-        syspath_provider: SysPathProvider,
+        syspath_provider: PathLookup,
     ):
         self._dependency = dependency
         self._parent = parent
@@ -195,7 +195,7 @@ class Dependency(abc.ABC):
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
         raise NotImplementedError()
 
 
@@ -378,7 +378,7 @@ class DependencyProblem:
 
 class DependencyGraphBuilder:
 
-    def __init__(self, resolver: DependencyResolver, syspath_provider: SysPathProvider):
+    def __init__(self, resolver: DependencyResolver, syspath_provider: PathLookup):
         self._resolver = resolver
         self._syspath_provider = syspath_provider
 

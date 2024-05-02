@@ -33,7 +33,7 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader, WorkspaceNotebookLoader
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.syspath import SysPathProvider
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraphBuilder
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages
@@ -355,16 +355,16 @@ class GlobalContext(abc.ABC):
         return SitePackages([])
 
     @cached_property
-    def syspath_provider(self):
-        return SysPathProvider.from_sys_path()
+    def path_lookup(self):
+        return PathLookup.from_sys_path()
 
     @cached_property
     def file_loader(self):
-        return FileLoader(self.syspath_provider)
+        return FileLoader(self.path_lookup)
 
     @cached_property
     def site_packages_resolver(self):
-        return SitePackagesResolver(self.site_packages, self.file_loader, self.syspath_provider)
+        return SitePackagesResolver(self.site_packages, self.file_loader, self.path_lookup)
 
     @cached_property
     def whitelist(self):
@@ -392,4 +392,4 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_graph_builder(self):
-        return DependencyGraphBuilder(self.dependency_resolver, self.syspath_provider)
+        return DependencyGraphBuilder(self.dependency_resolver, self.path_lookup)

@@ -21,7 +21,7 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.graph import SourceContainer, Dependency
 from databricks.labs.ucx.source_code.files import LocalFile, FileLoader
-from databricks.labs.ucx.source_code.syspath import SysPathProvider
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -250,7 +250,7 @@ def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited:
 class TestFileLoader(FileLoader):
     __test__ = False
 
-    def __init__(self, syspath_provider: SysPathProvider, sources: dict[str, str]):
+    def __init__(self, syspath_provider: PathLookup, sources: dict[str, str]):
         super().__init__(syspath_provider)
         self._sources = sources
 
@@ -272,7 +272,7 @@ class TestFileLoader(FileLoader):
 class VisitingFileLoader(FileLoader):
     __test__ = False
 
-    def __init__(self, syspath_provider: SysPathProvider, visited: dict[str, bool]):
+    def __init__(self, syspath_provider: PathLookup, visited: dict[str, bool]):
         super().__init__(syspath_provider)
         self._visited = visited
 
@@ -285,7 +285,7 @@ class VisitingFileLoader(FileLoader):
 
 class VisitingNotebookLoader(LocalNotebookLoader):
 
-    def __init__(self, syspath_provider: SysPathProvider, visited: dict[str, bool]):
+    def __init__(self, syspath_provider: PathLookup, visited: dict[str, bool]):
         super().__init__(syspath_provider)
         self._visited = visited
 

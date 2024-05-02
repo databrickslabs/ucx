@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from collections.abc import Callable
 
-from databricks.labs.ucx.source_code.syspath import SysPathProvider
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
@@ -36,7 +36,7 @@ class LocalFile(SourceContainer):
     def path(self):
         return self._path
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
@@ -149,7 +149,7 @@ class LocalFileMigrator:
 
 class FileLoader(DependencyLoader):
 
-    def __init__(self, syspath_provider: SysPathProvider):
+    def __init__(self, syspath_provider: PathLookup):
         self._syspath_provider = syspath_provider
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:

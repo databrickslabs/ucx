@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.syspath import SysPathProvider
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -61,7 +61,7 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
         syspath_provider.push_cwd(self.path.parent)
         problems: list[DependencyProblem] = []
         for cell in self._cells:
