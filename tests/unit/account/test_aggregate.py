@@ -34,8 +34,13 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
         = sql.ExecuteStatementResponse(status=sql.StatementStatus(
             state=sql.StatementState.SUCCEEDED),
             result=sql.ResultData(data_array=[
-                ["jobs", "123134", """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]"]"""],
-                ["clusters", "0325-3423-dfs", "[]"]]))
+                ["a", "b", "c"],
+                ["b", "c", "d"]], row_count=2),
+            manifest=sql.ResultManifest(schema=sql.ResultSchema(
+                columns=[sql.ColumnInfo(name="a", type_name=sql.ColumnInfoTypeName.STRING),
+                         sql.ColumnInfo(name="b", type_name=sql.ColumnInfoTypeName.STRING),
+                         sql.ColumnInfo(name="c", type_name=sql.ColumnInfoTypeName.STRING)])),
+            statement_id='123')
 
     ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="something", warehouse_id="1234"))
     account_aggregate_obj = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)

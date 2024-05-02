@@ -71,9 +71,6 @@ class AccountAggregate:
                     yield workspace_id, row
             except NotInstalled:
                 logger.warning(f"Workspace {workspace_id} does not have UCX installed")
-            # TODO: Add this exception handling
-            # except NotSuchTableException as e:
-            #     logger.warning(f"Workspace {workspace_id} does not have the required table: {e.table_name}")
 
     @cached_property
     def _aggregate_objects(self) -> list[AssessmentObject]:
