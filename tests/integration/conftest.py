@@ -229,8 +229,8 @@ class CommonUtils:
         instance_profile_mapping: list[AWSRoleAction],
         uc_roles_mapping: list[AWSRoleAction],
     ):
-        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
-        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
+        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME)
+        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
 
     @cached_property
     def installation(self):
