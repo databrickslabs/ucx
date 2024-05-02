@@ -58,7 +58,7 @@ def extract_test_info(ws, env_or_skip, make_random):
 
 
 @pytest.fixture
-def run_migration(sql_backend, inventory_schema):
+def run_migration(sql_backend, inventory_schema, env_or_skip):
     def inner(
         ws: WorkspaceClient,
         test_info: MigrationTestInfo,
@@ -77,7 +77,7 @@ def run_migration(sql_backend, inventory_schema):
         if azurerm is None:
             azurerm = AzureResources(azure_mgmt_client, graph_client)
 
-        external_location = ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/folder1", 1)
+        external_location = ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)
         sql_backend.save_table(f"{inventory_schema}.external_locations", [external_location], ExternalLocation)
         locations = ExternalLocations(ws, sql_backend, inventory_schema)
 
