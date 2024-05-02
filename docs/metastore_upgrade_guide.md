@@ -69,7 +69,7 @@ You can read about it here:
 In this step we are going to map all the cloud principals to the paths they have access to.
 
 
-#### Step 2.2: Create/Modify Cloud Principals
+#### Step 2.2: Create/Modify Cloud Principals and Credentials
 In this step we will create the necessary cloud principals for the UC credentials.
 The manual process is documented in the following links:
 [AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
@@ -96,12 +96,12 @@ Pass aws_profile for aws.
 
 For AWS we have the option to create fresh new AWS roles and set them up for UC access, using the following command:
 ```text
-
+databricks labs ucx create-missing-principles --aws-profile <aws_profile> --single-role <single_role>
 ```
-
-
-
-
+This command identifies all the S3 locations that are missing a UC compatible role and creates them. 
+It takes single-role optional parameter. 
+If set to True, it will create a single role for all the S3 locations.
+Otherwise, it will create a role for each S3 location.
 
 
 #### Step 2.3: Create Credentials
@@ -111,6 +111,10 @@ The manual process is documented in the following links:
 [Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
 AWS and Azure:
+The following CLI command can be used to create the UC credentials:
+```text
+databricks labs ucx create-credentials
+```
 
 
 #### Step 2.4: Create External Locations
