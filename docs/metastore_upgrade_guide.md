@@ -6,12 +6,12 @@ To effectively upgrade the metastores four principal operations are required:
 2. Create - In this step, you create the required UC assets such as, Metastore, Catalog, Schema, Storage Credentials, External Locations. This step is part of the upgrade process.
 3. Upgrade/Grant these are two steps that UCX combine.
    4. Upgrade - The metastores objects (tables/views) will be converted to a format supported by UC 
-   4. Grant - You will need to provide grants on the newly upgraded UC tables to principals, so that they can access the UC tables.
+   4. Grant - The table upgrade the newly created object the same permission as the original object.
 
 ## Prerequisites
 For UCX to be able to upgrade the metastore. The following prerequisites must be met:
-1. UCX must be installed and configured on the workspace. For more information on how to install UCX, refer to the [UCX Readme](../README.md).
-2. In case of an external metastore (such as GLUE), UCX has to be configured to attach to the metastore. For more information on how to configure UCX to attach to an external metastore, refer to the [UCX Readme](../README.md).
+1. UCX must be installed and configured on the workspace. For more information on how to install UCX, refer to the [external_hms_glue.md](external_hms_glue.md).
+2. In case of an external metastore (such as GLUE), UCX has to be configured to attach to the metastore. For more information on how to configure UCX to attach to an external metastore, refer to the [External Metastore Guide]().
 3. The assessment workflow must be run.
 4. It is recommended that the group migration process will be completed before upgrading the metastore. For more information on how to migrate groups, refer to the [UCX Readme](../README.md).
 5. The workspace should be configured with a Metastore follow the instruction here [Create UC Metastore](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html)<br>
@@ -28,6 +28,11 @@ This step can be performed using the `create-table-mapping` command documented i
 
 #### Step 1.2: Update the mapping file
 Update the mapping file with the required mappings. That can be performed by editing the file that was created in the previous step.
+By default all the tables/views will be mapped to UC tables.
+All the tables will be mapped to a single catalog, maintaining the schema/name of the original table.
+You can exclude tables from the mapping by removing the line from the mapping file.
+You can also change the catalog/schema name of the UC table by changing the line in the mapping file.
+
 
 
 
@@ -52,11 +57,37 @@ In this step we are going to map all the cloud principals to the paths they have
 
 
 #### Step 2.2: Create/Modify Cloud Principals
+In this step we will create the necessary cloud principals for the UC credentials.
+The manual process is documented in the following links:
+[AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
+[Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
+
+AWS:
+For AWS we have two options represented by two CLI commands:
+
+
+Azure:
+
+
+
 
 
 #### Step 2.3: Create Credentials
+Once the cloud principals are created, we can create the UC credentials.
+The manual process is documented in the following links:
+[AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
+[Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
+
+AWS and Azure:
+
 
 #### Step 2.4: Create External Locations
+Once the UC credentials are created, we can create the UC external locations.
+An external location will be created for each of the locations identified in the assessment.
+The Assessment dashboard displayed all the locations that need to be created.
+The Manual process is documented in the following links:
+[AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
+[Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
 
 #### Step 2.5: Create "Uber Principal"
 Uber Principals are principals that have access to all the external tables' location. 
