@@ -281,6 +281,7 @@ def sp_migration(installation, credential_manager):
         id=AzureResource("/subscriptions/test/providers/Microsoft.Storage/storageAccount/labsazurethings"),
         name="labsazurethings",
         location="westeu",
+        default_network_action="Allow",
     )
     azurerm = create_autospec(AzureResources)
     azurerm.storage_accounts.return_value = [storage_account]
@@ -406,7 +407,7 @@ def test_run_without_confirmation(sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
-            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -476,7 +477,7 @@ def test_create_access_connectors_for_storage_accounts(sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
         }
     )
 
