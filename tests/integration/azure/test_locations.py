@@ -220,7 +220,6 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_
 
 
 def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster, az_cli_ctx, env_or_skip):
-
     az_cli_ctx.with_dummy_resource_permission()
     az_cli_ctx.save_locations()
     cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
