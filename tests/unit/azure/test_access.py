@@ -376,7 +376,8 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     )
 
 
-def test_create_access_connectors_for_storage_accounts_one_access_connector():
+@pytest.mark.parametrize("yield_container", (True, False))
+def test_create_access_connectors_for_storage_accounts_one_access_connector(yield_container):
     """One access connector should be created for one storage account."""
     w = create_autospec(WorkspaceClient)
 
@@ -396,6 +397,15 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector():
         default_network_action="Allow",
     )
     azure_resources.storage_accounts.return_value = [storage_account]
+
+    container = AzureResource(
+        "/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1/containers/container"
+    )
+    if yield_container:
+        container_iter = iter([container])
+    else:
+        container_iter = iter([])
+    azure_resources.containers.return_value = container_iter
 
     access_connector_id = AzureResource(
         "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
