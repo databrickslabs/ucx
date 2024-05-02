@@ -12,7 +12,7 @@ from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.account.metastores import AccountMetastores
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.aws.credentials import IamRoleMigration
+from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreation
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration, StorageCredentialManager
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
@@ -167,6 +167,14 @@ class WorkspaceContext(CliContext):
             self.installation,
             self.aws_resource_permissions,
             self.iam_credential_manager,
+        )
+
+    @cached_property
+    def iam_role_creation(self):
+        return IamRoleCreation(
+            self.installation,
+            self.workspace_client,
+            self.aws_resource_permissions,
         )
 
     @cached_property
