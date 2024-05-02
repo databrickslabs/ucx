@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 
+from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -312,6 +313,16 @@ class DependencyProblem:
             start_col if start_col is not None else self.start_col,
             end_line if end_line is not None else self.end_line,
             end_col if end_col is not None else self.end_col,
+        )
+
+    def as_advisory(self) -> 'Advisory':
+        return Advisory(
+            code=self.code,
+            message=self.message,
+            start_line=self.start_line,
+            start_col=self.start_col,
+            end_line=self.end_line,
+            end_col=self.end_col,
         )
 
 

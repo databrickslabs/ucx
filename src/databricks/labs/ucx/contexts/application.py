@@ -33,6 +33,7 @@ from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
+from databricks.labs.ucx.source_code.jobs import WorkflowLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader, WorkspaceNotebookLoader
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -397,6 +398,15 @@ class GlobalContext(abc.ABC):
     @cached_property
     def dependency_graph_builder(self):
         return DependencyGraphBuilder(self.dependency_resolver, self.path_lookup)
+
+    @cached_property
+    def workflow_linter(self):
+        return WorkflowLinter(
+            self.workspace_client,
+            self.dependency_graph_builder,
+            self.tables_migrator.index(),
+            self.whitelist,
+        )
 
 
 class CliContext(GlobalContext, abc.ABC):
