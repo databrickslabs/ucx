@@ -6,10 +6,13 @@ import sys
 from pathlib import Path
 from collections.abc import Callable, Iterable
 
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
@@ -226,12 +229,13 @@ class SysPathProvider:
 
 class LocalFileLinter:
 
-    def __init__(self, languages: Languages):
-        self._languages = languages
-        # TODO: Needs to support local notebooks, as well as pure python files
-        self._extensions = {".py": Language.PYTHON}
+    def __init__(self, ws: WorkspaceClient) -> None:
+        self._ws = ws
+        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
+    # TODO: Build dependency graph, use ws tools for directory walk
     def lint(self, path: Path) -> bool:
+
         if path.is_dir():
             for child_path in path.iterdir():
                 self.lint(child_path)
@@ -246,10 +250,28 @@ class LocalFileLinter:
             return False
         advised = False
         logger.info(f"Analysing {path}")
-        linter = self._languages.linter(language)
+
+        # TODO: Where to load the migration index from?
+        migration_index = MigrationIndex([])
+        # Recreate Language every time to reset the state
+        languages = Languages(migration_index)
+        # TODO: Change to use ws tools rather than with
         with path.open("r") as f:
             code = f.read()
+            # Check to see if this is actually a notebook
+            if self.is_notebook(code):
+                notebook_linter = NotebookLinter.from_source(migration_index, code, language)
+                for advice in notebook_linter.lint():
+                    logger.info(f"Found: {advice}")
+                    advised = True
+                return advised
+
+            linter = languages.linter(language)
             for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
                 advised = True
             return advised
+
+    @staticmethod
+    def is_notebook(src: str) -> bool:
+        return NOTEBOOK_HEADER in src.split('\n', 1)[0]

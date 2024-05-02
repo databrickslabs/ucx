@@ -50,7 +50,7 @@ class WorkspaceContext(CliContext):
 
     @cached_property
     def local_file_linter(self):
-        return LocalFileLinter(self.languages)
+        return LocalFileLinter(self.workspace_client)
 
     @cached_property
     def cluster_access(self):

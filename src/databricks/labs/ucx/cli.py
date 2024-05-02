@@ -437,16 +437,12 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
             deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
 
 
-# TODO: Add the following commands to the CLI
-# TODO: local_file_migrator is a placeholder - maybe needs local_file_linter
 @ucx.command
-def lint_local_code(w: WorkspaceClient, prompts: Prompts, ctx: WorkspaceContext | None = None):
+def lint_local_code(w: WorkspaceClient, ctx: WorkspaceContext | None = None):
     """Lint local code files looking for problems in notebooks and python files."""
     if ctx is None:
         ctx = WorkspaceContext(w)
     working_directory = Path.cwd()
-    if not prompts.confirm("Do you want to run UC linting on all files in the current directory?"):
-        return
     ctx.local_file_linter.lint(working_directory)
 
 
