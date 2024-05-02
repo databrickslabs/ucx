@@ -400,7 +400,7 @@ class AwsACL:
 
         permission_mappings = self._installation.load(
             list[AWSRoleAction],
-            filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES,
+            filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME,
         )
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd

@@ -24,8 +24,8 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 class AWSResourcePermissions:
-    UC_ROLES_FILE_NAMES: typing.ClassVar[str] = "uc_roles_access.csv"
-    INSTANCE_PROFILES_FILE_NAMES: typing.ClassVar[str] = "aws_instance_profile_info.csv"
+    UC_ROLES_FILE_NAME: typing.ClassVar[str] = "uc_roles_access.csv"
+    INSTANCE_PROFILES_FILE_NAME: typing.ClassVar[str] = "aws_instance_profile_info.csv"
 
     def __init__(
         self,
@@ -87,14 +87,14 @@ class AWSResourcePermissions:
         if len(uc_role_access) == 0:
             logger.warning("No mapping was generated.")
             return None
-        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAMES)
+        return self._installation.save(uc_role_access, filename=self.UC_ROLES_FILE_NAME)
 
     def load_uc_compatible_roles(self):
         try:
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
         except ResourceDoesNotExist:
             self.save_uc_compatible_roles()
-            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAMES)
+            role_actions = self._installation.load(list[AWSRoleAction], filename=self.UC_ROLES_FILE_NAME)
         return role_actions
 
     def save_instance_profile_permissions(self) -> str | None:
@@ -102,7 +102,7 @@ class AWSResourcePermissions:
         if len(instance_profile_access) == 0:
             logger.warning("No mapping was generated.")
             return None
-        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAMES)
+        return self._installation.save(instance_profile_access, filename=self.INSTANCE_PROFILES_FILE_NAME)
 
     def role_exists(self, role_name: str) -> bool:
         return self._aws_resources.role_exists(role_name)
