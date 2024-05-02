@@ -3,6 +3,10 @@ name: acceptance
 on:
   pull_request:
     types: [ opened, synchronize, ready_for_review ]
+  push:
+    # required for merge queue to work. jobs.integration.if will mark it as skipped
+    branches:
+      - main
 
 permissions:
   id-token: write
