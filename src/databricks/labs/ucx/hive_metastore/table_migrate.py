@@ -136,6 +136,7 @@ class TablesMigrator:
             Threads.strict("migrate views", tasks)
             self._migration_status_refresher.reset()
             all_tasks.extend(tasks)
+        self._migration_status_refresher.reset()
         return all_tasks
 
     def _compute_grants(

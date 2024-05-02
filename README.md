@@ -705,6 +705,9 @@ by [`principal-prefix-access` command](#principal-prefix-access-command).
 Please review the file and delete the Service Principals you do not want to be migrated.
 The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
 
+**Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
+recommend to use access connectors instead.
+
 Once you're done with this command, run [`validate-external-locations` command](#validate-external-locations-command) after this one.
 
 [[back to top](#databricks-labs-ucx)]
