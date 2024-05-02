@@ -349,7 +349,10 @@ def test_read_secret_value_none(sp_migration):
     # the code under test as well.
     # pylint: disable-next=protected-access
     sp_migration._ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
-    prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
+    prompts = MockPrompts( {
+        "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+        r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+    })
     with pytest.raises(AssertionError):
         sp_migration.run(prompts)
 

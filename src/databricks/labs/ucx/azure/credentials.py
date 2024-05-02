@@ -290,6 +290,14 @@ class ServicePrincipalMigration(SecretsMixin):
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         plan_confirmed = prompts.confirm(
+            "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
+            "account."
+        )
+        ac_results = []
+        if plan_confirmed:
+            ac_results = self._create_access_connectors_for_storage_accounts()
+
+        plan_confirmed = prompts.confirm(
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
         )
         sp_results = []
@@ -306,15 +314,7 @@ class ServicePrincipalMigration(SecretsMixin):
             if plan_confirmed:
                 sp_results = self._migrate_service_principals(sp_migration_infos)
 
-        plan_confirmed = prompts.confirm(
-            "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
-            "account."
-        )
-        ac_results = []
-        if plan_confirmed:
-            ac_results = self._create_access_connectors_for_storage_accounts()
-
-        execution_results = sp_results + ac_results
+        execution_results = ac_results + sp_results
         if execution_results:
             results_file = self.save(execution_results)
             logger.info(
