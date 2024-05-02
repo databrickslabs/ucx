@@ -19,6 +19,7 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
     """The migration status should be refreshed after the migration job."""
     tables, _ = prepare_tables_for_migration
     ctx = installation_ctx.replace(
+        skip_dashboards=False,
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
         },
@@ -34,6 +35,7 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
             f"WHERE src_schema = '{table.schema_name}' AND src_table = '{table.name}'"
         )
         migration_status = list(ctx.sql_backend.fetch(query_migration_status))
-        assert len(migration_status) == 1, f"No migration status found for table {table.full_name}"
-        assert migration_status[0].dst_schema is not None, f"No destination schema found for {table.full_name}"
-        assert migration_status[0].dst_table is not None, f"No destination table found for {table.dst_table}"
+        assert_message_postfix = f" found for {table.table_type} {table.full_name}"
+        assert len(migration_status) == 1, f"No migration status found" + assert_message_postfix
+        assert migration_status[0].dst_schema is not None, f"No destination schema" + assert_message_postfix
+        assert migration_status[0].dst_table is not None, f"No destination table" + assert_message_postfix
