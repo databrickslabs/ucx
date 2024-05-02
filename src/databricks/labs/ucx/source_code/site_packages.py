@@ -47,9 +47,11 @@ class SitePackageContainer(SourceContainer):
         self._file_loader = file_loader
         self._site_package = site_package
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+        problems: list[DependencyProblem] = []
         for module_path in self._site_package.module_paths:
             parent.register_dependency(Dependency(self._file_loader, module_path))
+        return problems
 
 
 class SitePackages:

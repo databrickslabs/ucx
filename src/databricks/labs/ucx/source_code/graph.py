@@ -56,6 +56,7 @@ class DependencyGraph:
         return self.register_dependency(resolved)
 
     def register_dependency(self, dependency: Dependency):
+        # TODO: return MaybeGraph
         # already registered ?
         child_graph = self._locate_dependency(dependency)
         if child_graph is not None:
@@ -195,7 +196,7 @@ class Dependency(abc.ABC):
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
         raise NotImplementedError()
 
 
@@ -247,11 +248,9 @@ class BaseDependencyResolver(abc.ABC):
         assert self._next_resolver is not None
         return self._next_resolver.resolve_notebook(path, problem_collector)
 
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
+    def resolve_local_file(self, path: Path) -> MaybeDependency:
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_local_file(path, problem_collector)
+        return self._next_resolver.resolve_local_file(path)
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         assert self._next_resolver is not None
@@ -269,13 +268,27 @@ class StubResolver(BaseDependencyResolver):
     def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         return None
 
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
-        return None
+    def resolve_local_file(self, path: Path) -> MaybeDependency:
+        return FailedDependency(path, 'file-not-found', f"File not found: {path.as_posix()}")
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         return None
+
+
+@dataclass
+class MaybeDependency:
+    dependency: Dependency | None
+    problems: list[DependencyProblem]
+
+
+class SomeDependency(MaybeDependency):
+    def __init__(self, dependency: Dependency):
+        super().__init__(dependency, [])
+
+
+class FailedDependency(MaybeDependency):
+    def __init__(self, path: Path, code: str, message: str):
+        super().__init__(None, [DependencyProblem(code, message, path)])
 
 
 class DependencyResolver:
@@ -301,20 +314,8 @@ class DependencyResolver:
             self.add_problems(problems)
         return dependency
 
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
-        problems: list[DependencyProblem] = []
-        dependency = self._resolver.resolve_local_file(path, problems.append)
-        if dependency is None:
-            problem = DependencyProblem('file-not-found', f"File not found: {path.as_posix()}")
-            problems.append(problem)
-        if problem_collector:
-            for problem in problems:
-                problem_collector(problem)
-        else:
-            self.add_problems(problems)
-        return dependency
+    def resolve_local_file(self, path: Path) -> MaybeDependency:
+        return self._resolver.resolve_local_file(path)
 
     def resolve_import(
         self, name: str, problem_collector: Callable[[DependencyProblem], None] | None = None
@@ -376,6 +377,16 @@ class DependencyProblem:
         )
 
 
+@dataclass
+class MaybeGraph:
+    graph: DependencyGraph | None
+    problems: list[DependencyProblem]
+
+    @property
+    def failed(self):
+        return self.graph is None
+
+
 class DependencyGraphBuilder:
 
     def __init__(self, resolver: DependencyResolver, path_lookup: PathLookup):
@@ -386,15 +397,17 @@ class DependencyGraphBuilder:
     def problems(self):
         return self._resolver.problems
 
-    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph | None:
-        dependency = self._resolver.resolve_local_file(path)
-        if dependency is None:
-            return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
-        container = dependency.load()
+    def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
+        resolution = self._resolver.resolve_local_file(path)
+        if not resolution.dependency:
+            return MaybeGraph(None, resolution.problems)
+        graph = DependencyGraph(resolution.dependency, None, self._resolver, self._path_lookup)
+        container = resolution.dependency.load()
         if container is not None:
-            container.build_dependency_graph(graph, self._path_lookup)
-        return graph
+            problems = container.build_dependency_graph(graph, self._path_lookup)
+            if problems:
+                return MaybeGraph(None, problems)
+        return MaybeGraph(graph, [])
 
     def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_notebook(path)

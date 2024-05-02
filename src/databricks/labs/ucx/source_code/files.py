@@ -19,6 +19,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyLoader,
     Dependency,
     BaseDependencyResolver,
+    MaybeDependency,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,21 +33,13 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    @property
-    def path(self):
-        return self._path
-
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
-            return
-        path_lookup.push_cwd(self.path.parent)
-        self._build_dependency_graph(parent)
-        path_lookup.pop_cwd()
-
-    def _build_dependency_graph(self, parent: DependencyGraph) -> None:
+            return []
         # TODO replace the below with parent.build_graph_from_python_source
         # can only be done after https://github.com/databrickslabs/ucx/issues/1287
+        problems: list[DependencyProblem] = []
         linter = ASTLinter.parse(self._original_code)
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         for call in run_notebook_calls:
@@ -55,7 +48,7 @@ class LocalFile(SourceContainer):
             if isinstance(notebook_path_arg, ast.Constant):
                 notebook_path = notebook_path_arg.value
                 parent.register_notebook(Path(notebook_path), call_problems.append)
-                call_problems = [
+                problems += [
                     problem.replace(
                         source_path=self._path,
                         start_line=call.lineno,
@@ -65,7 +58,6 @@ class LocalFile(SourceContainer):
                     )
                     for problem in call_problems
                 ]
-                parent.add_problems(call_problems)
                 continue
             problem = DependencyProblem(
                 code='dependency-not-constant',
@@ -76,14 +68,14 @@ class LocalFile(SourceContainer):
                 end_line=call.end_lineno or 0,
                 end_col=call.end_col_offset or 0,
             )
-            parent.add_problems([problem])
+            problems.append(problem)
         # TODO https://github.com/databrickslabs/ucx/issues/1287
         for pair in PythonLinter.list_import_sources(linter):
             import_name = pair[0]
             import_problems: list[DependencyProblem] = []
             parent.register_import(import_name, import_problems.append)
             node = pair[1]
-            import_problems = [
+            problems += [
                 problem.replace(
                     source_path=self._path,
                     start_line=node.lineno,
@@ -93,7 +85,7 @@ class LocalFile(SourceContainer):
                 )
                 for problem in import_problems
             ]
-            parent.add_problems(import_problems)
+        return problems
 
 
 class LocalFileMigrator:
@@ -187,13 +179,10 @@ class LocalFileResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return LocalFileResolver(self._file_loader, resolver)
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
+    def resolve_local_file(self, path: Path) -> MaybeDependency:
         if self._file_loader.exists(path) and not self._file_loader.is_notebook(path):
-            return Dependency(self._file_loader, path)
-        return super().resolve_local_file(path, problem_collector)
+            return MaybeDependency(Dependency(self._file_loader, path), [])
+        return super().resolve_local_file(path)
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         fullpath = self._file_loader.full_path(Path(f"{name}.py"))

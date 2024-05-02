@@ -58,8 +58,8 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
-        pass
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+        return []
 
 
 class UCCompatibility(Enum):

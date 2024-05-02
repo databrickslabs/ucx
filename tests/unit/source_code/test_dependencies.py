@@ -364,7 +364,9 @@ def test_dependency_graph_builder_skips_builtin_dependencies():
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
+    maybe = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
+    assert not maybe.failed
+    graph = maybe.graph
     child = graph.locate_dependency(Path("os"))
     assert child
     assert len(child.local_dependencies) == 0
@@ -391,7 +393,9 @@ def test_dependency_graph_builder_ignores_known_dependencies():
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    graph = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
+    maybe = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
+    assert not maybe.failed
+    graph = maybe.graph
     assert not graph.locate_dependency(Path("databricks"))
 
 
@@ -414,7 +418,9 @@ def test_dependency_graph_builder_visits_site_packages(empty_index):
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    graph = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
+    maybe = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
+    assert not maybe.failed
+    graph = maybe.graph
     assert graph.locate_dependency(Path(site_packages_path, "certifi/core.py"))
     assert not graph.locate_dependency(Path("core.py"))
     assert not graph.locate_dependency(Path("core"))
