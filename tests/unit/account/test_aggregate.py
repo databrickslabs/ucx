@@ -34,8 +34,8 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
         = sql.ExecuteStatementResponse(status=sql.StatementStatus(
             state=sql.StatementState.SUCCEEDED),
             result=sql.ResultData(data_array=[
-                ["a", "b", "c"],
-                ["b", "c", "d"]], row_count=2),
+                ["tables", "32432", """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]"""],
+                ["clusters", "234234234", """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]"""]], row_count=2),
             manifest=sql.ResultManifest(schema=sql.ResultSchema(
                 columns=[sql.ColumnInfo(name="object_type", type_name=sql.ColumnInfoTypeName.STRING),
                          sql.ColumnInfo(name="object_id", type_name=sql.ColumnInfoTypeName.STRING),
