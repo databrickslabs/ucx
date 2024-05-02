@@ -42,7 +42,10 @@ class StorageCredentialValidationResult:
 
     @classmethod
     def from_storage_credential_info(
-        cls, storage_credential_info: StorageCredentialInfo, validated_on: str, failures: list[str] | None
+        cls,
+        storage_credential_info: StorageCredentialInfo,
+        validated_on: str,
+        failures: list[str] | None,
     ):
         if storage_credential_info.azure_service_principal is not None:
             application_id = storage_credential_info.azure_service_principal.application_id
