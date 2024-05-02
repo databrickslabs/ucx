@@ -90,9 +90,7 @@ class TablesMigrator:
                 mounts,
                 hiveserde_in_place_migrate,
             )
-        # Refresh migration status
-        self._migration_status_refresher.reset()
-        self._migration_status_refresher.snapshot()
+        self.index()  # Index migration status to show in migration dashboard
         return tasks
 
     def _migrate_tables(
