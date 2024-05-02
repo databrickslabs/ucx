@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import BadRequest
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AzureManagedIdentityRequest,
@@ -271,19 +272,19 @@ class ServicePrincipalMigration(SecretsMixin):
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
         execution_results = []
-        for access_connector in access_connectors:
+        for access_connector, url in access_connectors:
             storage_credential_info = self._ws.storage_credentials.create(
                 access_connector.name,
                 azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
                 comment="Created by ucx",
                 read_only=False,
             )
-            storage_account_name = access_connector.name.removeprefix("ac-")
-            validation_results = self._storage_credential_manager.validate(
-                storage_credential_info,
-                f"abfss://{storage_account_name}.dfs.core.windows.net/",
-            )
-            execution_results.append(validation_results)
+            try:
+                validation_results = self._storage_credential_manager.validate(storage_credential_info, url)
+            except BadRequest:
+                logger.warning(f"Could not validate storage credential {storage_credential_info.name} for url {url}")
+            else:
+                execution_results.append(validation_results)
 
         return execution_results
 
