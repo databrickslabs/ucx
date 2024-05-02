@@ -5,6 +5,7 @@ from functools import cached_property
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient, core
@@ -314,6 +315,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def languages(self):
         index = self.tables_migrator.index()
+        # TODO: initialize Languages every time, because it has CurrentSessionState for the cache
         return Languages(index)
 
     @cached_property
@@ -392,3 +394,9 @@ class GlobalContext(abc.ABC):
     @cached_property
     def dependency_graph_builder(self):
         return DependencyGraphBuilder(self.dependency_resolver)
+
+
+class CliContext(GlobalContext, abc.ABC):
+    @cached_property
+    def prompts(self) -> Prompts:
+        return Prompts()
