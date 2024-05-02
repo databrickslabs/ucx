@@ -18,7 +18,7 @@ def test_describe_all_udfs_in_databases(ws, sql_backend, inventory_schema, make_
     udf_b = make_udf(schema_name=schema_a.name)
     make_udf(schema_name=schema_b.name)
 
-    udfs_crawler = UdfsCrawler(sql_backend, inventory_schema, [schema_a.name, schema_b.name])
+    udfs_crawler = UdfsCrawler(sql_backend, inventory_schema, [schema_a.name, schema_b.name, "ucxx"])
     actual_grants = udfs_crawler.snapshot()
 
     unique_udf_grants = {

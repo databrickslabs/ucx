@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
@@ -24,7 +24,9 @@ class Udf:
     deterministic: bool
     data_access: str
     body: str
-    comment: str = ""
+    comment: str
+    success: int = 1
+    failures: str = ""
 
     @property
     def key(self) -> str:
@@ -72,10 +74,10 @@ class UdfsCrawler(CrawlerBase):
         for database in self._all_databases():
             for task in self._collect_tasks(catalog, database):
                 tasks.append(task)
-        catalog_tables, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
+        udfs, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning udfs in {catalog}")
-        return catalog_tables
+        return self._assess_udfs(udfs)
 
     def _collect_tasks(self, catalog, database) -> Iterable[partial[Udf | None]]:
         try:
@@ -101,22 +103,34 @@ class UdfsCrawler(CrawlerBase):
         try:
             logger.debug(f"[{full_name}] fetching udf metadata")
             describe = {}
-            for key_value in self._fetch(f"DESCRIBE FUNCTION EXTENDED {escape_sql_identifier(full_name)}"):
-                if ":" in key_value:  # skip free text configs that don't have a key
-                    key, value = key_value.split(":")
-                    describe[key] = value.strip()
+            current_key = ""
+            for row in self._fetch(f"DESCRIBE FUNCTION EXTENDED {escape_sql_identifier(full_name)}"):
+                key_value = row.as_dict()["function_desc"]
+                if ":" in key_value:
+                    current_key, value = key_value.split(":", 1)
+                    describe[current_key] = value.strip()
+                elif current_key != "":  # append multiline returns, e.g. Input
+                    describe[current_key] += f"\n{key_value.strip()}"
             return Udf(
                 catalog=catalog.lower(),
                 database=database.lower(),
                 name=udf.lower(),
-                func_type=describe.get("Type", "UNKNOWN"),
+                func_type=describe.get("Type", describe.get("Class", "UNKNOWN")),
                 func_input=describe.get("Input", "UNKNOWN"),
                 func_returns=describe.get("Returns", "UNKNOWN"),
                 deterministic=describe.get("Deterministic", False),
-                data_access=describe.get("Type", "UNKNOWN"),
+                data_access=describe.get("Data Access", "UNKNOWN"),
                 comment=describe.get("Comment", "UNKNOWN"),
                 body=describe.get("Body", "UNKNOWN"),
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for udf {full_name} : {e}")
             return None
+
+    @staticmethod
+    def _assess_udfs(udfs: Iterable[Udf]) -> Iterable[Udf]:
+        for udf in udfs:
+            if udf.func_type != "SCALAR":
+                yield replace(udf, success=0, failures="Only SCALAR functions are supported")
+            else:
+                yield replace(udf, success=1)
