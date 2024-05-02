@@ -37,7 +37,7 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
                 ["jobs", "123134", """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]"]"""],
                 ["clusters", "0325-3423-dfs", "[]"]]))
 
-    ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="something"))
+    ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="something", warehouse_id="1234"))
     account_aggregate_obj = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
 
     with caplog.at_level(logging.INFO):
