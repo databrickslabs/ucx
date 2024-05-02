@@ -17,7 +17,7 @@ from databricks.sdk.retries import retried
 )
 def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, prepare_tables_for_migration, workflow):
     """The migration status should be refreshed after the migration job."""
-    tables, dst_schema = prepare_tables_for_migration
+    tables, _ = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
             r".*Do you want to update the existing installation?.*": 'yes',
