@@ -34,6 +34,6 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
             f"WHERE src_schema = '{table.schema_name}' AND src_table = '{table.name}'"
         )
         migration_status = list(ctx.sql_backend.fetch(query_migration_status))
-        assert len(migration_status) == 1
-        assert migration_status[0].dst_schema is not None
-        assert migration_status[0].dst_table is not None
+        assert len(migration_status) == 1, f"No migration status found for table {table.full_name}"
+        assert migration_status[0].dst_schema is not None, f"No destination schema found for {table.full_name}"
+        assert migration_status[0].dst_table is not None, f"No destination table found for {table.dst_table}"
