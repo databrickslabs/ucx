@@ -4,6 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize]
   push:
+    # required for merge queue to work. jobs.integration.if will mark it as skipped
     branches:
       - main
 
