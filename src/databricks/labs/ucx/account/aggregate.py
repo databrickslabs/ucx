@@ -10,7 +10,7 @@ from databricks.labs.lsql import Row
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.blueprint.installation import NotInstalled
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
 
@@ -53,14 +53,20 @@ class AccountAggregate:
         for ctx in self._workspace_contexts:
             workspace_id = ctx.workspace_client.get_workspace_id()
             try:
-                logger.debug(f"Assessing workspace {workspace_id}")
                 # use already existing code to replace tables in the query, assuming that UCX database is in HMS
+                # TODO: this worked, but changing to check CurrentSessionState
+                # empty_index = MigrationIndex([MigrationStatus(ctx.config.inventory_database, "objects", None, ctx.config.inventory_database, "objects", "test")])
                 from_table = FromTable(empty_index, CurrentSessionState(schema=ctx.config.inventory_database))
+                logger.info(f"Querying Schema {ctx.config.inventory_database}")
+
                 workspace_specific_query = from_table.apply(query)
                 for row in ctx.sql_backend.fetch(workspace_specific_query):
                     yield workspace_id, row
             except NotInstalled:
                 logger.warning(f"Workspace {workspace_id} does not have UCX installed")
+            # TODO: Add this exception handling
+            # except NotSuchTableException as e:
+            #     logger.warning(f"Workspace {workspace_id} does not have the required table: {e.table_name}")
 
     @cached_property
     def _aggregate_objects(self) -> list[AssessmentObject]:
@@ -86,3 +92,7 @@ class AccountAggregate:
                 incompatible_objects += 1
         compatibility = (1 - incompatible_objects / all_objects if all_objects > 0 else 0) * 100
         logger.info(f"UC compatibility: {compatibility}% ({incompatible_objects}/{all_objects})")
+
+        for failure, objects in failures.items():
+            logger.info(f"{failure}: {len(objects)} objects")
+
