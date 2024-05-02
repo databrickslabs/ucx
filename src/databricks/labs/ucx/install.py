@@ -272,6 +272,8 @@ class WorkspaceInstaller(WorkspaceContext):
             return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
+        except AttributeError:
+            logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
         return self._configure_new_installation(default_config)
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
@@ -391,7 +393,8 @@ class WorkspaceInstaller(WorkspaceContext):
                     raise AlreadyExists(
                         f"Inventory database '{inventory_database}' already exists in another installation"
                     )
-            except (PermissionDenied, NotFound, SerdeError):
+            except (PermissionDenied, NotFound, SerdeError, ValueError, AttributeError):
+                logger.warning(f"Existing installation at {installation.install_folder()} is corrupted. Skipping...")
                 continue
 
 
