@@ -50,7 +50,7 @@ class WorkspaceContext(CliContext):
 
     @cached_property
     def local_file_linter(self):
-        return LocalFileLinter(self.workspace_client)
+        return LocalFileLinter(self.workspace_client, self.tables_migrator.index(), self.file_resolver)
 
     @cached_property
     def cluster_access(self):

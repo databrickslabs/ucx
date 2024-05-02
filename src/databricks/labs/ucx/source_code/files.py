@@ -20,7 +20,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     DependencyLoader,
     Dependency,
-    BaseDependencyResolver,
+    BaseDependencyResolver, DependencyResolver, DependencyGraphBuilder,
 )
 
 logger = logging.getLogger(__name__)
@@ -229,8 +229,10 @@ class SysPathProvider:
 
 class LocalFileLinter:
 
-    def __init__(self, ws: WorkspaceClient) -> None:
+    def __init__(self, ws: WorkspaceClient, migration_index: MigrationIndex, resolver: DependencyResolver ) -> None:
         self._ws = ws
+        self._migration_index = migration_index
+        self._resolver = resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
     # TODO: Build dependency graph, use ws tools for directory walk
@@ -251,16 +253,22 @@ class LocalFileLinter:
         advised = False
         logger.info(f"Analysing {path}")
 
-        # TODO: Where to load the migration index from?
-        migration_index = MigrationIndex([])
         # Recreate Language every time to reset the state
-        languages = Languages(migration_index)
+        languages = Languages(self._migration_index)
         # TODO: Change to use ws tools rather than with
         with path.open("r") as f:
+
+            # Check dependencies
+            builder = DependencyGraphBuilder(self._resolver)
+            builder.build_notebook_dependency_graph(path)
+            for problem in builder.problems:
+                logger.info(f"Found: {problem}")
+                advised = True
+
             code = f.read()
             # Check to see if this is actually a notebook
             if self.is_notebook(code):
-                notebook_linter = NotebookLinter.from_source(migration_index, code, language)
+                notebook_linter = NotebookLinter.from_source(self._migration_index, code, language)
                 for advice in notebook_linter.lint():
                     logger.info(f"Found: {advice}")
                     advised = True
