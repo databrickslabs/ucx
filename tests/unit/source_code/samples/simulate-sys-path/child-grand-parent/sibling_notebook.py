@@ -3,5 +3,4 @@ whatever = 12
 
 # COMMAND ----------
 
-# MAGIC %run ../in_parent_folder_notebook
-
+# MAGIC %run ./sibling2_notebook

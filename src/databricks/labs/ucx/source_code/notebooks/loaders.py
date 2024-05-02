@@ -67,6 +67,15 @@ class WorkspaceNotebookLoader(NotebookLoader):
 class LocalNotebookLoader(NotebookLoader, FileLoader):
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        fullpath = self.full_path(dependency.path)
+        fullpath = self.full_path(self._adjust_path(dependency.path))
         assert fullpath is not None
         return Notebook.parse(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
+
+    def is_notebook(self, path: Path) -> bool:
+        return super().is_notebook(self._adjust_path(path))
+
+    @staticmethod
+    def _adjust_path(path: Path):
+        if path.suffix == ".py":
+            return path
+        return Path(path.as_posix() + ".py")

@@ -13,10 +13,10 @@ from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, Visiti
 @pytest.mark.parametrize(
     "source, expected",
     [
-        (["simulate-sys-path", "siblings", "sibling1_notebook"], 2),
-        (["simulate-sys-path", "parent-child", "in_parent_folder_notebook"], 3),
-        (["simulate-sys-path", "child-parent", "child-folder", "in_child_folder_notebook"], 3),
-        (["simulate-sys-path", "parent-grand-child", "in_parent_folder_notebook"], 3),
+        (["simulate-sys-path", "siblings", "sibling1_notebook.py"], 2),
+        (["simulate-sys-path", "parent-child", "in_parent_folder_notebook.py"], 3),
+        (["simulate-sys-path", "child-parent", "child-folder", "in_child_folder_notebook.py"], 3),
+        (["simulate-sys-path", "parent-grand-child", "in_parent_folder_notebook.py"], 3),
         (
             [
                 "simulate-sys-path",
