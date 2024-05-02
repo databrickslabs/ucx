@@ -169,7 +169,6 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
         assert match is not None, "PATH_EXISTS validation should fail"
 
 
-@pytest.mark.skip(reason="TODO: Let migration create storage credentials.")
 @retried(on=[InternalError], timeout=timedelta(minutes=2))
 def test_spn_migration_access_connector_created(ws, extract_test_info, run_migration):
     """Storage credentials should be created for the access connectors."""
