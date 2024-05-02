@@ -121,7 +121,7 @@ commands:
       - name: aws-profile
         description: AWS Profile to use for authentication
       - name: single-role
-        description: (Optional) Create a single role for all the S3 locations (default:: True)
+        description: (Optional) Create a single role for all the S3 locations (default:True)
 
   - name: create-uber-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
