@@ -6,6 +6,7 @@ from pathlib import Path
 from collections.abc import Callable
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.files import FileLoader, SysPathProvider
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     WrappingLoader,
@@ -13,6 +14,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     BaseDependencyResolver,
     DependencyProblem,
+    MaybeDependency,
 )
 
 
@@ -33,12 +35,13 @@ class SitePackagesResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return SitePackagesResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
 
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+    def resolve_import(self, name: str) -> MaybeDependency:
         site_package = self._site_packages[name]
         if site_package is not None:
             container = SitePackageContainer(self._file_loader, site_package)
-            return Dependency(WrappingLoader(container), Path(name))
-        return super().resolve_import(name, problem_collector)
+            dependency = Dependency(WrappingLoader(container), Path(name))
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(name)
 
 
 class SitePackageContainer(SourceContainer):
@@ -50,7 +53,9 @@ class SitePackageContainer(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         for module_path in self._site_package.module_paths:
-            parent.register_dependency(Dependency(self._file_loader, module_path))
+            maybe = parent.register_dependency(Dependency(self._file_loader, module_path))
+            if maybe.problems:
+                problems.extend(maybe.problems)
         return problems
 
 

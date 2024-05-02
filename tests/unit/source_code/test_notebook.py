@@ -140,11 +140,10 @@ def test_notebook_builds_leaf_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
+    container = maybe.dependency.load()
+    container.build_dependency_graph(graph)
     assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
 
 
@@ -165,11 +164,10 @@ def test_notebook_builds_depth1_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
+    container = maybe.dependency.load()
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
@@ -186,11 +184,10 @@ def test_notebook_builds_depth2_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
+    container = maybe.dependency.load()
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
@@ -208,11 +205,10 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
             NotebookResolver(notebook_loader),
         ]
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
+    container = maybe.dependency.load()
+    container.build_dependency_graph(graph)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
 
@@ -230,11 +226,10 @@ def test_notebook_builds_cyclical_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
+    container = maybe.dependency.load()
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
@@ -251,11 +246,10 @@ def test_notebook_builds_python_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
+    container = maybe.dependency.load()
+    container.build_dependency_graph(graph)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 

@@ -64,7 +64,9 @@ class Notebook(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         for cell in self._cells:
-            cell.build_dependency_graph(parent, problems.append)
+            maybe = cell.build_dependency_graph(parent)
+            if maybe.problems:
+                problems.extend(maybe.problems)
         return problems
 
 

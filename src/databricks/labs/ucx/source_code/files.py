@@ -4,6 +4,7 @@ import ast
 import logging
 from pathlib import Path
 from collections.abc import Callable
+from collections.abc import Iterable
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
@@ -43,11 +44,10 @@ class LocalFile(SourceContainer):
         linter = ASTLinter.parse(self._original_code)
         run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         for call in run_notebook_calls:
-            call_problems: list[DependencyProblem] = []
             notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
             if isinstance(notebook_path_arg, ast.Constant):
                 notebook_path = notebook_path_arg.value
-                parent.register_notebook(Path(notebook_path), call_problems.append)
+                maybe = parent.register_notebook(Path(notebook_path))
                 problems += [
                     problem.replace(
                         source_path=self._path,
@@ -56,7 +56,7 @@ class LocalFile(SourceContainer):
                         end_line=call.end_lineno or 0,
                         end_col=call.end_col_offset or 0,
                     )
-                    for problem in call_problems
+                    for problem in maybe.problems
                 ]
                 continue
             problem = DependencyProblem(
@@ -70,11 +70,8 @@ class LocalFile(SourceContainer):
             )
             problems.append(problem)
         # TODO https://github.com/databrickslabs/ucx/issues/1287
-        for pair in PythonLinter.list_import_sources(linter):
-            import_name = pair[0]
-            import_problems: list[DependencyProblem] = []
-            parent.register_import(import_name, import_problems.append)
-            node = pair[1]
+        for import_name, node in PythonLinter.list_import_sources(linter):
+            maybe = parent.register_import(import_name)
             problems += [
                 problem.replace(
                     source_path=self._path,
@@ -83,7 +80,7 @@ class LocalFile(SourceContainer):
                     end_line=node.end_lineno or 0,
                     end_col=node.end_col_offset or 0,
                 )
-                for problem in import_problems
+                for problem in maybe.problems
             ]
         return problems
 
@@ -184,8 +181,9 @@ class LocalFileResolver(BaseDependencyResolver):
             return MaybeDependency(Dependency(self._file_loader, path), [])
         return super().resolve_local_file(path)
 
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+    def resolve_import(self, name: str) -> MaybeDependency:
         fullpath = self._file_loader.full_path(Path(f"{name}.py"))
         if fullpath is not None:
-            return Dependency(self._file_loader, fullpath)
-        return super().resolve_import(name, problem_collector)
+            dependency = Dependency(self._file_loader, fullpath)
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(name)
