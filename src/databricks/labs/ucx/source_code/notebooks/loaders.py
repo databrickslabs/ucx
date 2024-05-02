@@ -5,7 +5,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat
+from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
 
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
@@ -56,7 +56,7 @@ class WorkspaceNotebookLoader(NotebookLoader):
         assert object_info.path is not None
         assert object_info.language is not None
         source = self._load_source(object_info)
-        return Notebook.parse(object_info.path, source, object_info.language)
+        return Notebook.parse(Path(object_info.path), source, object_info.language)
 
     def _load_source(self, object_info: ObjectInfo) -> str:
         assert object_info.path is not None
@@ -65,5 +65,8 @@ class WorkspaceNotebookLoader(NotebookLoader):
 
 
 class LocalNotebookLoader(NotebookLoader, FileLoader):
-    # see https://github.com/databrickslabs/ucx/issues/1499
-    pass
+
+    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+        fullpath = self.full_path(dependency.path)
+        assert fullpath is not None
+        return Notebook.parse(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)

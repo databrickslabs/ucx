@@ -2,6 +2,7 @@ from __future__ import annotations  # for type hints
 
 import ast
 import logging
+import os
 import sys
 from pathlib import Path
 from collections.abc import Callable, Iterable
@@ -9,7 +10,8 @@ from collections.abc import Callable, Iterable
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
+from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
@@ -31,10 +33,19 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    @property
+    def path(self):
+        return self._path
+
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
+        syspath_provider.push_cwd(self.path.parent)
+        self._build_dependency_graph(parent)
+        syspath_provider.pop_cwd()
+
+    def _build_dependency_graph(self, parent: DependencyGraph) -> None:
         # TODO replace the below with parent.build_graph_from_python_source
         # can only be done after https://github.com/databrickslabs/ucx/issues/1287
         linter = ASTLinter.parse(self._original_code)
@@ -153,6 +164,9 @@ class FileLoader(DependencyLoader):
     def full_path(self, path: Path) -> Path | None:
         if path.is_file():
             return path
+        child = Path(self._syspath_provider.cwd, path)
+        if child.is_file():
+            return child
         for parent in self._syspath_provider.paths:
             child = Path(parent, path)
             if child.is_file():
@@ -161,7 +175,8 @@ class FileLoader(DependencyLoader):
 
     def is_notebook(self, path: Path) -> bool:
         fullpath = self.full_path(path)
-        assert fullpath is not None
+        if fullpath is None:
+            return False
         with fullpath.open(mode="r", encoding="utf-8") as stream:
             line = stream.readline()
             return NOTEBOOK_HEADER in line
@@ -204,17 +219,18 @@ class SysPathProvider:
 
     def __init__(self, paths: list[Path]):
         self._paths = paths
+        self._cwds = [Path(os.getcwd())]
 
-    def push(self, path: Path):
+    def push_path(self, path: Path):
         self._paths.insert(0, path)
 
-    def insert(self, index: int, path: Path):
+    def insert_path(self, index: int, path: Path):
         self._paths.insert(index, path)
 
-    def remove(self, index: int):
+    def remove_path(self, index: int):
         del self._paths[index]
 
-    def pop(self) -> Path:
+    def pop_path(self) -> Path:
         result = self._paths[0]
         del self._paths[0]
         return result
@@ -222,3 +238,15 @@ class SysPathProvider:
     @property
     def paths(self) -> Iterable[Path]:
         yield from self._paths
+
+    def push_cwd(self, path: Path):
+        self._cwds.append(path)
+
+    def pop_cwd(self):
+        result = self._cwds[0]
+        del self._cwds[0]
+        return result
+
+    @property
+    def cwd(self):
+        return self._cwds[-1] if len(self._cwds) > 0 else Path(os.getcwd())

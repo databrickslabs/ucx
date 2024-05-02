@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import abc
 import ast
+import typing
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable, Iterable
 
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+
+if typing.TYPE_CHECKING:
+    from databricks.labs.ucx.source_code.files import SysPathProvider
 
 
 class DependencyGraph:
@@ -16,10 +20,12 @@ class DependencyGraph:
         dependency: Dependency,
         parent: DependencyGraph | None,
         resolver: DependencyResolver,
+        syspath_provider: SysPathProvider,
     ):
         self._dependency = dependency
         self._parent = parent
         self._resolver = resolver
+        self._syspath_provider = syspath_provider
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
@@ -59,12 +65,12 @@ class DependencyGraph:
             self._dependencies[dependency] = child_graph
             return child_graph
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(dependency, self, self._resolver)
+        child_graph = DependencyGraph(dependency, self, self._resolver, self._syspath_provider)
         self._dependencies[dependency] = child_graph
         container = dependency.load()
         if not container:
             return None
-        container.build_dependency_graph(child_graph)
+        container.build_dependency_graph(child_graph, self._syspath_provider)
         return child_graph
 
     def _locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
@@ -192,7 +198,7 @@ class Dependency(abc.ABC):
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: SysPathProvider) -> None:
         raise NotImplementedError()
 
 
@@ -375,8 +381,9 @@ class DependencyProblem:
 
 class DependencyGraphBuilder:
 
-    def __init__(self, resolver: DependencyResolver):
+    def __init__(self, resolver: DependencyResolver, syspath_provider: SysPathProvider):
         self._resolver = resolver
+        self._syspath_provider = syspath_provider
 
     @property
     def problems(self):
@@ -386,18 +393,18 @@ class DependencyGraphBuilder:
         dependency = self._resolver.resolve_local_file(path)
         if dependency is None:
             return None
-        graph = DependencyGraph(dependency, None, self._resolver)
+        graph = DependencyGraph(dependency, None, self._resolver, self._syspath_provider)
         container = dependency.load()
         if container is not None:
-            container.build_dependency_graph(graph)
+            container.build_dependency_graph(graph, self._syspath_provider)
         return graph
 
     def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_notebook(path)
         if dependency is None:
             return None
-        graph = DependencyGraph(dependency, None, self._resolver)
+        graph = DependencyGraph(dependency, None, self._resolver, self._syspath_provider)
         container = dependency.load()
         if container is not None:
-            container.build_dependency_graph(graph)
+            container.build_dependency_graph(graph, self._syspath_provider)
         return graph

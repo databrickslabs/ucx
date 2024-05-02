@@ -391,4 +391,4 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_graph_builder(self):
-        return DependencyGraphBuilder(self.dependency_resolver)
+        return DependencyGraphBuilder(self.dependency_resolver, self.syspath_provider)
