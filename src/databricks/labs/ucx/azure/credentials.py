@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
-    AzureManagedIdentity,
+    AzureManagedIdentityRequest,
     AzureServicePrincipal,
     Privilege,
     StorageCredentialInfo,
@@ -274,7 +274,7 @@ class ServicePrincipalMigration(SecretsMixin):
         for access_connector in access_connectors:
             storage_credential_info = self._ws.storage_credentials.create(
                 access_connector.name,
-                azure_managed_identity=AzureManagedIdentity(str(access_connector.id)),
+                azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
                 comment="Created by ucx",
                 read_only=False,
             )
