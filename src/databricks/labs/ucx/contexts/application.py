@@ -32,7 +32,8 @@ from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader, WorkspaceNotebookLoader
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SysPathProvider
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraphBuilder
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages

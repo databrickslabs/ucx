@@ -20,7 +20,8 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, 
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.graph import SourceContainer, Dependency
-from databricks.labs.ucx.source_code.files import LocalFile, FileLoader, SysPathProvider
+from databricks.labs.ucx.source_code.files import LocalFile, FileLoader
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.whitelist import Whitelist

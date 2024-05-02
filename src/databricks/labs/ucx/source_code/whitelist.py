@@ -8,7 +8,7 @@ from pathlib import Path
 from collections.abc import Callable, Iterable
 from yaml import load_all as load_yaml, Loader
 
-from databricks.labs.ucx.source_code.files import SysPathProvider
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 
 from databricks.labs.ucx.source_code.graph import (
     Dependency,

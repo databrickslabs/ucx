@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.files import SysPathProvider
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 
 
 def test_provider_is_initialized_with_syspath():

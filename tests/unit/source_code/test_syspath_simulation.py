@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pytest
-from databricks.labs.ucx.source_code.files import SysPathProvider, LocalFileResolver
+from databricks.labs.ucx.source_code.files import LocalFileResolver
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraphBuilder, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver

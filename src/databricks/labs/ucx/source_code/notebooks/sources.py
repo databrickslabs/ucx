@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.files import SysPathProvider
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex

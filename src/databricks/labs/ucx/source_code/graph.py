@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import abc
 import ast
-import typing
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable, Iterable
 
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
-
-if typing.TYPE_CHECKING:
-    from databricks.labs.ucx.source_code.files import SysPathProvider
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 
 
 class DependencyGraph:

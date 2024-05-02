@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 import re
 
 import pytest
-from databricks.labs.ucx.source_code.files import SysPathProvider
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 

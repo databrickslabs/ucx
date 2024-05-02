@@ -4,7 +4,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
-from databricks.labs.ucx.source_code.files import FileLoader, SysPathProvider
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     WrappingLoader,

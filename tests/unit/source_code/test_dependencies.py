@@ -15,7 +15,8 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     WorkspaceNotebookLoader,
     LocalNotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SysPathProvider
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.syspath import SysPathProvider
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages
 from tests.unit import (
