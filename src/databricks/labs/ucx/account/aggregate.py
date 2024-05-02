@@ -4,12 +4,15 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Callable
 
 from databricks.labs.lsql import Row
+from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.blueprint.installation import NotInstalled
 
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.queries import FromTable
@@ -27,20 +30,19 @@ class AssessmentObject:
 
 
 class AccountAggregate:
-    def __init__(self, account_workspaces: AccountWorkspaces):
+    def __init__(self, account_workspaces: AccountWorkspaces, workspace_context_factory: Callable[[WorkspaceClient], WorkspaceContext] = WorkspaceContext):
         self._account_workspaces = account_workspaces
+        self._workspace_context_factory = workspace_context_factory
 
     @cached_property
     def _workspace_contexts(self):
-        # pylint: disable-next=import-outside-toplevel
-        from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
-
         contexts = []
         for workspace_client in self._account_workspaces.workspace_clients():
-            contexts.append(WorkspaceContext(workspace_client))
+            ctx = self._workspace_context_factory(workspace_client)
+            contexts.append(ctx)
         return contexts
 
-    def _federated_ucx_query(self, query: str) -> Iterable[tuple[int, Row]]:
+    def _federated_ucx_query(self, query: str, table_name='objects') -> Iterable[tuple[int, Row]]:
         """Modifies a query with a workspace-specific UCX schema and executes it on each workspace,
         yielding a tuple of workspace_id and Row. This means that you don't have to specify a database in the query,
         as it will be replaced with the UCX schema for each workspace. Use this method to aggregate results across
@@ -49,15 +51,20 @@ class AccountAggregate:
         At the moment, it's done sequentially, which is theoretically inefficient, but the number of workspaces is
         expected to be small. If this becomes a performance bottleneck, we can optimize it later via Threads.strict()
         """
-        empty_index = MigrationIndex([])
         for ctx in self._workspace_contexts:
             workspace_id = ctx.workspace_client.get_workspace_id()
             try:
                 # use already existing code to replace tables in the query, assuming that UCX database is in HMS
-                # TODO: this worked, but changing to check CurrentSessionState
-                # empty_index = MigrationIndex([MigrationStatus(ctx.config.inventory_database, "objects", None, ctx.config.inventory_database, "objects", "test")])
-                from_table = FromTable(empty_index, CurrentSessionState(schema=ctx.config.inventory_database))
-                logger.info(f"Querying Schema {ctx.config.inventory_database}")
+                inventory_database = ctx.config.inventory_database
+                stub_index = MigrationIndex([MigrationStatus(
+                    src_schema=inventory_database,
+                    src_table=table_name,
+                    dst_catalog='hive_metastore',
+                    dst_schema=inventory_database,
+                    dst_table=table_name,
+                )])
+                from_table = FromTable(stub_index, CurrentSessionState(schema=inventory_database))
+                logger.info(f"Querying Schema {inventory_database}")
 
                 workspace_specific_query = from_table.apply(query)
                 for row in ctx.sql_backend.fetch(workspace_specific_query):

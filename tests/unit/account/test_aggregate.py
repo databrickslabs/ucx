@@ -5,9 +5,12 @@ from databricks.labs.ucx.account.aggregate import AccountAggregate
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.lsql.backends import MockBackend, SqlBackend, StatementExecutionBackend
 from databricks.labs.blueprint.installation import MockInstallation
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+
+from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.sdk.service import iam, sql, jobs
 
+from tests.unit import workspace_client_mock
 
 
 def test_basic_readiness_report_no_workspaces(acc_client, caplog):
@@ -25,7 +28,6 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
     acc_client.workspaces.list.return_value = [
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc")]
 
-    account_aggregate_obj = AccountAggregate(account_ws)
     ws = create_autospec(WorkspaceClient)
     acc_client.get_workspace_client.return_value = ws
     ws.statement_execution.execute_statement.return_value \
@@ -34,6 +36,9 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
             result=sql.ResultData(data_array=[
                 ["jobs", "123134", """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]"]"""],
                 ["clusters", "0325-3423-dfs", "[]"]]))
+
+    ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="something"))
+    account_aggregate_obj = AccountAggregate(account_ws, workspace_context_factory=lambda _: ctx)
 
     with caplog.at_level(logging.INFO):
         account_aggregate_obj.readiness_report()

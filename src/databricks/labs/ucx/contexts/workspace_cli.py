@@ -5,9 +5,6 @@ from functools import cached_property
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.account.aggregate import AccountAggregate
-from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-from databricks.labs.ucx.account.metastores import AccountMetastores
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreation
