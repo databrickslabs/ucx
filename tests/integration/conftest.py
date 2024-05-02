@@ -245,7 +245,7 @@ class CommonUtils:
         return self._ws
 
 
-class TestRuntimeContext(RuntimeContext, CommonUtils):
+class TestRuntimeContext(CommonUtils, RuntimeContext):
     def __init__(
         self,
         make_table_fixture,
@@ -255,8 +255,8 @@ class TestRuntimeContext(RuntimeContext, CommonUtils):
         env_or_skip_fixture,
         ws_fixture,
     ):
-        super().__init__()
-        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
@@ -471,15 +471,15 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestWorkspaceContext(WorkspaceContext, CommonUtils):
+class TestWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
         make_schema_fixture,
         env_or_skip_fixture,
         ws_fixture,
     ):
-        super().__init__(ws_fixture)
-        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
     def config(self) -> WorkspaceConfig:
