@@ -45,14 +45,6 @@ class WorkspaceContext(CliContext):
         return StatementExecutionBackend(self.workspace_client, self.config.warehouse_id)
 
     @cached_property
-    def local_file_migrator(self):
-        return LocalFileMigrator(self.languages)
-
-    @cached_property
-    def local_file_linter(self):
-        return LocalFileLinter(self.workspace_client, self.tables_migrator.index(), self.file_resolver)
-
-    @cached_property
     def cluster_access(self):
         return ClusterAccess(self.installation, self.workspace_client, self.prompts)
 
@@ -206,3 +198,16 @@ class AccountContext(CliContext):
     @cached_property
     def account_metastores(self):
         return AccountMetastores(self.account_client)
+
+
+class LocalContext(WorkspaceContext):
+    """Local context extends Workspace context to provide extra properties
+    for running local operations."""
+
+    @cached_property
+    def local_file_migrator(self):
+        return LocalFileMigrator(self.languages)
+
+    @cached_property
+    def local_file_linter(self):
+        return LocalFileLinter(self.tables_migrator.index(), self.dependency_graph_builder)

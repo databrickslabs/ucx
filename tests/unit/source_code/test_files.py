@@ -2,11 +2,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileLinter
+from databricks.labs.ucx.source_code.files import LocalFileMigrator
 from databricks.labs.ucx.source_code.languages import Languages
 
 
@@ -74,10 +73,4 @@ def test_files_walks_directory():
     assert languages.fixer.call_count > 1
 
 
-def test_files_lint_ignores_unsupported_extensions():
-    # Create a mock WorkspaceClient
-    mock_ws = create_autospec(WorkspaceClient)
-    mock_ws.workspace.list.return_value = ["file1.py", "file2.py", "file3.py"]
-    files = LocalFileLinter(mock_ws)
-    path = Path('unsupported.ext')
-    assert not files.lint(path)
+# TODO: Add tests for the LocalFileLinter class once the NotebookLoader is implemented

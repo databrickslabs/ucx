@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 from collections.abc import Callable, Iterable
 
-from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -20,7 +19,8 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     DependencyLoader,
     Dependency,
-    BaseDependencyResolver, DependencyResolver, DependencyGraphBuilder,
+    BaseDependencyResolver,
+    DependencyGraphBuilder,
 )
 
 logger = logging.getLogger(__name__)
@@ -229,10 +229,9 @@ class SysPathProvider:
 
 class LocalFileLinter:
 
-    def __init__(self, ws: WorkspaceClient, migration_index: MigrationIndex, resolver: DependencyResolver ) -> None:
-        self._ws = ws
+    def __init__(self, migration_index: MigrationIndex, graph_builder: DependencyGraphBuilder) -> None:
         self._migration_index = migration_index
-        self._resolver = resolver
+        self._graph_builder = graph_builder
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
     # TODO: Build dependency graph, use ws tools for directory walk
@@ -255,13 +254,13 @@ class LocalFileLinter:
 
         # Recreate Language every time to reset the state
         languages = Languages(self._migration_index)
-        # TODO: Change to use ws tools rather than with
+        # TODO: Change to use tools rather than with
         with path.open("r") as f:
 
             # Check dependencies
-            builder = DependencyGraphBuilder(self._resolver)
-            builder.build_notebook_dependency_graph(path)
-            for problem in builder.problems:
+            # TODO: Need a local version of this, pending Eric's PR
+            self._graph_builder.build_notebook_dependency_graph(path)
+            for problem in self._graph_builder.problems:
                 logger.info(f"Found: {problem}")
                 advised = True
 
