@@ -245,7 +245,7 @@ class CommonUtils:
         return self._ws
 
 
-class TestRuntimeContext(CommonUtils, RuntimeContext):
+class TestRuntimeContext(RuntimeContext, CommonUtils):
     def __init__(
         self,
         make_table_fixture,
@@ -255,7 +255,7 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         env_or_skip_fixture,
         ws_fixture,
     ):
-        RuntimeContext.__init__(self)
+        super().__init__()
         CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
@@ -503,7 +503,6 @@ class TestWorkspaceContext(WorkspaceContext, CommonUtils):
 
 
 class LocalAzureCliTest(TestWorkspaceContext):
-
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -524,7 +523,6 @@ def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
 
 
 class LocalAwsCliTest(TestWorkspaceContext):
-
     @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
