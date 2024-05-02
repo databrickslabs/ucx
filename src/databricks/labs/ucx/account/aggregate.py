@@ -1,12 +1,18 @@
 import collections
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
+
+from databricks.labs.lsql import Row
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.blueprint.installation import NotInstalled
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.queries import FromTable
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -34,23 +40,34 @@ class AccountAggregate:
             contexts.append(WorkspaceContext(workspace_client))
         return contexts
 
+    def _federated_ucx_query(self, query: str) -> Iterable[tuple[int, Row]]:
+        """Modifies a query with a workspace-specific UCX schema and executes it on each workspace,
+        yielding a tuple of workspace_id and Row. This means that you don't have to specify a database in the query,
+        as it will be replaced with the UCX schema for each workspace. Use this method to aggregate results across
+        all workspaces, where UCX is installed.
+
+        At the moment, it's done sequentially, which is theoretically inefficient, but the number of workspaces is
+        expected to be small. If this becomes a performance bottleneck, we can optimize it later via Threads.strict()
+        """
+        empty_index = MigrationIndex([])
+        for ctx in self._workspace_contexts:
+            workspace_id = ctx.workspace_client.get_workspace_id()
+            try:
+                logger.debug(f"Assessing workspace {workspace_id}")
+                # use already existing code to replace tables in the query, assuming that UCX database is in HMS
+                from_table = FromTable(empty_index, CurrentSessionState(schema=ctx.config.inventory_database))
+                workspace_specific_query = from_table.apply(query)
+                for row in ctx.sql_backend.fetch(workspace_specific_query):
+                    yield workspace_id, row
+            except NotInstalled:
+                logger.warning(f"Workspace {workspace_id} does not have UCX installed")
+
     @cached_property
     def _aggregate_objects(self) -> list[AssessmentObject]:
         objects = []
-        # this is theoretically inefficient, but the number of workspaces is expected to be small. If this is a
-        # performance bottleneck, we can optimize it later via Threads.strict()
-        for ctx in self._workspace_contexts:
-            try:
-                workspace_id = ctx.workspace_client.get_workspace_id()
-                logger.info(f"Assessing workspace {workspace_id}")
-
-                # view is defined in src/databricks/labs/ucx/queries/views/objects.sql
-                for row in ctx.sql_backend.fetch(f'SELECT * FROM {ctx.config.inventory_database}.objects'):
-                    objects.append(
-                        AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures))
-                    )
-            except NotInstalled:
-                logger.warning(f"Workspace {ctx.workspace_client.get_workspace_id()} does not have UCX installed")
+        # view is defined in src/databricks/labs/ucx/queries/views/objects.sql
+        for workspace_id, row in self._federated_ucx_query('SELECT * FROM objects'):
+            objects.append(AssessmentObject(workspace_id, row.object_type, row.object_id, json.loads(row.failures)))
         return objects
 
     def readiness_report(self):
