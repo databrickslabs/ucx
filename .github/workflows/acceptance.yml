@@ -3,6 +3,9 @@ name: acceptance
 on:
   pull_request:
     types: [ opened, synchronize, ready_for_review ]
+  push:
+    branches:
+      - main
 
 permissions:
   id-token: write
