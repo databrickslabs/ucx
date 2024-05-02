@@ -37,9 +37,10 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
                 ["a", "b", "c"],
                 ["b", "c", "d"]], row_count=2),
             manifest=sql.ResultManifest(schema=sql.ResultSchema(
-                columns=[sql.ColumnInfo(name="a", type_name=sql.ColumnInfoTypeName.STRING),
-                         sql.ColumnInfo(name="b", type_name=sql.ColumnInfoTypeName.STRING),
-                         sql.ColumnInfo(name="c", type_name=sql.ColumnInfoTypeName.STRING)])),
+                columns=[sql.ColumnInfo(name="object_type", type_name=sql.ColumnInfoTypeName.STRING),
+                         sql.ColumnInfo(name="object_id", type_name=sql.ColumnInfoTypeName.STRING),
+                         sql.ColumnInfo(name="failures", type_name=sql.ColumnInfoTypeName.STRING)],
+                column_count=3)),
             statement_id='123')
 
     ctx = WorkspaceContext(ws).replace(config=WorkspaceConfig(inventory_database="something", warehouse_id="1234"))
