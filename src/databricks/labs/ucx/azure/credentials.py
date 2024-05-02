@@ -297,22 +297,19 @@ class ServicePrincipalMigration(SecretsMixin):
         if plan_confirmed:
             ac_results = self._create_access_connectors_for_storage_accounts()
 
+        sp_migration_infos = self._generate_migration_list(include_names)
+        if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
+            logger.warning(
+                "At least one Azure Service Principal accesses a storage account with non-Allow default network "
+                "configuration, which might cause connectivity issues. We recommend using Databricks Access "
+                "Connectors instead"
+            )
         plan_confirmed = prompts.confirm(
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
         )
         sp_results = []
         if plan_confirmed:
-            sp_migration_infos = self._generate_migration_list(include_names)
-            plan_confirmed = True
-            if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
-                plan_confirmed = prompts.confirm(
-                    "At least one Azure Service Principal accesses a storage account with non-Allow default network "
-                    "configuration, which might cause connectivity issues. We recommend using Databricks Access "
-                    "Connectors instead (next prompt). Would you like to continue with migrating the service "
-                    "principals?"
-                )
-            if plan_confirmed:
-                sp_results = self._migrate_service_principals(sp_migration_infos)
+            sp_results = self._migrate_service_principals(sp_migration_infos)
 
         execution_results = ac_results + sp_results
         if execution_results:

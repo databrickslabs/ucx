@@ -116,7 +116,6 @@ def run_migration(sql_backend, inventory_schema):
             MockPrompts(
                 {
                     "Above Azure Service Principals will be migrated to UC storage credentials *": migrate_service_principals,
-                    "At least one Azure Service Principal accesses a storage account with non-Allow default network*": migrate_service_principals,
                     r"\[RECOMMENDED\] Please confirm to create an access connector*": create_access_connectors,
                 }
             ),

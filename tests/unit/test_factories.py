@@ -72,7 +72,6 @@ def test_replace_installation():
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
