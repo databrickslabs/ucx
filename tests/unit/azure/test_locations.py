@@ -292,9 +292,6 @@ def test_run_managed_identity():
 )
 def test_run_access_connectors(azure_storage_account_info):
     """Test run with access connectors based storage credentials"""
-    ws = create_autospec(WorkspaceClient)
-
-    # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
             r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
@@ -304,7 +301,6 @@ def test_run_access_connectors(azure_storage_account_info):
         }
     )
 
-    # Mock AzureResources to return storage account and containers
     storage_account = StorageAccount(
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/test"),
         name="test",
@@ -319,15 +315,13 @@ def test_run_access_connectors(azure_storage_account_info):
         AzureResource(f"{storage_account.id}/containers/container5"),
     ]
 
-    # mock listing storage credentials
+    ws = create_autospec(WorkspaceClient)
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(name=f"ac-{storage_account.name}", comment="Created by UCX"),
     ]
 
-    # mock listing UC external locations, no HMS external location will be matched
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
 
-    # mock installation with permission mapping
     mock_installation = MockInstallation({"azure_storage_account_info.csv": azure_storage_account_info})
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation, azurerm)
@@ -356,18 +350,6 @@ def test_run_access_connectors(azure_storage_account_info):
 
 def test_run_access_connectors_warn_storage_account_not_found(caplog):
     """A warning should be raised when a storage account is not found."""
-    ws = create_autospec(WorkspaceClient)
-
-    # mock crawled HMS external locations
-    mock_backend = MockBackend(
-        rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
-                ("abfss://container@test.dfs.core.windows.net/", 1),
-            ]
-        }
-    )
-
-    # Mock AzureResources to return storage account and containers
     storage_account = StorageAccount(
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/other-storage-account"),
         name="other-storage-account",
@@ -377,16 +359,12 @@ def test_run_access_connectors_warn_storage_account_not_found(caplog):
     azurerm = create_autospec(AzureResources)
     azurerm.storage_accounts.return_value = [storage_account]
 
-    # mock listing storage credentials
+    ws = create_autospec(WorkspaceClient)
     ws.storage_credentials.list.return_value = [StorageCredentialInfo(name=f"ac-test", comment="Created by UCX")]
 
-    # mock listing UC external locations, no HMS external location will be matched
-    ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
-
-    # mock installation with permission mapping
     mock_installation = MockInstallation({"azure_storage_account_info.csv": []})
 
-    location_migration = location_migration_for_test(ws, mock_backend, mock_installation, azurerm)
+    location_migration = location_migration_for_test(ws, MockBackend(), mock_installation, azurerm)
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.azure.locations"):
         location_migration.run()
 
