@@ -186,14 +186,14 @@ def test_storage_credential_validation_result_from_storage_credential_info_servi
     "managed_identity_id",
     [
         None,
-        "/subscriptions/sub-test/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-test"
-    ]
+        "/subscriptions/sub-test/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-test",
+    ],
 )
 def test_storage_credential_validation_result_from_storage_credential_info_managed_identity(managed_identity_id):
     """Verify if the fields are correct"""
     azure_managed_identity = AzureManagedIdentityResponse(
-       "/subscriptions/sub-test/resourceGroups/rg-test/providers/providers/Microsoft.Databricks/accessConnectors/ac-test",
-       managed_identity_id=managed_identity_id
+        "/subscriptions/sub-test/resourceGroups/rg-test/providers/providers/Microsoft.Databricks/accessConnectors/ac-test",
+        managed_identity_id=managed_identity_id,
     )
     storage_credential_info = StorageCredentialInfo(
         name="test",
