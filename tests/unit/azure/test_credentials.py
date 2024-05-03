@@ -182,6 +182,41 @@ def test_storage_credential_validation_result_from_storage_credential_info_servi
     assert validation_result.failures == failures
 
 
+@pytest.mark.parametrize(
+    "managed_identity_id",
+    [
+        None,
+        "/subscriptions/sub-test/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-test"
+    ]
+)
+def test_storage_credential_validation_result_from_storage_credential_info_managed_identity(managed_identity_id):
+    """Verify if the fields are correct"""
+    azure_managed_identity = AzureManagedIdentityResponse(
+       "/subscriptions/sub-test/resourceGroups/rg-test/providers/providers/Microsoft.Databricks/accessConnectors/ac-test",
+       managed_identity_id=managed_identity_id
+    )
+    storage_credential_info = StorageCredentialInfo(
+        name="test",
+        azure_managed_identity=azure_managed_identity,
+        read_only=True,
+    )
+    validated_on = "abfss://container@storageaccount.dfs.core.windows.net"
+    failures = ["failure"]
+
+    validation_result = StorageCredentialValidationResult.from_storage_credential_info(
+        storage_credential_info, validated_on, failures
+    )
+
+    application_id = azure_managed_identity.managed_identity_id or azure_managed_identity.access_connector_id
+
+    assert validation_result.name == storage_credential_info.name
+    assert validation_result.application_id == application_id
+    assert validation_result.read_only == storage_credential_info.read_only
+    assert validation_result.validated_on == validated_on
+    assert validation_result.directory_id is None
+    assert validation_result.failures == failures
+
+
 def test_list_storage_credentials(credential_manager):
     assert credential_manager.list() == {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"}
 
