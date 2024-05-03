@@ -110,7 +110,7 @@ class StorageAccount:
     id: AzureResource
     name: str
     location: str
-    default_network_action: str  # "Deny" or "Allow"
+    default_network_action: str  # "Unknown", "Deny" or "Allow"
 
     @classmethod
     def from_raw_resource(cls, raw: RawResource) -> "StorageAccount":
@@ -125,9 +125,7 @@ class StorageAccount:
         if location == "":
             raise KeyError(f"Missing location: {raw}")
 
-        default_network_action = raw.get("networkAcls", {}).get("defaultAction", "")
-        if default_network_action == "":
-            raise KeyError(f"Missing networkAcls.defaultAction: {raw}")
+        default_network_action = raw.get("properties", {}).get("networkAcls", {}).get("defaultAction", "Unknown")
 
         storage_account = cls(id=raw.id, name=name, location=location, default_network_action=default_network_action)
         return storage_account
