@@ -113,6 +113,16 @@ commands:
       - name: aws-profile
         description: AWS Profile to use for authentication
 
+  - name: create-missing-principals
+    description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and 
+      creates them. It takes single-role optional parameter. 
+        If set to True, it will create a single role for all the S3 locations.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+      - name: single-role
+        description: (Optional) Create a single role for all the S3 locations (default:True)
+
   - name: create-uber-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
       used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
