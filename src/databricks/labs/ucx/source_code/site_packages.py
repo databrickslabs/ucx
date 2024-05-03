@@ -22,16 +22,16 @@ class SitePackagesResolver(BaseDependencyResolver):
         self,
         site_packages: SitePackages,
         file_loader: FileLoader,
-        syspath_provider: PathLookup,
+        path_lookup: PathLookup,
         next_resolver: BaseDependencyResolver | None = None,
     ):
         super().__init__(next_resolver)
         self._site_packages = site_packages
         self._file_loader = file_loader
-        self._syspath_provider = syspath_provider
+        self._path_lookup = path_lookup
 
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return SitePackagesResolver(self._site_packages, self._file_loader, self._syspath_provider, resolver)
+        return SitePackagesResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
 
     def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
         site_package = self._site_packages[name]
@@ -47,7 +47,7 @@ class SitePackageContainer(SourceContainer):
         self._file_loader = file_loader
         self._site_package = site_package
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
         for module_path in self._site_package.module_paths:
             parent.register_dependency(Dependency(self._file_loader, module_path))
 

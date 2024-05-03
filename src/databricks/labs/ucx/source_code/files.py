@@ -36,13 +36,13 @@ class LocalFile(SourceContainer):
     def path(self):
         return self._path
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
-        syspath_provider.push_cwd(self.path.parent)
+        path_lookup.push_cwd(self.path.parent)
         self._build_dependency_graph(parent)
-        syspath_provider.pop_cwd()
+        path_lookup.pop_cwd()
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> None:
         # TODO replace the below with parent.build_graph_from_python_source
@@ -149,8 +149,8 @@ class LocalFileMigrator:
 
 class FileLoader(DependencyLoader):
 
-    def __init__(self, syspath_provider: PathLookup):
-        self._syspath_provider = syspath_provider
+    def __init__(self, path_lookup: PathLookup):
+        self._path_lookup = path_lookup
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         fullpath = self.full_path(dependency.path)
@@ -163,10 +163,10 @@ class FileLoader(DependencyLoader):
     def full_path(self, path: Path) -> Path | None:
         if path.is_file():
             return path
-        child = Path(self._syspath_provider.cwd, path)
+        child = Path(self._path_lookup.cwd, path)
         if child.is_file():
             return child
-        for parent in self._syspath_provider.paths:
+        for parent in self._path_lookup.paths:
             child = Path(parent, path)
             if child.is_file():
                 return child

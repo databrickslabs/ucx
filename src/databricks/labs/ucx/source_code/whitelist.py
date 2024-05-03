@@ -58,7 +58,7 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
         pass
 
 

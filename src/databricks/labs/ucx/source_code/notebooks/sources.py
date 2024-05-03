@@ -61,13 +61,13 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_provider: PathLookup) -> None:
-        syspath_provider.push_cwd(self.path.parent)
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+        path_lookup.push_cwd(self.path.parent)
         problems: list[DependencyProblem] = []
         for cell in self._cells:
             cell.build_dependency_graph(parent, problems.append)
         parent.add_problems(problems)
-        syspath_provider.pop_cwd()
+        path_lookup.pop_cwd()
 
 
 class NotebookLinter:
