@@ -9,7 +9,6 @@ from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.sdk.service import sql
 
 
-
 def test_basic_readiness_report_no_workspaces(acc_client, caplog):
     account_ws = AccountWorkspaces(acc_client)
     account_aggregate_obj = AccountAggregate(account_ws)
@@ -33,14 +32,25 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
         result=sql.ResultData(
             data_array=[
                 [
-                    "tables",
-                    "32432",
-                    """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]""",
+                    "jobs",
+                    "32432123",
+                    """["cluster type not supported : LEGACY_TABLE_ACL",
+                     "cluster type not supported : LEGACY_SINGLE_USER"]""",
+                ],
+                [
+                    "jobs",
+                    "234234234",
+                    """["cluster type not supported : LEGACY_SINGLE_USER"]""",
                 ],
                 [
                     "clusters",
-                    "234234234",
-                    """["cluster type not supported : LEGACY_TABLE_ACL", "cluster type not supported : LEGACY_SINGLE_USER"]""",
+                    "21312312",
+                    """[]""",
+                ],
+                [
+                    "tables",
+                    "34234324",
+                    """["listTables returned null"]""",
                 ],
             ],
             row_count=2,
@@ -64,4 +74,6 @@ def test_readiness_report_ucx_installed(acc_client, caplog):
     with caplog.at_level(logging.INFO):
         account_aggregate_obj.readiness_report()
 
-    assert 'UC compatibility' in caplog.text
+    assert 'UC compatibility: 25.0% (3/4)' in caplog.text
+    assert 'cluster type not supported : LEGACY_TABLE_ACL: 1 objects' in caplog.text
+    assert 'cluster type not supported : LEGACY_SINGLE_USER: 2 objects' in caplog.text
