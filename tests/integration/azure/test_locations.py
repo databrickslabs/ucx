@@ -257,6 +257,7 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
         )
 
 
+@pytest.mark.skip("Waiting for change to use access connector in integration tests")
 def test_run_external_locations_using_access_connector(
     clean_storage_credentials,
     clean_external_locations,
