@@ -266,31 +266,7 @@ def test_run_managed_identity():
     )
 
 
-@pytest.mark.parametrize(
-    "azure_storage_account_info",
-    [
-        list(),
-        # Storage credentials based on access connectors take priority over other credentials
-        [
-            {
-                'prefix': 'abfss://container4@test.dfs.core.windows.net/',
-                'client_id': 'application_id_system_assigned_mi-123',
-                'principal': 'credential_system_assigned_mi',
-                'privilege': 'WRITE_FILES',
-                'type': 'ManagedIdentity',
-            },
-            {
-                'prefix': 'abfss://container5@test.dfs.core.windows.net/',
-                'client_id': 'application_id_1',
-                'principal': 'credential_sp1',
-                'privilege': 'WRITE_FILES',
-                'type': 'Application',
-                'directory_id': 'directory_id_1',
-            },
-        ],
-    ],
-)
-def test_run_access_connectors(azure_storage_account_info):
+def test_run_access_connectors():
     """Test run with access connectors based storage credentials"""
     mock_backend = MockBackend(
         rows={
@@ -322,7 +298,29 @@ def test_run_access_connectors(azure_storage_account_info):
 
     ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
 
-    mock_installation = MockInstallation({"azure_storage_account_info.csv": azure_storage_account_info})
+    mock_installation = MockInstallation(
+        {
+            "azure_storage_account_info.csv":
+            # Storage credentials based on access connectors take priority over other credentials
+            [
+                {
+                    'prefix': 'abfss://container4@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_system_assigned_mi-123',
+                    'principal': 'credential_system_assigned_mi',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'ManagedIdentity',
+                },
+                {
+                    'prefix': 'abfss://container5@test.dfs.core.windows.net/',
+                    'client_id': 'application_id_1',
+                    'principal': 'credential_sp1',
+                    'privilege': 'WRITE_FILES',
+                    'type': 'Application',
+                    'directory_id': 'directory_id_1',
+                },
+            ]
+        }
+    )
 
     location_migration = location_migration_for_test(ws, mock_backend, mock_installation, azurerm)
     location_migration.run()
