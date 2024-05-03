@@ -180,7 +180,13 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
 
 @retried(on=[InternalError], timeout=timedelta(minutes=2))
 def test_spn_migration_access_connector_created(
-    az_cli_ctx, env_or_skip, extract_test_info, run_migration, product_info, make_random
+    clean_storage_credentials,
+    az_cli_ctx,
+    env_or_skip,
+    extract_test_info,
+    run_migration,
+    product_info,
+    make_random,
 ):
     """Storage credentials should be created for the access connectors."""
     # Mocking in an integration test because Azure resource can not be created
@@ -200,14 +206,11 @@ def test_spn_migration_access_connector_created(
     mount = env_or_skip("TEST_MOUNT_CONTAINER")
     resource_permissions.create_access_connectors_for_storage_accounts.return_value = [(access_connector, mount)]
 
-    try:
-        run_migration(
-            az_cli_ctx.workspace_client,
-            extract_test_info,
-            migrate_service_principals="No",
-            create_access_connectors="Yes",
-            resource_permissions=resource_permissions,
-        )
-        assert az_cli_ctx.workspace_client.storage_credentials.get(access_connector.name)
-    finally:
-        save_delete_credential(az_cli_ctx.workspace_client, access_connector.name)
+    run_migration(
+        az_cli_ctx.workspace_client,
+        extract_test_info,
+        migrate_service_principals="No",
+        create_access_connectors="Yes",
+        resource_permissions=resource_permissions,
+    )
+    assert az_cli_ctx.workspace_client.storage_credentials.get(access_connector.name)
