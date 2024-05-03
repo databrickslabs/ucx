@@ -87,11 +87,7 @@ class RDDApiMatcher(SharedClusterMatcher):
 
 
 class SparkSqlContextMatcher(SharedClusterMatcher):
-    _ATTRIBUTES = [
-        "sc",
-        "sqlContext",
-        "sparkContext"
-    ]
+    _ATTRIBUTES = ["sc", "sqlContext", "sparkContext"]
 
     def lint(self, node: ast.AST) -> Iterator[Advice]:
         if not isinstance(node, ast.Attribute):

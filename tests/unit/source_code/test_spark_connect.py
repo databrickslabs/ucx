@@ -1,6 +1,5 @@
-from databricks.labs.ucx.source_code.base import Advisory, Failure
+from databricks.labs.ucx.source_code.base import Failure
 from databricks.labs.ucx.source_code.spark_connect import SparkConnectLinter
-from databricks.sdk.service.compute import DataSecurityMode
 
 
 def test_jvm_access_match_shared():
@@ -17,7 +16,7 @@ spark._jspark._jvm.com.my.custom.Name()
             start_line=3,
             start_col=0,
             end_line=3,
-            end_col=18
+            end_col=18,
         ),
         Failure(
             code="jvm-access-in-shared-clusters",
@@ -25,8 +24,8 @@ spark._jspark._jvm.com.my.custom.Name()
             start_line=3,
             start_col=0,
             end_line=3,
-            end_col=13
-        )
+            end_col=13,
+        ),
     ] == list(linter.lint(code))
 
 
@@ -44,7 +43,7 @@ spark._jspark._jvm.com.my.custom.Name()
             start_line=3,
             start_col=0,
             end_line=3,
-            end_col=18
+            end_col=18,
         ),
         Failure(
             code="jvm-access-in-shared-clusters",
@@ -52,8 +51,8 @@ spark._jspark._jvm.com.my.custom.Name()
             start_line=3,
             start_col=0,
             end_line=3,
-            end_col=13
-        )
+            end_col=13,
+        ),
     ] == list(linter.lint(code))
 
 
@@ -70,7 +69,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=2,
             start_col=7,
             end_line=2,
-            end_col=32
+            end_col=32,
         ),
         Failure(
             code='legacy-context-in-shared-clusters',
@@ -78,7 +77,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=2,
             start_col=7,
             end_line=2,
-            end_col=21
+            end_col=21,
         ),
         Failure(
             code="rdd-in-shared-clusters",
@@ -86,7 +85,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=3,
             start_col=29,
             end_line=3,
-            end_col=42
+            end_col=42,
         ),
         Failure(
             code="legacy-context-in-shared-clusters",
@@ -94,8 +93,8 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=3,
             start_col=29,
             end_line=3,
-            end_col=40
-        )
+            end_col=40,
+        ),
     ] == list(linter.lint(code))
 
 
@@ -112,7 +111,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=2,
             start_col=7,
             end_line=2,
-            end_col=32
+            end_col=32,
         ),
         Failure(
             code='legacy-context-in-shared-clusters',
@@ -120,7 +119,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=2,
             start_col=7,
             end_line=2,
-            end_col=21
+            end_col=21,
         ),
         Failure(
             code="rdd-in-shared-clusters",
@@ -128,7 +127,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=3,
             start_col=29,
             end_line=3,
-            end_col=42
+            end_col=42,
         ),
         Failure(
             code="legacy-context-in-shared-clusters",
@@ -136,8 +135,8 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             start_line=3,
             start_col=29,
             end_line=3,
-            end_col=40
-        )
+            end_col=40,
+        ),
     ] == list(linter.lint(code))
 
 
@@ -147,4 +146,4 @@ def test_valid_code():
 df = spark.range(10)
 df.collect()
     """
-    assert [] == list(linter.lint(code))
+    assert not list(linter.lint(code))
