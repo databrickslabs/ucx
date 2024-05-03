@@ -47,16 +47,20 @@
           "name": "sto2",
           "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto2",
           "location": "westeu",
-          "networkAcls": {
-            "defaultAction": "Allow"
+          "properties": {
+            "networkAcls": {
+              "defaultAction": "Allow"
+            }
           }
         },
         {
           "name": "sto3",
           "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
           "location": "westeu",
-          "networkAcls": {
-            "defaultAction": "Deny"
+          "properties": {
+            "networkAcls": {
+              "defaultAction": "Deny"
+            }
           }
         }
       ]
