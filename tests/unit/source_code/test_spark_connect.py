@@ -4,7 +4,7 @@ from databricks.sdk.service.compute import DataSecurityMode
 
 
 def test_jvm_access_match_shared():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.USER_ISOLATION)
+    linter = SparkConnectLinter(is_serverless=False)
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
@@ -12,7 +12,7 @@ spark._jspark._jvm.com.my.custom.Name()
 
     assert [
         Failure(
-            code="shared-clusters",
+            code="jvm-access-in-shared-clusters",
             message='Cannot access Spark Driver JVM on UC Shared Clusters',
             start_line=3,
             start_col=0,
@@ -20,7 +20,7 @@ spark._jspark._jvm.com.my.custom.Name()
             end_col=18
         ),
         Failure(
-            code="shared-clusters",
+            code="jvm-access-in-shared-clusters",
             message='Cannot access Spark Driver JVM on UC Shared Clusters',
             start_line=3,
             start_col=0,
@@ -30,25 +30,25 @@ spark._jspark._jvm.com.my.custom.Name()
     ] == list(linter.lint(code))
 
 
-def test_jvm_access_match_non_shared():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.SINGLE_USER)
+def test_jvm_access_match_serverless():
+    linter = SparkConnectLinter(is_serverless=True)
     code = """
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
     """
 
     assert [
-        Advisory(
-            code="shared-clusters",
-            message='Cannot access Spark Driver JVM on UC Shared Clusters',
+        Failure(
+            code="jvm-access-in-shared-clusters",
+            message='Cannot access Spark Driver JVM on Serverless Compute',
             start_line=3,
             start_col=0,
             end_line=3,
             end_col=18
         ),
-        Advisory(
-            code="shared-clusters",
-            message='Cannot access Spark Driver JVM on UC Shared Clusters',
+        Failure(
+            code="jvm-access-in-shared-clusters",
+            message='Cannot access Spark Driver JVM on Serverless Compute',
             start_line=3,
             start_col=0,
             end_line=3,
@@ -57,15 +57,15 @@ spark._jspark._jvm.com.my.custom.Name()
     ] == list(linter.lint(code))
 
 
-def test_rdd_match_shared():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.USER_ISOLATION)
+def test_rdd_context_match_shared():
+    linter = SparkConnectLinter(is_serverless=False)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     """
     assert [
         Failure(
-            code="shared-clusters",
+            code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
             start_line=2,
             start_col=7,
@@ -73,96 +73,76 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_col=32
         ),
         Failure(
-            code="shared-clusters",
+            code='legacy-context-in-shared-clusters',
+            message='sc is not supported on UC Shared Clusters. Rewrite it using spark',
+            start_line=2,
+            start_col=7,
+            end_line=2,
+            end_col=21
+        ),
+        Failure(
+            code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
             start_line=3,
             start_col=29,
             end_line=3,
             end_col=42
+        ),
+        Failure(
+            code="legacy-context-in-shared-clusters",
+            message='sc is not supported on UC Shared Clusters. Rewrite it using spark',
+            start_line=3,
+            start_col=29,
+            end_line=3,
+            end_col=40
         )
     ] == list(linter.lint(code))
 
 
-def test_rdd_match_non_shared():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.SINGLE_USER)
-    code = """
-rdd1 = sc.parallelize([1, 2, 3])
-rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
-    """
-    assert [
-        Advisory(
-            code="shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
-            start_line=2,
-            start_col=7,
-            end_line=2,
-            end_col=32
-        ),
-        Advisory(
-            code="shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
-            start_line=3,
-            start_col=29,
-            end_line=3,
-            end_col=42
-        )
-    ] == list(linter.lint(code))
-
-
-def test_spark_sql_context_matcher_shared():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.USER_ISOLATION)
+def test_rdd_context_match_shared():
+    linter = SparkConnectLinter(is_serverless=True)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     """
     assert [
         Failure(
-            code="shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+            code="rdd-in-shared-clusters",
+            message='RDD APIs are not supported on Serverless Compute. Rewrite it using DataFrame API',
             start_line=2,
             start_col=7,
             end_line=2,
             end_col=32
         ),
         Failure(
-            code="shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
-            start_line=3,
-            start_col=29,
-            end_line=3,
-            end_col=42
-        )
-    ] == list(linter.lint(code))
-
-
-def test_spark_sql_context_matcher_non_shared():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.SINGLE_USER)
-    code = """
-rdd1 = sc.parallelize([1, 2, 3])
-rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
-    """
-    assert [
-        Advisory(
-            code="shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+            code='legacy-context-in-shared-clusters',
+            message='sc is not supported on Serverless Compute. Rewrite it using spark',
             start_line=2,
             start_col=7,
             end_line=2,
-            end_col=32
+            end_col=21
         ),
-        Advisory(
-            code="shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+        Failure(
+            code="rdd-in-shared-clusters",
+            message='RDD APIs are not supported on Serverless Compute. Rewrite it using DataFrame API',
             start_line=3,
             start_col=29,
             end_line=3,
             end_col=42
+        ),
+        Failure(
+            code="legacy-context-in-shared-clusters",
+            message='sc is not supported on Serverless Compute. Rewrite it using spark',
+            start_line=3,
+            start_col=29,
+            end_line=3,
+            end_col=40
         )
     ] == list(linter.lint(code))
 
 
 def test_valid_code():
-    linter = SparkConnectLinter(data_security_mode=DataSecurityMode.USER_ISOLATION)
+    linter = SparkConnectLinter()
     code = """
 df = spark.range(10)
 df.collect()
