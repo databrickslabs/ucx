@@ -46,7 +46,8 @@ from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
 from databricks.labs.ucx.assessment.jobs import JobInfo, SubmitRunInfo
 from databricks.labs.ucx.assessment.pipelines import PipelineInfo
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
+from databricks.labs.ucx.contexts.account_cli import AccountContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.hive_metastore.grants import Grant
@@ -272,6 +273,8 @@ class WorkspaceInstaller(WorkspaceContext):
             return config
         except NotFound as err:
             logger.debug(f"Cannot find previous installation: {err}")
+        except (PermissionDenied, SerdeError, ValueError, AttributeError):
+            logger.warning(f"Existing installation at {self.installation.install_folder()} is corrupted. Skipping...")
         return self._configure_new_installation(default_config)
 
     def replace_config(self, **changes: Any) -> WorkspaceConfig | None:
@@ -391,7 +394,8 @@ class WorkspaceInstaller(WorkspaceContext):
                     raise AlreadyExists(
                         f"Inventory database '{inventory_database}' already exists in another installation"
                     )
-            except (PermissionDenied, NotFound, SerdeError):
+            except (PermissionDenied, NotFound, SerdeError, ValueError, AttributeError):
+                logger.warning(f"Existing installation at {installation.install_folder()} is corrupted. Skipping...")
                 continue
 
 

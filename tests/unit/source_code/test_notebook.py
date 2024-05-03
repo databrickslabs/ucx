@@ -3,19 +3,16 @@ from unittest.mock import create_autospec
 import re
 
 import pytest
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.dependencies import (
-    DependencyGraph,
-)
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer, LocalFileLoader, WorkspaceNotebookLoader
-from databricks.labs.ucx.source_code.dependency_resolvers import DependencyResolver
-from databricks.labs.ucx.source_code.notebook import Notebook
+from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, WorkspaceNotebookLoader
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
-from databricks.labs.ucx.source_code.site_packages import SitePackages
-from tests.unit import _load_sources, _download_side_effect, whitelist_mock, locate_site_packages
+from tests.unit import _load_sources, _download_side_effect
 
 
 # fmt: off
@@ -80,7 +77,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     languages = [cell.language.magic_name for cell in notebook.cells]
     assert languages == source[2]
@@ -100,7 +97,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
@@ -123,7 +120,7 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     for cell in notebook.cells:
         assert cell.is_runnable()
@@ -137,15 +134,18 @@ def test_notebook_builds_leaf_dependency_graph():
     ws.workspace.get_status.return_value = ObjectInfo(
         object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
     )
-    loader = create_autospec(LocalFileLoader)
-    loader.is_notebook.return_value = True
-    site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
-    dependency = resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, resolver)
+    notebook_loader = WorkspaceNotebookLoader(ws)
+    dependency_resolver = DependencyResolver(
+        [
+            NotebookResolver(notebook_loader),
+        ]
+    )
+    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
-    assert {str(path) for path in graph.paths} == {"leaf1.py.txt"}
+    container.build_dependency_graph(graph, provider)
+    assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
 
 
 def get_status_side_effect(*args):
@@ -159,15 +159,18 @@ def test_notebook_builds_depth1_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalFileLoader)
-    loader.is_notebook.return_value = False
-    site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
-    dependency = resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, resolver)
+    notebook_loader = WorkspaceNotebookLoader(ws)
+    dependency_resolver = DependencyResolver(
+        [
+            NotebookResolver(notebook_loader),
+        ]
+    )
+    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    container.build_dependency_graph(graph, provider)
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 
@@ -177,15 +180,18 @@ def test_notebook_builds_depth2_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalFileLoader)
-    loader.is_notebook.return_value = False
-    site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
-    dependency = resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, resolver)
+    notebook_loader = WorkspaceNotebookLoader(ws)
+    dependency_resolver = DependencyResolver(
+        [
+            NotebookResolver(notebook_loader),
+        ]
+    )
+    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    container.build_dependency_graph(graph, provider)
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 
@@ -196,14 +202,17 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalFileLoader)
-    loader.is_notebook.return_value = True
-    site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
-    dependency = resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, resolver)
+    notebook_loader = WorkspaceNotebookLoader(ws)
+    dependency_resolver = DependencyResolver(
+        [
+            NotebookResolver(notebook_loader),
+        ]
+    )
+    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
 
@@ -215,15 +224,18 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalFileLoader)
-    loader.is_notebook.return_value = False
-    site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
-    dependency = resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, resolver)
+    notebook_loader = WorkspaceNotebookLoader(ws)
+    dependency_resolver = DependencyResolver(
+        [
+            NotebookResolver(notebook_loader),
+        ]
+    )
+    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    container.build_dependency_graph(graph, provider)
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 
@@ -233,15 +245,18 @@ def test_notebook_builds_python_dependency_graph():
     ws = create_autospec(WorkspaceClient)
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
-    loader = create_autospec(LocalFileLoader)
-    loader.is_notebook.return_value = False
-    site_packages = SitePackages.parse(locate_site_packages())
-    resolver = DependencyResolver(whitelist_mock(), site_packages, loader, WorkspaceNotebookLoader(ws))
-    dependency = resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, resolver)
+    notebook_loader = WorkspaceNotebookLoader(ws)
+    dependency_resolver = DependencyResolver(
+        [
+            NotebookResolver(notebook_loader),
+        ]
+    )
+    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.paths)}
+    container.build_dependency_graph(graph, provider)
+    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
 

@@ -1,33 +1,21 @@
-import abc
-import logging
 import os
 import shutil
 from functools import cached_property
 
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
-from databricks.sdk import AccountClient, WorkspaceClient
+from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-from databricks.labs.ucx.account.metastores import AccountMetastores
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
-from databricks.labs.ucx.aws.credentials import IamRoleMigration
+from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreation
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
-from databricks.labs.ucx.azure.credentials import ServicePrincipalMigration, StorageCredentialManager
+from databricks.labs.ucx.azure.credentials import StorageCredentialManager, ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
-from databricks.labs.ucx.contexts.application import GlobalContext
+from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, LocalNotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
-
-logger = logging.getLogger(__name__)
-
-
-class CliContext(GlobalContext, abc.ABC):
-    @cached_property
-    def prompts(self) -> Prompts:
-        return Prompts()
 
 
 class WorkspaceContext(CliContext):
@@ -119,6 +107,7 @@ class WorkspaceContext(CliContext):
             self.external_locations,
             self.azure_resource_permissions,
             self.azure_resources,
+            self.principal_acl,
         )
 
     @cached_property
@@ -154,7 +143,7 @@ class WorkspaceContext(CliContext):
             self.sql_backend,
             self.aws_resources,
             self.external_locations,
-            self.inventory_database,
+            self.principal_acl,
             self.named_parameters.get("aws_account_id"),
             self.named_parameters.get("kms_key"),
         )
@@ -167,24 +156,14 @@ class WorkspaceContext(CliContext):
             self.iam_credential_manager,
         )
 
-
-class AccountContext(CliContext):
-    def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):
-        super().__init__(named_parameters)
-        self._ac = ac
+    @cached_property
+    def iam_role_creation(self):
+        return IamRoleCreation(
+            self.installation,
+            self.workspace_client,
+            self.aws_resource_permissions,
+        )
 
     @cached_property
-    def account_client(self) -> AccountClient:
-        return self._ac
-
-    @cached_property
-    def workspace_ids(self):
-        return [int(_.strip()) for _ in self.named_parameters.get("workspace_ids", "").split(",") if _]
-
-    @cached_property
-    def account_workspaces(self):
-        return AccountWorkspaces(self.account_client, self.workspace_ids)
-
-    @cached_property
-    def account_metastores(self):
-        return AccountMetastores(self.account_client)
+    def notebook_loader(self) -> NotebookLoader:
+        return LocalNotebookLoader(self.path_lookup)

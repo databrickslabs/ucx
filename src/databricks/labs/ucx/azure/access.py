@@ -118,13 +118,14 @@ class AzureResourcePermissions:
                     continue
                 privilege = returned_privilege.value
                 principal_spm_mapping[spm_mapping_key] = StoragePermissionMapping(
-                    prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
-                    client_id=role_assignment.principal.client_id,
-                    principal=role_assignment.principal.display_name,
-                    privilege=privilege,
-                    type=role_assignment.principal.type,
-                    directory_id=role_assignment.principal.directory_id,
-                )
+                        prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
+                        client_id=role_assignment.principal.client_id,
+                        principal=role_assignment.principal.display_name,
+                        privilege=privilege,
+                        type=role_assignment.principal.type,
+                        default_network_action=storage.default_network_action,
+                        directory_id=role_assignment.principal.directory_id,
+                    )
         return principal_spm_mapping.values()
 
     def save_spn_permissions(self) -> str | None:

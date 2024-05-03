@@ -162,7 +162,13 @@ def created_job_tasks(workspace_client: MagicMock, name: str) -> dict[str, jobs.
 @pytest.fixture
 def mock_installation():
     return MockInstallation(
-        {'state.json': {'resources': {'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def'}}}}
+        {
+            'state.json': {
+                'resources': {
+                    'dashboards': {'assessment_main': 'abc', 'assessment_estimates': 'def', 'migration_main': 'ghi'}
+                }
+            }
+        }
     )
 
 
@@ -478,6 +484,28 @@ def test_save_config(ws, mock_installation):
             'workspace_start_path': '/',
         },
     )
+
+
+def test_corrupted_config(ws, mock_installation, caplog):
+    installation = MockInstallation({'config.yml': "corrupted"})
+
+    prompts = MockPrompts(
+        {
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r"Choose how to map the workspace groups.*": "2",
+            r".*": "",
+            r".*days to analyze submitted runs.*": "1",
+        }
+    )
+    install = WorkspaceInstaller(ws).replace(
+        prompts=prompts,
+        installation=installation,
+        product_info=PRODUCT_INFO,
+    )
+    with caplog.at_level('WARNING'):
+        install.configure()
+
+    assert 'Existing installation at ~/mock is corrupted' in caplog.text
 
 
 def test_save_config_strip_group_names(ws, mock_installation):

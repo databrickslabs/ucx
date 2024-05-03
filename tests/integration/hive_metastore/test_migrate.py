@@ -11,9 +11,7 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
 
-from . import get_azure_spark_conf
-from ..conftest import prepare_hiveserde_tables
-
+from ..conftest import prepare_hiveserde_tables, get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()

@@ -228,14 +228,19 @@ class ServicePrincipalMigration(SecretsMixin):
         return self._installation.save(migration_results, filename=self._output_file)
 
     def _migrate_service_principals(
-        self, include_names: set[str] | None = None
+        self, sp_migration_infos: list[ServicePrincipalMigrationInfo]
     ) -> list[StorageCredentialValidationResult]:
-        sp_list_with_secret = self._generate_migration_list(include_names)
-
         execution_result = []
-        for spn in sp_list_with_secret:
+        for spn in sp_migration_infos:
+            if spn.permission_mapping.default_network_action != "Allow":
+                logger.warning(
+                    f"Service principal '{spn.permission_mapping.principal}' accesses storage account "
+                    f"'{spn.permission_mapping.prefix}' with non-Allow network configuration"
+                )
+
             self._storage_credential_manager.create_with_client_secret(spn)
             execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
+
         return execution_result
 
     def _create_access_connectors_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
@@ -246,16 +251,27 @@ class ServicePrincipalMigration(SecretsMixin):
         plan_confirmed = prompts.confirm(
             "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
         )
+        sp_results = []
         if plan_confirmed:
-            sp_results = self._migrate_service_principals(include_names)
-        else:
-            sp_results = []
+            sp_migration_infos = self._generate_migration_list(include_names)
+            plan_confirmed = True
+            if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
+                plan_confirmed = prompts.confirm(
+                    "At least one Azure Service Principal accesses a storage account with non-Allow default network "
+                    "configuration, which might cause connectivity issues. We recommend using Databricks Access "
+                    "Connectors instead (next prompt). Would you like to continue with migrating the service "
+                    "principals?"
+                )
+            if plan_confirmed:
+                sp_results = self._migrate_service_principals(sp_migration_infos)
 
-        plan_confirmed = prompts.confirm("Please confirm to create an access connector for each storage account.")
+        plan_confirmed = prompts.confirm(
+            "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
+            "account."
+        )
+        ac_results = []
         if plan_confirmed:
             ac_results = self._create_access_connectors_for_storage_accounts()
-        else:
-            ac_results = []
 
         execution_results = sp_results + ac_results
         if execution_results:

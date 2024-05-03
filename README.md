@@ -413,6 +413,8 @@ flowchart TB
     class mt_serde_inplace_wf,serde_inplace_mt_task,view_mt_task_inplace roadmap;
     class mt_in_mounts_wf,scan_tables_in_mounts_experimental_task,migrate_tables_in_mounts_experimental roadmap;
 ```
+
+After a UCX table migration is executed, the migration dashboard will be populated with migration status information.
 More details can be found in the [design of table migration](docs/table_upgrade.md)
 
 ### Dependency CLI commands
@@ -702,6 +704,9 @@ in `/Users/{user_name}/.ucx/azure_storage_account_info.csv` which is generated
 by [`principal-prefix-access` command](#principal-prefix-access-command). 
 Please review the file and delete the Service Principals you do not want to be migrated.
 The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
+
+**Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
+recommend to use access connectors instead.
 
 Once you're done with this command, run [`validate-external-locations` command](#validate-external-locations-command) after this one.
 

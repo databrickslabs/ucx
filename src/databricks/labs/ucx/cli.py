@@ -10,7 +10,8 @@ from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.cli_command import AccountContext, WorkspaceContext
+from databricks.labs.ucx.contexts.account_cli import AccountContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore.tables import What
 
 ucx = App(__file__)
@@ -276,6 +277,25 @@ def principal_prefix_access(w: WorkspaceClient, ctx: WorkspaceContext | None = N
         logger.info(f"Instance profile and bucket info saved {instance_role_path}")
         logger.info("Generating UC roles and bucket permission info")
         return ctx.aws_resource_permissions.save_uc_compatible_roles()
+    raise ValueError("Unsupported cloud provider")
+
+
+@ucx.command
+def create_missing_principals(
+    w: WorkspaceClient,
+    prompts: Prompts,
+    ctx: WorkspaceContext | None = None,
+    single_role: bool = True,
+    **named_parameters,
+):
+    """Not supported for Azure.
+    For AWS, this command identifies all the S3 locations that are missing a UC compatible role and creates them.
+    By default, it will create a single role for all S3. Set the optional single_role parameter to False, to create one role per S3 location.
+    """
+    if not ctx:
+        ctx = WorkspaceContext(w, named_parameters)
+    if ctx.is_aws:
+        return ctx.iam_role_creation.run(prompts, single_role=single_role)
     raise ValueError("Unsupported cloud provider")
 
 

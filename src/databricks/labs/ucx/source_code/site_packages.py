@@ -1,6 +1,73 @@
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    WrappingLoader,
+    SourceContainer,
+    DependencyGraph,
+    BaseDependencyResolver,
+    DependencyProblem,
+)
+
+
+class SitePackagesResolver(BaseDependencyResolver):
+
+    def __init__(
+        self,
+        site_packages: SitePackages,
+        file_loader: FileLoader,
+        path_lookup: PathLookup,
+        next_resolver: BaseDependencyResolver | None = None,
+    ):
+        super().__init__(next_resolver)
+        self._site_packages = site_packages
+        self._file_loader = file_loader
+        self._path_lookup = path_lookup
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return SitePackagesResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
+
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        site_package = self._site_packages[name]
+        if site_package is not None:
+            container = SitePackageContainer(self._file_loader, site_package)
+            return Dependency(WrappingLoader(container), Path(name))
+        return super().resolve_import(name, problem_collector)
+
+
+class SitePackageContainer(SourceContainer):
+
+    def __init__(self, file_loader: FileLoader, site_package: SitePackage):
+        self._file_loader = file_loader
+        self._site_package = site_package
+
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+        for module_path in self._site_package.module_paths:
+            parent.register_dependency(Dependency(self._file_loader, module_path))
+
+
+class SitePackages:
+
+    @staticmethod
+    def parse(site_packages_path: Path):
+        dist_info_dirs = [dir for dir in os.listdir(site_packages_path) if dir.endswith(".dist-info")]
+        packages = [SitePackage.parse(Path(site_packages_path, dist_info_dir)) for dist_info_dir in dist_info_dirs]
+        return SitePackages(packages)
+
+    def __init__(self, packages: list[SitePackage]):
+        self._packages: dict[str, SitePackage] = {}
+        for package in packages:
+            for top_level in package.top_levels:
+                self._packages[top_level] = package
+
+    def __getitem__(self, item: str) -> SitePackage | None:
+        return self._packages.get(item, None)
 
 
 @dataclass
@@ -37,21 +104,3 @@ class SitePackage:
     @property
     def module_paths(self) -> list[Path]:
         return [Path(self._dist_info_path.parent, path) for path in self._module_paths]
-
-
-class SitePackages:
-
-    @staticmethod
-    def parse(site_packages_path: Path):
-        dist_info_dirs = [dir for dir in os.listdir(site_packages_path) if dir.endswith(".dist-info")]
-        packages = [SitePackage.parse(Path(site_packages_path, dist_info_dir)) for dist_info_dir in dist_info_dirs]
-        return SitePackages(packages)
-
-    def __init__(self, packages: list[SitePackage]):
-        self._packages: dict[str, SitePackage] = {}
-        for package in packages:
-            for top_level in package.top_levels:
-                self._packages[top_level] = package
-
-    def __getitem__(self, item: str) -> SitePackage | None:
-        return self._packages.get(item, None)
