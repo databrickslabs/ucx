@@ -41,7 +41,9 @@ class StorageCredentialValidationResult:
     failures: list[str] | None = None
 
     @classmethod
-    def _get_application_and_directory_id(cls, storage_credential_info: StorageCredentialInfo) -> tuple[str | None, str | None]:
+    def _get_application_and_directory_id(
+        cls, storage_credential_info: StorageCredentialInfo
+    ) -> tuple[str | None, str | None]:
         if storage_credential_info.azure_service_principal is not None:
             application_id = storage_credential_info.azure_service_principal.application_id
             directory_id = storage_credential_info.azure_service_principal.directory_id
@@ -284,7 +286,7 @@ class ServicePrincipalMigration(SecretsMixin):
                 access_connector.name,
                 azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
                 comment="Created by ucx",
-                read_only=False,
+                read_only=False,  # Access connectors get "STORAGE_BLOB_DATA_CONTRIBUTOR" permissions
             )
             try:
                 validation_results = self._storage_credential_manager.validate(storage_credential_info, url)
