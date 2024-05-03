@@ -118,10 +118,11 @@ class LocalFileResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return LocalFileResolver(self._file_loader, resolver)
 
-    def resolve_local_file(self, path: Path) -> MaybeDependency:
-        if self._file_loader.exists(path):
-            return MaybeDependency(Dependency(self._file_loader, path), [])
-        return super().resolve_local_file(path)
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+        absolute_path = path_lookup.resolve(path)
+        if absolute_path:
+            return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
+        return super().resolve_local_file(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         parts = []
@@ -138,7 +139,8 @@ class LocalFileResolver(BaseDependencyResolver):
                 break
             parts.append("..")
         for candidate in (f'{"/".join(parts)}.py', f'{"/".join(parts)}/__init__.py'):
-            absolute_path = path_lookup.resolve(Path(candidate))
+            relative_path = Path(candidate)
+            absolute_path = path_lookup.resolve(relative_path)
             if not absolute_path:
                 continue
             dependency = Dependency(self._file_loader, absolute_path)

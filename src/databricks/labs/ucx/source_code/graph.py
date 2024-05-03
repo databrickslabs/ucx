@@ -116,6 +116,10 @@ class DependencyGraph:
         # for package imports, like certifi.
         return {d.path for d in self.all_dependencies}
 
+    def all_relative_names(self) -> set[str]:
+        """This method is intented to simplify testing"""
+        return {d.path.relative_to(self._path_lookup.cwd).as_posix() for d in self.all_dependencies}
+
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
         if self.path in visited:
@@ -128,26 +132,10 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str) -> MaybeGraph:
-        linter = ASTLinter.parse(python_code)
-        problems: list[DependencyProblem] = []
-        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        for call in run_notebook_calls:
-            assert isinstance(call, ast.Call)
-            notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(notebook_path_arg, ast.Constant):
-                notebook_path = notebook_path_arg.value
-                maybe = self.register_notebook(Path(notebook_path))
-                for problem in maybe.problems:
-                    problem = problem.replace(
-                        start_line=call.lineno,
-                        start_col=call.col_offset,
-                        end_line=call.end_lineno or 0,
-                        end_col=call.end_col_offset or 0,
-                    )
-                    problems.append(problem)
-                continue
-            problem = DependencyProblem(
+    def _traverse_notebook_run(self, call: ast.Call):
+        notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+        if not isinstance(notebook_path_arg, ast.Constant):
+            yield DependencyProblem(
                 code='dependency-not-constant',
                 message="Can't check dependency not provided as a constant",
                 start_line=call.lineno,
@@ -155,7 +143,25 @@ class DependencyGraph:
                 end_line=call.end_lineno or 0,
                 end_col=call.end_col_offset or 0,
             )
-            problems.append(problem)
+            return
+        notebook_path = notebook_path_arg.value
+        maybe = self.register_notebook(Path(notebook_path))
+        for problem in maybe.problems:
+            yield problem.replace(
+                start_line=call.lineno,
+                start_col=call.col_offset,
+                end_line=call.end_lineno or 0,
+                end_col=call.end_col_offset or 0,
+            )
+
+    def build_graph_from_python_source(self, python_code: str) -> MaybeGraph:
+        linter = ASTLinter.parse(python_code)
+        problems: list[DependencyProblem] = []
+        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
+        for call in run_notebook_calls:
+            assert isinstance(call, ast.Call)
+            for problem in self._traverse_notebook_run(call):
+                problems.append(problem)
         for import_name, node in PythonLinter.list_import_sources(linter):
             if import_name.split('.')[0] in sys.stdlib_module_names:
                 # we don't need to register stdlib imports
@@ -241,9 +247,9 @@ class BaseDependencyResolver(abc.ABC):
         assert self._next_resolver is not None
         return self._next_resolver.resolve_notebook(path_lookup, path)
 
-    def resolve_local_file(self, path: Path) -> MaybeDependency:
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_local_file(path)
+        return self._next_resolver.resolve_local_file(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         # TODO: remove StubResolver and return MaybeDependency(None, [...])
@@ -290,8 +296,8 @@ class DependencyResolver:
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
         return self._resolver.resolve_notebook(path_lookup, path)
 
-    def resolve_local_file(self, path: Path) -> MaybeDependency:
-        return self._resolver.resolve_local_file(path)
+    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._resolver.resolve_local_file(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._resolver.resolve_import(path_lookup, name)
@@ -361,7 +367,7 @@ class DependencyGraphBuilder:
         self._path_lookup = path_lookup
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
-        maybe = self._resolver.resolve_local_file(path)
+        maybe = self._resolver.resolve_local_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, maybe.problems)
         graph = DependencyGraph(maybe.dependency, None, self._resolver, self._path_lookup)

@@ -28,10 +28,10 @@ class NotebookResolver(BaseDependencyResolver):
         return NotebookResolver(self._notebook_loader, resolver)
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        dependency = Dependency(self._notebook_loader, path)
-        container = self._notebook_loader.load_dependency(path_lookup, dependency)
-        if not container:
+        absolute_path = path_lookup.resolve(path)
+        if not absolute_path:
             return super().resolve_notebook(path_lookup, path)
+        dependency = Dependency(self._notebook_loader, absolute_path)
         return MaybeDependency(dependency, [])
 
 
@@ -72,10 +72,12 @@ class WorkspaceNotebookLoader(NotebookLoader):
 class LocalNotebookLoader(NotebookLoader, FileLoader):
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        fullpath = path_lookup.resolve(self._adjust_path(dependency.path))
-        if not fullpath:
-            return None
-        return Notebook.parse(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
+        for path in (dependency.path, self._adjust_path(dependency.path)):
+            absolute_path = path_lookup.resolve(path)
+            if not absolute_path:
+                continue
+            return Notebook.parse(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
+        return None
 
     @staticmethod
     def _adjust_path(path: Path):

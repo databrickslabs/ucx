@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import pathlib
+from pathlib import Path
 from unittest.mock import create_autospec
 from typing import BinaryIO
 
@@ -127,6 +128,7 @@ def _id_list(cls: type, ids=None):
 
 
 def _load_sources(cls: type, *filenames: str):
+    # TODO: remove the usage of it in favor of MockPathLookup
     if not filenames:
         return []
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_source(f'{_FOLDERS[cls]}/{_}') for _ in filenames})
@@ -243,6 +245,32 @@ def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited:
         sources, visited, *args
     )
     return file_loader
+
+
+class MockPathLookup(PathLookup):
+    def __init__(self, cwd='source_code/samples', sys_paths: list[Path] = None):
+        super().__init__(pathlib.Path(__file__).parent / cwd, sys_paths or [])
+
+    def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
+        return MockPathLookup(new_working_directory, self._sys_paths)
+
+    def resolve(self, path: pathlib.Path) -> pathlib.Path | None:
+        if path.is_absolute():
+            return path
+        filename = path.as_posix()
+        if filename.startswith('./'):
+            filename = filename[2:]
+        if filename.find(".py") < 0:
+            filename = filename + ".py"
+        if filename.find(".txt") < 0:
+            filename = filename + ".txt"
+        some_file = self._cwd / filename
+        if some_file.exists():
+            return some_file
+        return None
+
+    def __repr__(self):
+        return f"<MockPathLookup {self._cwd}>"
 
 
 class TestFileLoader(FileLoader):
