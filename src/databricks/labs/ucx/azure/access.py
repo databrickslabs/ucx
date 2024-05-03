@@ -34,6 +34,7 @@ class StoragePermissionMapping:
     principal: str
     privilege: str
     type: str
+    default_network_action: str = "Unknown"  # "Deny", "Allow" or "Unknown"
     # Need this directory_id/tenant_id when create UC storage credentials using service principal
     directory_id: str | None = None
 
