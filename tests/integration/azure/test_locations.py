@@ -1,15 +1,18 @@
 import pytest
+from unittest.mock import create_autospec
+from urllib.parse import urlparse
+
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.errors.platform import NotFound
 from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.compute import DataSecurityMode
+from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.sdk.service.compute import DataSecurityMode
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
-
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from ..conftest import get_azure_spark_conf
 
@@ -252,3 +255,70 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
             env_or_skip("TEST_A_LOCATION"),
             changes=[PermissionsChange(remove=remove_azure_permissions, principal=user.user_name)],
         )
+
+
+def delete_ucx_created_resources(api_client):
+    """Delete UCX created resources"""
+    for resource in api_client.list():
+        if resource.name is not None and resource.comment is not None and resource.comment == "Created by UCX":
+            api_client.delete(resource.name, force=True)
+
+
+@pytest.fixture
+def clean_storage_credentials(az_cli_ctx):
+    """Clean test generated storage credentials."""
+    delete_ucx_created_resources(az_cli_ctx.workspace_client.storage_credentials)
+    yield
+    delete_ucx_created_resources(az_cli_ctx.workspace_client.storage_credentials)
+
+
+@pytest.fixture
+def clean_external_locations(az_cli_ctx):
+    """Clean test generated external locations."""
+    delete_ucx_created_resources(az_cli_ctx.workspace_client.external_locations)
+    yield
+    delete_ucx_created_resources(az_cli_ctx.workspace_client.external_locations)
+
+
+def test_run_external_locations_using_access_connector(
+    clean_storage_credentials,
+    clean_external_locations,
+    az_cli_ctx,
+    env_or_skip,
+):
+    """Create external locations using the storage credential from an access connector."""
+    # Mocking in an integration test because Azure resource can not be created
+    resource_permissions = create_autospec(AzureResourcePermissions)
+
+    # TODO: Remove the after 20-05-2024
+    access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR").replace("-external", ""))
+    mount = env_or_skip("TEST_MOUNT_CONTAINER")
+    storage_account_name = urlparse(mount).hostname.removesuffix(".dfs.core.windows.net")
+    access_connector = AccessConnector(
+        id=access_connector_id,
+        name=f"ac-{storage_account_name}",
+        location="westeu",
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [(access_connector, mount)]
+
+    az_cli_ctx = az_cli_ctx.replace(azure_resource_permissions=resource_permissions)
+
+    az_cli_ctx.save_locations()
+    # Storage credentials based on access connectors take priority over other credentials
+    az_cli_ctx.with_dummy_resource_permission()
+
+    prompts = MockPrompts(
+        {
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
+            "Above Azure Service Principals will be migrated to UC storage credentials *": "No",
+        }
+    )
+
+    az_cli_ctx.service_principal_migration.run(prompts)  # Create storage credential for above access connector
+    az_cli_ctx.azure_external_locations_migration.run()  # Create external location using storage credential
+
+    assert False
