@@ -57,6 +57,10 @@ class TablesMigrator:
         self._principal_grants = principal_grants
 
     def index(self):
+        return self._migration_status_refresher.index()
+
+    def _index_with_reset(self):
+        # when we want the latest up-to-date status, e.g. to determine whether views dependencies have been migrated
         self._migration_status_refresher.reset()
         return self._migration_status_refresher.index()
 
@@ -117,7 +121,7 @@ class TablesMigrator:
     def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
-        sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index())
+        sequencer = ViewsMigrationSequencer(tables_to_migrate, self._index_with_reset())
         batches = sequencer.sequence_batches()
         for batch in batches:
             tasks = []
@@ -198,7 +202,7 @@ class TablesMigrator:
     def _view_can_be_migrated(self, view: ViewToMigrate):
         # dependencies have already been computed, therefore an empty dict is good enough
         for table in view.dependencies:
-            if not self.index().get(table.schema, table.name):
+            if not self._index_with_reset().get(table.schema, table.name):
                 logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
@@ -216,8 +220,8 @@ class TablesMigrator:
         # CREATE VIEW x.y (col1, col2) AS SELECT * FROM w.t
         create_statement = self._backend.fetch(f"SHOW CREATE TABLE {src_view.src.safe_sql_key}")
         src_view.src.view_text = next(iter(create_statement))["createtab_stmt"]
-        migration_index = self._migration_status_refresher.index()
-        return src_view.sql_migrate_view(migration_index)
+        # this does not require the index to be refreshed because the dependencies have already been validated
+        return src_view.sql_migrate_view(self.index())
 
     def _migrate_external_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key

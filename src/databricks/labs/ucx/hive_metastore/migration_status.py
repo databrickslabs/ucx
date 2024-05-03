@@ -70,6 +70,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         seen_tables: dict[str, str] = {}
         for schema in self._iter_schemas():
             try:
+                # ws.tables.list returns Iterator[TableInfo], so we need to convert it to a list in order to catch the exception
                 tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
             except NotFound:
                 logger.warning(
