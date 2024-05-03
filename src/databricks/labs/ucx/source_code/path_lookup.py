@@ -49,4 +49,6 @@ class PathLookup:
 
     @property
     def cwd(self):
-        return self._cwds[-1] if len(self._cwds) > 0 else Path(os.getcwd())
+        # the below might fail but that's better than returning an incorrect cwd
+        assert len(self._cwds) > 0
+        return self._cwds[-1]
