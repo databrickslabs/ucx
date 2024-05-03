@@ -3,7 +3,7 @@ import pytest
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code import languages
 from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
-from databricks.labs.ucx.source_code.notebook_linter import NotebookLinter
+from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 
 index = MigrationIndex([])
 

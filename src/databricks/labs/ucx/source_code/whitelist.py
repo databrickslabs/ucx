@@ -1,9 +1,65 @@
+from __future__ import annotations
+
 import abc
 import sys
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from collections.abc import Callable, Iterable
 from yaml import load_all as load_yaml, Loader
+
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    WrappingLoader,
+    SourceContainer,
+    DependencyGraph,
+    BaseDependencyResolver,
+    DependencyProblem,
+)
+
+
+class WhitelistResolver(BaseDependencyResolver):
+
+    def __init__(self, whitelist: Whitelist, next_resolver: BaseDependencyResolver | None = None):
+        super().__init__(next_resolver)
+        self._whitelist = whitelist
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return WhitelistResolver(self._whitelist, resolver)
+
+    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
+    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+        if self._is_whitelisted(name):
+            container = StubContainer()
+            return Dependency(WrappingLoader(container), Path(name))
+        return super().resolve_import(name, problem_collector)
+
+    def _is_whitelisted(self, name: str) -> bool:
+        compatibility = self._whitelist.compatibility(name)
+        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        if compatibility is None:
+            return False
+        if compatibility == UCCompatibility.NONE:
+            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
+            self._problems.append(
+                DependencyProblem(
+                    code="dependency-check",
+                    message=f"Use of dependency {name} is deprecated",
+                    start_line=0,
+                    start_col=0,
+                    end_line=0,
+                    end_col=0,
+                )
+            )
+        return True
+
+
+class StubContainer(SourceContainer):
+
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+        pass
 
 
 class UCCompatibility(Enum):

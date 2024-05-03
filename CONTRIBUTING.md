@@ -55,6 +55,10 @@ unit test coverage suite and the clear difference between _unit tests_ and _inte
 
 See https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html for more details
 
+### `if typing.TYPE_CHECKING:` usage
+
+We don't use `if typing.TYPE_CHECKING:` in our codebase, because PyCharm and `mypy` can handle it without it and `Refactoring -> Move` may produce incorrect results.
+
 ### ..., expression has type "None", variable has type "str"
 
 * Add `assert ... is not None` if it's a body of a method. Example:

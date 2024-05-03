@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 
 
 def test_replace_installation():

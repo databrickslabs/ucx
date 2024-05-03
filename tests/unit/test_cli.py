@@ -44,8 +44,10 @@ from databricks.labs.ucx.cli import (
     show_all_metastores,
     assign_metastore,
     migrate_tables,
+    create_missing_principals,
 )
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext, AccountContext
+from databricks.labs.ucx.contexts.account_cli import AccountContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
 
@@ -479,3 +481,27 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(789)
+
+
+def test_create_missing_principal_aws(ws):
+    aws_resource_permissions = create_autospec(AWSResourcePermissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    prompts = MockPrompts({'.*': 'yes'})
+    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    aws_resource_permissions.create_uc_roles.assert_called_once()
+
+
+def test_create_missing_principal_aws_not_approved(ws):
+    aws_resource_permissions = create_autospec(AWSResourcePermissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    prompts = MockPrompts({'.*': 'No'})
+    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    aws_resource_permissions.create_uc_roles.assert_not_called()
+
+
+def test_create_missing_principal_azure(ws, caplog):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=True)
+    prompts = MockPrompts({'.*': 'yes'})
+    with pytest.raises(ValueError) as failure:
+        create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    assert str(failure.value) == "Unsupported cloud provider"

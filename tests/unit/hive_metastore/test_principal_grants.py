@@ -1,4 +1,4 @@
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, call
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -6,7 +6,12 @@ from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
-from databricks.sdk.service.catalog import ExternalLocationInfo
+from databricks.sdk.service.catalog import (
+    ExternalLocationInfo,
+    Privilege,
+    SecurableType,
+    PermissionsChange,
+)
 from databricks.sdk.service.compute import (
     AwsAttributes,
     ClusterDetails,
@@ -33,11 +38,11 @@ from databricks.labs.ucx.hive_metastore.tables import Table
 def ws():
     w = create_autospec(WorkspaceClient)
     w.external_locations.list.return_value = [
-        ExternalLocationInfo(url="abfss://container1@storage1.dfs.core.windows.net/folder1"),
-        ExternalLocationInfo(url="abfss://container1@storage2.dfs.core.windows.net/folder2"),
-        ExternalLocationInfo(url="abfss://container1@storage3.dfs.core.windows.net/folder3"),
-        ExternalLocationInfo(url="s3://storage5/folder5"),
-        ExternalLocationInfo(url="s3://storage2/folder2"),
+        ExternalLocationInfo(url="abfss://container1@storage1.dfs.core.windows.net/folder1", name='loc1'),
+        ExternalLocationInfo(url="abfss://container1@storage2.dfs.core.windows.net/folder2", name='loc2'),
+        ExternalLocationInfo(url="abfss://container1@storage3.dfs.core.windows.net/folder3", name='loc3'),
+        ExternalLocationInfo(url="s3://storage5/folder5", name='loc1'),
+        ExternalLocationInfo(url="s3://storage2/folder2", name='loc2'),
         ExternalLocationInfo(url="s3://storage3/folder3"),
     ]
 
@@ -64,6 +69,16 @@ def ws():
             ],
         ),
         'cluster3': iam.ObjectPermissions(object_id='cluster2', object_type="clusters"),
+        'cluster4': iam.ObjectPermissions(
+            object_id='cluster4',
+            object_type="clusters",
+            access_control_list=[
+                iam.AccessControlResponse(
+                    service_principal_name='spn1',
+                    all_permissions=[iam.Permission(permission_level=iam.PermissionLevel.CAN_USE)],
+                ),
+            ],
+        ),
     }
     w.permissions.get.side_effect = lambda _, object_id: permissions[object_id]
 
@@ -177,6 +192,12 @@ def installation():
                 {
                     'resource_path': 's3://storage5/*',
                     'role_arn': 'arn:aws:iam::12345:instance-profile/role1',
+                    'privilege': 'WRITE_FILES',
+                    'resource_type': 's3',
+                },
+                {
+                    'resource_path': 's3://storage3/*',
+                    'role_arn': 'arn:aws:iam::12345:instance-profile/role2',
                     'privilege': 'WRITE_FILES',
                     'resource_type': 's3',
                 },
@@ -383,7 +404,7 @@ def test_get_eligible_locations_principals_aws_no_matching_locations(ws, install
             cluster_id='cluster1',
             cluster_source=ClusterSource.UI,
             data_security_mode=DataSecurityMode.NONE,
-            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role2"),
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role3"),
         ),
     ]
 
@@ -411,7 +432,7 @@ def test_get_eligible_locations_principals_aws(ws, installation):
     assert eligible_locations['cluster1'] == {'s3://storage5/folder5': 'WRITE_FILES'}
 
 
-def test_interactive_cluster__aws_no_acl(ws, installation):
+def test_interactive_cluster_aws_no_acl(ws, installation):
     ws.config.is_azure = False
     ws.config.is_aws = True
     ws.clusters.list.return_value = [
@@ -449,3 +470,88 @@ def test_interactive_cluster_aws(ws, installation):
     actual_grants = grants.get_interactive_cluster_grants()
     for grant in expected_grants:
         assert grant in actual_grants
+
+
+def test_apply_location_acl_no_principal_azure(ws, installation):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    cluster_spn = ServicePrincipalClusterMapping(
+        'cluster3', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
+    )
+    location_acl = principal_acl(ws, installation, [cluster_spn])
+    location_acl.apply_location_acl()
+    ws.grants.update.assert_not_called()
+
+
+def test_apply_location_acl_no_principal_aws(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id='cluster3',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+    location_acl = principal_acl(ws, installation, [])
+    location_acl.apply_location_acl()
+    ws.grants.update.assert_not_called()
+
+
+def test_apply_location_acl_no_location_name(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id='cluster4',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role2"),
+        ),
+    ]
+    location_acl = principal_acl(ws, installation, [])
+    location_acl.apply_location_acl()
+    ws.grants.update.assert_not_called()
+
+
+def test_apply_location_acl_single_spn_azure(ws, installation):
+    ws.config.is_azure = True
+    ws.config.is_aws = False
+    cluster_spn = ServicePrincipalClusterMapping(
+        'cluster1', {AzureServicePrincipalInfo(application_id='client1', storage_account='storage1')}
+    )
+    location_acl = principal_acl(ws, installation, [cluster_spn])
+    location_acl.apply_location_acl()
+    permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
+    calls = [
+        call(
+            SecurableType.EXTERNAL_LOCATION,
+            'loc1',
+            changes=[
+                PermissionsChange(add=permissions, principal='group1'),
+                PermissionsChange(add=permissions, principal='foo.bar@imagine.com'),
+            ],
+        )
+    ]
+    ws.grants.update.assert_has_calls(calls, any_order=True)
+
+
+def test_apply_location_acl_single_spn_aws(ws, installation):
+    ws.config.is_azure = False
+    ws.config.is_aws = True
+    ws.clusters.list.return_value = [
+        ClusterDetails(
+            cluster_id='cluster2',
+            cluster_source=ClusterSource.UI,
+            data_security_mode=DataSecurityMode.NONE,
+            aws_attributes=AwsAttributes(instance_profile_arn="arn:aws:iam::12345:instance-profile/role1"),
+        ),
+    ]
+    location_acl = principal_acl(ws, installation, [])
+    location_acl.apply_location_acl()
+    permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
+    calls = [
+        call(SecurableType.EXTERNAL_LOCATION, 'loc1', changes=[PermissionsChange(add=permissions, principal='spn1')])
+    ]
+    ws.grants.update.assert_has_calls(calls, any_order=True)

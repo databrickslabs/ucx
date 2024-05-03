@@ -1,12 +1,19 @@
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.sdk.errors.platform import NotFound
+from databricks.sdk.service.iam import PermissionLevel
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.sdk.service.compute import DataSecurityMode
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
+
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
+from ..conftest import get_azure_spark_conf
+
+_SPARK_CONF = get_azure_spark_conf()
 
 
 def save_delete_location(ws, name):
@@ -20,7 +27,7 @@ def save_delete_location(ws, name):
 
 
 @pytest.mark.skip
-def test_run(caplog, ws, sql_backend, inventory_schema):
+def test_run(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     locations = [
         ExternalLocation("abfss://uctest@ziyuanqintest.dfs.core.windows.net/one", 1),
         ExternalLocation("abfss://uctest@ziyuanqintest.dfs.core.windows.net/two", 2),
@@ -56,9 +63,13 @@ def test_run(caplog, ws, sql_backend, inventory_schema):
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
-
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
     location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
+        ws,
+        location_crawler,
+        azure_resource_permissions,
+        azurerm,
+        az_cli_ctx.principal_acl,
     )
     try:
         location_migration.run()
@@ -73,7 +84,7 @@ def test_run(caplog, ws, sql_backend, inventory_schema):
 
 
 @pytest.mark.skip
-def test_read_only_location(caplog, ws, sql_backend, inventory_schema):
+def test_read_only_location(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     locations = [ExternalLocation("abfss://ucx1@ziyuanqintest.dfs.core.windows.net/", 1)]
     sql_backend.save_table(f"{inventory_schema}.external_locations", locations, ExternalLocation)
     location_crawler = ExternalLocations(ws, sql_backend, inventory_schema)
@@ -98,9 +109,14 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema):
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
 
     location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
+        ws,
+        location_crawler,
+        azure_resource_permissions,
+        azurerm,
+        az_cli_ctx.principal_acl,
     )
     try:
         location_migration.run()
@@ -111,7 +127,7 @@ def test_read_only_location(caplog, ws, sql_backend, inventory_schema):
 
 
 @pytest.mark.skip
-def test_missing_credential(caplog, ws, sql_backend, inventory_schema):
+def test_missing_credential(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     locations = [
         ExternalLocation("abfss://ucx3@ziyuanqintest.dfs.core.windows.net/one", 1),
         ExternalLocation("abfss://ucx3@ziyuanqintest.dfs.core.windows.net/two", 2),
@@ -139,9 +155,13 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema):
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
-
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
     location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
+        ws,
+        location_crawler,
+        azure_resource_permissions,
+        azurerm,
+        az_cli_ctx.principal_acl,
     )
     leftover_loc = location_migration.run()
 
@@ -150,7 +170,7 @@ def test_missing_credential(caplog, ws, sql_backend, inventory_schema):
 
 
 @pytest.mark.skip
-def test_overlapping_location(caplog, ws, sql_backend, inventory_schema):
+def test_overlapping_location(caplog, ws, sql_backend, inventory_schema, az_cli_ctx):
     """Customer may already create external location with url that is a sub path of the table prefix hive_metastore/locations.py extracted.
     This test case is to verify the overlapping location will be detected and reported.
     """
@@ -183,9 +203,13 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema):
     )
     graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
     azurerm = AzureResources(azure_mgmt_client, graph_client)
-
+    azure_resource_permissions = AzureResourcePermissions(installation, ws, azurerm, location_crawler)
     location_migration = ExternalLocationsMigration(
-        ws, location_crawler, AzureResourcePermissions(installation, ws, azurerm, location_crawler), azurerm
+        ws,
+        location_crawler,
+        azure_resource_permissions,
+        azurerm,
+        az_cli_ctx.principal_acl,
     )
     try:
         leftover_loc_urls = location_migration.run()
@@ -193,3 +217,38 @@ def test_overlapping_location(caplog, ws, sql_backend, inventory_schema):
         assert "overlaps with an existing external location" in caplog.text
     finally:
         save_delete_location(ws, "uctest_ziyuanqintest_overlap")
+
+
+def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster, az_cli_ctx, env_or_skip):
+    az_cli_ctx.with_dummy_resource_permission()
+    az_cli_ctx.save_locations()
+    cluster = make_cluster(single_node=True, spark_conf=_SPARK_CONF, data_security_mode=DataSecurityMode.NONE)
+    user = make_user()
+    make_cluster_permissions(
+        object_id=cluster.cluster_id,
+        permission_level=PermissionLevel.CAN_ATTACH_TO,
+        user_name=user.user_name,
+    )
+
+    location_migration = az_cli_ctx.azure_external_locations_migration
+    try:
+        location_migration.run()
+        permissions = ws.grants.get(
+            SecurableType.EXTERNAL_LOCATION, env_or_skip("TEST_A_LOCATION"), principal=user.user_name
+        )
+        expected_azure_permission = PrivilegeAssignment(
+            principal=user.user_name,
+            privileges=[Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES],
+        )
+        assert expected_azure_permission in permissions.privilege_assignments
+    finally:
+        remove_azure_permissions = [
+            Privilege.CREATE_EXTERNAL_TABLE,
+            Privilege.CREATE_EXTERNAL_VOLUME,
+            Privilege.READ_FILES,
+        ]
+        ws.grants.update(
+            SecurableType.EXTERNAL_LOCATION,
+            env_or_skip("TEST_A_LOCATION"),
+            changes=[PermissionsChange(remove=remove_azure_permissions, principal=user.user_name)],
+        )

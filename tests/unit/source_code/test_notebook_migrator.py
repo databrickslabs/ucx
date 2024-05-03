@@ -4,12 +4,10 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ExportFormat, Language, ObjectInfo, ObjectType
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.dependencies import (
-    Dependency,
-)
+from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code.notebook_migrator import NotebookMigrator
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
 
 
 def test_apply_invalid_object_fails():

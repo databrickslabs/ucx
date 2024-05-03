@@ -1,28 +1,21 @@
-from __future__ import annotations  # for type hints
+from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
-from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
+from collections.abc import Callable
+from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
-from sqlglot import ParseError as SQLParseError
-from sqlglot import parse as parse_sql
+from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.sdk.service.workspace import Language
-
-from databricks.labs.ucx.source_code.dependencies import (
-    DependencyGraph,
-    DependencyProblem,
-)
-from databricks.labs.ucx.source_code.dependency_loaders import SourceContainer
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 
 
-logger = logging.getLogger(__name__)
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 
-NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
 MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'
@@ -171,7 +164,7 @@ class RunCell(Cell):
                 return
         start_line = self._original_offset + 1
         problem = DependencyProblem(
-            'dependency-check',
+            'invalid-run-cell',
             "Missing notebook path in %run command",
             start_line=start_line,
             start_col=0,
@@ -367,56 +360,3 @@ class CellLanguage(Enum):
         if code.endswith('./'):
             lines.append('\n')
         return "\n".join(lines)
-
-
-class Notebook(SourceContainer):
-
-    @staticmethod
-    def parse(path: str, source: str, default_language: Language) -> Notebook:
-        default_cell_language = CellLanguage.of_language(default_language)
-        cells = default_cell_language.extract_cells(source)
-        if cells is None:
-            raise ValueError(f"Could not parse Notebook: {path}")
-        return Notebook(path, source, default_language, cells, source.endswith('\n'))
-
-    def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
-        self._path = path
-        self._source = source
-        self._language = language
-        self._cells = cells
-        self._ends_with_lf = ends_with_lf
-
-    @property
-    def path(self) -> str:
-        return self._path
-
-    @property
-    def cells(self) -> list[Cell]:
-        return self._cells
-
-    @property
-    def original_code(self) -> str:
-        return self._source
-
-    def to_migrated_code(self):
-        default_language = CellLanguage.of_language(self._language)
-        header = f"{default_language.comment_prefix} {NOTEBOOK_HEADER}"
-        sources = [header]
-        for i, cell in enumerate(self._cells):
-            migrated_code = cell.migrated_code
-            if cell.language is not default_language:
-                migrated_code = default_language.wrap_with_magic(migrated_code, cell.language)
-            sources.append(migrated_code)
-            if i < len(self._cells) - 1:
-                sources.append('')
-                sources.append(f'{default_language.comment_prefix} {CELL_SEPARATOR}')
-                sources.append('')
-        if self._ends_with_lf:
-            sources.append('')  # following join will append lf
-        return '\n'.join(sources)
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
-        problems: list[DependencyProblem] = []
-        for cell in self._cells:
-            cell.build_dependency_graph(parent, problems.append)
-        parent.add_problems(problems)

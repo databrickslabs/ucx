@@ -164,7 +164,7 @@ def test_create_storage_credentials(credential_manager):
             "principal_write",
             "WRITE_FILES",
             "Application",
-            "directory_id_1",
+            directory_id="directory_id_1",
         ),
         "test",
     )
@@ -175,7 +175,7 @@ def test_create_storage_credentials(credential_manager):
             "principal_read",
             "READ_FILES",
             "Application",
-            "directory_id_1",
+            directory_id="directory_id_1",
         ),
         "test",
     )
@@ -283,7 +283,8 @@ def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
     assert len(sp_migration.run(prompts)) == num_migrated
@@ -313,7 +314,7 @@ def test_read_secret_read_exception(caplog, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -331,7 +332,8 @@ def test_print_action_plan(caplog, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -353,7 +355,24 @@ def test_run_without_confirmation(sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
+        }
+    )
+
+    assert sp_migration.run(prompts) == []
+
+
+def test_run_without_confirmation_for_non_allow_network_configuration(sp_migration):
+    """Migration should not happen when the answer to "non-Allow default network configuration" prompt is 'No'"""
+    ws = create_autospec(WorkspaceClient)
+    ws.secrets.get_secret.return_value = GetSecretResponse(
+        value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
+    )
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -364,7 +383,8 @@ def test_run(installation, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -380,3 +400,22 @@ def test_run(installation, sp_migration):
             }
         ],
     )
+
+
+def test_run_warning_non_allow_network_configuration(installation, sp_migration, caplog):
+    """The user should be warned when a network configuration is not 'Allow'"""
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            "At least one Azure Service Principal accesses a storage account with non-Allow default network*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+        }
+    )
+
+    expected_message = (
+        "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration"
+    )
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):
+        sp_migration.run(prompts)
+        assert any(expected_message in message for message in caplog.messages)
