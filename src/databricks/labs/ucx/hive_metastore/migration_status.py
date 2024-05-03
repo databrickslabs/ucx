@@ -70,7 +70,7 @@ class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
         seen_tables: dict[str, str] = {}
         for schema in self._iter_schemas():
             try:
-                tables = self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name)
+                tables = list(self._ws.tables.list(catalog_name=schema.catalog_name, schema_name=schema.name))
             except NotFound:
                 logger.warning(
                     f"Schema {schema.catalog_name}.{schema.name} no longer exists. Skipping checking its migration status."
