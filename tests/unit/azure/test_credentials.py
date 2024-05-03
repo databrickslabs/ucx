@@ -217,6 +217,16 @@ def test_storage_credential_validation_result_from_storage_credential_info_manag
     assert validation_result.failures == failures
 
 
+def test_storage_credential_validation_result_from_storage_credential_info_missing_application_id():
+    """Raise KeyError when application id is missing"""
+    storage_credential_info = StorageCredentialInfo(name="test", read_only=True)
+    validated_on = "abfss://container@storageaccount.dfs.core.windows.net"
+    failures = ["failure"]
+
+    with pytest.raises(KeyError):
+        StorageCredentialValidationResult.from_storage_credential_info(storage_credential_info, validated_on, failures)
+
+
 def test_list_storage_credentials(credential_manager):
     assert credential_manager.list() == {"b6420590-5e1c-4426-8950-a94cbe9b6115", "app_secret2"}
 
