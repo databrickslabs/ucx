@@ -41,12 +41,7 @@ class StorageCredentialValidationResult:
     failures: list[str] | None = None
 
     @classmethod
-    def from_storage_credential_info(
-        cls,
-        storage_credential_info: StorageCredentialInfo,
-        validated_on: str,
-        failures: list[str] | None,
-    ):
+    def _get_application_and_directory_id(cls, storage_credential_info: StorageCredentialInfo) -> tuple[str | None, str | None]:
         if storage_credential_info.azure_service_principal is not None:
             application_id = storage_credential_info.azure_service_principal.application_id
             directory_id = storage_credential_info.azure_service_principal.directory_id
@@ -58,7 +53,16 @@ class StorageCredentialValidationResult:
             directory_id = None
         else:
             raise KeyError("Storage credential info is missing an application id.")
+        return application_id, directory_id
 
+    @classmethod
+    def from_storage_credential_info(
+        cls,
+        storage_credential_info: StorageCredentialInfo,
+        validated_on: str,
+        failures: list[str] | None,
+    ):
+        application_id, directory_id = cls._get_application_and_directory_id(storage_credential_info)
         return cls(
             storage_credential_info.name,
             application_id,
