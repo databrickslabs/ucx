@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Udf:
+class Udf:  # pylint: disable=too-many-instance-attributes
     catalog: str
     database: str
     name: str
@@ -100,10 +100,10 @@ class UdfsCrawler(CrawlerBase):
         if specified for a specific udf within the given catalog and database.
         """
         full_name = f"{catalog}.{database}.{udf}"
+        logger.debug(f"[{full_name}] fetching udf metadata")
+        describe = {}
+        current_key = ""
         try:
-            logger.debug(f"[{full_name}] fetching udf metadata")
-            describe = {}
-            current_key = ""
             for row in self._fetch(f"DESCRIBE FUNCTION EXTENDED {escape_sql_identifier(full_name)}"):
                 key_value = row.as_dict()["function_desc"]
                 if ":" in key_value:
