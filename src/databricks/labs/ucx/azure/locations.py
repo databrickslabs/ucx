@@ -102,7 +102,7 @@ class ExternalLocationsMigration:
                 continue
 
             for container in self._azurerm.containers(storage_accounts[0].id):
-                storage_url = f"abfss://{container.container}@{container.storage}.dfs.core.windows.net/"
+                storage_url = f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/"
                 # UCX assigns created access connectors the "STORAGE_BLOB_DATA_CONTRIBUTOR" role on the storage account
                 prefix_mapping_write[storage_url] = storage_credential.name
 
