@@ -3,6 +3,8 @@ name: no-cheat
 on:
   pull_request:
     types: [opened, synchronize]
+  merge_group:
+    types: [checks_requested]
   push:
     # required for merge queue to work. jobs.integration.if will mark it as skipped
     branches:
