@@ -41,6 +41,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
   * [`installations` command](#installations-command)
+  * [`report-account-compatibility` command](#report-account-compatibility-command)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
@@ -572,6 +573,12 @@ This command displays the [installations](#installation) by different users on t
 the installations where the `ucx` package is installed and prints their details in JSON format. This command is useful 
 for administrators who want to see which users have installed `ucx` and where. It can also be used to debug issues 
 related to multiple installations of `ucx` on the same workspace.
+
+## `report-account-compatibility` command
+
+```text
+
+```
 
 [[back to top](#databricks-labs-ucx)]
 
