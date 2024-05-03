@@ -15,6 +15,11 @@ def test_migrate_dbfs_root_delta_tables(run_workflow):
     ctx.workspace_client.catalogs.list.assert_called_once()
 
 
+def test_migrate_dbfs_root_non_delta_tables(run_workflow):
+    ctx = run_workflow(TableMigration.migrate_dbfs_root_non_delta_tables)
+    ctx.workspace_client.catalogs.list.assert_called_once()
+
+
 def test_migrate_hive_serde_in_place(run_workflow):
     ctx = run_workflow(MigrateHiveSerdeTablesInPlace.migrate_hive_serde_in_place)
     ctx.workspace_client.catalogs.list.assert_called_once()
