@@ -27,6 +27,8 @@ from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, Visiti
             ],
             3,
         ),
+        (["simulate-sys-path", "via-sys-path", "start_notebook.py"], 2),
+
     ],
 )
 def test_locates_notebooks(source: list[str], expected: int):
