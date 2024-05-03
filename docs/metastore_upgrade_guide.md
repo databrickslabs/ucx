@@ -75,10 +75,22 @@ The manual process is documented in the following links:
 [AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
 [Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
+For AWS we have the to create fresh new AWS roles and set them up for UC access, using the following command:
+```text
+databricks labs ucx create-missing-principles --aws-profile <aws_profile> --single-role <single_role>
+```
+This command identifies all the S3 locations that are missing a UC compatible role and creates them. 
+It takes single-role optional parameter. 
+If set to True, it will create a single role for all the S3 locations.
+Otherwise, it will create a role for each S3 location.
+
+
 For both AWS and Azure we can use the following CLI command to upgrade the necessary cloud principals:
 ```text
 databricks labs ucx migrate-credentials
 ```
+
+For both AWS and Azure this command will create the necessary UC storage credentials in the UC metastore.
 
 Azure: this command migrates Azure Service Principals, which have Storage Blob Data Contributor,
 Storage Blob Data Reader, Storage Blob Data Owner roles on ADLS Gen2 locations that are being used in
@@ -94,43 +106,21 @@ The AWS Instance Profiles to location mapping are listed in
 Please review the file and delete the Instance Profiles you do not want to be migrated.
 Pass aws_profile for aws.
 
-For AWS we have the option to create fresh new AWS roles and set them up for UC access, using the following command:
-```text
-databricks labs ucx create-missing-principles --aws-profile <aws_profile> --single-role <single_role>
-```
-This command identifies all the S3 locations that are missing a UC compatible role and creates them. 
-It takes single-role optional parameter. 
-If set to True, it will create a single role for all the S3 locations.
-Otherwise, it will create a role for each S3 location.
 
-
-#### Step 2.3: Create Credentials
-Once the cloud principals are created, we can create the UC credentials.
-The manual process is documented in the following links:
-[AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
-[Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
-
-AWS and Azure:
-The following CLI command can be used to create the UC credentials:
-```text
-databricks labs ucx create-credentials
-```
-
-
-#### Step 2.4: Create External Locations
+#### Step 2.3: Create External Locations
 Once the UC credentials are created, we can create the UC external locations.
 An external location will be created for each of the locations identified in the assessment.
-The Assessment dashboard displayed all the locations that need to be created.
+The Assessment dashboard displays all the locations that need to be created.
 The Manual process is documented in the following links:
 [AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
 [Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
 
-#### Step 2.5: Create "Uber Principal"
+#### Step 2.4: Create "Uber Principal"
 Uber Principals are principals that have access to all the external tables' location. 
 They are "Legacy" principals and not required to support UC. The purpose of these roles is for the cluster that performs the upgrade to have access to all the tables in HMS.
 Once the upgrade is completed, these principals can (and should) be deleted.
 
-#### Step 2.6: Create Catalogs and Schemas 
+#### Step 2.5: Create Catalogs and Schemas 
 In this step we will create the UC catalogs and schemas required for the target tables.
 The following CLI command can be used to create the UC catalogs and schemas:
 ```text
