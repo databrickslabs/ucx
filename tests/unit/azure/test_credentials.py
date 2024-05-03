@@ -33,6 +33,7 @@ from databricks.labs.ucx.azure.credentials import (
     ServicePrincipalMigration,
     ServicePrincipalMigrationInfo,
     StorageCredentialManager,
+    StorageCredentialValidationResult,
 )
 from databricks.labs.ucx.azure.resources import (
     AzureResource,
@@ -156,6 +157,29 @@ def credential_manager():
     ws.storage_credentials.validate.side_effect = side_effect_validate_storage_credential
 
     return StorageCredentialManager(ws)
+
+
+def test_storage_credential_validation_result_from_storage_credential_info_service_principal():
+    """Verify the SP field to be present in the result"""
+    azure_service_principal = AzureServicePrincipal("directory_id", "application_id", "client_secret")
+    storage_credential_info = StorageCredentialInfo(
+        name="test",
+        azure_service_principal=azure_service_principal,
+        read_only=True,
+    )
+    validated_on = "abfss://container@storageaccount.dfs.core.windows.net"
+    failures = ["failure"]
+
+    validation_result = StorageCredentialValidationResult.from_storage_credential_info(
+        storage_credential_info, validated_on, failures
+    )
+
+    assert validation_result.name == storage_credential_info.name
+    assert validation_result.application_id == azure_service_principal.application_id
+    assert validation_result.read_only == storage_credential_info.read_only
+    assert validation_result.validated_on == validated_on
+    assert validation_result.directory_id == azure_service_principal.directory_id
+    assert validation_result.failures == failures
 
 
 def test_list_storage_credentials(credential_manager):
