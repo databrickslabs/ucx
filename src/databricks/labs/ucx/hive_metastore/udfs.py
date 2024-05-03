@@ -105,7 +105,7 @@ class UdfsCrawler(CrawlerBase):
         current_key = ""
         try:
             for row in self._fetch(f"DESCRIBE FUNCTION EXTENDED {escape_sql_identifier(full_name)}"):
-                key_value = row.as_dict()["function_desc"]
+                key_value = row["function_desc"]
                 if ":" in key_value:
                     current_key, value = key_value.split(":", 1)
                     describe[current_key] = value.strip()
