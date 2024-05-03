@@ -43,7 +43,7 @@ class StorageCredentialValidationResult:
     @classmethod
     def _get_application_and_directory_id(
         cls, storage_credential_info: StorageCredentialInfo
-    ) -> tuple[str | None, str | None]:
+    ) -> tuple[str, str | None]:
         if storage_credential_info.azure_service_principal is not None:
             application_id = storage_credential_info.azure_service_principal.application_id
             directory_id = storage_credential_info.azure_service_principal.directory_id
