@@ -163,9 +163,6 @@ class FileLoader(DependencyLoader):
     def full_path(self, path: Path) -> Path | None:
         if path.is_file():
             return path
-        child = Path(self._path_lookup.cwd, path)
-        if child.is_file():
-            return child
         for parent in self._path_lookup.paths:
             child = Path(parent, path)
             if child.is_file():

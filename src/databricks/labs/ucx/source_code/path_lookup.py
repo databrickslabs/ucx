@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -37,6 +36,7 @@ class PathLookup:
 
     @property
     def paths(self) -> Iterable[Path]:
+        yield self.cwd
         yield from self._sys_paths
 
     def push_cwd(self, path: Path):
