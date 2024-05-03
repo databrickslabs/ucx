@@ -52,8 +52,7 @@ class StorageCredentialValidationResult:
         if storage_credential_info.azure_managed_identity is not None:
             if storage_credential_info.azure_managed_identity.managed_identity_id is not None:
                 return storage_credential_info.azure_managed_identity.managed_identity_id, None
-            else:
-                return storage_credential_info.azure_managed_identity.access_connector_id, None
+            return storage_credential_info.azure_managed_identity.access_connector_id, None
 
         raise KeyError("Storage credential info is missing an application id.")
 
