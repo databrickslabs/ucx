@@ -656,7 +656,8 @@ databricks labs ucx principal-prefix-access --aws-profile test-profile
 
 Use to identify all instance profiles in the workspace, and map their access to S3 buckets. 
 Also captures the IAM roles which has UC arn listed, and map their access to S3 buckets 
-This requires `aws` CLI to be installed and configured. 
+This requires `aws` CLI to be installed and configured. It outputs uc_roles_access.csv which 
+will be later used by migrate-credentials command to create UC storage credentials.
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
@@ -669,7 +670,10 @@ databricks labs ucx principal-prefix-access --subscription-id test-subscription-
 ```
 
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions 
-on each storage account. This requires Azure CLI to be installed and configured via `az login`. 
+on each storage account. The command is used to identify Azure Service Principals, which have `Storage Blob Data Contributor`,
+`Storage Blob Data Reader`, `Storage Blob Data Owner` roles, or custom read/write roles on ADLS Gen2 locations that are being 
+used in Databricks. This requires Azure CLI to be installed and configured via `az login`. It outputs azure_storage_account_info.csv
+which will be later used by migrate-credentials command to create UC storage credentials.
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
@@ -697,10 +701,8 @@ This command is one of prerequisites for the [table migration workflow](#table-m
 databricks labs ucx migrate-credentials
 ```
 
-For Azure, this command migrate Azure Service Principals, which have `Storage Blob Data Contributor`,
-`Storage Blob Data Reader`, `Storage Blob Data Owner` roles on ADLS Gen2 locations that are being used in
-Databricks, to UC storage credentials. The Azure Service Principals to location mapping are listed 
-in `/Users/{user_name}/.ucx/azure_storage_account_info.csv` which is generated 
+This command migrates Azure Service Principals or IAM roles listed in `/Users/{user_name}/.ucx/azure_storage_account_info.csv` 
+or `/Users/{user_name}/.ucx/uc_roles_access.csv` to UC storage credentials, which has been generated 
 by [`principal-prefix-access` command](#principal-prefix-access-command). 
 Please review the file and delete the Service Principals you do not want to be migrated.
 The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
