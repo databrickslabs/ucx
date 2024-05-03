@@ -186,7 +186,7 @@ def test_spn_migration_access_connector_created(
     # Mocking in an integration test because Azure resource can not be created
     resource_permissions = create_autospec(AzureResourcePermissions)
 
-    # TODO: Remove the replace!
+    # TODO: Remove the after 20-05-2024
     access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR").replace("-external", ""))
     access_connector = AccessConnector(
         id=access_connector_id,
