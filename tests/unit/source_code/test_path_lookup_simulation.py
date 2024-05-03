@@ -36,8 +36,8 @@ def test_locates_notebooks(source: list[str], expected: int):
     notebook_path = Path(*elems)
     whitelist = whitelist_mock()
     provider = PathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(provider, visited)
-    notebook_loader = VisitingNotebookLoader(provider, visited)
+    file_loader = VisitingFileLoader(visited)
+    notebook_loader = VisitingNotebookLoader(visited)
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
@@ -46,7 +46,8 @@ def test_locates_notebooks(source: list[str], expected: int):
         LocalFileResolver(file_loader),
     ]
     builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
-    builder.build_notebook_dependency_graph(notebook_path)
+    maybe = builder.build_notebook_dependency_graph(notebook_path)
+    assert maybe.problems == []
     assert len(visited) == expected
 
 
@@ -58,8 +59,8 @@ def test_locates_files(source: list[str], expected: int):
     file_path = Path(*elems)
     whitelist = whitelist_mock()
     provider = PathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(provider, visited)
-    notebook_loader = VisitingNotebookLoader(provider, visited)
+    file_loader = VisitingFileLoader(visited)
+    notebook_loader = VisitingNotebookLoader(visited)
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
@@ -68,5 +69,6 @@ def test_locates_files(source: list[str], expected: int):
         LocalFileResolver(file_loader),
     ]
     builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
-    builder.build_local_file_dependency_graph(file_path)
+    maybe = builder.build_local_file_dependency_graph(file_path)
+    assert maybe.problems == []
     assert len(visited) == expected

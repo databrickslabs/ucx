@@ -36,51 +36,8 @@ class LocalFile(SourceContainer):
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return []
-        # TODO replace the below with parent.build_graph_from_python_source
-        # can only be done after https://github.com/databrickslabs/ucx/issues/1287
-        problems: list[DependencyProblem] = []
-        linter = ASTLinter.parse(self._original_code)
-        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        for call in run_notebook_calls:
-            notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(notebook_path_arg, ast.Constant):
-                notebook_path = notebook_path_arg.value
-                maybe = parent.register_notebook(Path(notebook_path))
-                problems += [
-                    problem.replace(
-                        source_path=self._path,
-                        start_line=call.lineno,
-                        start_col=call.col_offset,
-                        end_line=call.end_lineno or 0,
-                        end_col=call.end_col_offset or 0,
-                    )
-                    for problem in maybe.problems
-                ]
-                continue
-            problem = DependencyProblem(
-                code='dependency-not-constant',
-                message="Can't check dependency not provided as a constant",
-                source_path=self._path,
-                start_line=call.lineno,
-                start_col=call.col_offset,
-                end_line=call.end_lineno or 0,
-                end_col=call.end_col_offset or 0,
-            )
-            problems.append(problem)
-        # TODO https://github.com/databrickslabs/ucx/issues/1287
-        for import_name, node in PythonLinter.list_import_sources(linter):
-            maybe = parent.register_import(import_name)
-            problems += [
-                problem.replace(
-                    source_path=self._path,
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno or 0,
-                    end_col=node.end_col_offset or 0,
-                )
-                for problem in maybe.problems
-            ]
-        return problems
+        maybe = parent.build_graph_from_python_source(self._original_code)
+        return [problem.replace(source_path=self._path) for problem in maybe.problems]
 
     def __repr__(self):
         return f"<LocalFile {self._path}>"
@@ -138,37 +95,25 @@ class LocalFileMigrator:
 
 
 class FileLoader(DependencyLoader):
-
-    def __init__(self, path_lookup: PathLookup):
-        self._path_lookup = path_lookup
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        fullpath = self.full_path(dependency.path)
-        assert fullpath is not None
-        return LocalFile(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        absolute_path = path_lookup.resolve(dependency.path)
+        if not absolute_path:
+            return None
+        return LocalFile(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
 
     def exists(self, path: Path) -> bool:
-        return self.full_path(path) is not None
+        return path.exists()
 
-    def full_path(self, path: Path) -> Path | None:
-        if path.is_file():
-            return path
-        for parent in self._path_lookup.paths:
-            child = Path(parent, path)
-            if child.is_file():
-                return child
-        return None
-
-    def is_notebook(self, path: Path) -> bool:
-        fullpath = self.full_path(path)
-        if fullpath is None:
-            return False
-        with fullpath.open(mode="r", encoding="utf-8") as stream:
-            line = stream.readline()
-            return NOTEBOOK_HEADER in line
+    # def is_notebook(self, path: Path) -> bool:
+    #     fullpath = self.full_path(path)
+    #     if fullpath is None:
+    #         return False
+    #     with fullpath.open(mode="r", encoding="utf-8") as stream:
+    #         line = stream.readline()
+    #         return NOTEBOOK_HEADER in line
 
     def __repr__(self):
-        return f"<FileLoader syspath={self._syspath_provider}>"
+        return f"FileLoader()"
 
 
 class LocalFileResolver(BaseDependencyResolver):
@@ -181,13 +126,31 @@ class LocalFileResolver(BaseDependencyResolver):
         return LocalFileResolver(self._file_loader, resolver)
 
     def resolve_local_file(self, path: Path) -> MaybeDependency:
-        if self._file_loader.exists(path) and not self._file_loader.is_notebook(path):
+        if self._file_loader.exists(path):
             return MaybeDependency(Dependency(self._file_loader, path), [])
         return super().resolve_local_file(path)
 
-    def resolve_import(self, name: str) -> MaybeDependency:
-        fullpath = self._file_loader.full_path(Path(f"{name}.py"))
-        if fullpath is not None:
-            dependency = Dependency(self._file_loader, fullpath)
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        parts = []
+        # Relative imports use leading dots. A single leading dot indicates a relative import, starting with
+        # the current package. Two or more leading dots indicate a relative import to the parent(s) of the current
+        # package, one level per dot after the first.
+        # see https://docs.python.org/3/reference/import.html#package-relative-imports
+        for i, rune in enumerate(name):
+            if not i and rune == '.':  # leading single dot
+                parts.append(path_lookup.cwd.as_posix())
+                continue
+            if rune != '.':
+                parts.append(name[i:].replace('.', '/'))
+                break
+            parts.append("..")
+        for candidate in [f'{"/".join(parts)}.py', f'{"/".join(parts)}/__init__.py']:
+            absolute_path = path_lookup.resolve(Path(candidate))
+            if not absolute_path:
+                continue
+            dependency = Dependency(self._file_loader, absolute_path)
             return MaybeDependency(dependency, [])
-        return super().resolve_import(name)
+        return super().resolve_import(path_lookup, name)
+
+    def __repr__(self):
+        return f"LocalFileResolver()"

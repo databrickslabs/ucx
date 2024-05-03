@@ -84,7 +84,8 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    builder.build_notebook_dependency_graph(Path("root4.py.txt"))
+    maybe = builder.build_notebook_dependency_graph(Path("root4.py.txt"))
+    assert not maybe.failed
     assert len(visited) == len(paths)
 
 
@@ -106,7 +107,8 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    builder.build_local_file_dependency_graph(Path(paths[0]))
+    maybe = builder.build_local_file_dependency_graph(Path(paths[0]))
+    assert not maybe.failed
     assert len(visited) == len(paths)
 
 
@@ -264,7 +266,8 @@ def test_dependency_graph_builder_visits_recursive_file_dependencies():
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    builder.build_local_file_dependency_graph(Path("root6.py.txt"))
+    maybe = builder.build_local_file_dependency_graph(Path("root6.py.txt"))
+    assert not maybe.failed
     assert len(visited) == len(paths)
 
 
@@ -344,7 +347,8 @@ def test_dependency_graph_builder_visits_file_dependencies():
         ]
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
-    builder.build_local_file_dependency_graph(Path("root5.py.txt"))
+    maybe = builder.build_local_file_dependency_graph(Path("root5.py.txt"))
+    assert not maybe.failed
     assert len(visited) == len(paths)
 
 
@@ -401,17 +405,16 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     assert not maybe_graph.graph
 
 
-@pytest.mark.skip("there's a bug in 'from .x import y' - we omit level")
 def test_dependency_graph_builder_visits_site_packages(empty_index):
     datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
     paths = ["import-site-package.py.txt"]
     sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     provider = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
-    file_loader = TestFileLoader(provider, sources)
+    file_loader = TestFileLoader(sources)
     site_packages_path = locate_site_packages()
     site_packages = SitePackages.parse(site_packages_path)
-    notebook_loader = LocalNotebookLoader(provider)
+    notebook_loader = LocalNotebookLoader()
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
@@ -424,9 +427,10 @@ def test_dependency_graph_builder_visits_site_packages(empty_index):
     maybe = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
     assert not maybe.failed
     graph = maybe.graph
-    assert graph.locate_dependency(Path(site_packages_path, "certifi/core.py"))
-    assert not graph.locate_dependency(Path("core.py"))
-    assert not graph.locate_dependency(Path("core"))
+    maybe = graph.locate_dependency(Path(site_packages_path, "certifi/core.py"))
+    assert not maybe.failed
+    maybe = graph.locate_dependency(Path("core.py"))
+    assert maybe.failed
 
 
 def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_index):

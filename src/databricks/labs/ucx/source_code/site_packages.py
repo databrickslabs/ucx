@@ -16,6 +16,7 @@ from databricks.labs.ucx.source_code.graph import (
 
 
 class SitePackagesResolver(BaseDependencyResolver):
+    # TODO: this is incorrect logic, remove this resolver
 
     def __init__(
         self,
@@ -32,13 +33,13 @@ class SitePackagesResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return SitePackagesResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
 
-    def resolve_import(self, name: str) -> MaybeDependency:
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         site_package = self._site_packages[name]
         if site_package is not None:
             container = SitePackageContainer(self._file_loader, site_package)
             dependency = Dependency(WrappingLoader(container), Path(name))
             return MaybeDependency(dependency, [])
-        return super().resolve_import(name)
+        return super().resolve_import(path_lookup, name)
 
 
 class SitePackageContainer(SourceContainer):
@@ -47,7 +48,7 @@ class SitePackageContainer(SourceContainer):
         self._file_loader = file_loader
         self._site_package = site_package
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         for module_path in self._site_package.module_paths:
             maybe = parent.register_dependency(Dependency(self._file_loader, module_path))

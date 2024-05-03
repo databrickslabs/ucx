@@ -15,6 +15,7 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
 )
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class NotebookResolver(BaseDependencyResolver):
@@ -47,7 +48,7 @@ class WorkspaceNotebookLoader(NotebookLoader):
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         return object_info is not None and object_info.object_type is ObjectType.NOTEBOOK
 
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         object_info = self._ws.workspace.get_status(str(dependency.path))
         # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
         return self._load_notebook(object_info)
@@ -69,13 +70,11 @@ class WorkspaceNotebookLoader(NotebookLoader):
 
 class LocalNotebookLoader(NotebookLoader, FileLoader):
 
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        fullpath = self.full_path(self._adjust_path(dependency.path))
-        assert fullpath is not None
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        fullpath = path_lookup.resolve(self._adjust_path(dependency.path))
+        if not fullpath:
+            return None
         return Notebook.parse(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
-
-    def is_notebook(self, path: Path) -> bool:
-        return super().is_notebook(self._adjust_path(path))
 
     @staticmethod
     def _adjust_path(path: Path):
@@ -84,4 +83,4 @@ class LocalNotebookLoader(NotebookLoader, FileLoader):
         return Path(path.as_posix() + ".py")
 
     def __repr__(self):
-        return "<LocalNotebookLoader>"
+        return "LocalNotebookLoader()"

@@ -31,7 +31,7 @@ class WhitelistResolver(BaseDependencyResolver):
         return WhitelistResolver(self._whitelist, resolver)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def resolve_import(self, name: str) -> MaybeDependency:
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         problem, ok = self._is_whitelisted(name)
         if problem is not None:
             return MaybeDependency(None, [problem])
@@ -39,7 +39,7 @@ class WhitelistResolver(BaseDependencyResolver):
             container = StubContainer()
             dependency = Dependency(WrappingLoader(container), Path(name))
             return MaybeDependency(dependency, [])
-        return super().resolve_import(name)
+        return super().resolve_import(path_lookup, name)
 
     def _is_whitelisted(self, name: str) -> tuple[DependencyProblem | None, bool]:
         compatibility = self._whitelist.compatibility(name)
@@ -60,7 +60,7 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         return []
 
 

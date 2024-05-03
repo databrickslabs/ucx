@@ -250,8 +250,7 @@ def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited:
 class TestFileLoader(FileLoader):
     __test__ = False
 
-    def __init__(self, path_lookup: PathLookup, sources: dict[str, str]):
-        super().__init__(path_lookup)
+    def __init__(self, sources: dict[str, str]):
         self._sources = sources
 
     def exists(self, path: pathlib.Path):
@@ -275,12 +274,11 @@ class TestFileLoader(FileLoader):
 class VisitingFileLoader(FileLoader):
     __test__ = False
 
-    def __init__(self, path_lookup: PathLookup, visited: dict[str, bool]):
-        super().__init__(path_lookup)
+    def __init__(self, visited: dict[str, bool]):
         self._visited = visited
 
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        container = super().load_dependency(dependency)
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        container = super().load_dependency(path_lookup, dependency)
         if isinstance(container, LocalFile):
             self._visited[container.path.as_posix()] = True
         return container
@@ -288,12 +286,11 @@ class VisitingFileLoader(FileLoader):
 
 class VisitingNotebookLoader(LocalNotebookLoader):
 
-    def __init__(self, path_lookup: PathLookup, visited: dict[str, bool]):
-        super().__init__(path_lookup)
+    def __init__(self, visited: dict[str, bool]):
         self._visited = visited
 
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        container = super().load_dependency(dependency)
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        container = super().load_dependency(path_lookup, dependency)
         if isinstance(container, Notebook):
             self._visited[container.path.as_posix()] = True
         return container
