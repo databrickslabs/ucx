@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import abc
-import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable, Iterable
 
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
+from databricks.labs.ucx.source_code.python_linter import (
+    ASTLinter,
+    PythonLinter,
+    SysPathChange,
+    NotebookRunCall,
+    ImportSource,
+)
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -130,50 +135,61 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(
-        self, python_code: str, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
-    ):
+    def build_graph_from_python_source(self, python_code: str, path_lookup: PathLookup) -> list[DependencyProblem]:
+        problems: list[DependencyProblem] = []
         linter = ASTLinter.parse(python_code)
-        syspath_changes = linter.collect_sys_paths_changes()
-        run_calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        syspath_changes = PythonLinter.list_sys_path_changes(linter)
+        run_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         import_sources = PythonLinter.list_import_sources(linter)
-        print("here")
-        # for call in calls:
-        #     assert isinstance(call, ast.Call)
-        #     path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-        #     if isinstance(path, ast.Constant):
-        #         path = path.value.strip().strip("'").strip('"')
-        #         call_problems: list[DependencyProblem] = []
-        #         self.register_notebook(Path(path), call_problems.append)
-        #         for problem in call_problems:
-        #             problem = problem.replace(
-        #                 start_line=call.lineno,
-        #                 start_col=call.col_offset,
-        #                 end_line=call.end_lineno or 0,
-        #                 end_col=call.end_col_offset or 0,
-        #             )
-        #             problem_collector(problem)
-        #     else:
-        #         problem = DependencyProblem(
-        #             code='dependency-not-constant',
-        #             message="Can't check dependency not provided as a constant",
-        #             start_line=call.lineno,
-        #             start_col=call.col_offset,
-        #             end_line=call.end_lineno or 0,
-        #             end_col=call.end_col_offset or 0,
-        #         )
-        #         problem_collector(problem)
-        # for name, node in PythonLinter.list_import_sources(linter):
-        #     import_problems: list[DependencyProblem] = []
-        #     self.register_import(name, import_problems.append)
-        #     for problem in import_problems:
-        #         problem = problem.replace(
-        #             start_line=node.lineno,
-        #             start_col=node.col_offset,
-        #             end_line=node.end_lineno or 0,
-        #             end_col=node.end_col_offset or 0,
-        #         )
-        #         problem_collector(problem)
+        nodes = syspath_changes + run_calls + import_sources
+        nodes.sort(key=lambda node: node.node.lineno * 10000 + node.node.col_offset)
+        for base_node in nodes:
+            if isinstance(base_node, SysPathChange):
+                path = Path(base_node.path)
+                if not path.is_absolute():
+                    path = path_lookup.cwd / path
+                if base_node.is_append:
+                    path_lookup.append_path(path)
+                    continue
+                path_lookup.prepend_path(path)
+                continue
+            if isinstance(base_node, NotebookRunCall):
+                path = base_node.get_constant_path()
+                if path is None:
+                    problem = DependencyProblem(
+                        code='dependency-not-constant',
+                        message="Can't check dependency not provided as a constant",
+                        start_line=base_node.node.lineno,
+                        start_col=base_node.node.col_offset,
+                        end_line=base_node.node.end_lineno or 0,
+                        end_col=base_node.node.end_col_offset or 0,
+                    )
+                    problems.append(problem)
+                    continue
+                call_problems: list[DependencyProblem] = []
+                self.register_notebook(Path(path), call_problems.append)
+                for problem in call_problems:
+                    problem = problem.replace(
+                        start_line=base_node.node.lineno,
+                        start_col=base_node.node.col_offset,
+                        end_line=base_node.node.end_lineno or 0,
+                        end_col=base_node.node.end_col_offset or 0,
+                    )
+                    problems.append(problem)
+                    continue
+            if isinstance(base_node, ImportSource):
+                import_problems: list[DependencyProblem] = []
+                self.register_import(base_node.name, import_problems.append)
+                for problem in import_problems:
+                    problem = problem.replace(
+                        start_line=base_node.node.lineno,
+                        start_col=base_node.node.col_offset,
+                        end_line=base_node.node.end_lineno or 0,
+                        end_col=base_node.node.end_col_offset or 0,
+                    )
+                    problems.append(problem)
+                    continue
+        return problems
 
 
 class Dependency(abc.ABC):

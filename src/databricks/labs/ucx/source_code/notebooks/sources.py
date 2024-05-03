@@ -9,7 +9,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice
 
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
@@ -63,10 +63,9 @@ class Notebook(SourceContainer):
 
     def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
         path_lookup.push_cwd(self.path.parent)
-        problems: list[DependencyProblem] = []
         for cell in self._cells:
-            cell.build_dependency_graph(parent, path_lookup, problems.append)
-        parent.add_problems(problems)
+            problems = cell.build_dependency_graph(parent, path_lookup)
+            parent.add_problems(problems)
         path_lookup.pop_cwd()
 
 

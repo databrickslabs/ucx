@@ -20,19 +20,17 @@ class PathLookup:
         self._sys_paths = sys_paths
         self._cwds = [cwd]
 
-    def push_path(self, path: Path):
+    def prepend_path(self, path: Path):
         self._sys_paths.insert(0, path)
 
     def insert_path(self, index: int, path: Path):
         self._sys_paths.insert(index, path)
 
+    def append_path(self, path: Path):
+        self._sys_paths.append(path)
+
     def remove_path(self, index: int):
         del self._sys_paths[index]
-
-    def pop_path(self) -> Path:
-        result = self._sys_paths[0]
-        del self._sys_paths[0]
-        return result
 
     @property
     def paths(self) -> Iterable[Path]:

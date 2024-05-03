@@ -1,6 +1,5 @@
 from __future__ import annotations  # for type hints
 
-import ast
 import logging
 from pathlib import Path
 from collections.abc import Callable
@@ -11,7 +10,6 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     SourceContainer,
@@ -41,59 +39,9 @@ class LocalFile(SourceContainer):
             logger.warning(f"Unsupported language: {self._language.language}")
             return
         path_lookup.push_cwd(self.path.parent)
-        self._build_dependency_graph(parent)
+        problems = parent.build_graph_from_python_source(self._original_code, path_lookup)
+        parent.add_problems(problems)
         path_lookup.pop_cwd()
-
-    def _build_dependency_graph(self, parent: DependencyGraph) -> None:
-        # TODO replace the below with parent.build_graph_from_python_source
-        # can only be done after https://github.com/databrickslabs/ucx/issues/1287
-        linter = ASTLinter.parse(self._original_code)
-        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        for call in run_notebook_calls:
-            call_problems: list[DependencyProblem] = []
-            notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(notebook_path_arg, ast.Constant):
-                notebook_path = notebook_path_arg.value
-                parent.register_notebook(Path(notebook_path), call_problems.append)
-                call_problems = [
-                    problem.replace(
-                        source_path=self._path,
-                        start_line=call.lineno,
-                        start_col=call.col_offset,
-                        end_line=call.end_lineno or 0,
-                        end_col=call.end_col_offset or 0,
-                    )
-                    for problem in call_problems
-                ]
-                parent.add_problems(call_problems)
-                continue
-            problem = DependencyProblem(
-                code='dependency-not-constant',
-                message="Can't check dependency not provided as a constant",
-                source_path=self._path,
-                start_line=call.lineno,
-                start_col=call.col_offset,
-                end_line=call.end_lineno or 0,
-                end_col=call.end_col_offset or 0,
-            )
-            parent.add_problems([problem])
-        # TODO https://github.com/databrickslabs/ucx/issues/1287
-        for pair in PythonLinter.list_import_sources(linter):
-            import_name = pair[0]
-            import_problems: list[DependencyProblem] = []
-            parent.register_import(import_name, import_problems.append)
-            node = pair[1]
-            import_problems = [
-                problem.replace(
-                    source_path=self._path,
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno or 0,
-                    end_col=node.end_col_offset or 0,
-                )
-                for problem in import_problems
-            ]
-            parent.add_problems(import_problems)
 
 
 class LocalFileMigrator:

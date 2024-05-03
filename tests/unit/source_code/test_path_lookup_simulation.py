@@ -6,7 +6,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraphBuilder, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
-from databricks.labs.ucx.source_code.whitelist import WhitelistResolver
+from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, VisitingNotebookLoader, locate_site_packages
 
 
@@ -35,7 +35,7 @@ def test_locates_notebooks(source: list[str], expected: int):
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
-    whitelist = whitelist_mock()
+    whitelist = Whitelist()
     provider = PathLookup.from_sys_path(Path.cwd())
     file_loader = VisitingFileLoader(provider, visited)
     notebook_loader = VisitingNotebookLoader(provider, visited)
