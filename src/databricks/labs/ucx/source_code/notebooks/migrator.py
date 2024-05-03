@@ -10,6 +10,7 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import RunCell
 from databricks.labs.ucx.source_code.notebooks.loaders import WorkspaceNotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class NotebookMigrator:
@@ -33,7 +34,9 @@ class NotebookMigrator:
         if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
             return False
         dependency = Dependency(WorkspaceNotebookLoader(self._ws), Path(object_info.path))
-        container = dependency.load()
+        # TODO: the interface for this method has to be changed
+        lookup = PathLookup.from_sys_path(Path.cwd())
+        container = dependency.load(lookup)
         assert isinstance(container, Notebook)
         return self._apply(container)
 

@@ -56,6 +56,10 @@ class SitePackageContainer(SourceContainer):
                 problems.extend(maybe.problems)
         return problems
 
+    @property
+    def paths(self):
+        return self._site_package.module_paths
+
     def __repr__(self):
         return f"<SitePackageContainer {self._site_package}>"
 

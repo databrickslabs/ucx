@@ -1,6 +1,5 @@
 from __future__ import annotations  # for type hints
 
-import ast
 import logging
 from pathlib import Path
 
@@ -9,8 +8,6 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     SourceContainer,
@@ -113,7 +110,7 @@ class FileLoader(DependencyLoader):
     #         return NOTEBOOK_HEADER in line
 
     def __repr__(self):
-        return f"FileLoader()"
+        return "FileLoader()"
 
 
 class LocalFileResolver(BaseDependencyResolver):
@@ -153,4 +150,4 @@ class LocalFileResolver(BaseDependencyResolver):
         return super().resolve_import(path_lookup, name)
 
     def __repr__(self):
-        return f"LocalFileResolver()"
+        return "LocalFileResolver()"

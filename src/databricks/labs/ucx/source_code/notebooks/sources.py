@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -11,8 +10,7 @@ from databricks.labs.ucx.source_code.base import Advice
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR, NOTEBOOK_HEADER
 
 
 class Notebook(SourceContainer):
@@ -61,7 +59,7 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         for cell in self._cells:
             maybe = cell.build_dependency_graph(parent)

@@ -1,7 +1,6 @@
 from pathlib import Path
 from unittest.mock import create_autospec
 
-import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 

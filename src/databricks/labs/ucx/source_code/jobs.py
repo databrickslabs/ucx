@@ -6,9 +6,11 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import DependencyGraphBuilder
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter
+from databricks.labs.ucx.source_code.site_packages import SitePackageContainer
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
@@ -35,7 +37,7 @@ class WorkflowLinter:
                 for problem in maybe.problems:
                     problems[problem.source_path].append(problem.as_advisory())
                 for dependency in maybe.graph.all_dependencies:
-                    container = dependency.load()
+                    container = dependency.load(maybe.graph.path_lookup)
                     if not container:
                         continue
                     if isinstance(container, Notebook):
@@ -43,6 +45,13 @@ class WorkflowLinter:
                         linter = NotebookLinter(languages, container)
                         for problem in linter.lint():
                             problems[container.path].append(problem)
+                    if isinstance(container, SitePackageContainer):
+                        for path in container.paths:
+                            # lint every path
+                            continue
+                    if isinstance(container, LocalFile):
+                        # lint every path
+                        continue
             if task.spark_python_task:
                 # TODO: ... load from dbfs
                 continue
