@@ -141,6 +141,7 @@ class DependencyGraph:
         syspath_changes = PythonLinter.list_sys_path_changes(linter)
         run_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
         import_sources = PythonLinter.list_import_sources(linter)
+        # need to execute things in intertwined sequence so concat and sort
         nodes = syspath_changes + run_calls + import_sources
         nodes.sort(key=lambda node: node.node.lineno * 10000 + node.node.col_offset)
         for base_node in nodes:
@@ -154,8 +155,8 @@ class DependencyGraph:
                 path_lookup.prepend_path(path)
                 continue
             if isinstance(base_node, NotebookRunCall):
-                path = base_node.get_constant_path()
-                if path is None:
+                strpath = base_node.get_constant_path()
+                if strpath is None:
                     problem = DependencyProblem(
                         code='dependency-not-constant',
                         message="Can't check dependency not provided as a constant",
@@ -167,7 +168,7 @@ class DependencyGraph:
                     problems.append(problem)
                     continue
                 call_problems: list[DependencyProblem] = []
-                self.register_notebook(Path(path), call_problems.append)
+                self.register_notebook(Path(strpath), call_problems.append)
                 for problem in call_problems:
                     problem = problem.replace(
                         start_line=base_node.node.lineno,
