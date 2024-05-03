@@ -99,7 +99,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     ] == list(linter.lint(code))
 
 
-def test_rdd_context_match_shared():
+def test_rdd_context_match_serverless():
     linter = SparkConnectLinter(is_serverless=True)
     code = """
 rdd1 = sc.parallelize([1, 2, 3])
