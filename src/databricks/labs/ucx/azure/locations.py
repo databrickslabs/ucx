@@ -80,7 +80,7 @@ class ExternalLocationsMigration:
             if permission_mapping.client_id in app_id_mapping_read:
                 prefix_mapping_read[permission_mapping.prefix] = app_id_mapping_read[permission_mapping.client_id]
 
-        all_storage_accounts = self._azurerm.storage_accounts()
+        all_storage_accounts = list(self._azurerm.storage_accounts())
         for storage_credential in self._ws.storage_credentials.list():
             # Filter storage credentials for access connectors created by UCX
             if not (
