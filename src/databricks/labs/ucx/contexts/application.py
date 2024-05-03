@@ -2,6 +2,7 @@ import abc
 import logging
 from datetime import timedelta
 from functools import cached_property
+from pathlib import Path
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
@@ -358,7 +359,8 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def path_lookup(self):
-        return PathLookup.from_sys_path()
+        # TODO find a solution to enable a different cwd per job/task (maybe it's not necessary or possible?)
+        return PathLookup.from_sys_path(Path.cwd())
 
     @cached_property
     def file_loader(self):

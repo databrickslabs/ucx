@@ -141,7 +141,7 @@ def test_notebook_builds_leaf_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path()
+    provider = PathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
     container.build_dependency_graph(graph, provider)
@@ -166,7 +166,7 @@ def test_notebook_builds_depth1_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path()
+    provider = PathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
     container.build_dependency_graph(graph, provider)
@@ -187,7 +187,7 @@ def test_notebook_builds_depth2_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path()
+    provider = PathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
     container.build_dependency_graph(graph, provider)
@@ -209,7 +209,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path()
+    provider = PathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
     container.build_dependency_graph(graph, provider)
@@ -231,7 +231,7 @@ def test_notebook_builds_cyclical_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path()
+    provider = PathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
     container.build_dependency_graph(graph, provider)
@@ -252,7 +252,7 @@ def test_notebook_builds_python_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path()
+    provider = PathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
     container.build_dependency_graph(graph, provider)

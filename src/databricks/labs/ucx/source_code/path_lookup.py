@@ -9,35 +9,35 @@ from pathlib import Path
 class PathLookup:
 
     @classmethod
-    def from_pathlike_string(cls, syspath: str):
+    def from_pathlike_string(cls, cwd: Path, syspath: str):
         paths = syspath.split(':')
-        return PathLookup([Path(path) for path in paths])
+        return PathLookup(cwd, [Path(path) for path in paths])
 
     @classmethod
-    def from_sys_path(cls):
-        return PathLookup([Path(path) for path in sys.path])
+    def from_sys_path(cls, cwd: Path):
+        return PathLookup(cwd, [Path(path) for path in sys.path])
 
-    def __init__(self, paths: list[Path]):
-        self._paths = paths
-        self._cwds = [Path(os.getcwd())]
+    def __init__(self, cwd: Path, sys_paths: list[Path]):
+        self._sys_paths = sys_paths
+        self._cwds = [cwd]
 
     def push_path(self, path: Path):
-        self._paths.insert(0, path)
+        self._sys_paths.insert(0, path)
 
     def insert_path(self, index: int, path: Path):
-        self._paths.insert(index, path)
+        self._sys_paths.insert(index, path)
 
     def remove_path(self, index: int):
-        del self._paths[index]
+        del self._sys_paths[index]
 
     def pop_path(self) -> Path:
-        result = self._paths[0]
-        del self._paths[0]
+        result = self._sys_paths[0]
+        del self._sys_paths[0]
         return result
 
     @property
     def paths(self) -> Iterable[Path]:
-        yield from self._paths
+        yield from self._sys_paths
 
     def push_cwd(self, path: Path):
         self._cwds.append(path)
