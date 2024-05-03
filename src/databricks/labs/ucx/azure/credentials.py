@@ -284,7 +284,7 @@ class ServicePrincipalMigration(SecretsMixin):
             storage_credential_info = self._ws.storage_credentials.create(
                 access_connector.name,
                 azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
-                comment="Created by ucx",
+                comment="Created by UCX",
                 read_only=False,  # Access connectors get "STORAGE_BLOB_DATA_CONTRIBUTOR" permissions
             )
             try:
