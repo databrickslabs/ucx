@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import create_autospec
+from unittest.mock import call, create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -15,14 +15,14 @@ from databricks.sdk.service.catalog import (
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.azure.resources import AzureResources
+from databricks.labs.ucx.azure.resources import AzureResource, AzureResources, StorageAccount
 from databricks.labs.ucx.hive_metastore import ExternalLocations, TablesCrawler, Mounts
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from tests.unit.azure import azure_api_client
 
 
-def location_migration_for_test(ws, mock_backend, mock_installation):
-    azurerm = AzureResources(azure_api_client(), azure_api_client())
+def location_migration_for_test(ws, mock_backend, mock_installation, azurerm=None):
+    azurerm = azurerm or AzureResources(azure_api_client(), azure_api_client())
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
     azure_resource_permissions = AzureResourcePermissions(mock_installation, ws, azurerm, location_crawler)
     tables_crawler = TablesCrawler(mock_backend, 'ucx')
@@ -264,6 +264,70 @@ def test_run_managed_identity():
         read_only=True,
         skip_validation=False,
     )
+
+
+def test_run_access_connectors():
+    """Test run with access connectors based storage credentials"""
+    ws = create_autospec(WorkspaceClient)
+
+    # mock crawled HMS external locations
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container4@test.dfs.core.windows.net/", 4),
+                ("abfss://container5@test.dfs.core.windows.net/a/b/", 5),
+            ]
+        }
+    )
+
+    # Mock AzureResources to return storage account and containers
+    storage_account = StorageAccount(
+        id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/test"),
+        name="test",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    azurerm = create_autospec(AzureResources)
+    azurerm.storage_accounts.return_value = [storage_account]
+
+    azurerm.containers.return_value = [
+        AzureResource(f"{storage_account.id}/containers/container4"),
+        AzureResource(f"{storage_account.id}/containers/container5"),
+    ]
+
+    # mock listing storage credentials
+    ws.storage_credentials.list.return_value = [
+        StorageCredentialInfo(name=f"ac-{storage_account.name}", comment="Created by UCX"),
+    ]
+
+    # mock listing UC external locations, no HMS external location will be matched
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
+
+    # mock installation with permission mapping
+    mock_installation = MockInstallation({"azure_storage_account_info.csv": []})
+
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation, azurerm)
+    location_migration.run()
+
+    calls = [
+        call(
+            "container4_test",
+            "abfss://container4@test.dfs.core.windows.net/",
+            "ac-test",
+            comment="Created by UCX",
+            read_only=False,
+            skip_validation=False,
+        ),
+        call(
+            "container5_test_a_b",
+            "abfss://container5@test.dfs.core.windows.net/a/b/",
+            "ac-test",
+            comment="Created by UCX",
+            read_only=False,
+            skip_validation=False,
+        ),
+    ]
+    ws.external_locations.create.assert_has_calls(calls)
 
 
 def create_side_effect(location_name, *args, **kwargs):  # pylint: disable=unused-argument
