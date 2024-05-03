@@ -3,8 +3,6 @@ from __future__ import annotations  # for type hints
 import ast
 import logging
 from pathlib import Path
-from collections.abc import Callable
-from collections.abc import Iterable
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language

@@ -59,7 +59,7 @@ class DependencyGraph:
         if not container:
             problem = DependencyProblem('dependency-register-failed', 'Failed to register dependency', dependency.path)
             return MaybeGraph(child_graph, [problem])
-        problems = container.build_dependency_graph(child_graph)
+        problems = container.build_dependency_graph(child_graph, self._path_lookup)
         return MaybeGraph(child_graph, problems)
 
     def locate_dependency(self, path: Path) -> MaybeGraph:

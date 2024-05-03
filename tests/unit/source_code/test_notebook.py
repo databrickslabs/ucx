@@ -3,7 +3,6 @@ from unittest.mock import create_autospec
 import re
 
 import pytest
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 

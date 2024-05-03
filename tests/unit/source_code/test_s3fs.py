@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     _load_sources,
