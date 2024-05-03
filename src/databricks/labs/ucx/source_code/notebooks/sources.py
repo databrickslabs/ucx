@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -9,20 +11,21 @@ from databricks.labs.ucx.source_code.base import Advice
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, NOTEBOOK_HEADER, CELL_SEPARATOR
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR
+from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 
 
 class Notebook(SourceContainer):
 
     @staticmethod
-    def parse(path: str, source: str, default_language: Language) -> Notebook:
+    def parse(path: Path, source: str, default_language: Language) -> Notebook:
         default_cell_language = CellLanguage.of_language(default_language)
         cells = default_cell_language.extract_cells(source)
         if cells is None:
             raise ValueError(f"Could not parse Notebook: {path}")
         return Notebook(path, source, default_language, cells, source.endswith('\n'))
 
-    def __init__(self, path: str, source: str, language: Language, cells: list[Cell], ends_with_lf):
+    def __init__(self, path: Path, source: str, language: Language, cells: list[Cell], ends_with_lf):
         self._path = path
         self._source = source
         self._language = language
@@ -30,7 +33,7 @@ class Notebook(SourceContainer):
         self._ends_with_lf = ends_with_lf
 
     @property
-    def path(self) -> str:
+    def path(self) -> Path:
         return self._path
 
     @property
@@ -58,11 +61,13 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+        path_lookup.push_cwd(self.path.parent)
         problems: list[DependencyProblem] = []
         for cell in self._cells:
             cell.build_dependency_graph(parent, problems.append)
         parent.add_problems(problems)
+        path_lookup.pop_cwd()
 
 
 class NotebookLinter:
@@ -78,7 +83,7 @@ class NotebookLinter:
     @classmethod
     def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
         langs = Languages(index)
-        notebook = Notebook.parse("", source, default_language)
+        notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
         return cls(langs, notebook)
 

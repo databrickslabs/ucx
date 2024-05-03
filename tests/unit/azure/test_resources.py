@@ -86,14 +86,14 @@ def test_role_assignments_container():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
-@pytest.mark.parametrize("missing_field", ["id", "name", "location", "networkAcls"])
+@pytest.mark.parametrize("missing_field", ["id", "name", "location"])
 def test_storage_account_missing_fields(missing_field: str):
     """A KeyError should be raised when the fields are missing."""
     raw = {
         "name": "sto3",
         "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
         "location": "westeu",
-        "networkAcls": {"defaultAction": "Deny"},
+        "properties": {"networkAcls": {"defaultAction": "Deny"}},
     }
     raw.pop(missing_field)
     with pytest.raises(KeyError):

@@ -2,14 +2,15 @@ from __future__ import annotations  # for type hints
 
 import ast
 import logging
-import sys
 from pathlib import Path
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
+from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
@@ -31,10 +32,19 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    @property
+    def path(self):
+        return self._path
+
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
+        path_lookup.push_cwd(self.path.parent)
+        self._build_dependency_graph(parent)
+        path_lookup.pop_cwd()
+
+    def _build_dependency_graph(self, parent: DependencyGraph) -> None:
         # TODO replace the below with parent.build_graph_from_python_source
         # can only be done after https://github.com/databrickslabs/ucx/issues/1287
         linter = ASTLinter.parse(self._original_code)
@@ -139,8 +149,8 @@ class LocalFileMigrator:
 
 class FileLoader(DependencyLoader):
 
-    def __init__(self, syspath_provider: SysPathProvider):
-        self._syspath_provider = syspath_provider
+    def __init__(self, path_lookup: PathLookup):
+        self._path_lookup = path_lookup
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         fullpath = self.full_path(dependency.path)
@@ -153,7 +163,7 @@ class FileLoader(DependencyLoader):
     def full_path(self, path: Path) -> Path | None:
         if path.is_file():
             return path
-        for parent in self._syspath_provider.paths:
+        for parent in self._path_lookup.paths:
             child = Path(parent, path)
             if child.is_file():
                 return child
@@ -161,7 +171,8 @@ class FileLoader(DependencyLoader):
 
     def is_notebook(self, path: Path) -> bool:
         fullpath = self.full_path(path)
-        assert fullpath is not None
+        if fullpath is None:
+            return False
         with fullpath.open(mode="r", encoding="utf-8") as stream:
             line = stream.readline()
             return NOTEBOOK_HEADER in line
@@ -189,36 +200,3 @@ class LocalFileResolver(BaseDependencyResolver):
         if fullpath is not None:
             return Dependency(self._file_loader, fullpath)
         return super().resolve_import(name, problem_collector)
-
-
-class SysPathProvider:
-
-    @classmethod
-    def from_pathlike_string(cls, syspath: str):
-        paths = syspath.split(':')
-        return SysPathProvider([Path(path) for path in paths])
-
-    @classmethod
-    def from_sys_path(cls):
-        return SysPathProvider([Path(path) for path in sys.path])
-
-    def __init__(self, paths: list[Path]):
-        self._paths = paths
-
-    def push(self, path: Path):
-        self._paths.insert(0, path)
-
-    def insert(self, index: int, path: Path):
-        self._paths.insert(index, path)
-
-    def remove(self, index: int):
-        del self._paths[index]
-
-    def pop(self) -> Path:
-        result = self._paths[0]
-        del self._paths[0]
-        return result
-
-    @property
-    def paths(self) -> Iterable[Path]:
-        yield from self._paths

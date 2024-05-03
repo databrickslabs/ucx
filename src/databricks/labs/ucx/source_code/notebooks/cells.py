@@ -7,6 +7,8 @@ from enum import Enum
 from pathlib import Path
 from collections.abc import Callable
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
+
+from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 
@@ -14,7 +16,6 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyPro
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 
-NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
 MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'
