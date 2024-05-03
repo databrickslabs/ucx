@@ -307,7 +307,11 @@ def test_run_external_locations_using_access_connector(
 
     az_cli_ctx = az_cli_ctx.replace(azure_resource_permissions=resource_permissions)
 
-    az_cli_ctx.save_locations()
+    external_location = ExternalLocation(f"{mount}/d", 1)
+    az_cli_ctx.sql_backend.save_table(
+        f"{az_cli_ctx.inventory_database}.external_locations", [external_location], ExternalLocation
+    )
+
     # Storage credentials based on access connectors take priority over other credentials
     az_cli_ctx.with_dummy_resource_permission()
 
@@ -321,4 +325,5 @@ def test_run_external_locations_using_access_connector(
     az_cli_ctx.service_principal_migration.run(prompts)  # Create storage credential for above access connector
     az_cli_ctx.azure_external_locations_migration.run()  # Create external location using storage credential
 
-    assert False
+    all_external_locations = az_cli_ctx.workspace_client.external_locations.list()
+    assert len([loc for loc in all_external_locations if loc.url == external_location.location]) > 0
