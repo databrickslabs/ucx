@@ -80,6 +80,15 @@ class UdfsCrawler(CrawlerBase):
         return self._assess_udfs(udfs)
 
     def _collect_tasks(self, catalog, database) -> Iterable[partial[Udf | None]]:
+        """
+        Hive metastore supports 2 type of UDFs, SQL UDFs & Hive UDFs, both are created using CREATE FUNCTION
+        - https://docs.databricks.com/en/udf/index.html
+        - https://docs.databricks.com/en/sql/language-manual/sql-ref-functions-udf-hive.html
+        We do not have to worry about Python or Scala UDF/UDAFs, as they cannot be permanent registered in HMS. Those
+        UDFs when defined are only valid within the Spark session.
+        Unity Catalog supports SQL UDFs, Python UDFs, which means SQL UDFs can be migrated as is. Hive UDFs cannot be
+        migrated
+        """
         try:
             logger.debug(f"[{catalog}.{database}] listing udfs")
             for (udf,) in self._fetch(
@@ -98,6 +107,7 @@ class UdfsCrawler(CrawlerBase):
     def _describe(self, catalog: str, database: str, udf: str) -> Udf | None:
         """Fetches metadata like udf type, input, returns, data access and body
         if specified for a specific udf within the given catalog and database.
+        The output is different between SQL UDFs and Hive UDFs. Hive UDFs only returns the class & usage.
         """
         full_name = f"{catalog}.{database}.{udf}"
         logger.debug(f"[{full_name}] fetching udf metadata")
