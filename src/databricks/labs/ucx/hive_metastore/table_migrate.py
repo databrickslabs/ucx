@@ -57,7 +57,7 @@ class TablesMigrator:
         self._principal_grants = principal_grants
 
     def index(self):
-        # TODO: remove this method
+        self._migration_status_refresher.reset()
         return self._migration_status_refresher.index()
 
     def migrate_tables(
@@ -116,7 +116,6 @@ class TablesMigrator:
 
     def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
-        self._migration_status_refresher.reset()
         all_tasks = []
         sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index())
         batches = sequencer.sequence_batches()
@@ -134,9 +133,7 @@ class TablesMigrator:
                     )
                 )
             Threads.strict("migrate views", tasks)
-            self._migration_status_refresher.reset()
             all_tasks.extend(tasks)
-        self._migration_status_refresher.reset()
         return all_tasks
 
     def _compute_grants(
