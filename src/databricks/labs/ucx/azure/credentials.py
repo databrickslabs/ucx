@@ -45,15 +45,15 @@ class StorageCredentialValidationResult:
         if storage_credential_info.azure_service_principal is not None:
             application_id = storage_credential_info.azure_service_principal.application_id
             directory_id = storage_credential_info.azure_service_principal.directory_id
-        elif storage_credential_info.azure_managed_identity is not None:
+            return application_id, directory_id
+
+        if storage_credential_info.azure_managed_identity is not None:
             if storage_credential_info.azure_managed_identity.managed_identity_id is not None:
-                application_id = storage_credential_info.azure_managed_identity.managed_identity_id
+                return storage_credential_info.azure_managed_identity.managed_identity_id, None
             else:
-                application_id = storage_credential_info.azure_managed_identity.access_connector_id
-            directory_id = None
-        else:
-            raise KeyError("Storage credential info is missing an application id.")
-        return application_id, directory_id
+                return storage_credential_info.azure_managed_identity.access_connector_id, None
+
+        raise KeyError("Storage credential info is missing an application id.")
 
     @classmethod
     def from_storage_credential_info(
