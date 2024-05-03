@@ -354,6 +354,46 @@ def test_run_access_connectors(azure_storage_account_info):
     ws.external_locations.create.assert_has_calls(calls)
 
 
+def test_run_access_connectors_warn_storage_account_not_found(caplog):
+    """A warning should be raised when a storage account is not found."""
+    ws = create_autospec(WorkspaceClient)
+
+    # mock crawled HMS external locations
+    mock_backend = MockBackend(
+        rows={
+            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+                ("abfss://container@test.dfs.core.windows.net/", 1),
+            ]
+        }
+    )
+
+    # Mock AzureResources to return storage account and containers
+    storage_account = StorageAccount(
+        id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/other-storage-account"),
+        name="other-storage-account",
+        location="eastus",
+        default_network_action="Allow",
+    )
+    azurerm = create_autospec(AzureResources)
+    azurerm.storage_accounts.return_value = [storage_account]
+
+    # mock listing storage credentials
+    ws.storage_credentials.list.return_value = [StorageCredentialInfo(name=f"ac-test", comment="Created by UCX")]
+
+    # mock listing UC external locations, no HMS external location will be matched
+    ws.external_locations.list.return_value = [ExternalLocationInfo(name="none", url="none")]
+
+    # mock installation with permission mapping
+    mock_installation = MockInstallation({"azure_storage_account_info.csv": []})
+
+    location_migration = location_migration_for_test(ws, mock_backend, mock_installation, azurerm)
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.azure.locations"):
+        location_migration.run()
+
+    assert any("Storage account test for access connector ac-test not found" in message for message in caplog.messages)
+    ws.external_locations.create.assert_not_called()
+
+
 def create_side_effect(location_name, *args, **kwargs):  # pylint: disable=unused-argument
     # if external_locations.create is called without skip_validation=True, raise PermissionDenied
     if not kwargs.get('skip_validation'):

@@ -80,7 +80,7 @@ class ExternalLocationsMigration:
             if permission_mapping.client_id in app_id_mapping_read:
                 prefix_mapping_read[permission_mapping.prefix] = app_id_mapping_read[permission_mapping.client_id]
 
-        storage_accounts = self._azurerm.storage_accounts()
+        all_storage_accounts = self._azurerm.storage_accounts()
         for storage_credential in self._ws.storage_credentials.list():
             # Filter storage credentials for access connectors created by UCX
             if not (
@@ -92,7 +92,7 @@ class ExternalLocationsMigration:
                 continue
 
             storage_account_name = storage_credential.name.removeprefix("ac-")
-            storage_accounts = [st for st in storage_accounts if st.name == storage_account_name]
+            storage_accounts = [st for st in all_storage_accounts if st.name == storage_account_name]
             if len(storage_accounts) == 0:
                 logger.warning(
                     f"Storage account {storage_account_name} for access connector {storage_credential.name} not found, "
