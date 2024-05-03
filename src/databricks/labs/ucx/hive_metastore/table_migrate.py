@@ -43,7 +43,7 @@ class TablesMigrator:
         backend: SqlBackend,
         table_mapping: TableMapping,
         group_manager: GroupManager,
-        migration_status_refresher: 'MigrationStatusRefresher',
+        migration_status_refresher: MigrationStatusRefresher,
         principal_grants: PrincipalACL,
     ):
         self._tc = table_crawler
