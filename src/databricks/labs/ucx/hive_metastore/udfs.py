@@ -128,7 +128,7 @@ class UdfsCrawler(CrawlerBase):
                 func_type=describe.get("Type", describe.get("Class", "UNKNOWN")),
                 func_input=describe.get("Input", "UNKNOWN"),
                 func_returns=describe.get("Returns", "UNKNOWN"),
-                deterministic=describe.get("Deterministic", False),
+                deterministic=bool(describe.get("Deterministic", False)),
                 data_access=describe.get("Data Access", "UNKNOWN"),
                 comment=describe.get("Comment", "UNKNOWN"),
                 body=describe.get("Body", "UNKNOWN"),
