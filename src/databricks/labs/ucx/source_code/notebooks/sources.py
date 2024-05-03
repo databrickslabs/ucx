@@ -65,7 +65,7 @@ class Notebook(SourceContainer):
         path_lookup.push_cwd(self.path.parent)
         problems: list[DependencyProblem] = []
         for cell in self._cells:
-            cell.build_dependency_graph(parent, problems.append)
+            cell.build_dependency_graph(parent, path_lookup, problems.append)
         parent.add_problems(problems)
         path_lookup.pop_cwd()
 

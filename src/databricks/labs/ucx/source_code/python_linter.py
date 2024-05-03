@@ -63,23 +63,28 @@ class MatchingVisitor(ast.NodeVisitor):
         return self._matches(next_node, depth + 1)
 
 
-class SysPath(abc.ABC):
+class SysPathChange(abc.ABC):
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, is_append: bool):
         self._path = path
+        self._is_append = is_append
 
     @property
     def path(self):
         return self._path
 
+    @property
+    def is_append(self):
+        return self._is_append
+
 
 # path directly added to sys.path
-class AbsolutePath(SysPath):
+class AbsolutePath(SysPathChange):
     pass
 
 
 # path added to sys.path using os.path.abspath
-class RelativePath(SysPath):
+class RelativePath(SysPathChange):
     pass
 
 
@@ -87,11 +92,11 @@ class SysPathVisitor(ast.NodeVisitor):
 
     def __init__(self):
         self._aliases: dict[str, str] = {}
-        self._appended_paths: list[SysPath] = []
+        self._paths_changes: list[SysPathChange] = []
 
     @property
-    def appended_paths(self):
-        return self._appended_paths
+    def paths_changes(self):
+        return self._paths_changes
 
     def visit_Import(self, node: ast.Import):
         for alias in node.names:
@@ -110,13 +115,17 @@ class SysPathVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call):
         # check for 'sys.path.append'
-        if not self._match_aliases(node.func, ["sys", "path", "append"]):
+        if not (
+            self._match_aliases(node.func, ["sys", "path", "append"])
+            or self._match_aliases(node.func, ["sys", "path", "prepend"])
+        ):
             return
-        appended = node.args[0]
-        if isinstance(appended, ast.Constant):
-            self._appended_paths.append(AbsolutePath(appended.value))
-        elif isinstance(appended, ast.Call):
-            self._append_relative_path(appended)
+        changed = node.args[0]
+        is_append = node.func.attr == "append"
+        if isinstance(changed, ast.Constant):
+            self._paths_changes.append(AbsolutePath(changed.value, is_append))
+        elif isinstance(changed, ast.Call):
+            self._visit_relative_path(changed, is_append)
 
     def _match_aliases(self, node: ast.AST, names: list[str]):
         if isinstance(node, ast.Attribute):
@@ -131,13 +140,13 @@ class SysPathVisitor(ast.NodeVisitor):
             return node.id == alias
         return False
 
-    def _append_relative_path(self, node: ast.Call):
+    def _visit_relative_path(self, node: ast.Call, is_append: bool):
         # check for 'os.path.abspath'
         if not self._match_aliases(node.func, ["os", "path", "abspath"]):
             return
-        appended = node.args[0]
-        if isinstance(appended, ast.Constant):
-            self._appended_paths.append(RelativePath(appended.value))
+        changed = node.args[0]
+        if isinstance(changed, ast.Constant):
+            self._paths_changes.append(RelativePath(changed.value, is_append))
 
 
 T = TypeVar("T", bound=ast.AST)
@@ -159,10 +168,10 @@ class ASTLinter(Generic[T]):
         visitor.visit(self._root)
         return visitor.matched_nodes
 
-    def collect_appended_sys_paths(self):
+    def collect_sys_paths_changes(self):
         visitor = SysPathVisitor()
         visitor.visit(self._root)
-        return visitor.appended_paths
+        return visitor.path_changes
 
     def extract_callchain(self) -> ast.Call | None:
         """If 'node' is an assignment or expression, extract its full call-chain (if it has one)"""
@@ -270,5 +279,5 @@ class PythonLinter(Linter):
         return tuples
 
     @staticmethod
-    def list_appended_sys_paths(linter: ASTLinter) -> list[SysPath]:
+    def list_appended_sys_paths(linter: ASTLinter) -> list[SysPathChange]:
         return linter.collect_appended_sys_paths()

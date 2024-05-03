@@ -6,6 +6,8 @@ from ast import parse as parse_python
 from enum import Enum
 from pathlib import Path
 from collections.abc import Callable
+
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
@@ -56,7 +58,9 @@ class Cell(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         raise NotImplementedError()
 
 
@@ -73,8 +77,10 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        parent.build_graph_from_python_source(self._original_code, problem_collector)
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
+        parent.build_graph_from_python_source(self._original_code, path_lookup, problem_collector)
 
 
 class RCell(Cell):
@@ -86,7 +92,9 @@ class RCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         pass  # not in scope
 
 
@@ -99,7 +107,9 @@ class ScalaCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         pass  # TODO
 
 
@@ -117,7 +127,9 @@ class SQLCell(Cell):
             sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         pass  # not in scope
 
 
@@ -130,7 +142,9 @@ class MarkdownCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         pass  # not in scope
 
 
@@ -143,7 +157,9 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for idx, line in enumerate(lines):
@@ -186,7 +202,9 @@ class ShellCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
@@ -202,7 +220,9 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(
+        self, parent: DependencyGraph, path_lookup: PathLookup, problem_collector: Callable[[DependencyProblem], None]
+    ):
         pass  # nothing to do
 
     def migrate_notebook_path(self):
