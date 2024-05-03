@@ -35,6 +35,6 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
         )
         migration_status = list(ctx.sql_backend.fetch(query_migration_status))
         assert_message_postfix = f" found for {table.table_type} {table.full_name}"
-        assert len(migration_status) == 1, "No migration status found" + assert_message_postfix
+        assert len(migration_status) == 1, "No migration status" + assert_message_postfix
         assert migration_status[0].dst_schema is not None, "No destination schema" + assert_message_postfix
         assert migration_status[0].dst_table is not None, "No destination table" + assert_message_postfix
