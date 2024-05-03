@@ -102,23 +102,23 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def azure_external_locations_migration(self):
-        return ExternalLocationsMigration(
-            self.workspace_client,
-            self.external_locations,
-            self.azure_resource_permissions,
-            self.azure_resources,
-            self.principal_acl,
-        )
-
-    @cached_property
-    def aws_external_locations_migration(self):
-        return AWSExternalLocationsMigration(
-            self.workspace_client,
-            self.external_locations,
-            self.aws_resource_permissions,
-            self.principal_acl,
-        )
+    def external_locations_migration(self):
+        if self.is_aws:
+            return AWSExternalLocationsMigration(
+                self.workspace_client,
+                self.external_locations,
+                self.aws_resource_permissions,
+                self.principal_acl,
+            )
+        if self.is_azure:
+            return ExternalLocationsMigration(
+                self.workspace_client,
+                self.external_locations,
+                self.azure_resource_permissions,
+                self.azure_resources,
+                self.principal_acl,
+            )
+        raise NotImplementedError
 
     @cached_property
     def aws_cli_run_command(self):

@@ -371,13 +371,18 @@ def test_create_uber_principal(ws):
 
 
 def test_migrate_locations_azure(ws):
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 

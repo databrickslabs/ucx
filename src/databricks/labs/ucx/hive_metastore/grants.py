@@ -348,7 +348,6 @@ class GrantsCrawler(CrawlerBase[Grant]):
 
 
 class AwsACL:
-
     def __init__(
         self,
         ws: WorkspaceClient,

@@ -136,7 +136,7 @@ def test_create_external_location_validate_acl(
         permission_level=PermissionLevel.CAN_RESTART,
         user_name=cluster_user.user_name,
     )
-    location_migration = aws_cli_ctx.aws_external_locations_migration
+    location_migration = aws_cli_ctx.external_locations_migration
     try:
         location_migration.run()
         permissions = ws.grants.get(

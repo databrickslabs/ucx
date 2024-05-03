@@ -284,7 +284,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, backend, aws, locations, "ucx")
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}))
@@ -297,7 +297,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
 
 def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
-    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, backend, aws, locations, "ucx")
+    aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
@@ -317,10 +317,6 @@ def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
         aws,
         external_locations,
     )
-    aws_resource_permissions.create_uc_roles_cli(single_role=False)
-    aws.create_uc_role.assert_has_calls([call('UC_ROLE-1'), call('UC_ROLE-2')], any_order=True)
-    assert call('UC_ROLE-1', 'UC_POLICY-1', {'s3://BUCKET1/FOLDER1'}, None, None) in aws.put_role_policy.call_args_list
-    assert call('UC_ROLE-2', 'UC_POLICY-2', {'s3://BUCKET2/FOLDER2'}, None, None) in aws.put_role_policy.call_args_list
     role_creation = IamRoleCreation(installation_no_roles, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
     with caplog.at_level(logging.INFO):
