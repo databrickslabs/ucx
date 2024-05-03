@@ -10,6 +10,7 @@ from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources, _download_side_effect
 
@@ -139,9 +140,10 @@ def test_notebook_builds_leaf_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
-    container = maybe.dependency.load()
+    lookup = PathLookup.from_sys_path(Path.cwd())
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
@@ -164,9 +166,10 @@ def test_notebook_builds_depth1_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
-    container = maybe.dependency.load()
+    lookup = PathLookup.from_sys_path(Path.cwd())
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
@@ -185,9 +188,10 @@ def test_notebook_builds_depth2_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
-    container = maybe.dependency.load()
+    lookup = PathLookup.from_sys_path(Path.cwd())
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
@@ -207,9 +211,10 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
             NotebookResolver(notebook_loader),
         ]
     )
-    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
-    container = maybe.dependency.load()
+    lookup = PathLookup.from_sys_path(Path.cwd())
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     # if visited once only, set and list will have same len
@@ -229,9 +234,10 @@ def test_notebook_builds_cyclical_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
-    container = maybe.dependency.load()
+    lookup = PathLookup.from_sys_path(Path.cwd())
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
@@ -250,9 +256,10 @@ def test_notebook_builds_python_dependency_graph():
             NotebookResolver(notebook_loader),
         ]
     )
-    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver)
-    container = maybe.dependency.load()
+    lookup = PathLookup.from_sys_path(Path.cwd())
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}

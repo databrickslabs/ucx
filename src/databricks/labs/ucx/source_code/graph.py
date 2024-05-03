@@ -40,7 +40,7 @@ class DependencyGraph:
         return self._dependency.path
 
     def register_notebook(self, path: Path) -> MaybeGraph:
-        maybe = self._resolver.resolve_notebook(path)
+        maybe = self._resolver.resolve_notebook(self.path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, maybe.problems)
         return self.register_dependency(maybe.dependency)
@@ -236,9 +236,10 @@ class BaseDependencyResolver(abc.ABC):
     def next_resolver(self):
         return self._next_resolver
 
-    def resolve_notebook(self, path: Path) -> MaybeDependency:
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        # TODO: remove StubResolver and return MaybeDependency(None, [...])
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_notebook(path)
+        return self._next_resolver.resolve_notebook(path_lookup, path)
 
     def resolve_local_file(self, path: Path) -> MaybeDependency:
         assert self._next_resolver is not None
@@ -258,7 +259,7 @@ class StubResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         raise NotImplementedError("Should never happen!")
 
-    def resolve_notebook(self, path: Path) -> MaybeDependency:
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
         return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
 
     def resolve_local_file(self, path: Path) -> MaybeDependency:
@@ -286,8 +287,8 @@ class DependencyResolver:
             previous = resolver
         self._resolver: BaseDependencyResolver = previous
 
-    def resolve_notebook(self, path: Path) -> MaybeDependency:
-        return self._resolver.resolve_notebook(path)
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._resolver.resolve_notebook(path_lookup, path)
 
     def resolve_local_file(self, path: Path) -> MaybeDependency:
         return self._resolver.resolve_local_file(path)
@@ -372,7 +373,7 @@ class DependencyGraphBuilder:
         return MaybeGraph(graph, [])
 
     def build_notebook_dependency_graph(self, path: Path) -> MaybeGraph:
-        maybe = self._resolver.resolve_notebook(path)
+        maybe = self._resolver.resolve_notebook(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, maybe.problems)
         graph = DependencyGraph(maybe.dependency, None, self._resolver, self._path_lookup)

@@ -27,11 +27,12 @@ class NotebookResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return NotebookResolver(self._notebook_loader, resolver)
 
-    def resolve_notebook(self, path: Path) -> MaybeDependency:
-        if self._notebook_loader.is_notebook(path):
-            dependency = Dependency(self._notebook_loader, path)
-            return MaybeDependency(dependency, [])
-        return super().resolve_notebook(path)
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        dependency = Dependency(self._notebook_loader, path)
+        container = self._notebook_loader.load_dependency(path_lookup, dependency)
+        if not container:
+            return super().resolve_notebook(path_lookup, path)
+        return MaybeDependency(dependency, [])
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):

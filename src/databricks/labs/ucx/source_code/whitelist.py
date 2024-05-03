@@ -32,10 +32,10 @@ class WhitelistResolver(BaseDependencyResolver):
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        problem, ok = self._is_whitelisted(name)
+        problem, is_known = self._is_whitelisted(name)
         if problem is not None:
             return MaybeDependency(None, [problem])
-        if ok:
+        if is_known:
             container = StubContainer()
             dependency = Dependency(WrappingLoader(container), Path(name))
             return MaybeDependency(dependency, [])

@@ -47,7 +47,7 @@ def test_locates_notebooks(source: list[str], expected: int):
     ]
     builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
     maybe = builder.build_notebook_dependency_graph(notebook_path)
-    assert maybe.problems == []
+    assert not maybe.problems
     assert len(visited) == expected
 
 
@@ -70,5 +70,5 @@ def test_locates_files(source: list[str], expected: int):
     ]
     builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
     maybe = builder.build_local_file_dependency_graph(file_path)
-    assert maybe.problems == []
+    assert not maybe.problems
     assert len(visited) == expected

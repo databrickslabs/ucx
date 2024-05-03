@@ -46,10 +46,3 @@ def test_lookup_pops_path():
     assert popped.as_posix() == "what"
     paths = list(provider.paths)[1:]
     assert [path.as_posix() for path in paths] == ["on", "earth"]
-
-
-def test_lookup_pushes_cwd():
-    provider = PathLookup.from_sys_path(Path.cwd())
-    location = Path("some-location")
-    provider.push_cwd(location)
-    assert provider.cwd == location

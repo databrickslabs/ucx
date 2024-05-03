@@ -2,6 +2,7 @@ import collections
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
@@ -30,73 +31,119 @@ class WorkflowLinter:
     def lint(self, job_id: int):
         job = self._ws.jobs.get(job_id)
         problems: dict[Path, list[Advice]] = collections.defaultdict(list)
+        assert job.settings is not None
+        assert job.settings.tasks is not None
         for task in job.settings.tasks:
-            if task.notebook_task:
-                path = WorkspacePath(self._ws, task.notebook_task.notebook_path)
-                maybe = self._builder.build_notebook_dependency_graph(path)
-                for problem in maybe.problems:
-                    problems[problem.source_path].append(problem.as_advisory())
-                for dependency in maybe.graph.all_dependencies:
-                    container = dependency.load(maybe.graph.path_lookup)
-                    if not container:
-                        continue
-                    if isinstance(container, Notebook):
-                        languages = Languages(self._migration_index)
-                        linter = NotebookLinter(languages, container)
-                        for problem in linter.lint():
-                            problems[container.path].append(problem)
-                    if isinstance(container, SitePackageContainer):
-                        for path in container.paths:
-                            # lint every path
-                            continue
-                    if isinstance(container, LocalFile):
-                        # lint every path
-                        continue
-            if task.spark_python_task:
-                # TODO: ... load from dbfs
+            for path, advice in self._lint_task(task):
+                problems[path].append(advice)
+
+    def _lint_task(self, task: jobs.Task):
+        yield from self._lint_notebook_task(task)
+        yield from self._lint_spark_python_task(task)
+        yield from self._lint_python_wheel_task(task)
+        yield from self._lint_spark_jar_task(task)
+        yield from self._lint_libraries(task)
+        yield from self._lint_run_job_task(task)
+        yield from self._lint_pipeline_task(task)
+        yield from self._lint_existing_cluster_id(task)
+        yield from self._lint_spark_submit_task(task)
+
+    def _lint_notebook_task(self, task: jobs.Task):
+        if not task.notebook_task:
+            return
+        notebook_path = task.notebook_task.notebook_path
+        path = WorkspacePath(self._ws, notebook_path)
+        maybe = self._builder.build_notebook_dependency_graph(path)
+        for problem in maybe.problems:
+            yield problem.source_path, problem.as_advisory()
+        if not maybe.graph:
+            return
+        for dependency in maybe.graph.all_dependencies:
+            container = dependency.load(maybe.graph.path_lookup)
+            if not container:
                 continue
-            if task.spark_jar_task:
-                # TODO: ...
-                continue
-            if task.spark_submit_task:
-                # TODO: ... --py-files
-                continue
-            if task.python_wheel_task:
-                # TODO: ... load wheel
-                continue
-            if task.pipeline_task:
-                # TODO: load pipeline notebooks
-                continue
-            if task.run_job_task:
-                # TODO: load other job and lint
-                continue
-            if task.existing_cluster_id:
-                # TODO: load pypi and dbfs libraries
-                continue
-            if task.libraries:
-                for library in task.libraries:
-                    # TODO: load library
-                    continue
-                continue
-        for job_cluster in job.settings.job_clusters:
-            for library in job_cluster.libraries:
-                if library.pypi:
-                    # TODO: whitelist
-                    continue
-                if library.dbfs:
-                    # TODO: load from DBFS
-                    continue
-                if library.jar:
-                    # TODO: warning
-                    continue
-                if library.egg:
-                    # TODO: load and lint
-                    continue
-                if library.whl:
-                    # TODO: load and lint
-                    continue
-                if library.requirements:
-                    # TODO: load and lint
-                    continue
-                # TODO: ..
-                continue
+            if isinstance(container, Notebook):
+                yield from self._lint_notebook(container)
+            if isinstance(container, SitePackageContainer):
+                yield from self._lint_python_package(container)
+            if isinstance(container, LocalFile):
+                # TODO: lint every path
+                yield path, Advice('not-yet-implemented', 'Local file is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_python_package(self, site_package):
+        for path in site_package.paths:
+            # lint every path
+            yield path, Advice('not-yet-implemented', 'Python package is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_notebook(self, notebook):
+        languages = Languages(self._migration_index)
+        linter = NotebookLinter(languages, notebook)
+        for advice in linter.lint():
+            yield notebook.path, advice
+
+    _UNKNOWN = Path('<MISSING>')
+
+    def _lint_spark_submit_task(self, task: jobs.Task):
+        if not task.spark_submit_task:
+            return
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Spark submit task is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_existing_cluster_id(self, task: jobs.Task):
+        if not task.existing_cluster_id:
+            return
+        # TODO: load pypi and dbfs libraries
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Existing cluster ID is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_pipeline_task(self, task: jobs.Task):
+        if not task.pipeline_task:
+            return
+        # TODO: ... load DLT
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Pipeline task is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_run_job_task(self, task: jobs.Task):
+        if not task.run_job_task:
+            return
+        # TODO: something like self.lint(task.run_job_task.job_id)
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Run job task is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_spark_python_task(self, task: jobs.Task):
+        if not task.spark_python_task:
+            return
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Spark Python task is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_python_wheel_task(self, task: jobs.Task):
+        if not task.python_wheel_task:
+            return
+        # TODO: ... load
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Python wheel task is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_spark_jar_task(self, task: jobs.Task):
+        if not task.spark_jar_task:
+            return
+        # TODO: ... load
+        yield self._UNKNOWN, Advice('not-yet-implemented', 'Spark Jar task is not yet implemented', 0, 0, 0, 0)
+
+    def _lint_libraries(self, task: jobs.Task):
+        if not task.libraries:
+            return
+        if task.libraries:
+            for library in task.libraries:
+                yield from self._lint_library(library)
+
+    def _lint_library(self, library: compute.Library):
+        if library.pypi:
+            yield self._UNKNOWN, Advice('not-yet-implemented', 'Pypi library is not yet implemented', 0, 0, 0, 0)
+        if library.jar:
+            yield self._UNKNOWN, Advice('not-yet-implemented', 'Jar library is not yet implemented', 0, 0, 0, 0)
+        if library.egg:
+            # TODO: load and lint
+            yield self._UNKNOWN, Advice('not-yet-implemented', 'Egg library is not yet implemented', 0, 0, 0, 0)
+        if library.whl:
+            # TODO: load from DBFS
+            # TODO: load and lint
+            yield self._UNKNOWN, Advice('not-yet-implemented', 'Whl library is not yet implemented', 0, 0, 0, 0)
+        if library.requirements:
+            # TODO: load and lint
+            yield self._UNKNOWN, Advice(
+                'not-yet-implemented', 'Requirements library is not yet implemented', 0, 0, 0, 0
+            )

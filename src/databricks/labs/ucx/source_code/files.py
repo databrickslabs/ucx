@@ -36,6 +36,10 @@ class LocalFile(SourceContainer):
         maybe = parent.build_graph_from_python_source(self._original_code)
         return [problem.replace(source_path=self._path) for problem in maybe.problems]
 
+    @property
+    def path(self) -> Path:
+        return self._path
+
     def __repr__(self):
         return f"<LocalFile {self._path}>"
 
@@ -101,14 +105,6 @@ class FileLoader(DependencyLoader):
     def exists(self, path: Path) -> bool:
         return path.exists()
 
-    # def is_notebook(self, path: Path) -> bool:
-    #     fullpath = self.full_path(path)
-    #     if fullpath is None:
-    #         return False
-    #     with fullpath.open(mode="r", encoding="utf-8") as stream:
-    #         line = stream.readline()
-    #         return NOTEBOOK_HEADER in line
-
     def __repr__(self):
         return "FileLoader()"
 
@@ -141,7 +137,7 @@ class LocalFileResolver(BaseDependencyResolver):
                 parts.append(name[i:].replace('.', '/'))
                 break
             parts.append("..")
-        for candidate in [f'{"/".join(parts)}.py', f'{"/".join(parts)}/__init__.py']:
+        for candidate in (f'{"/".join(parts)}.py', f'{"/".join(parts)}/__init__.py'):
             absolute_path = path_lookup.resolve(Path(candidate))
             if not absolute_path:
                 continue

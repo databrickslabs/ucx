@@ -268,7 +268,7 @@ class TestFileLoader(FileLoader):
         return filename in self._sources
 
     def __repr__(self):
-        return f"<TestFileLoader syspath={self._syspath_provider}, sources={self._sources}>"
+        return f"<TestFileLoader sources={self._sources}>"
 
 
 class VisitingFileLoader(FileLoader):
