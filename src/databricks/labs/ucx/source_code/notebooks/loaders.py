@@ -63,6 +63,9 @@ class WorkspaceNotebookLoader(NotebookLoader):
         with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
             return f.read().decode("utf-8")
 
+    def __repr__(self):
+        return f"<WorkspaceNotebookLoader ws={self._ws}>"
+
 
 class LocalNotebookLoader(NotebookLoader, FileLoader):
 
@@ -79,3 +82,6 @@ class LocalNotebookLoader(NotebookLoader, FileLoader):
         if path.suffix == ".py":
             return path
         return Path(path.as_posix() + ".py")
+
+    def __repr__(self):
+        return "<LocalNotebookLoader>"

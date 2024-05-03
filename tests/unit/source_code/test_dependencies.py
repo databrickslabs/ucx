@@ -394,10 +394,10 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     )
     builder = DependencyGraphBuilder(dependency_resolver, provider)
     maybe = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
-    assert not maybe.failed
+    assert maybe.graph
     graph = maybe.graph
     maybe_graph = graph.locate_dependency(Path("databricks"))
-    assert maybe_graph.failed
+    assert not maybe_graph.graph
 
 
 def test_dependency_graph_builder_visits_site_packages(empty_index):

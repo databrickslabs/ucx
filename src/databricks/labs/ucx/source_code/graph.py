@@ -179,6 +179,9 @@ class Dependency(abc.ABC):
     def load(self) -> SourceContainer | None:
         return self._loader.load_dependency(self)
 
+    def __repr__(self):
+        return f"Dependency<{self.path}>"
+
 
 class SourceContainer(abc.ABC):
 
@@ -208,6 +211,9 @@ class WrappingLoader(DependencyLoader):
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         return self._source_container
+
+    def __repr__(self):
+        return f"<WrappingLoader source_container={self._source_container}>"
 
 
 class BaseDependencyResolver(abc.ABC):

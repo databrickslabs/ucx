@@ -84,6 +84,9 @@ class LocalFile(SourceContainer):
             ]
         return problems
 
+    def __repr__(self):
+        return f"<LocalFile {self._path}>"
+
 
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
@@ -165,6 +168,9 @@ class FileLoader(DependencyLoader):
         with fullpath.open(mode="r", encoding="utf-8") as stream:
             line = stream.readline()
             return NOTEBOOK_HEADER in line
+
+    def __repr__(self):
+        return f"<FileLoader syspath={self._syspath_provider}>"
 
 
 class LocalFileResolver(BaseDependencyResolver):

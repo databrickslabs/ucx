@@ -58,6 +58,9 @@ class SitePackageContainer(SourceContainer):
                 problems.extend(maybe.problems)
         return problems
 
+    def __repr__(self):
+        return f"<SitePackageContainer {self._site_package}>"
+
 
 class SitePackages:
 
@@ -77,7 +80,6 @@ class SitePackages:
         return self._packages.get(item, None)
 
 
-@dataclass
 class SitePackage:
 
     @staticmethod
@@ -111,3 +113,6 @@ class SitePackage:
     @property
     def module_paths(self) -> list[Path]:
         return [Path(self._dist_info_path.parent, path) for path in self._module_paths]
+
+    def __repr__(self):
+        return f"<SitePackage {self._dist_info_path}>"
