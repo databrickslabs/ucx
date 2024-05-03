@@ -290,7 +290,7 @@ def test_run_external_locations_using_access_connector(
     # Mocking in an integration test because Azure resource can not be created
     resource_permissions = create_autospec(AzureResourcePermissions)
 
-    # TODO: Remove the after 20-05-2024
+    # TODO: Remove the replace after 20-05-2024
     access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR").replace("-external", ""))
     mount = env_or_skip("TEST_MOUNT_CONTAINER")
     storage_account_name = urlparse(mount).hostname.removesuffix(".dfs.core.windows.net")
