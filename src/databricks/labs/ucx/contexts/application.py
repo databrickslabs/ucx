@@ -45,7 +45,6 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -407,8 +406,11 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def redash(self):
-        from_table = FromTable(self.migration_status_refresher.index())
-        return Redash(from_table, self.workspace_client)
+        return Redash(
+            self.migration_status_refresher.index(),
+            self.workspace_client,
+            self.installation.install_folder(),
+        )
 
 
 class CliContext(GlobalContext, abc.ABC):

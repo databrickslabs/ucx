@@ -16,7 +16,7 @@ class FromTable(Linter, Fixer):
     SQL queries.
     """
 
-    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState | None = None):
+    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState):
         """
         Initializes the FromTable class.
 
@@ -33,7 +33,7 @@ class FromTable(Linter, Fixer):
                 table                               -> Table(catalog='', db='', this='table')
         """
         self._index: MigrationIndex = index
-        self._session_state: CurrentSessionState = session_state if session_state else CurrentSessionState()
+        self._session_state: CurrentSessionState = session_state
 
     def name(self) -> str:
         return 'table-migrate'

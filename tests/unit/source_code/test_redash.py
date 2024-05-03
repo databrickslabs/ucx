@@ -1,10 +1,8 @@
-from unittest.mock import create_autospec, call
+from unittest.mock import create_autospec
 
 import pytest
-from databricks.sdk.service.sql import Query, Dashboard
+from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.redash import Redash
 
 from databricks.sdk import WorkspaceClient
@@ -12,65 +10,49 @@ from databricks.sdk import WorkspaceClient
 
 @pytest.fixture
 def redash_ws():
-    def api_client_do(method: str, path: str, body: dict | None = None):
-        _ = body
-        tags_lookup = {"1": [Redash.BACKUP_TAG], "2": [Redash.MIGRATED_TAG, "backup: 123", "original"], "3": []}
-        if method == "POST":
-            return {}
-        if path.startswith("/api/2.0/preview/sql/dashboards"):
-            dashboard_id = path.removeprefix("/api/2.0/preview/sql/dashboards/")
-            tags = tags_lookup[dashboard_id]
-            return {
-                "id": dashboard_id,
-                "tags": tags,
-                "widgets": [
-                    {},
-                    {"visualization": {}},
-                    {
-                        "visualization": {
-                            "query": {
-                                "id": "1",
-                                "name": "test_query",
-                                "query": "SELECT * FROM old.things",
-                                "tags": tags,
-                            }
-                        }
-                    },
-                    {
-                        "visualization": {
-                            "query": {
-                                "id": "1",
-                                "name": "test_query",
-                                "query": "SELECT * FROM old.things",
-                                "tags": None,
-                            }
-                        }
-                    },
-                ],
-            }
-        if path.startswith("/api/2.0/preview/sql/queries"):
-            return {}
-        return {}
-
     workspace_client = create_autospec(WorkspaceClient)
-    workspace_client.api_client.do.side_effect = api_client_do
     workspace_client.queries.create.return_value = Query(id="123")
     workspace_client.dashboards.list.return_value = [
-        Dashboard(id="1", tags=[Redash.BACKUP_TAG]),
+        Dashboard(
+            id="1",
+            tags=[Redash.BACKUP_TAG],
+            widgets=[
+                Widget(
+                    visualization=Visualization(
+                        query=Query(
+                            id="1",
+                            name="test_query",
+                            query="SELECT * FROM old.things",
+                        )
+                    )
+                )
+            ],
+        ),
         Dashboard(id="2", tags=[Redash.MIGRATED_TAG]),
         Dashboard(id="3", tags=[]),
     ]
+    workspace_client.dashboards.get.return_value = Dashboard(
+        id="2",
+        tags=[Redash.MIGRATED_TAG],
+        widgets=[
+            Widget(
+                visualization=Visualization(
+                    query=Query(
+                        id="1",
+                        name="test_query",
+                        query="SELECT * FROM old.things",
+                        tags=[Redash.MIGRATED_TAG, 'backup:123'],
+                    )
+                )
+            )
+        ],
+    )
 
     return workspace_client
 
 
-@pytest.fixture
-def empty_fixer(empty_index):
-    return FromTable(empty_index, CurrentSessionState())
-
-
-def test_fix_all_dashboards(redash_ws, empty_fixer):
-    redash = Redash(empty_fixer, redash_ws)
+def test_fix_all_dashboards(redash_ws, empty_index):
+    redash = Redash(empty_index, redash_ws, "backup")
     redash.fix_dashboard()
     redash_ws.queries.create.assert_called_with(
         name='test_query_original',
@@ -78,45 +60,27 @@ def test_fix_all_dashboards(redash_ws, empty_fixer):
         data_source_id=None,
         description=None,
         options=None,
-        parent=None,
+        parent="backup/backup_queries",
         run_as_role=None,
+        tags=[Redash.BACKUP_TAG],
     )
-    redash_ws.api_client.do.assert_has_calls(
-        [
-            call('GET', '/api/2.0/preview/sql/dashboards/1'),
-            # tag the backup query
-            call('POST', '/api/2.0/preview/sql/queries/123', body={'tags': [Redash.BACKUP_TAG]}),
-            # tag the migrated query
-            call(
-                'POST',
-                '/api/2.0/preview/sql/queries/1',
-                body={'query': 'SELECT * FROM old.things', 'tags': [Redash.MIGRATED_TAG, "backup: 123"]},
-            ),
-        ]
+    redash_ws.queries.update.assert_called_with(
+        "1",
+        query='SELECT * FROM old.things',
+        tags=[Redash.MIGRATED_TAG, 'backup:123'],
     )
 
 
-def test_revert_dashboard(redash_ws, empty_fixer):
+def test_revert_dashboard(redash_ws, empty_index):
     redash_ws.queries.get.return_value = Query(id="1", query="original_query")
-    redash = Redash(empty_fixer, redash_ws)
+    redash = Redash(empty_index, redash_ws, "")
     redash.revert_dashboard("2")
-    redash_ws.api_client.do.assert_has_calls(
-        [
-            call('GET', '/api/2.0/preview/sql/dashboards/2'),
-            call('GET', '/api/2.0/preview/sql/dashboards/2'),
-            # update the migrated query
-            call(
-                'POST',
-                '/api/2.0/preview/sql/queries/1',
-                body={'query': 'original_query', 'tags': ['original']},
-            ),
-        ]
-    )
+    redash_ws.queries.update.assert_called_with("1", query="original_query", tags=[])
     redash_ws.queries.delete.assert_called_once_with("123")
 
 
-def test_delete_backup_dashboards(redash_ws, empty_fixer):
+def test_delete_backup_dashboards(redash_ws, empty_index):
     redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[])]
-    redash = Redash(empty_fixer, redash_ws)
+    redash = Redash(empty_index, redash_ws, "")
     redash.delete_backup_dbsql_queries()
     redash_ws.queries.delete.assert_called_once_with("1")

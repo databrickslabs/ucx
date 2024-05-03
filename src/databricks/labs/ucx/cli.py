@@ -456,14 +456,14 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 
 
 @ucx.command
-def migrate_dbsql_dashboard(w: WorkspaceClient, dashboard_id: str | None = None):
+def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
     """Migrate table references in DBSQL Dashboard queries"""
     ctx = WorkspaceContext(w)
     ctx.redash.fix_dashboard(dashboard_id)
 
 
 @ucx.command
-def revert_dbsql_dashboard(w: WorkspaceClient, dashboard_id: str | None = None):
+def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
     """Revert migrated DBSQL Dashboard queries back to their original state"""
     ctx = WorkspaceContext(w)
     ctx.redash.fix_dashboard(dashboard_id)

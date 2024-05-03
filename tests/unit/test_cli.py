@@ -50,8 +50,8 @@ from databricks.labs.ucx.cli import (
     assign_metastore,
     migrate_tables,
     create_missing_principals,
-    migrate_dbsql_dashboard,
-    revert_dbsql_dashboard,
+    migrate_dbsql_dashboards,
+    revert_dbsql_dashboards,
     delete_backup_dbsql_queries,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
@@ -541,12 +541,12 @@ def test_create_missing_principal_azure(ws, caplog):
 
 
 def test_migrate_dbsql_dashboards(ws, caplog):
-    migrate_dbsql_dashboard(ws)
+    migrate_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
 
 
 def test_revert_dbsql_dashboards(ws, caplog):
-    revert_dbsql_dashboard(ws)
+    revert_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
 
 

@@ -1129,9 +1129,10 @@ def make_query(ws, make_table, make_random):
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
         query = ws.queries.create(
-            name=f"{query_name}",
+            name=query_name,
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
+            tags=[query_name],
         )
         logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
@@ -1271,7 +1272,7 @@ def make_storage_dir(ws, env_or_skip):
 
 @pytest.fixture
 def make_dashboard(ws, make_random, make_query):
-    def create() -> (Dashboard, Query):
+    def create() -> Dashboard:
         query = make_query()
         viz = ws.query_visualizations.create(
             type="table",
@@ -1288,9 +1289,7 @@ def make_dashboard(ws, make_random, make_query):
         )
 
         dashboard_name = f"ucx_dashboard_D{make_random(4)}"
-        dashboard = ws.dashboards.create(
-            name=f"{dashboard_name}",
-        )
+        dashboard = ws.dashboards.create(name=dashboard_name, tags=[dashboard_name])
         ws.dashboard_widgets.create(
             dashboard_id=dashboard.id,
             visualization_id=viz.id,
@@ -1306,13 +1305,12 @@ def make_dashboard(ws, make_random, make_query):
             ),
         )
         logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
-        return dashboard, query
+        return dashboard
 
-    def remove(pair: (Dashboard, Query)):
+    def remove(dashboard: Dashboard):
         try:
-            dashboard, _ = pair
             ws.dashboards.delete(dashboard_id=dashboard.id)
         except RuntimeError as e:
-            logger.info(f"Can't drop dashboard {e}")
+            logger.info(f"Can't delete dashboard {e}")
 
     yield from factory("dashboard", create, remove)
