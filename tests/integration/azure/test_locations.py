@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import create_autospec
 from urllib.parse import urlparse
 
+import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.errors.platform import NotFound
