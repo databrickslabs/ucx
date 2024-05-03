@@ -360,7 +360,7 @@ def test_run_access_connectors_warn_storage_account_not_found(caplog):
     azurerm.storage_accounts.return_value = [storage_account]
 
     ws = create_autospec(WorkspaceClient)
-    ws.storage_credentials.list.return_value = [StorageCredentialInfo(name=f"ac-test", comment="Created by UCX")]
+    ws.storage_credentials.list.return_value = [StorageCredentialInfo(name="ac-test", comment="Created by UCX")]
 
     mock_installation = MockInstallation({"azure_storage_account_info.csv": []})
 
