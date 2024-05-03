@@ -177,7 +177,7 @@ def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *ar
 
 
 def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, bool], *args):
-    dependency = args[0]
+    dependency = args[1]
     filename = str(dependency.path)
     is_package_file = os.path.isfile(dependency.path)
     if is_package_file:
@@ -239,8 +239,6 @@ def _is_file_side_effect(sources: dict[str, str], *args):
 def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited: dict[str, bool]):
     file_loader = create_autospec(cls)
     file_loader.exists.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
-    file_loader.is_notebook.return_value = False
-    file_loader.full_path.side_effect = lambda *args: _full_path_side_effect(sources, *args)
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
         sources, visited, *args
     )

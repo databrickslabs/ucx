@@ -65,13 +65,11 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
     file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
         sources, visited, *args
     )
-    file_loader.is_notebook.return_value = True
     file_loader.exists.return_value = True
     notebook_loader = create_autospec(LocalNotebookLoader)
     notebook_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
         sources, visited, *args
     )
-    notebook_loader.is_notebook.return_value = True
     notebook_loader.exists.return_value = True
     site_packages = SitePackages.parse(locate_site_packages())
     provider = PathLookup.from_pathlike_string(Path.cwd(), "")
@@ -97,7 +95,7 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
     whi = whitelist_mock()
     site_packages = SitePackages.parse(locate_site_packages())
     provider = PathLookup.from_pathlike_string(Path.cwd(), "")
-    notebook_loader = LocalNotebookLoader(provider)
+    notebook_loader = LocalNotebookLoader()
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),

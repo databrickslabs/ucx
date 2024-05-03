@@ -6,7 +6,7 @@ from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import DependencyGraphBuilder
 from databricks.labs.ucx.source_code.languages import Languages
@@ -75,8 +75,9 @@ class WorkflowLinter:
             # lint every path
             yield path, Advice('not-yet-implemented', 'Python package is not yet implemented', 0, 0, 0, 0)
 
-    def _lint_notebook(self, notebook):
-        languages = Languages(self._migration_index)
+    def _lint_notebook(self, notebook: Notebook):
+        session_state = CurrentSessionState()
+        languages = Languages(self._migration_index, session_state)
         linter = NotebookLinter(languages, notebook)
         for advice in linter.lint():
             yield notebook.path, advice
