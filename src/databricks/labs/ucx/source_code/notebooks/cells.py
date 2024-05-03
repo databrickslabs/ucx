@@ -57,6 +57,9 @@ class Cell(ABC):
     def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
         raise NotImplementedError()
 
+    def __repr__(self):
+        return f"{self.language.name}: {self._original_code[:20]}"
+
 
 class PythonCell(Cell):
 
@@ -159,6 +162,7 @@ class RunCell(Cell):
                     maybe.graph,
                     [
                         problem.replace(
+                            source_path=parent.dependency.path,
                             start_line=start_line,
                             start_col=0,
                             end_line=start_line,

@@ -49,9 +49,9 @@ def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
             NotebookResolver(workspace_notebook_loader),
         ]
     )
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "")
-    builder = DependencyGraphBuilder(dependency_resolver, provider)
-    builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
+    builder = DependencyGraphBuilder(dependency_resolver)
+    maybe = builder.build_notebook_dependency_graph(Path("root3.run.py.txt"))
+    assert not maybe.failed
     assert len(visited) == len(paths)
 
 

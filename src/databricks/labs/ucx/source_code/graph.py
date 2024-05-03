@@ -159,6 +159,9 @@ class DependencyGraph:
                 problems.append(problem)
         return MaybeGraph(self, problems)
 
+    def __repr__(self):
+        return f"<DependencyGraph {self.path}>"
+
 
 class Dependency(abc.ABC):
 

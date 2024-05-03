@@ -65,9 +65,12 @@ class Notebook(SourceContainer):
         problems: list[DependencyProblem] = []
         for cell in self._cells:
             maybe = cell.build_dependency_graph(parent)
-            if maybe.problems:
-                problems.extend(maybe.problems)
+            for problem in maybe.problems:
+                problems.append(problem.replace(source_path=parent.path))
         return problems
+
+    def __repr__(self):
+        return f"<Notebook {self._path}>"
 
 
 class NotebookLinter:
