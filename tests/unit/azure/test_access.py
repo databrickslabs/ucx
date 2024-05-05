@@ -580,6 +580,7 @@ def test_create_global_spn_spn_present():
     w.secrets.put_secret.assert_not_called()
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def test_create_global_spn_no_storage():
@@ -613,6 +614,7 @@ def test_create_global_spn_no_storage():
     w.secrets.put_secret.assert_not_called()
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def test_create_global_spn_cluster_policy_not_found():
@@ -645,6 +647,7 @@ def test_create_global_spn_cluster_policy_not_found():
     w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def test_create_global_spn():
@@ -708,6 +711,8 @@ def test_create_global_spn():
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
+    w.warehouses.get_workspace_warehouse_config.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_called_once()
 
 
 def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(caplog):
