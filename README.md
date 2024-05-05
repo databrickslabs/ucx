@@ -709,11 +709,15 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 databricks labs ucx create-uber-principal [--subscription-id X]
 ```
 
-**Requires Cloud IAM admin privileges.** Once the [`assessment` workflow](#assessment-workflow) complete, you should run 
-this command to creates a service principal with the _**read-only access to all storage**_ used by tables in this 
-workspace and configure the [UCX Cluster Policy](#installation) with the details of it. Once migration is complete, this
-service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
-assignment on every storage account using Azure Resource Manager APIs.
+**Requires Cloud IAM admin privileges.** 
+
+Once the [`assessment` workflow](#assessment-workflow) complete, you should run this command to create a service principal with the 
+_**read-only access to all storage**_ used by tables in this workspace. It will also configure the 
+[UCX Cluster Policy](#installation) & SQL Warehouse data access configuration to use this service principal for migration 
+workflows. Once migration is complete, this service principal should be unprovisioned. 
+
+On Azure, it creates a principal with `Storage Blob Data Contributor` role assignment on every storage account using 
+Azure Resource Manager APIs.
 
 This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
 
