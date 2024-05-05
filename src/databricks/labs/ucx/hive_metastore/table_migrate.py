@@ -59,7 +59,7 @@ class TablesMigrator:
     def index(self):
         return self._migration_status_refresher.index()
 
-    def _index_with_reset(self):
+    def index_full_refresh(self):
         # when we want the latest up-to-date status, e.g. to determine whether views dependencies have been migrated
         self._migration_status_refresher.reset()
         return self._migration_status_refresher.index()
@@ -121,7 +121,7 @@ class TablesMigrator:
     def _migrate_views(self, acl_strategy, all_grants_to_migrate, all_migrated_groups, all_principal_grants):
         tables_to_migrate = self._tm.get_tables_to_migrate(self._tc)
         all_tasks = []
-        sequencer = ViewsMigrationSequencer(tables_to_migrate, self._index_with_reset())
+        sequencer = ViewsMigrationSequencer(tables_to_migrate, self.index_full_refresh())
         batches = sequencer.sequence_batches()
         for batch in batches:
             tasks = []
@@ -202,7 +202,7 @@ class TablesMigrator:
     def _view_can_be_migrated(self, view: ViewToMigrate):
         # dependencies have already been computed, therefore an empty dict is good enough
         for table in view.dependencies:
-            if not self._index_with_reset().get(table.schema, table.name):
+            if not self.index_full_refresh().get(table.schema, table.name):
                 logger.info(f"View {view.src.key} cannot be migrated because {table.key} is not migrated yet")
                 return False
         return True
