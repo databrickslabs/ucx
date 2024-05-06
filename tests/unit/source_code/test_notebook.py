@@ -142,9 +142,9 @@ def test_notebook_builds_leaf_dependency_graph():
         ],
         lookup,
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
-    container = dependency.load()
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load()
     container.build_dependency_graph(graph, lookup)
     assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
 
@@ -168,9 +168,9 @@ def test_notebook_builds_depth1_dependency_graph():
         ],
         lookup,
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
-    container = dependency.load()
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load()
     container.build_dependency_graph(graph, lookup)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
@@ -190,9 +190,9 @@ def test_notebook_builds_depth2_dependency_graph():
         ],
         lookup,
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
-    container = dependency.load()
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load()
     container.build_dependency_graph(graph, lookup)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
@@ -213,9 +213,9 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
         ],
         lookup,
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
-    container = dependency.load()
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load()
     container.build_dependency_graph(graph, lookup)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
@@ -236,9 +236,9 @@ def test_notebook_builds_cyclical_dependency_graph():
         ],
         lookup,
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
-    container = dependency.load()
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load()
     container.build_dependency_graph(graph, lookup)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
@@ -258,9 +258,9 @@ def test_notebook_builds_python_dependency_graph():
         ],
         lookup,
     )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
-    container = dependency.load()
+    maybe = dependency_resolver.resolve_notebook(Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load()
     container.build_dependency_graph(graph, lookup)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)

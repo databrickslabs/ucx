@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from yaml import load_all as load_yaml, Loader
 
 from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
@@ -17,6 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     BaseDependencyResolver,
     DependencyProblem,
+    MaybeDependency,
 )
 
 
@@ -30,11 +31,12 @@ class WhitelistResolver(BaseDependencyResolver):
         return WhitelistResolver(self._whitelist, resolver)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+    def resolve_import(self, name: str) -> MaybeDependency:
         if self._is_whitelisted(name):
             container = StubContainer()
-            return Dependency(WrappingLoader(container), Path(name))
-        return super().resolve_import(name, problem_collector)
+            dependency = Dependency(WrappingLoader(container), Path(name))
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(name)
 
     def _is_whitelisted(self, name: str) -> bool:
         compatibility = self._whitelist.compatibility(name)
@@ -58,8 +60,8 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
-        pass
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
+        return []
 
 
 class UCCompatibility(Enum):

@@ -9,7 +9,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice
 
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph
+from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
@@ -61,13 +61,15 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
+        problems: list[DependencyProblem] = []
         cwd_old = syspath_lookup.cwd
-        syspath_lookup.cwd = self.path.parent
         for cell in self._cells:
-            problems = cell.build_dependency_graph(parent, syspath_lookup)
-            parent.add_problems(problems)
+            syspath_lookup.cwd = self.path.parent
+            maybe = cell.build_dependency_graph(parent, syspath_lookup)
+            problems.extend(maybe.problems)
         syspath_lookup.cwd = cwd_old
+        return problems
 
 
 class NotebookLinter:

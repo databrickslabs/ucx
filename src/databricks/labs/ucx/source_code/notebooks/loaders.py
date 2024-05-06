@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 from pathlib import Path
-from collections.abc import Callable
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
@@ -10,10 +9,10 @@ from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportForma
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     BaseDependencyResolver,
-    DependencyProblem,
     Dependency,
     DependencyLoader,
     SourceContainer,
+    MaybeDependency,
 )
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 
@@ -27,10 +26,11 @@ class NotebookResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return NotebookResolver(self._notebook_loader, resolver)
 
-    def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+    def resolve_notebook(self, path: Path) -> MaybeDependency:
         if self._notebook_loader.is_notebook(path):
-            return Dependency(self._notebook_loader, path)
-        return super().resolve_notebook(path, problem_collector)
+            dependency = Dependency(self._notebook_loader, path)
+            return MaybeDependency(dependency, [])
+        return super().resolve_notebook(path)
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):
