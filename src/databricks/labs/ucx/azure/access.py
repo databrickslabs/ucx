@@ -218,7 +218,7 @@ class AzureResourcePermissions:
         return access_connector, url
 
     def create_access_connectors_for_storage_accounts(self) -> list[tuple[AccessConnector, str]]:
-        """Creat access connectors for storage accounts
+        """Create access connectors for storage accounts
 
         Returns:
             list[AccessConnector, str] : The access connectors with a storage url to which it has access.
