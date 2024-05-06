@@ -343,7 +343,7 @@ def test_create_global_spn():
         "spark_conf.fs.azure.account.auth.type.sto2.dfs.core.windows.net": {"type": "fixed", "value": "OAuth"},
         "spark_conf.fs.azure.account.oauth2.client.secret.sto2.dfs.core.windows.net": {
             "type": "fixed",
-            "value": "{secrets/ucx/uber_principal_secret}",
+            "value": "{{secrets/ucx/uber_principal_secret}}",
         },
     }
     w.cluster_policies.edit.assert_called_with(
