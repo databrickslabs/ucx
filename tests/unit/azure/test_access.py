@@ -376,7 +376,8 @@ def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(
     )
 
 
-def test_create_access_connectors_for_storage_accounts_one_access_connector():
+@pytest.mark.parametrize("yield_container", (True, False))
+def test_create_access_connectors_for_storage_accounts_one_access_connector(yield_container):
     """One access connector should be created for one storage account."""
     w = create_autospec(WorkspaceClient)
 
@@ -389,14 +390,22 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector():
     installation = MockInstallation()
 
     azure_resources = create_autospec(AzureResources)
-    azure_resources.storage_accounts.return_value = [
-        StorageAccount(
-            id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
-            name="storage1",
-            location="westeu",
-            default_network_action="Allow",
-        )
-    ]
+    storage_account = StorageAccount(
+        id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
+        name="storage1",
+        location="westeu",
+        default_network_action="Allow",
+    )
+    azure_resources.storage_accounts.return_value = [storage_account]
+
+    container = AzureResource(
+        "/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1/containers/container"
+    )
+    if yield_container:
+        container_iter = iter([container])
+    else:
+        container_iter = iter([])
+    azure_resources.containers.return_value = container_iter
 
     access_connector_id = AzureResource(
         "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
@@ -419,8 +428,11 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector():
     w.secrets.get_secret.assert_not_called()
     w.secrets.create_scope.assert_not_called()
 
+    azure_resources.create_or_update_access_connector.assert_called_once()
+    azure_resources.containers.assert_called_once_with(storage_account.id)
+
     assert len(access_connectors) == 1
-    assert access_connectors[0].name == "ac-test"
+    assert access_connectors[0][0].name == "ac-test"
 
 
 def test_create_access_connectors_for_storage_accounts_log_permission_applied(caplog):

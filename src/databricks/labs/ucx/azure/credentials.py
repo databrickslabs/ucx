@@ -1,11 +1,13 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import BadRequest
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
+    AzureManagedIdentityRequest,
     AzureServicePrincipal,
     Privilege,
     StorageCredentialInfo,
@@ -33,19 +35,42 @@ class ServicePrincipalMigrationInfo:
 class StorageCredentialValidationResult:
     name: str
     application_id: str
-    read_only: bool
+    read_only: bool | None
     validated_on: str
-    directory_id: str | None = None
-    failures: list[str] | None = None
+    directory_id: str | None = None  # str when storage credential created for AzureServicePrincipal
+    failures: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_validation(cls, permission_mapping: StoragePermissionMapping, failures: list[str] | None):
+    def _get_application_and_directory_id(
+        cls, storage_credential_info: StorageCredentialInfo
+    ) -> tuple[str, str | None]:
+        if storage_credential_info.azure_service_principal is not None:
+            application_id = storage_credential_info.azure_service_principal.application_id
+            directory_id = storage_credential_info.azure_service_principal.directory_id
+            return application_id, directory_id
+
+        if storage_credential_info.azure_managed_identity is not None:
+            if storage_credential_info.azure_managed_identity.managed_identity_id is not None:
+                return storage_credential_info.azure_managed_identity.managed_identity_id, None
+            return storage_credential_info.azure_managed_identity.access_connector_id, None
+
+        raise KeyError("Storage credential info is missing an application id.")
+
+    @classmethod
+    def from_storage_credential_info(
+        cls,
+        storage_credential_info: StorageCredentialInfo,
+        validated_on: str,
+        failures: list[str],
+    ):
+        assert storage_credential_info.name is not None
+        application_id, directory_id = cls._get_application_and_directory_id(storage_credential_info)
         return cls(
-            permission_mapping.principal,
-            permission_mapping.client_id,
-            permission_mapping.privilege == Privilege.READ_FILES.value,
-            permission_mapping.prefix,
-            permission_mapping.directory_id,
+            storage_credential_info.name,
+            application_id,
+            storage_credential_info.read_only,
+            validated_on,
+            directory_id,
             failures,
         )
 
@@ -104,12 +129,12 @@ class StorageCredentialManager:
             read_only=spn.permission_mapping.privilege == Privilege.READ_FILES.value,
         )
 
-    def validate(self, permission_mapping: StoragePermissionMapping) -> StorageCredentialValidationResult:
+    def validate(self, storage_credential_info: StorageCredentialInfo, url: str) -> StorageCredentialValidationResult:
         try:
             validation = self._ws.storage_credentials.validate(
-                storage_credential_name=permission_mapping.principal,
-                url=permission_mapping.prefix,
-                read_only=permission_mapping.privilege == Privilege.READ_FILES.value,
+                storage_credential_name=storage_credential_info.name,
+                url=url,
+                read_only=storage_credential_info.read_only,
             )
         except InvalidParameterValue:
             logger.warning(
@@ -117,8 +142,9 @@ class StorageCredentialManager:
                 "the service principal and used for validating the migrated storage credential. "
                 "Skip the validation"
             )
-            return StorageCredentialValidationResult.from_validation(
-                permission_mapping,
+            return StorageCredentialValidationResult.from_storage_credential_info(
+                storage_credential_info,
+                url,
                 [
                     "The validation is skipped because an existing external location overlaps "
                     "with the location used for validation."
@@ -126,8 +152,8 @@ class StorageCredentialManager:
             )
 
         if not validation.results:
-            return StorageCredentialValidationResult.from_validation(
-                permission_mapping, ["Validation returned no results."]
+            return StorageCredentialValidationResult.from_storage_credential_info(
+                storage_credential_info, url, ["Validation returned no results."]
             )
 
         failures = []
@@ -136,7 +162,8 @@ class StorageCredentialManager:
                 continue
             if result.result == ValidationResultResult.FAIL:
                 failures.append(f"{result.operation.value} validation failed with message: {result.message}")
-        return StorageCredentialValidationResult.from_validation(permission_mapping, None if not failures else failures)
+
+        return StorageCredentialValidationResult.from_storage_credential_info(storage_credential_info, url, failures)
 
 
 class ServicePrincipalMigration(SecretsMixin):
@@ -238,53 +265,69 @@ class ServicePrincipalMigration(SecretsMixin):
                     f"'{spn.permission_mapping.prefix}' with non-Allow network configuration"
                 )
 
-            self._storage_credential_manager.create_with_client_secret(spn)
-            execution_result.append(self._storage_credential_manager.validate(spn.permission_mapping))
-
+            storage_credential_info = self._storage_credential_manager.create_with_client_secret(spn)
+            validation_results = self._storage_credential_manager.validate(
+                storage_credential_info,
+                spn.permission_mapping.prefix,
+            )
+            execution_result.append(validation_results)
         return execution_result
 
-    def _create_access_connectors_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
-        self._resource_permissions.create_access_connectors_for_storage_accounts()
-        return []
+    def _create_storage_credentials_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
+        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
+
+        execution_results = []
+        for access_connector, url in access_connectors:
+            storage_credential_info = self._ws.storage_credentials.create(
+                access_connector.name,
+                azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
+                comment="Created by UCX",
+                read_only=False,  # Access connectors get "STORAGE_BLOB_DATA_CONTRIBUTOR" permissions
+            )
+            try:
+                validation_results = self._storage_credential_manager.validate(storage_credential_info, url)
+            except BadRequest:
+                logger.warning(f"Could not validate storage credential {storage_credential_info.name} for url {url}")
+            else:
+                execution_results.append(validation_results)
+
+        return execution_results
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
-        plan_confirmed = prompts.confirm(
-            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
-        )
-        sp_results = []
-        if plan_confirmed:
-            sp_migration_infos = self._generate_migration_list(include_names)
-            plan_confirmed = True
-            if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
-                plan_confirmed = prompts.confirm(
-                    "At least one Azure Service Principal accesses a storage account with non-Allow default network "
-                    "configuration, which might cause connectivity issues. We recommend using Databricks Access "
-                    "Connectors instead (next prompt). Would you like to continue with migrating the service "
-                    "principals?"
-                )
-            if plan_confirmed:
-                sp_results = self._migrate_service_principals(sp_migration_infos)
-
         plan_confirmed = prompts.confirm(
             "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
             "account."
         )
         ac_results = []
         if plan_confirmed:
-            ac_results = self._create_access_connectors_for_storage_accounts()
+            ac_results = self._create_storage_credentials_for_storage_accounts()
 
-        execution_results = sp_results + ac_results
+        sp_migration_infos = self._generate_migration_list(include_names)
+        if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
+            logger.warning(
+                "At least one Azure Service Principal accesses a storage account with non-Allow default network "
+                "configuration, which might cause connectivity issues. We recommend using Databricks Access "
+                "Connectors instead"
+            )
+        plan_confirmed = prompts.confirm(
+            "Above Azure Service Principals will be migrated to UC storage credentials, please review and confirm."
+        )
+        sp_results = []
+        if plan_confirmed:
+            sp_results = self._migrate_service_principals(sp_migration_infos)
+
+        execution_results = ac_results + sp_results
         if execution_results:
             results_file = self.save(execution_results)
             logger.info(
                 "Completed migration from Azure Service Principal to UC Storage credentials "
-                "and creation of Databricks Access Connectors for storage accounts "
+                "and creation of UC Storage credentials for storage access with Databricks Access Connectors. "
                 f"Please check {results_file} for validation results"
             )
         else:
             logger.info(
-                "No Azure Service Principal migrated to UC Storage credentials "
-                "nor Databricks Access Connectors created for storage accounts"
+                "No UC Storage credentials created during Azure Service Principal migration "
+                "nor for storage access with Databricks Access Connectors."
             )
 
         return execution_results

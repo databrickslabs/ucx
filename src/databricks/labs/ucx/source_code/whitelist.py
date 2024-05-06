@@ -8,6 +8,8 @@ from pathlib import Path
 from collections.abc import Callable, Iterable
 from yaml import load_all as load_yaml, Loader
 
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     WrappingLoader,
@@ -56,7 +58,7 @@ class WhitelistResolver(BaseDependencyResolver):
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
         pass
 
 
