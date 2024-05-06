@@ -196,23 +196,10 @@ def test_dependency_graph_builder_skips_builtin_dependencies():
 
 
 def test_dependency_graph_builder_ignores_known_dependencies():
-    paths = ["python_builtins.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
-    whitelist = Whitelist.parse(datas[0])
-    file_loader = _local_loader_with_side_effects(FileLoader, sources, {})
-    site_packages = SitePackages.parse(locate_site_packages())
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "")
+    lookup = MockPathLookup()
     notebook_loader = LocalNotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, provider),
-            WhitelistResolver(whitelist),
-            LocalFileResolver(file_loader),
-        ]
-    )
-    builder = DependencyGraphBuilder(dependency_resolver, provider)
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader), LocalFileResolver(FileLoader())])
+    builder = DependencyGraphBuilder(dependency_resolver, lookup)
     maybe = builder.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert maybe.graph
     graph = maybe.graph
@@ -249,45 +236,17 @@ def test_dependency_graph_builder_visits_site_packages(empty_index):
 
 
 def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_index):
-    site_packages = SitePackages.parse(locate_site_packages())
-    whi = whitelist_mock()
-    file_loader = create_autospec(FileLoader)
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "")
-    notebook_loader = LocalNotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, provider),
-            WhitelistResolver(whi),
-            LocalFileResolver(file_loader),
-        ]
-    )
-    builder = DependencyGraphBuilder(dependency_resolver, provider)
-    maybe = builder.build_local_file_dependency_graph(Path("root1.run.py.txt"))
-    assert list(maybe.problems) == [DependencyProblem('file-not-found', 'File not found: root1.run.py.txt')]
-    file_loader.load_dependency.assert_not_called()
+    lookup = MockPathLookup()
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())])
+    builder = DependencyGraphBuilder(dependency_resolver, lookup)
+    maybe = builder.build_local_file_dependency_graph(Path("non-existing.py.txt"))
+    assert list(maybe.problems) == [DependencyProblem('file-not-found', 'File not found: non-existing.py.txt')]
 
 
 def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empty_index):
-    sources: dict[str, str] = {}
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.return_value = None
-    site_packages = SitePackages.parse(locate_site_packages())
-    whi = whitelist_mock()
-    file_loader = create_autospec(FileLoader)
-    notebook_loader = create_autospec(LocalNotebookLoader)
-    notebook_loader.is_notebook.return_value = False
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "")
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, provider),
-            WhitelistResolver(whi),
-            LocalFileResolver(file_loader),
-        ]
-    )
-    builder = DependencyGraphBuilder(dependency_resolver, provider)
-    maybe = builder.build_notebook_dependency_graph(Path("root2.run.py.txt"))
-    assert list(maybe.problems) == [DependencyProblem('notebook-not-found', 'Notebook not found: root2.run.py.txt')]
-    file_loader.load_dependency.assert_not_called()
+    lookup = MockPathLookup()
+    notebook_loader = LocalNotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    builder = DependencyGraphBuilder(dependency_resolver, lookup)
+    maybe = builder.build_notebook_dependency_graph(Path("unknown_notebook"))
+    assert list(maybe.problems) == [DependencyProblem('notebook-not-found', 'Notebook not found: unknown_notebook')]

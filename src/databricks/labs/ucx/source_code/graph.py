@@ -268,7 +268,7 @@ class StubResolver(BaseDependencyResolver):
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
         return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
 
-    def resolve_local_file(self, path: Path) -> MaybeDependency:
+    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
         return self._fail('file-not-found', f"File not found: {path.as_posix()}")
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
