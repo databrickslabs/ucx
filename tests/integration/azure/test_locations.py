@@ -263,6 +263,8 @@ def test_run_external_locations_using_access_connector(
     clean_external_locations,
     az_cli_ctx,
     env_or_skip,
+    make_dbfs_data_copy,
+    make_random,
 ):
     """Create external locations using the storage credential from an access connector."""
     # Mocking in an integration test because Azure resource can not be created
@@ -285,7 +287,12 @@ def test_run_external_locations_using_access_connector(
 
     az_cli_ctx = az_cli_ctx.replace(azure_resource_permissions=resource_permissions)
 
-    external_location = ExternalLocation(f"{mount}/d", 1)
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+
+    location = new_mounted_location.replace(f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}", mount)
+    external_location = ExternalLocation(location, 1)
     az_cli_ctx.sql_backend.save_table(
         f"{az_cli_ctx.inventory_database}.external_locations", [external_location], ExternalLocation
     )
