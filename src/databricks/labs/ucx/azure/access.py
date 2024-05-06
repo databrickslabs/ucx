@@ -1,6 +1,8 @@
 import json
 import logging
+import re
 import uuid
+from collections.abc import ValuesView
 from dataclasses import dataclass
 from functools import partial
 
@@ -14,6 +16,7 @@ from databricks.sdk.service.catalog import Privilege
 from databricks.labs.ucx.azure.resources import (
     AccessConnector,
     AzureResources,
+    AzureRoleAssignment,
     PrincipalSecret,
     StorageAccount,
 )
@@ -55,29 +58,76 @@ class AzureResourcePermissions:
             "Storage Blob Data Owner": Privilege.WRITE_FILES,
             "Storage Blob Data Reader": Privilege.READ_FILES,
         }
+        self._permission_levels = {
+            "Microsoft.Storage/storageAccounts/blobServices/containers/write": Privilege.WRITE_FILES,
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write": Privilege.WRITE_FILES,
+            "Microsoft.Storage/storageAccounts/blobServices/containers/read": Privilege.READ_FILES,
+            "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read": Privilege.READ_FILES,
+        }
 
-    def _map_storage(self, storage: StorageAccount) -> list[StoragePermissionMapping]:
+    def _get_permission_level(self, permission_to_match: str) -> Privilege | None:
+        # String might contain '*', check for wildcard match
+        pattern = re.sub(r'\*', '.*', permission_to_match)
+        permission_compiled = re.compile(pattern)
+        for each_level, privilege_level in self._permission_levels.items():
+            # Check for storage blob permission with regex to account for star pattern
+            match = permission_compiled.match(each_level)
+            # If a match is found, return the privilege level, no need to check for lower levels
+            if match:
+                return privilege_level
+        return None
+
+    def _get_custom_role_privilege(self, role_permissions: list[str]) -> Privilege | None:
+        # If both read and write privileges are found, only write privilege will be considered
+        higher_privilege = None
+        for each_permission in role_permissions:
+            privilege = self._get_permission_level(each_permission)
+            if privilege is None:
+                continue
+            # WRITE_FILES is the higher permission, don't need to check further
+            if privilege == Privilege.WRITE_FILES:
+                return privilege
+            if privilege == Privilege.READ_FILES:
+                higher_privilege = privilege
+        return higher_privilege
+
+    def _get_role_privilege(self, role_assignment: AzureRoleAssignment) -> Privilege | None:
+        privilege = None
+        # Check for custom role permissions on the storage accounts
+        if role_assignment.role_permissions:
+            privilege = self._get_custom_role_privilege(role_assignment.role_permissions)
+        elif role_assignment.role_name in self._levels:
+            privilege = self._levels[role_assignment.role_name]
+        return privilege
+
+    def _map_storage(self, storage: StorageAccount) -> ValuesView[StoragePermissionMapping]:
         logger.info(f"Fetching role assignment for {storage.name}")
-        out = []
+        principal_spm_mapping: dict[str, StoragePermissionMapping] = {}
         for container in self._azurerm.containers(storage.id):
             for role_assignment in self._azurerm.role_assignments(str(container)):
+                # Skip the role assignments that already have WRITE_FILES privilege
+                spm_mapping_key = f"{container.container}_{role_assignment.principal.client_id}"
+                if (
+                    spm_mapping_key in principal_spm_mapping
+                    and principal_spm_mapping[spm_mapping_key].privilege == Privilege.WRITE_FILES.value
+                ):
+                    continue
                 # one principal may be assigned multiple roles with overlapping dataActions, hence appearing
                 # here in duplicates. hence, role name -> permission level is not enough for the perfect scenario.
-                if role_assignment.role_name not in self._levels:
+                returned_privilege = self._get_role_privilege(role_assignment)
+                if not returned_privilege:
                     continue
-                privilege = self._levels[role_assignment.role_name].value
-                out.append(
-                    StoragePermissionMapping(
-                        prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
-                        client_id=role_assignment.principal.client_id,
-                        principal=role_assignment.principal.display_name,
-                        privilege=privilege,
-                        type=role_assignment.principal.type,
-                        default_network_action=storage.default_network_action,
-                        directory_id=role_assignment.principal.directory_id,
-                    )
+                privilege = returned_privilege.value
+                principal_spm_mapping[spm_mapping_key] = StoragePermissionMapping(
+                    prefix=f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/",
+                    client_id=role_assignment.principal.client_id,
+                    principal=role_assignment.principal.display_name,
+                    privilege=privilege,
+                    type=role_assignment.principal.type,
+                    default_network_action=storage.default_network_action,
+                    directory_id=role_assignment.principal.directory_id,
                 )
-        return out
+        return principal_spm_mapping.values()
 
     def save_spn_permissions(self) -> str | None:
         used_storage_accounts = self._get_storage_accounts()
