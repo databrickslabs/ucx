@@ -182,7 +182,8 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
         lookup,
     )
     maybe = dependency_resolver.build_notebook_dependency_graph(Path(paths[0]))
-    assert list(maybe.problems) == [
+    problems = [adjust_path_in_problem(problem) for problem in maybe.problems]
+    assert problems == [
         DependencyProblem('notebook-not-found', 'Notebook not found: leaf3.py.txt', Path(paths[0]), 1, 0, 1, 38)
     ]
 
@@ -216,7 +217,8 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
         lookup,
     )
     maybe = dependency_resolver.build_notebook_dependency_graph(Path(paths[0]))
-    assert maybe.problems == [
+    problems = [adjust_path_in_problem(problem) for problem in maybe.problems]
+    assert problems == [
         DependencyProblem(
             'dependency-not-constant', "Can't check dependency not provided as a constant", Path(paths[0]), 2, 0, 2, 35
         )
@@ -294,7 +296,8 @@ def test_dependency_graph_builder_raises_problem_with_unresolved_import():
         lookup,
     )
     maybe = dependency_resolver.build_local_file_dependency_graph(Path(paths[0]))
-    assert maybe.problems == [
+    problems = [adjust_path_in_problem(problem) for problem in maybe.problems]
+    assert problems == [
         DependencyProblem(
             'import-not-found', 'Could not locate import: some_library', Path("root7.py.txt"), 1, 0, 1, 19
         )
@@ -320,7 +323,8 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argu
         lookup,
     )
     maybe = dependency_resolver.build_local_file_dependency_graph(Path(paths[0]))
-    assert maybe.problems == [
+    problems = [adjust_path_in_problem(problem) for problem in maybe.problems]
+    assert problems == [
         DependencyProblem(
             'dependency-not-constant',
             "Can't check dependency not provided as a constant",
@@ -448,9 +452,7 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_in
         lookup,
     )
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("root1.run.py.txt"))
-    assert maybe.problems == [
-        DependencyProblem('file-not-found', 'File not found: root1.run.py.txt')
-    ]
+    assert maybe.problems == [DependencyProblem('file-not-found', 'File not found: root1.run.py.txt')]
     file_loader.load_dependency.assert_not_called()
 
 
@@ -475,7 +477,5 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empt
         lookup,
     )
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root2.run.py.txt"))
-    assert maybe.problems == [
-        DependencyProblem('notebook-not-found', 'Notebook not found: root2.run.py.txt')
-    ]
+    assert maybe.problems == [DependencyProblem('notebook-not-found', 'Notebook not found: root2.run.py.txt')]
     file_loader.load_dependency.assert_not_called()

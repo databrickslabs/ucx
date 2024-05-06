@@ -39,7 +39,7 @@ class DependencyGraph:
         return self._dependency.path
 
     def add_problems(self, problems: list[DependencyProblem]):
-        problems = [problem.replace(source_path=self.dependency.path) for problem in problems]
+        problems = [problem.replace(source_path=self.dependency.path.absolute()) for problem in problems]
         self._resolver.add_problems(problems)
 
     def register_notebook(self, path: Path) -> MaybeGraph:

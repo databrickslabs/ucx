@@ -60,7 +60,7 @@ class Cell(ABC):
 
     def _adjust_problem_source_path(self, parent: DependencyGraph, problem: DependencyProblem) -> DependencyProblem:
         if problem.is_path_missing():
-            return problem.replace(source_path=parent.path)
+            return problem.replace(source_path=parent.path.absolute())
         return problem
 
 
@@ -178,8 +178,8 @@ class RunCell(Cell):
         )
         return MaybeGraph(None, [problem])
 
+    @staticmethod
     def _adjust_problems(
-        self,
         parent: DependencyGraph,
         line_number: int,
         source_code_line: str,

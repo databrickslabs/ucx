@@ -47,7 +47,7 @@ class LocalFile(SourceContainer):
 
     def _adjust_problem_path(self, problem: DependencyProblem) -> DependencyProblem:
         if problem.is_path_missing():
-            return problem.replace(source_path=self._path)
+            return problem.replace(source_path=self._path.absolute())
         return problem
 
 
