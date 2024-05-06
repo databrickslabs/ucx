@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import Prompts
@@ -38,7 +38,7 @@ class StorageCredentialValidationResult:
     read_only: bool | None
     validated_on: str
     directory_id: str | None = None  # str when storage credential created for AzureServicePrincipal
-    failures: list[str] | None = None
+    failures: list[str] = field(default_factory=list)
 
     @classmethod
     def _get_application_and_directory_id(
@@ -61,7 +61,7 @@ class StorageCredentialValidationResult:
         cls,
         storage_credential_info: StorageCredentialInfo,
         validated_on: str,
-        failures: list[str] | None,
+        failures: list[str],
     ):
         assert storage_credential_info.name is not None
         application_id, directory_id = cls._get_application_and_directory_id(storage_credential_info)
@@ -163,11 +163,7 @@ class StorageCredentialManager:
             if result.result == ValidationResultResult.FAIL:
                 failures.append(f"{result.operation.value} validation failed with message: {result.message}")
 
-        return StorageCredentialValidationResult.from_storage_credential_info(
-            storage_credential_info,
-            url,
-            None if not failures else failures,
-        )
+        return StorageCredentialValidationResult.from_storage_credential_info(storage_credential_info, url, failures)
 
 
 class ServicePrincipalMigration(SecretsMixin):
