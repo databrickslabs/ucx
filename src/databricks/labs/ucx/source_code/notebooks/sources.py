@@ -62,11 +62,12 @@ class Notebook(SourceContainer):
         return '\n'.join(sources)
 
     def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
-        syspath_lookup.push_cwd(self.path.parent)
+        cwd_old = syspath_lookup.cwd
+        syspath_lookup.cwd = self.path.parent
         for cell in self._cells:
             problems = cell.build_dependency_graph(parent, syspath_lookup)
             parent.add_problems(problems)
-        syspath_lookup.pop_cwd()
+        syspath_lookup.cwd = cwd_old
 
 
 class NotebookLinter:

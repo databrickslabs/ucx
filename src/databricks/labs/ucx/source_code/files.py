@@ -38,10 +38,11 @@ class LocalFile(SourceContainer):
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
-        syspath_lookup.push_cwd(self.path.parent)
+        cwd_old = syspath_lookup.cwd
+        syspath_lookup.cwd = self.path.parent
         problems = parent.build_graph_from_python_source(self._original_code, syspath_lookup)
         parent.add_problems(problems)
-        syspath_lookup.pop_cwd()
+        syspath_lookup.cwd = cwd_old
 
 
 class LocalFileMigrator:

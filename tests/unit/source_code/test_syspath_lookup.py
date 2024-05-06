@@ -48,8 +48,8 @@ def test_lookup_removes_path():
     assert [path.as_posix() for path in paths] == ["what", "on", "earth"]
 
 
-def test_lookup_pushes_cwd():
+def test_lookup_sets_cwd():
     lookup = SysPathLookup.from_sys_path(Path.cwd())
     location = Path("some-location")
-    lookup.push_cwd(location)
+    lookup.cwd = location
     assert lookup.cwd == location

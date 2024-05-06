@@ -17,8 +17,11 @@ class SysPathLookup:
         return SysPathLookup(cwd, [Path(path) for path in sys.path])
 
     def __init__(self, cwd: Path, sys_paths: list[Path]):
+        self._cwd = cwd
         self._sys_paths = sys_paths
-        self._cwds = [cwd]
+
+    def has_path(self, path: Path):
+        return next(p for p in self._sys_paths if path == p) is not None
 
     def prepend_path(self, path: Path):
         self._sys_paths.insert(0, path)
@@ -34,19 +37,13 @@ class SysPathLookup:
 
     @property
     def paths(self) -> Iterable[Path]:
-        yield self.cwd
+        yield self._cwd
         yield from self._sys_paths
-
-    def push_cwd(self, path: Path):
-        self._cwds.append(path)
-
-    def pop_cwd(self):
-        result = self._cwds[0]
-        del self._cwds[0]
-        return result
 
     @property
     def cwd(self):
-        # the below might fail but that's better than returning an incorrect cwd
-        assert len(self._cwds) > 0
-        return self._cwds[-1]
+        return self._cwd
+
+    @cwd.setter
+    def cwd(self, cwd: Path):
+        self._cwd = cwd
