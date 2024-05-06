@@ -19,6 +19,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSResources,
     AWSRoleAction,
     logger,
+    AWSUCRoleCandidate,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -51,12 +52,13 @@ class AWSResourcePermissions:
         self._filename = self.INSTANCE_PROFILES_FILE_NAMES
         self._principal_acl = principal_acl
 
-    def create_uc_roles_cli(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+    def list_uc_roles(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
         # Get the missing paths
         # Identify the S3 prefixes
         # Create the roles and policies for the missing S3 prefixes
         # If single_role is True, create a single role and policy for all the missing S3 prefixes
         # If single_role is False, create a role and policy for each missing S3 prefix
+        roles: list[AWSUCRoleCandidate] = []
         missing_paths = self._identify_missing_paths()
         s3_prefixes = set()
         for missing_path in missing_paths:
@@ -64,20 +66,25 @@ class AWSResourcePermissions:
             if match:
                 s3_prefixes.add(missing_path)
         if single_role:
-            if self._aws_resources.create_uc_role(role_name):
-                self._aws_resources.put_role_policy(
-                    role_name, policy_name, s3_prefixes, self._aws_account_id, self._kms_key
-                )
+            roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes)))
         else:
             for idx, s3_prefix in enumerate(sorted(list(s3_prefixes))):
-                if self._aws_resources.create_uc_role(f"{role_name}-{idx+1}"):
-                    self._aws_resources.put_role_policy(
-                        f"{role_name}-{idx+1}",
-                        f"{policy_name}-{idx+1}",
-                        {s3_prefix},
-                        self._aws_account_id,
-                        self._kms_key,
-                    )
+                roles.append(AWSUCRoleCandidate(f"{role_name}_{idx+1}", policy_name, [s3_prefix]))
+        return roles
+
+    def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
+        roles_created = []
+        for role in roles:
+            if self._aws_resources.create_uc_role(role.role_name):
+                self._aws_resources.put_role_policy(
+                    role.role_name,
+                    role.policy_name,
+                    set(role.resource_paths),
+                    self._aws_account_id,
+                    self._kms_key,
+                )
+                roles_created.append(role)
+        return roles_created
 
     def update_uc_role_trust_policy(self, role_name, external_id="0000"):
         return self._aws_resources.update_uc_trust_role(role_name, external_id)

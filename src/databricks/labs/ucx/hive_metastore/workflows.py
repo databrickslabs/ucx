@@ -39,7 +39,7 @@ class TableMigration(Workflow):
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index()
+        ctx.tables_migrator.index_full_refresh()
 
     @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
     def migration_report(self, ctx: RuntimeContext):
@@ -74,7 +74,7 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index()
+        ctx.tables_migrator.index_full_refresh()
 
     @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
     def migration_report(self, ctx: RuntimeContext):
@@ -117,7 +117,7 @@ class MigrateExternalTablesCTAS(Workflow):
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index()
+        ctx.tables_migrator.index_full_refresh()
 
     @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
     def migration_report(self, ctx: RuntimeContext):
@@ -139,7 +139,7 @@ class MigrateTablesInMounts(Workflow):
     @job_task(job_cluster="table_migration", depends_on=[scan_tables_in_mounts_experimental])
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
-        ctx.tables_migrator.index()
+        ctx.tables_migrator.index_full_refresh()
 
     @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
     def migration_report(self, ctx: RuntimeContext):

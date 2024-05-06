@@ -102,11 +102,13 @@ def test_save_spn_permissions_valid_azure_storage_account():
             id=AzureResource(f'{storage_accounts}/storage1'),
             name="storage1",
             location="westeu",
+            default_network_action="Allow",
         ),
         StorageAccount(
             id=AzureResource(f'{storage_accounts}/storage2'),
             name="storage2",
             location="westeu",
+            default_network_action="Allow",
         ),
     ]
     azure_resources.containers.return_value = [
@@ -144,6 +146,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
                 'type': 'Application',
+                'default_network_action': 'Allow',
                 'directory_id': '0000-0000',
             },
             {
@@ -152,6 +155,7 @@ def test_save_spn_permissions_valid_azure_storage_account():
                 'principal': 'b',
                 'privilege': 'WRITE_FILES',
                 'type': 'Application',
+                'default_network_action': 'Allow',
                 'directory_id': '0000-0000',
             },
         ],
@@ -390,6 +394,7 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector():
             id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
             name="storage1",
             location="westeu",
+            default_network_action="Allow",
         )
     ]
 
@@ -436,6 +441,7 @@ def test_create_access_connectors_for_storage_accounts_log_permission_applied(ca
             id=AzureResource('/subscriptions/abc/providers/Microsoft.Storage/storageAccounts/storage1'),
             name="storage1",
             location="westeu",
+            default_network_action="Allow",
         )
     ]
 

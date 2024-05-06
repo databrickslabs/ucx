@@ -8,6 +8,7 @@ from databricks.labs.ucx.azure.resources import (
     AzureResource,
     AzureResources,
     Principal,
+    RawResource,
     StorageAccount,
 )
 
@@ -85,6 +86,20 @@ def test_role_assignments_container():
         assert role_assignment.resource == AzureResource(resource_id)
 
 
+@pytest.mark.parametrize("missing_field", ["id", "name", "location"])
+def test_storage_account_missing_fields(missing_field: str):
+    """A KeyError should be raised when the fields are missing."""
+    raw = {
+        "name": "sto3",
+        "id": "subscriptions/002/resourceGroups/rg1/storageAccounts/sto3",
+        "location": "westeu",
+        "properties": {"networkAcls": {"defaultAction": "Deny"}},
+    }
+    raw.pop(missing_field)
+    with pytest.raises(KeyError):
+        StorageAccount.from_raw_resource(RawResource(raw))
+
+
 def test_create_service_principal():
     api_client = azure_api_client()
     azure_resource = AzureResources(api_client, api_client)
@@ -111,6 +126,7 @@ def test_apply_storage_permission():
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
+        default_network_action="Allow",
     )
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")
     path = "/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2/providers/Microsoft.Authorization/roleAssignments/12345"
@@ -132,6 +148,7 @@ def test_apply_storage_permission_no_access():
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
+        default_network_action="Allow",
     )
     azure_resource = AzureResources(api_client, api_client)
     with pytest.raises(PermissionDenied):
@@ -160,6 +177,7 @@ def test_apply_storage_permission_assignment_present():
         id=AzureResource("/subscriptions/002/resourceGroups/rg1/storageAccounts/sto2"),
         name="sto2",
         location="eastus",
+        default_network_action="Allow",
     )
     azure_resource = AzureResources(api_client, api_client)
     azure_resource.apply_storage_permission("test", azure_storage, "STORAGE_BLOB_DATA_READER", "12345")

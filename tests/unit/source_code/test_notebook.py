@@ -3,6 +3,7 @@ from unittest.mock import create_autospec
 import re
 
 import pytest
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.sdk import WorkspaceClient
 
@@ -76,7 +77,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     languages = [cell.language.magic_name for cell in notebook.cells]
     assert languages == source[2]
@@ -96,7 +97,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
@@ -119,7 +120,7 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     for cell in notebook.cells:
         assert cell.is_runnable()
@@ -140,9 +141,10 @@ def test_notebook_builds_leaf_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver)
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
 
 
@@ -164,9 +166,10 @@ def test_notebook_builds_depth1_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver)
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
@@ -184,9 +187,10 @@ def test_notebook_builds_depth2_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver)
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
@@ -205,9 +209,10 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver)
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     # if visited once only, set and list will have same len
     assert len(set(visited)) == len(visited)
 
@@ -226,9 +231,10 @@ def test_notebook_builds_cyclical_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver)
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 
@@ -246,9 +252,10 @@ def test_notebook_builds_python_dependency_graph():
         ]
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    graph = DependencyGraph(dependency, None, dependency_resolver)
+    provider = PathLookup.from_sys_path(Path.cwd())
+    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
     container = dependency.load()
-    container.build_dependency_graph(graph)
+    container.build_dependency_graph(graph, provider)
     actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
     assert actual == set(paths)
 

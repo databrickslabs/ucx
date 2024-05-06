@@ -44,7 +44,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-dependencies = ["databricks-sdk~=0.26.0",
+dependencies = ["databricks-sdk~=0.27.0",
                 "databricks-labs-lsql~=0.4.0",
                 "databricks-labs-blueprint~=0.4.3",
                 "PyYAML>=6.0.0,<7.0.0",
@@ -89,11 +89,11 @@ coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=htm
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
 fmt         = ["black .",
                "ruff check . --fix",
-               "mypy --disable-error-code 'annotation-unchecked' .",
+               "mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 verify      = ["black --check .",
                "ruff .",
-               "mypy .",
+               "mypy --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 
