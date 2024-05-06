@@ -7,8 +7,12 @@ from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGra
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, LocalNotebookLoader
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver
-from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, VisitingNotebookLoader, locate_site_packages, \
-    MockPathLookup
+from tests.unit import (
+    _samples_path,
+    whitelist_mock,
+    locate_site_packages,
+    MockPathLookup,
+)
 
 
 @pytest.mark.parametrize(
@@ -47,19 +51,19 @@ def test_locates_notebooks(source: list[str], expected: int):
     builder = DependencyGraphBuilder(dependency_resolver, lookup)
     maybe = builder.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
+    assert maybe.graph is not None
     assert len(maybe.graph.all_paths) == expected
 
 
 @pytest.mark.parametrize("source, expected", [(["simulate-sys-path", "siblings", "sibling1_file.py"], 2)])
 def test_locates_files(source: list[str], expected: int):
-    visited: dict[str, bool] = {}
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     file_path = Path(*elems)
     whitelist = whitelist_mock()
     provider = PathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(visited)
-    notebook_loader = VisitingNotebookLoader(visited)
+    file_loader = FileLoader()
+    notebook_loader = LocalNotebookLoader()
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
@@ -70,4 +74,5 @@ def test_locates_files(source: list[str], expected: int):
     builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
     maybe = builder.build_local_file_dependency_graph(file_path)
     assert not maybe.problems
-    assert len(visited) == expected
+    assert maybe.graph is not None
+    assert len(maybe.graph.all_dependencies) == expected

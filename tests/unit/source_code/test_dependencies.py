@@ -1,8 +1,5 @@
 from pathlib import Path
-from unittest.mock import create_autospec
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectInfo, Language, ObjectType
 
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
@@ -12,22 +9,17 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
-    WorkspaceNotebookLoader,
     LocalNotebookLoader,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
+from databricks.labs.ucx.source_code.whitelist import WhitelistResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages
 from tests.unit import (
-    _load_sources,
-    _download_side_effect,
     whitelist_mock,
-    _load_dependency_side_effect,
     locate_site_packages,
-    TestFileLoader,
     _samples_path,
-    _local_loader_with_side_effects, MockPathLookup,
+    MockPathLookup,
 )
 
 
@@ -89,7 +81,13 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
     maybe = builder.build_notebook_dependency_graph(Path("./root1-no-leaf.run.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
-            'notebook-not-found', 'Notebook not found: __NOT_FOUND__', lookup.cwd / 'root1-no-leaf.run.py.txt', 19, 0, 19, 22
+            'notebook-not-found',
+            'Notebook not found: __NOT_FOUND__',
+            lookup.cwd / 'root1-no-leaf.run.py.txt',
+            19,
+            0,
+            19,
+            22,
         )
     ]
 
@@ -101,7 +99,9 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     builder = DependencyGraphBuilder(dependency_resolver, lookup)
     maybe = builder.build_notebook_dependency_graph(Path("./root4-no-leaf.py"))
     assert list(maybe.problems) == [
-        DependencyProblem('notebook-not-found', 'Notebook not found: __NO_LEAF__', lookup.cwd / 'root4-no-leaf.py.txt', 1, 0, 1, 37)
+        DependencyProblem(
+            'notebook-not-found', 'Notebook not found: __NO_LEAF__', lookup.cwd / 'root4-no-leaf.py.txt', 1, 0, 1, 37
+        )
     ]
 
 
@@ -113,7 +113,13 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
     maybe = builder.build_notebook_dependency_graph(Path('./root10.py.txt'))
     assert list(maybe.problems) == [
         DependencyProblem(
-            'dependency-not-constant', "Can't check dependency not provided as a constant", lookup.cwd / 'root10.py.txt', 2, 0, 2, 35
+            'dependency-not-constant',
+            "Can't check dependency not provided as a constant",
+            lookup.cwd / 'root10.py.txt',
+            2,
+            0,
+            2,
+            35,
         )
     ]
 
@@ -125,7 +131,9 @@ def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
     builder = DependencyGraphBuilder(dependency_resolver, lookup)
     maybe = builder.build_notebook_dependency_graph(Path('leaf6.py.txt'))
     assert list(maybe.problems) == [
-        DependencyProblem('invalid-run-cell', 'Missing notebook path in %run command', lookup.cwd / 'leaf6.py.txt', 5, 0, 5, 4)
+        DependencyProblem(
+            'invalid-run-cell', 'Missing notebook path in %run command', lookup.cwd / 'leaf6.py.txt', 5, 0, 5, 4
+        )
     ]
 
 
@@ -208,23 +216,17 @@ def test_dependency_graph_builder_ignores_known_dependencies():
 
 
 def test_dependency_graph_builder_visits_site_packages(empty_index):
-    datas = _load_sources(SourceContainer, "sample-python-compatibility-catalog.yml")
-    whitelist = Whitelist.parse(datas[0])
-    paths = ["import-site-package.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
     provider = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
-    file_loader = TestFileLoader(sources)
+    file_loader = FileLoader()
     site_packages_path = locate_site_packages()
     site_packages = SitePackages.parse(site_packages_path)
     notebook_loader = LocalNotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, provider),
-            WhitelistResolver(whitelist),
-            LocalFileResolver(file_loader),
-        ]
-    )
+    resolvers = [
+        NotebookResolver(notebook_loader),
+        SitePackagesResolver(site_packages, file_loader, provider),
+        LocalFileResolver(file_loader),
+    ]
+    dependency_resolver = DependencyResolver(resolvers)
     builder = DependencyGraphBuilder(dependency_resolver, provider)
     maybe = builder.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
     assert not maybe.failed

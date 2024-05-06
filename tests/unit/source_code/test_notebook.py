@@ -1,19 +1,18 @@
 from pathlib import Path
-from unittest.mock import create_autospec
 import re
 
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, WorkspaceNotebookLoader, \
-    LocalNotebookLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.notebooks.loaders import (
+    NotebookResolver,
+    LocalNotebookLoader,
+)
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
-from tests.unit import _load_sources, _download_side_effect, MockPathLookup
+from tests.unit import _load_sources, MockPathLookup
 
 # fmt: off
 # the following samples are real samples from https://github.com/databricks-industry-solutions

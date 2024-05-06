@@ -3,18 +3,15 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.source_code.graph import (
-    SourceContainer,
     DependencyResolver,
     DependencyProblem,
     DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import LocalNotebookLoader, NotebookResolver
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
-    _load_sources,
-    _local_loader_with_side_effects, MockPathLookup,
+    MockPathLookup,
 )
 
 
