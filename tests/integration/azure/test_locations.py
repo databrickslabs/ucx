@@ -233,7 +233,7 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
         user_name=user.user_name,
     )
 
-    location_migration = az_cli_ctx.azure_external_locations_migration
+    location_migration = az_cli_ctx.external_locations_migration
     try:
         location_migration.run()
         permissions = ws.grants.get(
