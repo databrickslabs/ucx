@@ -1,4 +1,3 @@
-import collections
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -49,7 +48,9 @@ class WorkflowLinter:
 
     def _lint_job(self, job: jobs.Job) -> list[JobProblem]:
         problems: list[JobProblem] = []
+        assert job.job_id is not None
         assert job.settings is not None
+        assert job.settings.name is not None
         assert job.settings.tasks is not None
         for task in job.settings.tasks:
             for path, advice in self._lint_task(task):

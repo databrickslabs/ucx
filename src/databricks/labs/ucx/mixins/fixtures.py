@@ -763,10 +763,11 @@ def make_job(ws, make_random, make_notebook):
         if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
+        if isinstance(notebook_path, pathlib.Path):
+            notebook_path = str(notebook_path)
         if not notebook_path:
             notebook_path = make_notebook()
-        elif isinstance(notebook_path, pathlib.Path):
-            notebook_path = str(notebook_path)
+        assert notebook_path is not None
         if "tasks" not in kwargs:
             kwargs["tasks"] = [
                 jobs.Task(

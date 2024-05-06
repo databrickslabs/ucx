@@ -159,17 +159,7 @@ class RunCell(Cell):
                 if not maybe.problems:
                     return maybe
                 start_line = self._original_offset + idx + 1
-                problems: list[DependencyProblem] = []
-                for problem in maybe.problems:
-                    if problem.is_path_missing():
-                        problem = problem.replace(source_path=parent.dependency.path.absolute())
-                    problem = problem.replace(
-                        start_line=start_line,
-                        start_col=0,
-                        end_line=start_line,
-                        end_col=len(line),
-                    )
-                    problems.append(problem)
+                problems = self._adjust_import_problems(parent, start_line, line, maybe.problems)
                 if problems:
                     return MaybeGraph(None, problems)
                 return MaybeGraph(maybe.graph, [])
@@ -183,6 +173,26 @@ class RunCell(Cell):
             end_col=len(self._original_code),
         )
         return MaybeGraph(None, [problem])
+
+    def _adjust_import_problems(
+        self,
+        parent: DependencyGraph,
+        line_number: int,
+        source_code_line: str,
+        raw_problems: list[DependencyProblem],
+    ):
+        problems: list[DependencyProblem] = []
+        for problem in raw_problems:
+            if problem.is_path_missing():
+                problem = problem.replace(source_path=parent.dependency.path.absolute())
+            problem = problem.replace(
+                start_line=line_number,
+                start_col=0,
+                end_line=line_number,
+                end_col=len(source_code_line),
+            )
+            problems.append(problem)
+        return problems
 
     def migrate_notebook_path(self):
         pass

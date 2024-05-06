@@ -5,8 +5,11 @@ from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.graph import DependencyGraphBuilder, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowLinter
-from databricks.labs.ucx.source_code.notebooks.loaders import WorkspaceNotebookLoader, NotebookResolver, \
-    LocalNotebookLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import (
+    WorkspaceNotebookLoader,
+    NotebookResolver,
+    LocalNotebookLoader,
+)
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
