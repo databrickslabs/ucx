@@ -133,11 +133,11 @@ class SysPathVisitor(ast.NodeVisitor):
         # check for 'sys.path.append'
         if not (
             self._match_aliases(func, ["sys", "path", "append"])
-            or self._match_aliases(func, ["sys", "path", "prepend"])
+            or self._match_aliases(func, ["sys", "path", "insert"])
         ):
             return
         is_append = func.attr == "append"
-        changed = node.args[0]
+        changed = node.args[0] if is_append else node.args[1]
         if isinstance(changed, ast.Constant):
             self._syspath_changes.append(AbsolutePath(node, changed.value, is_append))
         elif isinstance(changed, ast.Call):
