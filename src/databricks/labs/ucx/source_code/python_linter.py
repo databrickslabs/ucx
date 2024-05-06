@@ -132,8 +132,7 @@ class SysPathVisitor(ast.NodeVisitor):
         func = cast(ast.Attribute, node.func)
         # check for 'sys.path.append'
         if not (
-            self._match_aliases(func, ["sys", "path", "append"])
-            or self._match_aliases(func, ["sys", "path", "insert"])
+            self._match_aliases(func, ["sys", "path", "append"]) or self._match_aliases(func, ["sys", "path", "insert"])
         ):
             return
         is_append = func.attr == "append"
