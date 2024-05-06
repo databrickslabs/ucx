@@ -79,6 +79,33 @@ class ExternalLocationsMigration:
                 continue
             if permission_mapping.client_id in app_id_mapping_read:
                 prefix_mapping_read[permission_mapping.prefix] = app_id_mapping_read[permission_mapping.client_id]
+
+        all_storage_accounts = list(self._azurerm.storage_accounts())
+        for storage_credential in self._ws.storage_credentials.list():
+            # Filter storage credentials for access connectors created by UCX
+            if not (
+                storage_credential.name is not None
+                and storage_credential.name.startswith("ac-")
+                and storage_credential.comment is not None
+                and storage_credential.comment == "Created by UCX"
+            ):
+                continue
+
+            storage_account_name = storage_credential.name.removeprefix("ac-")
+            storage_accounts = [st for st in all_storage_accounts if st.name == storage_account_name]
+            if len(storage_accounts) == 0:
+                logger.warning(
+                    f"Storage account {storage_account_name} for access connector {storage_credential.name} not found, "
+                    "therefore, not able to create external locations for this storage account using the access "
+                    "connector."
+                )
+                continue
+
+            for container in self._azurerm.containers(storage_accounts[0].id):
+                storage_url = f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/"
+                # UCX assigns created access connectors the "STORAGE_BLOB_DATA_CONTRIBUTOR" role on the storage account
+                prefix_mapping_write[storage_url] = storage_credential.name
+
         return prefix_mapping_write, prefix_mapping_read
 
     def _create_location_name(self, location_url: str) -> str:
