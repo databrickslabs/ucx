@@ -299,9 +299,9 @@ class DashboardFromFiles:
             "query": query.query,
         }
         if query.key in self._state.queries:
-            return self._ws.queries.update(self._state.queries[query.key], **query_meta, run_as_role=None)
+            return self._ws.queries.update(self._state.queries[query.key], **query_meta, tags=None, run_as_role=None)
 
-        deployed_query = self._ws.queries.create(parent=parent, run_as_role=RunAsRole.VIEWER, **query_meta)
+        deployed_query = self._ws.queries.create(parent=parent, run_as_role=RunAsRole.VIEWER, **query_meta, tags=None)
         assert deployed_query.id is not None
         self._ws.dbsql_permissions.set(
             ObjectTypePlural.QUERIES,
