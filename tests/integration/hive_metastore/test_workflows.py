@@ -26,8 +26,6 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
 
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow(workflow)
-    ctx.migration_status_refresher.reset()
-    ctx.migration_status_refresher.snapshot()
 
     for table in tables.values():
         # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
