@@ -159,6 +159,11 @@ commands:
 
   - name: migrate-locations
     description: Create UC external locations based on the output of guess_external_locations assessment task.
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+      - name: aws-profile
+        description: AWS Profile to use for authentication
 
   - name: create-catalogs-schemas
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
@@ -182,7 +187,7 @@ commands:
 
   - name: assign-metastore
     is_account_level: true
-    description: Show all metastores available in the same region as the specified workspace
+    description: Enable Unity Catalog features on a workspace by assign a metastore to it
     flags:
       - name: workspace-id
         description: (Optional) Workspace ID to assign a metastore to
