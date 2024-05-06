@@ -1,10 +1,9 @@
 import collections
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Callable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Callable
 
 from databricks.labs.lsql import Row
 from databricks.sdk import WorkspaceClient

@@ -30,5 +30,6 @@ class AccountContext(CliContext):
     def account_aggregate(self):
         return AccountAggregate(self.account_workspaces)
 
+    @cached_property
     def account_metastores(self):
         return AccountMetastores(self.account_client)

@@ -167,4 +167,3 @@ class WorkspaceContext(CliContext):
     @cached_property
     def notebook_loader(self) -> NotebookLoader:
         return LocalNotebookLoader(self.path_lookup)
-
