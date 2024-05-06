@@ -273,7 +273,7 @@ class ServicePrincipalMigration(SecretsMixin):
             execution_result.append(validation_results)
         return execution_result
 
-    def _create_access_connectors_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
+    def _create_storage_credentials_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
         access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
 
         execution_results = []
@@ -300,7 +300,7 @@ class ServicePrincipalMigration(SecretsMixin):
         )
         ac_results = []
         if plan_confirmed:
-            ac_results = self._create_access_connectors_for_storage_accounts()
+            ac_results = self._create_storage_credentials_for_storage_accounts()
 
         sp_migration_infos = self._generate_migration_list(include_names)
         if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
