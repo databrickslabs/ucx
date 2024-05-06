@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import pytest
 from databricks.labs.ucx.source_code.files import LocalFileResolver
 from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraphBuilder, DependencyResolver
+from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
@@ -50,8 +50,8 @@ def test_locates_notebooks(source: list[str], expected: int):
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
-    builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
-    builder.build_notebook_dependency_graph(notebook_path)
+    resolver = DependencyResolver(resolvers, lookup)
+    resolver.build_notebook_dependency_graph(notebook_path)
     assert len(visited) == expected
 
 
@@ -79,8 +79,8 @@ def test_locates_files(source: list[str], expected: int):
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
-    builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
-    builder.build_local_file_dependency_graph(file_path)
+    resolver = DependencyResolver(resolvers, lookup)
+    resolver.build_local_file_dependency_graph(file_path)
     assert len(visited) == expected
 
 
@@ -121,8 +121,8 @@ sys.path.append('{child_dir_path.as_posix()}')
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
-        builder.build_notebook_dependency_graph(parent_file_path)
+        resolver = DependencyResolver(resolvers, lookup)
+        resolver.build_notebook_dependency_graph(parent_file_path)
         assert len(visited) == 2
 
 
@@ -162,6 +162,6 @@ def func():
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
-        builder.build_local_file_dependency_graph(parent_file_path)
+        resolver = DependencyResolver(resolvers, lookup)
+        resolver.build_local_file_dependency_graph(parent_file_path)
         assert len(visited) == 2

@@ -302,12 +302,33 @@ class StubResolver(BaseDependencyResolver):
 
 
 class DependencyResolver:
-    def __init__(self, resolvers: list[BaseDependencyResolver]):
+    def __init__(self, resolvers: list[BaseDependencyResolver], syspath_lookup: SysPathLookup):
         previous: BaseDependencyResolver = StubResolver()
         for resolver in resolvers:
             resolver = resolver.with_next_resolver(previous)
             previous = resolver
         self._resolver: BaseDependencyResolver = previous
+        self._syspath_lookup = syspath_lookup
+
+    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph | None:
+        dependency = self.resolve_local_file(path)
+        if dependency is None:
+            return None
+        graph = DependencyGraph(dependency, None, self, self._syspath_lookup)
+        container = dependency.load()
+        if container is not None:
+            container.build_dependency_graph(graph, self._syspath_lookup)
+        return graph
+
+    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
+        dependency = self.resolve_notebook(path)
+        if dependency is None:
+            return None
+        graph = DependencyGraph(dependency, None, self, self._syspath_lookup)
+        container = dependency.load()
+        if container is not None:
+            container.build_dependency_graph(graph, self._syspath_lookup)
+        return graph
 
     def resolve_notebook(
         self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
@@ -397,34 +418,3 @@ class DependencyProblem:
             end_line if end_line is not None else self.end_line,
             end_col if end_col is not None else self.end_col,
         )
-
-
-class DependencyGraphBuilder:
-
-    def __init__(self, resolver: DependencyResolver, syspath_lookup: SysPathLookup):
-        self._resolver = resolver
-        self._syspath_lookup = syspath_lookup
-
-    @property
-    def problems(self):
-        return self._resolver.problems
-
-    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph | None:
-        dependency = self._resolver.resolve_local_file(path)
-        if dependency is None:
-            return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._syspath_lookup)
-        container = dependency.load()
-        if container is not None:
-            container.build_dependency_graph(graph, self._syspath_lookup)
-        return graph
-
-    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
-        dependency = self._resolver.resolve_notebook(path)
-        if dependency is None:
-            return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._syspath_lookup)
-        container = dependency.load()
-        if container is not None:
-            container.build_dependency_graph(graph, self._syspath_lookup)
-        return graph

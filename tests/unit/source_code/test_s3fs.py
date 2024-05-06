@@ -6,7 +6,6 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
     DependencyProblem,
-    DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
@@ -112,15 +111,15 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     whitelist = Whitelist.parse(datas[0])
     sources = {"path": source}
     file_loader = _local_loader_with_side_effects(FileLoader, sources, {})
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
-        ]
+        ],
+        lookup,
     )
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
-    builder = DependencyGraphBuilder(dependency_resolver, lookup)
-    builder.build_local_file_dependency_graph(Path("path"))
+    dependency_resolver.build_local_file_dependency_graph(Path("path"))
     problems: list[DependencyProblem] = list(dependency_resolver.problems)
     assert problems == expected
 
@@ -146,14 +145,14 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     datas = _load_sources(SourceContainer, "s3fs-python-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
     file_loader = _local_loader_with_side_effects(FileLoader, sources, {})
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
-        ]
+        ],
+        lookup,
     )
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
-    builder = DependencyGraphBuilder(dependency_resolver, lookup)
-    builder.build_local_file_dependency_graph(Path("root9.py.txt"))
+    dependency_resolver.build_local_file_dependency_graph(Path("root9.py.txt"))
     problems: list[DependencyProblem] = list(dependency_resolver.problems)
     assert problems == expected

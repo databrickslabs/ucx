@@ -36,7 +36,7 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader, WorkspaceNotebookLoader
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraphBuilder
+from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
@@ -391,12 +391,9 @@ class GlobalContext(abc.ABC):
                 self.site_packages_resolver,
                 self.whitelist_resolver,
                 self.file_resolver,
-            ]
+            ],
+            self.syspath_lookup,
         )
-
-    @cached_property
-    def dependency_graph_builder(self):
-        return DependencyGraphBuilder(self.dependency_resolver, self.syspath_lookup)
 
 
 class CliContext(GlobalContext, abc.ABC):

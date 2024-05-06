@@ -135,13 +135,14 @@ def test_notebook_builds_leaf_dependency_graph():
         object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
     )
     notebook_loader = WorkspaceNotebookLoader(ws)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-        ]
+        ],
+        lookup,
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
     container = dependency.load()
     container.build_dependency_graph(graph, lookup)
@@ -160,13 +161,14 @@ def test_notebook_builds_depth1_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     notebook_loader = WorkspaceNotebookLoader(ws)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-        ]
+        ],
+        lookup,
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
     container = dependency.load()
     container.build_dependency_graph(graph, lookup)
@@ -181,13 +183,14 @@ def test_notebook_builds_depth2_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     notebook_loader = WorkspaceNotebookLoader(ws)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-        ]
+        ],
+        lookup,
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
     container = dependency.load()
     container.build_dependency_graph(graph, lookup)
@@ -203,13 +206,14 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     notebook_loader = WorkspaceNotebookLoader(ws)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-        ]
+        ],
+        lookup,
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
     container = dependency.load()
     container.build_dependency_graph(graph, lookup)
@@ -225,13 +229,14 @@ def test_notebook_builds_cyclical_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     notebook_loader = WorkspaceNotebookLoader(ws)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-        ]
+        ],
+        lookup,
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
     container = dependency.load()
     container.build_dependency_graph(graph, lookup)
@@ -246,13 +251,14 @@ def test_notebook_builds_python_dependency_graph():
     ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
     ws.workspace.get_status.side_effect = get_status_side_effect
     notebook_loader = WorkspaceNotebookLoader(ws)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-        ]
+        ],
+        lookup,
     )
     dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
     graph = DependencyGraph(dependency, None, dependency_resolver, lookup)
     container = dependency.load()
     container.build_dependency_graph(graph, lookup)
