@@ -1,15 +1,18 @@
+from unittest.mock import create_autospec
+from urllib.parse import urlparse
+
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
+from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk.errors.platform import NotFound
 from databricks.sdk.service.iam import PermissionLevel
+from databricks.sdk.service.compute import DataSecurityMode
+from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.sdk.service.compute import DataSecurityMode
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
+from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
-from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
-
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from ..conftest import get_azure_spark_conf
 
@@ -230,7 +233,7 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
         user_name=user.user_name,
     )
 
-    location_migration = az_cli_ctx.azure_external_locations_migration
+    location_migration = az_cli_ctx.external_locations_migration
     try:
         location_migration.run()
         permissions = ws.grants.get(
@@ -252,3 +255,60 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
             env_or_skip("TEST_A_LOCATION"),
             changes=[PermissionsChange(remove=remove_azure_permissions, principal=user.user_name)],
         )
+
+
+@pytest.mark.skip("Waiting for change to use access connector in integration tests")
+def test_run_external_locations_using_access_connector(
+    clean_storage_credentials,
+    clean_external_locations,
+    az_cli_ctx,
+    env_or_skip,
+    make_dbfs_data_copy,
+    make_random,
+):
+    """Create external locations using the storage credential from an access connector."""
+    # Mocking in an integration test because Azure resource can not be created
+    resource_permissions = create_autospec(AzureResourcePermissions)
+
+    # TODO: Remove the replace after 20-05-2024
+    access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR").replace("-external", ""))
+    mount = env_or_skip("TEST_MOUNT_CONTAINER")
+    storage_account_name = urlparse(mount).hostname.removesuffix(".dfs.core.windows.net")
+    access_connector = AccessConnector(
+        id=access_connector_id,
+        name=f"ac-{storage_account_name}",
+        location="westeu",
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [(access_connector, mount)]
+
+    az_cli_ctx = az_cli_ctx.replace(azure_resource_permissions=resource_permissions)
+
+    existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
+    new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/{make_random(4)}'
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+
+    location = new_mounted_location.replace(f"dbfs:/mnt/{env_or_skip('TEST_MOUNT_NAME')}", mount)
+    external_location = ExternalLocation(location, 1)
+    az_cli_ctx.sql_backend.save_table(
+        f"{az_cli_ctx.inventory_database}.external_locations", [external_location], ExternalLocation
+    )
+
+    # Storage credentials based on access connectors take priority over other credentials
+    az_cli_ctx.with_dummy_resource_permission()
+
+    prompts = MockPrompts(
+        {
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
+            "Above Azure Service Principals will be migrated to UC storage credentials *": "No",
+        }
+    )
+
+    az_cli_ctx.service_principal_migration.run(prompts)  # Create storage credential for above access connector
+    az_cli_ctx.azure_external_locations_migration.run()  # Create external location using storage credential
+
+    all_external_locations = az_cli_ctx.workspace_client.external_locations.list()
+    assert len([loc for loc in all_external_locations if loc.url == external_location.location]) > 0

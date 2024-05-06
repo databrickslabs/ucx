@@ -136,6 +136,7 @@ def test_uc_sql(grant, query):
 
 UCX_TABLES = MockBackend.rows("catalog", "database", "table", "object_type", "table_format", "location", "view_text")
 DESCRIBE_TABLE = MockBackend.rows("key", "value", "ignored")
+DESCRIBE_FUNCTION = MockBackend.rows("function_desc")
 SHOW_DATABASES = MockBackend.rows("databaseName")
 SHOW_FUNCTIONS = MockBackend.rows("function")
 SHOW_GRANTS = MockBackend.rows("principal", "action_type", "object_type", "ignored")
@@ -216,7 +217,7 @@ def test_crawler_udf_crawl():
                 ("hive_metastore.database_one.function_one",),
                 ("hive_metastore.database_one.function_two",),
             ],
-            "DESCRIBE FUNCTION EXTENDED hive_metastore.database_one.*": MockBackend.rows("something")[
+            "DESCRIBE FUNCTION EXTENDED hive_metastore.database_one.*": DESCRIBE_FUNCTION[
                 ("Type: SCALAR",),
                 ("Input: p INT",),
                 ("Returns: FLOAT",),
@@ -362,7 +363,7 @@ def test_udf_grants_returning_error_when_showing_grants():
         "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": SHOW_GRANTS[
             ("principal1", "OWN", "FUNCTION", "")
         ],
-        "DESCRIBE *": SHOW_FUNCTIONS[
+        "DESCRIBE *": DESCRIBE_FUNCTION[
             ("Type: SCALAR",),
             ("Body: 1",),
         ],
@@ -398,7 +399,7 @@ def test_udf_grants_returning_error_when_describing():
         "SHOW GRANTS ON FUNCTION hive_metastore.test_database.function_good": SHOW_GRANTS[
             ("principal1", "OWN", "FUNCTION", ""),
         ],
-        "DESCRIBE *": SHOW_FUNCTIONS[
+        "DESCRIBE *": DESCRIBE_FUNCTION[
             ("Type: SCALAR",),
             ("Body: 1",),
         ],

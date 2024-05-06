@@ -11,6 +11,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreatio
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import StorageCredentialManager, ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
+from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
@@ -101,14 +102,23 @@ class WorkspaceContext(CliContext):
         )
 
     @cached_property
-    def azure_external_locations_migration(self):
-        return ExternalLocationsMigration(
-            self.workspace_client,
-            self.external_locations,
-            self.azure_resource_permissions,
-            self.azure_resources,
-            self.principal_acl,
-        )
+    def external_locations_migration(self):
+        if self.is_aws:
+            return AWSExternalLocationsMigration(
+                self.workspace_client,
+                self.external_locations,
+                self.aws_resource_permissions,
+                self.principal_acl,
+            )
+        if self.is_azure:
+            return ExternalLocationsMigration(
+                self.workspace_client,
+                self.external_locations,
+                self.azure_resource_permissions,
+                self.azure_resources,
+                self.principal_acl,
+            )
+        raise NotImplementedError
 
     @cached_property
     def aws_cli_run_command(self):
@@ -140,10 +150,8 @@ class WorkspaceContext(CliContext):
         return AWSResourcePermissions(
             self.installation,
             self.workspace_client,
-            self.sql_backend,
             self.aws_resources,
             self.external_locations,
-            self.principal_acl,
             self.named_parameters.get("aws_account_id"),
             self.named_parameters.get("kms_key"),
         )

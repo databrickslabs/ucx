@@ -229,8 +229,8 @@ class CommonUtils:
         instance_profile_mapping: list[AWSRoleAction],
         uc_roles_mapping: list[AWSRoleAction],
     ):
-        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
-        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
+        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME)
+        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
 
     @cached_property
     def installation(self):
@@ -255,8 +255,8 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         env_or_skip_fixture,
         ws_fixture,
     ):
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
         RuntimeContext.__init__(self)
-        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
@@ -478,8 +478,8 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         env_or_skip_fixture,
         ws_fixture,
     ):
-        WorkspaceContext.__init__(self, ws_fixture, {})
-        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
     def config(self) -> WorkspaceConfig:
@@ -503,9 +503,6 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
 
 
 class LocalAzureCliTest(TestWorkspaceContext):
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
-        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
-
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -526,9 +523,6 @@ def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
 
 
 class LocalAwsCliTest(TestWorkspaceContext):
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
-        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
-
     @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
