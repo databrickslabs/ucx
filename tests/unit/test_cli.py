@@ -551,5 +551,6 @@ def test_revert_dbsql_dashboards(ws, caplog):
 
 
 def test_delete_backup_dbsql_queries(ws, caplog):
-    delete_backup_dbsql_queries(ws)
+    prompts = MockPrompts({'.*': 'yes'})
+    delete_backup_dbsql_queries(ws, prompts)
     ws.queries.list.assert_called_once()
