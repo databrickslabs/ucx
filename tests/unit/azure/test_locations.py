@@ -21,6 +21,9 @@ from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
 from tests.unit.azure import azure_api_client
 
 
+EXTERNAL_LOCATIONS = MockBackend.rows("location", "table_count")
+
+
 def location_migration_for_test(ws, mock_backend, mock_installation, azurerm=None):
     azurerm = azurerm or AzureResources(azure_api_client(), azure_api_client())
     location_crawler = ExternalLocations(ws, mock_backend, "location_test")
@@ -41,7 +44,7 @@ def test_run_service_principal():
     # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://container1@test.dfs.core.windows.net/one/", 1),
                 ("abfss://container2@test.dfs.core.windows.net/", 2),
             ]
@@ -118,7 +121,7 @@ def test_skip_unsupported_location(caplog):
     ws = create_autospec(WorkspaceClient)
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://container1@test.dfs.core.windows.net/one/", 1),
                 ("adl://container2@test.dfs.core.windows.net/", 2),
                 ("wasbs://container2@test.dfs.core.windows.net/", 2),
@@ -195,7 +198,7 @@ def test_run_managed_identity():
     # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://container4@test.dfs.core.windows.net/", 4),
                 ("abfss://container5@test.dfs.core.windows.net/a/b/", 5),
             ]
@@ -270,7 +273,7 @@ def test_run_access_connectors():
     """Test run with access connectors based storage credentials"""
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://container4@test.dfs.core.windows.net/", 4),
                 ("abfss://container5@test.dfs.core.windows.net/a/b/", 5),
             ]
@@ -390,7 +393,7 @@ def test_location_failed_to_read():
     # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://empty@test.dfs.core.windows.net/", 1),
                 ("abfss://other_permission_denied@test.dfs.core.windows.net/", 2),
             ]
@@ -458,7 +461,7 @@ def test_overlapping_locations(caplog):
     # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://overlap_location@test.dfs.core.windows.net/a/", 1),
                 ("abfss://other_invalid_parameter@test.dfs.core.windows.net/a/", 1),
             ]
@@ -524,7 +527,7 @@ def test_corner_cases_with_missing_fields(caplog, mocker):
     # mock crawled HMS external locations
     mock_backend = MockBackend(
         rows={
-            r"SELECT \* FROM location_test.external_locations": MockBackend.rows("location", "table_count")[
+            r"SELECT \* FROM location_test.external_locations": EXTERNAL_LOCATIONS[
                 ("abfss://container1@test.dfs.core.windows.net/", 1),
                 ("abfss://container2@test.dfs.core.windows.net/", 2),
             ]
