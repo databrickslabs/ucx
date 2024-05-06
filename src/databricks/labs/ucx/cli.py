@@ -91,6 +91,14 @@ def sync_workspace_info(a: AccountClient):
 
 
 @ucx.command(is_account=True)
+def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
+    """upload workspace config to all workspaces in the account where ucx is installed"""
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_aggregate.readiness_report()
+
+
+@ucx.command(is_account=True)
 def create_account_groups(
     a: AccountClient,
     prompts: Prompts,
