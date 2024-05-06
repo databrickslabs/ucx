@@ -172,7 +172,7 @@ class AzureResourcePermissions:
                 self._policy_config("OAuth")
             )
             policy_dict[f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net"] = (
-                self._policy_config(f"{{secrets/{inventory_database}/uber_principal_secret}}")
+                self._policy_config("{{secrets/" + inventory_database + "/uber_principal_secret}}")
             )
         return json.dumps(policy_dict)
 
