@@ -154,23 +154,22 @@ class RunCell(Cell):
                 path = path.strip().strip("'").strip('"')
                 if len(path) == 0:
                     continue
-                maybe = parent.register_notebook(Path(path))
+                notebook_path = Path(path)
+                maybe = parent.register_notebook(notebook_path)
                 if not maybe.problems:
                     return maybe
                 start_line = self._original_offset + idx + 1
-                return MaybeGraph(
-                    maybe.graph,
-                    [
-                        problem.replace(
-                            source_path=parent.dependency.path,
-                            start_line=start_line,
-                            start_col=0,
-                            end_line=start_line,
-                            end_col=len(line),
-                        )
-                        for problem in maybe.problems
-                    ],
-                )
+                problems: list[DependencyProblem] = []
+                for problem in maybe.problems:
+                    with_path = problem.replace(
+                        source_path=parent.dependency.path.absolute(),
+                        start_line=start_line,
+                        start_col=0,
+                        end_line=start_line,
+                        end_col=len(line),
+                    )
+                    problems.append(with_path)
+                return MaybeGraph(maybe.graph, problems)
         start_line = self._original_offset + 1
         problem = DependencyProblem(
             'invalid-run-cell',

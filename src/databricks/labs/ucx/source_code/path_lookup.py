@@ -23,7 +23,7 @@ class PathLookup:
         return PathLookup(new_working_directory, self._sys_paths)
 
     def resolve(self, path: Path) -> Path | None:
-        if path.is_absolute():
+        if path.is_absolute() and path.exists():
             return path
         for parent in self.paths:
             absolute_path = parent / path

@@ -34,7 +34,10 @@ class LocalFile(SourceContainer):
             logger.warning(f"Unsupported language: {self._language.language}")
             return []
         maybe = parent.build_graph_from_python_source(self._original_code)
-        return [problem.replace(source_path=self._path) for problem in maybe.problems]
+        problems = []
+        for problem in maybe.problems:
+            problems.append(problem.replace(source_path=self._path))
+        return problems
 
     @property
     def path(self) -> Path:

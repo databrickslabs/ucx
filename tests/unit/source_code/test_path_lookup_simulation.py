@@ -1,13 +1,14 @@
 from pathlib import Path
 
 import pytest
-from databricks.labs.ucx.source_code.files import LocalFileResolver
+from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraphBuilder, DependencyResolver
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, LocalNotebookLoader
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver
-from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, VisitingNotebookLoader, locate_site_packages
+from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, VisitingNotebookLoader, locate_site_packages, \
+    MockPathLookup
 
 
 @pytest.mark.parametrize(
@@ -30,25 +31,23 @@ from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, Visiti
     ],
 )
 def test_locates_notebooks(source: list[str], expected: int):
-    visited: dict[str, bool] = {}
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
-    whitelist = whitelist_mock()
-    provider = PathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(visited)
-    notebook_loader = VisitingNotebookLoader(visited)
+    lookup = MockPathLookup()
+    file_loader = FileLoader()
+    notebook_loader = LocalNotebookLoader()
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, provider),
-        WhitelistResolver(whitelist),
+        SitePackagesResolver(site_packages, file_loader, lookup),
         LocalFileResolver(file_loader),
     ]
-    builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
+    dependency_resolver = DependencyResolver(resolvers)
+    builder = DependencyGraphBuilder(dependency_resolver, lookup)
     maybe = builder.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
-    assert len(visited) == expected
+    assert len(maybe.graph.all_paths) == expected
 
 
 @pytest.mark.parametrize("source, expected", [(["simulate-sys-path", "siblings", "sibling1_file.py"], 2)])

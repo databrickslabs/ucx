@@ -255,17 +255,16 @@ class MockPathLookup(PathLookup):
         return MockPathLookup(new_working_directory, self._sys_paths)
 
     def resolve(self, path: pathlib.Path) -> pathlib.Path | None:
-        if path.is_absolute():
+        if path.is_absolute() and path.exists():
             return path
         filename = path.as_posix()
-        if filename.startswith('./'):
-            filename = filename[2:]
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        some_file = self._cwd / filename
-        if some_file.exists():
+        candidates = [filename]
+        if not filename.endswith('.txt'):
+            candidates.append(f'{filename}.txt')
+        for candidate in candidates:
+            some_file = self._cwd / candidate
+            if not some_file.exists():
+                continue
             return some_file
         return None
 

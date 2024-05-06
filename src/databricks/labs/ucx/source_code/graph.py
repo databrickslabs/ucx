@@ -168,13 +168,13 @@ class DependencyGraph:
                 continue
             maybe = self.register_import(import_name)
             for problem in maybe.problems:
-                problem = problem.replace(
+                with_lines = problem.replace(
                     start_line=node.lineno,
                     start_col=node.col_offset,
                     end_line=node.end_lineno or 0,
                     end_col=node.end_col_offset or 0,
                 )
-                problems.append(problem)
+                problems.append(with_lines)
         return MaybeGraph(self, problems)
 
     def __repr__(self):

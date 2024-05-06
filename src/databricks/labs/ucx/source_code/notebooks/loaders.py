@@ -28,7 +28,7 @@ class NotebookResolver(BaseDependencyResolver):
         return NotebookResolver(self._notebook_loader, resolver)
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        absolute_path = path_lookup.resolve(path)
+        absolute_path = self._notebook_loader.resolve(path_lookup, path)
         if not absolute_path:
             return super().resolve_notebook(path_lookup, path)
         dependency = Dependency(self._notebook_loader, absolute_path)
@@ -36,7 +36,9 @@ class NotebookResolver(BaseDependencyResolver):
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):
-    pass
+    def resolve(self, path_lookup: PathLookup, path: Path) -> Path | None:
+        """Resolve the path to a notebook file. If the path is not a notebook, return None."""
+        return path_lookup.resolve(path)
 
 
 class WorkspaceNotebookLoader(NotebookLoader):
@@ -71,13 +73,23 @@ class WorkspaceNotebookLoader(NotebookLoader):
 
 class LocalNotebookLoader(NotebookLoader, FileLoader):
 
-    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        for path in (dependency.path, self._adjust_path(dependency.path)):
+    def resolve(self, path_lookup: PathLookup, path: Path) -> Path | None:
+        """When exported through Git, notebooks are saved with a .py extension. If the path is a notebook, return the
+        path to the notebook. If the path is a Python file, return the path to the Python file. If the path is neither,
+        return None."""
+        for path in (self._adjust_path(path), path):
             absolute_path = path_lookup.resolve(path)
             if not absolute_path:
                 continue
-            return Notebook.parse(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
+            return absolute_path
         return None
+
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        # TODO: catch exceptions, and create MaybeContainer to follow the pattern - OSError and NotFound are common
+        absolute_path = self.resolve(path_lookup, dependency.path)
+        if not absolute_path:
+            return None
+        return Notebook.parse(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
 
     @staticmethod
     def _adjust_path(path: Path):
