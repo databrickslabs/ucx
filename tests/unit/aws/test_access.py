@@ -228,7 +228,6 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts(
         {
-            "Do you want to create new migration role *": "yes",
             "There is an existing instance profile *": "yes",
             "We have identified existing UCX migration role *": "yes",
         }
@@ -266,11 +265,7 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     aws.create_instance_profile.return_value = instance_profile_arn
     aws.get_instance_profile.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
-    prompts = MockPrompts(
-        {
-            "Do you want to create new migration role *": "yes",
-        }
-    )
+    prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
