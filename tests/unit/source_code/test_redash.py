@@ -1,6 +1,8 @@
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.blueprint.tui import MockPrompts
+
 from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization
 
 from databricks.labs.ucx.source_code.redash import Redash
@@ -82,5 +84,13 @@ def test_revert_dashboard(redash_ws, empty_index):
 def test_delete_backup_dashboards(redash_ws, empty_index):
     redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[])]
     redash = Redash(empty_index, redash_ws, "")
-    redash.delete_backup_dbsql_queries()
+    mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "Yes"})
+    redash.delete_backup_dbsql_queries(mock_prompts)
     redash_ws.queries.delete.assert_called_once_with("1")
+
+
+def test_delete_backup_dashboards_not_confirmed(redash_ws, empty_index):
+    redash = Redash(empty_index, redash_ws, "")
+    mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "No"})
+    redash.delete_backup_dbsql_queries(mock_prompts)
+    redash_ws.queries.delete.assert_not_called()

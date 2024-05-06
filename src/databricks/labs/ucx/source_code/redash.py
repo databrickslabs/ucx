@@ -2,6 +2,8 @@ import logging
 from collections.abc import Iterator
 from dataclasses import replace
 
+from databricks.labs.blueprint.tui import Prompts
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
 from databricks.sdk.errors.platform import DatabricksError, NotFound, ResourceDoesNotExist
@@ -51,7 +53,9 @@ class Redash:
             logger.debug(f"Cannot list dashboards: {e}")
             return []
 
-    def delete_backup_dbsql_queries(self):
+    def delete_backup_dbsql_queries(self, prompts: Prompts):
+        if not prompts.confirm("Are you sure you want to delete all backup queries?"):
+            return
         for query in self._ws.queries.list():
             if query.tags is None or self.BACKUP_TAG not in query.tags:
                 continue
@@ -63,8 +67,8 @@ class Redash:
     def _fix_query(self, query: Query):
         assert query.id is not None
         assert query.query is not None
+        # query already migrated
         if query.tags is not None and self.MIGRATED_TAG in query.tags:
-            # already migrated
             return
         # create the backup folder for queries if it does not exist
         try:
