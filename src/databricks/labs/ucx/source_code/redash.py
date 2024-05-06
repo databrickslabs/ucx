@@ -29,7 +29,7 @@ class Redash:
             assert dashboard.id is not None
             if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
                 logger.debug(f"Dashboard {dashboard.name} already migrated by UCX")
-                return
+                continue
             for query in self.get_queries_from_dashboard(dashboard):
                 self._fix_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_migrated_tags(dashboard.tags))
