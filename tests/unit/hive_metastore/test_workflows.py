@@ -52,7 +52,7 @@ def test_migrate_ctas_views(run_workflow):
     ctx = run_workflow(MigrateExternalTablesCTAS.migrate_views)
     ctx.workspace_client.catalogs.list.assert_called()
 
-    
+
 @pytest.mark.parametrize(
     "workflow", [TableMigration, MigrateHiveSerdeTablesInPlace, MigrateExternalTablesCTAS, MigrateTablesInMounts]
 )
