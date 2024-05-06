@@ -33,7 +33,7 @@ class ServicePrincipalMigrationInfo:
 
 @dataclass
 class StorageCredentialValidationResult:
-    name: str | None
+    name: str
     application_id: str
     read_only: bool | None
     validated_on: str
@@ -63,6 +63,7 @@ class StorageCredentialValidationResult:
         validated_on: str,
         failures: list[str] | None,
     ):
+        assert storage_credential_info.name is not None
         application_id, directory_id = cls._get_application_and_directory_id(storage_credential_info)
         return cls(
             storage_credential_info.name,
