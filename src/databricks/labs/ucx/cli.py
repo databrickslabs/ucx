@@ -459,21 +459,21 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
     """Migrate table references in DBSQL Dashboard queries"""
     ctx = WorkspaceContext(w)
-    ctx.redash.fix_dashboard(dashboard_id)
+    ctx.redash.fix_dashboards(dashboard_id)
 
 
 @ucx.command
 def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
     """Revert migrated DBSQL Dashboard queries back to their original state"""
     ctx = WorkspaceContext(w)
-    ctx.redash.fix_dashboard(dashboard_id)
+    ctx.redash.revert_dashboards(dashboard_id)
 
 
 @ucx.command
 def delete_backup_dbsql_queries(w: WorkspaceClient):
     """Delete DBSQL queries that have been backed up by UCX"""
     ctx = WorkspaceContext(w)
-    ctx.redash.delete_backup_dbsql_queries(ctx.prompts)
+    ctx.redash.delete_backup_queries(ctx.prompts)
 
 
 if __name__ == "__main__":

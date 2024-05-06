@@ -24,7 +24,7 @@ class Redash:
         self._ws = ws
         self._backup_path = backup_path + "/backup_queries"
 
-    def fix_dashboard(self, dashboard_id: str | None = None):
+    def fix_dashboards(self, dashboard_id: str | None = None):
         for dashboard in self._list_dashboards(dashboard_id):
             assert dashboard.id is not None
             if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
@@ -34,7 +34,7 @@ class Redash:
                 self._fix_query(query)
             self._ws.dashboards.update(dashboard.id, tags=self._get_migrated_tags(dashboard.tags))
 
-    def revert_dashboard(self, dashboard_id: str | None = None):
+    def revert_dashboards(self, dashboard_id: str | None = None):
         for dashboard in self._list_dashboards(dashboard_id):
             assert dashboard.id is not None
             if dashboard.tags is None or self.MIGRATED_TAG not in dashboard.tags:
@@ -53,7 +53,7 @@ class Redash:
             logger.debug(f"Cannot list dashboards: {e}")
             return []
 
-    def delete_backup_dbsql_queries(self, prompts: Prompts):
+    def delete_backup_queries(self, prompts: Prompts):
         if not prompts.confirm("Are you sure you want to delete all backup queries?"):
             return
         for query in self._ws.queries.list():

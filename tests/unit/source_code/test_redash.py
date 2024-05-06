@@ -55,7 +55,7 @@ def redash_ws():
 
 def test_fix_all_dashboards(redash_ws, empty_index):
     redash = Redash(empty_index, redash_ws, "backup")
-    redash.fix_dashboard()
+    redash.fix_dashboards()
     redash_ws.queries.create.assert_called_with(
         name='test_query_original',
         query='SELECT * FROM old.things',
@@ -76,7 +76,7 @@ def test_fix_all_dashboards(redash_ws, empty_index):
 def test_revert_dashboard(redash_ws, empty_index):
     redash_ws.queries.get.return_value = Query(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, "")
-    redash.revert_dashboard("2")
+    redash.revert_dashboards("2")
     redash_ws.queries.update.assert_called_with("1", query="original_query", tags=[])
     redash_ws.queries.delete.assert_called_once_with("123")
 
@@ -85,12 +85,12 @@ def test_delete_backup_dashboards(redash_ws, empty_index):
     redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[])]
     redash = Redash(empty_index, redash_ws, "")
     mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "Yes"})
-    redash.delete_backup_dbsql_queries(mock_prompts)
+    redash.delete_backup_queries(mock_prompts)
     redash_ws.queries.delete.assert_called_once_with("1")
 
 
 def test_delete_backup_dashboards_not_confirmed(redash_ws, empty_index):
     redash = Redash(empty_index, redash_ws, "")
     mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "No"})
-    redash.delete_backup_dbsql_queries(mock_prompts)
+    redash.delete_backup_queries(mock_prompts)
     redash_ws.queries.delete.assert_not_called()
