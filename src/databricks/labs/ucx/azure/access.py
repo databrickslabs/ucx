@@ -236,7 +236,7 @@ class AzureResourcePermissions:
                     ),
                     EndpointConfPair(
                         f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
-                        f"{{secrets/{inventory_database}/uber_principal_secret}}",
+                        "{{secrets/" + inventory_database + "/uber_principal_secret}}",
                     ),
                 ]
             )
