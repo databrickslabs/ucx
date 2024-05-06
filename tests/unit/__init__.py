@@ -21,7 +21,7 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.graph import SourceContainer, Dependency
 from databricks.labs.ucx.source_code.files import LocalFile, FileLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -250,8 +250,8 @@ def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited:
 class TestFileLoader(FileLoader):
     __test__ = False
 
-    def __init__(self, path_lookup: PathLookup, sources: dict[str, str]):
-        super().__init__(path_lookup)
+    def __init__(self, syspath_lookup: SysPathLookup, sources: dict[str, str]):
+        super().__init__(syspath_lookup)
         self._sources = sources
 
     def exists(self, path: pathlib.Path):
@@ -272,8 +272,8 @@ class TestFileLoader(FileLoader):
 class VisitingFileLoader(FileLoader):
     __test__ = False
 
-    def __init__(self, path_lookup: PathLookup, visited: dict[str, bool]):
-        super().__init__(path_lookup)
+    def __init__(self, syspath_lookup: SysPathLookup, visited: dict[str, bool]):
+        super().__init__(syspath_lookup)
         self._visited = visited
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
@@ -285,8 +285,8 @@ class VisitingFileLoader(FileLoader):
 
 class VisitingNotebookLoader(LocalNotebookLoader):
 
-    def __init__(self, path_lookup: PathLookup, visited: dict[str, bool]):
-        super().__init__(path_lookup)
+    def __init__(self, syspath_lookup: SysPathLookup, visited: dict[str, bool]):
+        super().__init__(syspath_lookup)
         self._visited = visited
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:

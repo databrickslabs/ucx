@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from collections.abc import Callable
 
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
@@ -34,14 +34,14 @@ class LocalFile(SourceContainer):
     def path(self):
         return self._path
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return
-        path_lookup.push_cwd(self.path.parent)
-        problems = parent.build_graph_from_python_source(self._original_code, path_lookup)
+        syspath_lookup.push_cwd(self.path.parent)
+        problems = parent.build_graph_from_python_source(self._original_code, syspath_lookup)
         parent.add_problems(problems)
-        path_lookup.pop_cwd()
+        syspath_lookup.pop_cwd()
 
 
 class LocalFileMigrator:
@@ -97,8 +97,8 @@ class LocalFileMigrator:
 
 class FileLoader(DependencyLoader):
 
-    def __init__(self, path_lookup: PathLookup):
-        self._path_lookup = path_lookup
+    def __init__(self, syspath_lookup: SysPathLookup):
+        self._syspath_lookup = syspath_lookup
 
     def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
         fullpath = self.full_path(dependency.path)
@@ -111,7 +111,7 @@ class FileLoader(DependencyLoader):
     def full_path(self, path: Path) -> Path | None:
         if path.is_file():
             return path
-        for parent in self._path_lookup.paths:
+        for parent in self._syspath_lookup.paths:
             child = Path(parent, path)
             if child.is_file():
                 return child

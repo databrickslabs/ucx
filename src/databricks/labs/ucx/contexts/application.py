@@ -9,6 +9,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -35,7 +36,6 @@ from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader, WorkspaceNotebookLoader
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraphBuilder
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages
@@ -358,17 +358,17 @@ class GlobalContext(abc.ABC):
         return SitePackages([])
 
     @cached_property
-    def path_lookup(self):
+    def syspath_lookup(self):
         # TODO find a solution to enable a different cwd per job/task (maybe it's not necessary or possible?)
-        return PathLookup.from_sys_path(Path.cwd())
+        return SysPathLookup.from_sys_path(Path.cwd())
 
     @cached_property
     def file_loader(self):
-        return FileLoader(self.path_lookup)
+        return FileLoader(self.syspath_lookup)
 
     @cached_property
     def site_packages_resolver(self):
-        return SitePackagesResolver(self.site_packages, self.file_loader, self.path_lookup)
+        return SitePackagesResolver(self.site_packages, self.file_loader, self.syspath_lookup)
 
     @cached_property
     def whitelist(self):
@@ -396,7 +396,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_graph_builder(self):
-        return DependencyGraphBuilder(self.dependency_resolver, self.path_lookup)
+        return DependencyGraphBuilder(self.dependency_resolver, self.syspath_lookup)
 
 
 class CliContext(GlobalContext, abc.ABC):

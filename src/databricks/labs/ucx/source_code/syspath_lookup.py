@@ -5,16 +5,16 @@ from collections.abc import Iterable
 from pathlib import Path
 
 
-class PathLookup:
+class SysPathLookup:
 
     @classmethod
     def from_pathlike_string(cls, cwd: Path, syspath: str):
         paths = syspath.split(':')
-        return PathLookup(cwd, [Path(path) for path in paths])
+        return SysPathLookup(cwd, [Path(path) for path in paths])
 
     @classmethod
     def from_sys_path(cls, cwd: Path):
-        return PathLookup(cwd, [Path(path) for path in sys.path])
+        return SysPathLookup(cwd, [Path(path) for path in sys.path])
 
     def __init__(self, cwd: Path, sys_paths: list[Path]):
         self._sys_paths = sys_paths

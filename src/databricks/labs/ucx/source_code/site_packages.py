@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     WrappingLoader,
@@ -22,7 +22,7 @@ class SitePackagesResolver(BaseDependencyResolver):
         self,
         site_packages: SitePackages,
         file_loader: FileLoader,
-        path_lookup: PathLookup,
+        path_lookup: SysPathLookup,
         next_resolver: BaseDependencyResolver | None = None,
     ):
         super().__init__(next_resolver)
@@ -47,7 +47,7 @@ class SitePackageContainer(SourceContainer):
         self._file_loader = file_loader
         self._site_package = site_package
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
         for module_path in self._site_package.module_paths:
             parent.register_dependency(Dependency(self._file_loader, module_path))
 

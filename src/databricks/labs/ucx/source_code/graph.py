@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.python_linter import (
     NotebookRunCall,
     ImportSource,
 )
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 
 
 class DependencyGraph:
@@ -22,12 +22,12 @@ class DependencyGraph:
         dependency: Dependency,
         parent: DependencyGraph | None,
         resolver: DependencyResolver,
-        path_lookup: PathLookup,
+        syspath_lookup: SysPathLookup,
     ):
         self._dependency = dependency
         self._parent = parent
         self._resolver = resolver
-        self._path_lookup = path_lookup
+        self._path_lookup = syspath_lookup
         self._dependencies: dict[Dependency, DependencyGraph] = {}
 
     @property
@@ -135,7 +135,9 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_graph_from_python_source(
+        self, python_code: str, syspath_lookup: SysPathLookup
+    ) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         linter = ASTLinter.parse(python_code)
         syspath_changes = PythonLinter.list_sys_path_changes(linter)
@@ -148,11 +150,11 @@ class DependencyGraph:
             if isinstance(base_node, SysPathChange):
                 path = Path(base_node.path)
                 if not path.is_absolute():
-                    path = path_lookup.cwd / path
+                    path = syspath_lookup.cwd / path
                 if base_node.is_append:
-                    path_lookup.append_path(path)
+                    syspath_lookup.append_path(path)
                     continue
-                path_lookup.prepend_path(path)
+                syspath_lookup.prepend_path(path)
                 continue
             if isinstance(base_node, NotebookRunCall):
                 strpath = base_node.get_constant_path()
@@ -216,7 +218,7 @@ class Dependency(abc.ABC):
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
         raise NotImplementedError()
 
 
@@ -399,9 +401,9 @@ class DependencyProblem:
 
 class DependencyGraphBuilder:
 
-    def __init__(self, resolver: DependencyResolver, path_lookup: PathLookup):
+    def __init__(self, resolver: DependencyResolver, syspath_lookup: SysPathLookup):
         self._resolver = resolver
-        self._path_lookup = path_lookup
+        self._syspath_lookup = syspath_lookup
 
     @property
     def problems(self):
@@ -411,18 +413,18 @@ class DependencyGraphBuilder:
         dependency = self._resolver.resolve_local_file(path)
         if dependency is None:
             return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
+        graph = DependencyGraph(dependency, None, self._resolver, self._syspath_lookup)
         container = dependency.load()
         if container is not None:
-            container.build_dependency_graph(graph, self._path_lookup)
+            container.build_dependency_graph(graph, self._syspath_lookup)
         return graph
 
     def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
         dependency = self._resolver.resolve_notebook(path)
         if dependency is None:
             return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
+        graph = DependencyGraph(dependency, None, self._resolver, self._syspath_lookup)
         container = dependency.load()
         if container is not None:
-            container.build_dependency_graph(graph, self._path_lookup)
+            container.build_dependency_graph(graph, self._syspath_lookup)
         return graph

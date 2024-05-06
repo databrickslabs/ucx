@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 from databricks.labs.ucx.source_code.files import LocalFileResolver
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraphBuilder, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver
 from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
@@ -40,17 +40,17 @@ def test_locates_notebooks(source: list[str], expected: int):
     elems.extend(source)
     notebook_path = Path(*elems)
     whitelist = Whitelist()
-    provider = PathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(provider, visited)
-    notebook_loader = VisitingNotebookLoader(provider, visited)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
+    file_loader = VisitingFileLoader(lookup, visited)
+    notebook_loader = VisitingNotebookLoader(lookup, visited)
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, provider),
+        SitePackagesResolver(site_packages, file_loader, lookup),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
-    builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
+    builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
     builder.build_notebook_dependency_graph(notebook_path)
     assert len(visited) == expected
 
@@ -69,17 +69,17 @@ def test_locates_files(source: list[str], expected: int):
     elems.extend(source)
     file_path = Path(*elems)
     whitelist = whitelist_mock()
-    provider = PathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(provider, visited)
-    notebook_loader = VisitingNotebookLoader(provider, visited)
+    lookup = SysPathLookup.from_sys_path(Path.cwd())
+    file_loader = VisitingFileLoader(lookup, visited)
+    notebook_loader = VisitingNotebookLoader(lookup, visited)
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, provider),
+        SitePackagesResolver(site_packages, file_loader, lookup),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
-    builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
+    builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
     builder.build_local_file_dependency_graph(file_path)
     assert len(visited) == expected
 
@@ -111,17 +111,17 @@ sys.path.append('{child_dir_path.as_posix()}')
         )
         visited: dict[str, bool] = {}
         whitelist = Whitelist()
-        provider = PathLookup.from_sys_path(Path.cwd())
-        file_loader = VisitingFileLoader(provider, visited)
-        notebook_loader = VisitingNotebookLoader(provider, visited)
+        lookup = SysPathLookup.from_sys_path(Path.cwd())
+        file_loader = VisitingFileLoader(lookup, visited)
+        notebook_loader = VisitingNotebookLoader(lookup, visited)
         site_packages = SitePackages.parse(locate_site_packages())
         resolvers = [
             NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, provider),
+            SitePackagesResolver(site_packages, file_loader, lookup),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
+        builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
         builder.build_notebook_dependency_graph(parent_file_path)
         assert len(visited) == 2
 
@@ -152,16 +152,16 @@ def func():
         )
         visited: dict[str, bool] = {}
         whitelist = Whitelist()
-        provider = PathLookup.from_sys_path(Path.cwd())
-        file_loader = VisitingFileLoader(provider, visited)
-        notebook_loader = VisitingNotebookLoader(provider, visited)
+        lookup = SysPathLookup.from_sys_path(Path.cwd())
+        file_loader = VisitingFileLoader(lookup, visited)
+        notebook_loader = VisitingNotebookLoader(lookup, visited)
         site_packages = SitePackages.parse(locate_site_packages())
         resolvers = [
             NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, provider),
+            SitePackagesResolver(site_packages, file_loader, lookup),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        builder = DependencyGraphBuilder(DependencyResolver(resolvers), provider)
+        builder = DependencyGraphBuilder(DependencyResolver(resolvers), lookup)
         builder.build_local_file_dependency_graph(parent_file_path)
         assert len(visited) == 2

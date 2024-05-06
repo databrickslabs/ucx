@@ -7,7 +7,7 @@ from enum import Enum
 from pathlib import Path
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
@@ -56,7 +56,7 @@ class Cell(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         raise NotImplementedError()
 
 
@@ -73,8 +73,8 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup):
-        return parent.build_graph_from_python_source(self._original_code, path_lookup)
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup):
+        return parent.build_graph_from_python_source(self._original_code, syspath_lookup)
 
 
 class RCell(Cell):
@@ -86,7 +86,7 @@ class RCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         return []
 
 
@@ -99,7 +99,7 @@ class ScalaCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         return []
 
 
@@ -117,7 +117,7 @@ class SQLCell(Cell):
             sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         return []
 
 
@@ -130,7 +130,7 @@ class MarkdownCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         return []
 
 
@@ -143,7 +143,7 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup):
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup):
         problems: list[DependencyProblem] = []
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
@@ -185,7 +185,7 @@ class ShellCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         return []
 
     def migrate_notebook_path(self):
@@ -201,7 +201,7 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> list[DependencyProblem]:
+    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> list[DependencyProblem]:
         return []
 
     def migrate_notebook_path(self):
