@@ -319,6 +319,9 @@ class DependencyProblem:
     end_line: int = -1
     end_col: int = -1
 
+    def is_path_missing(self):
+        return self.source_path == Path(MISSING_SOURCE_PATH)
+
     def replace(
         self,
         code: str | None = None,

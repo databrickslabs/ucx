@@ -161,15 +161,18 @@ class RunCell(Cell):
                 start_line = self._original_offset + idx + 1
                 problems: list[DependencyProblem] = []
                 for problem in maybe.problems:
-                    with_path = problem.replace(
-                        source_path=parent.dependency.path.absolute(),
+                    if problem.is_path_missing():
+                        problem = problem.replace(source_path=parent.dependency.path.absolute())
+                    problem = problem.replace(
                         start_line=start_line,
                         start_col=0,
                         end_line=start_line,
                         end_col=len(line),
                     )
-                    problems.append(with_path)
-                return MaybeGraph(maybe.graph, problems)
+                    problems.append(problem)
+                if problems:
+                    return MaybeGraph(None, problems)
+                return MaybeGraph(maybe.graph, [])
         start_line = self._original_offset + 1
         problem = DependencyProblem(
             'invalid-run-cell',
@@ -233,6 +236,10 @@ class CellLanguage(Enum):
         self._new_cell = args[4]
 
     @property
+    def file_magic_header(self):
+        return f"{self._comment_prefix} {NOTEBOOK_HEADER}"
+
+    @property
     def language(self) -> Language:
         return self._language
 
@@ -279,8 +286,7 @@ class CellLanguage(Enum):
 
     def extract_cells(self, source: str) -> list[Cell] | None:
         lines = source.split('\n')
-        header = f"{self.comment_prefix} {NOTEBOOK_HEADER}"
-        if not lines[0].startswith(header):
+        if not lines[0].startswith(self.file_magic_header):
             raise ValueError("Not a Databricks notebook source!")
 
         def make_cell(cell_lines: list[str], start: int):

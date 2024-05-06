@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from functools import cached_property
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
@@ -64,7 +65,9 @@ class Notebook(SourceContainer):
         for cell in self._cells:
             maybe = cell.build_dependency_graph(parent)
             for problem in maybe.problems:
-                problems.append(problem.replace(source_path=parent.path))
+                if problem.is_path_missing():
+                    problem = problem.replace(source_path=parent.path)
+                problems.append(problem)
         return problems
 
     def __repr__(self):
@@ -102,3 +105,39 @@ class NotebookLinter:
     @staticmethod
     def name() -> str:
         return "notebook-linter"
+
+
+class FileLinter:
+    _EXT = {
+        '.py': Language.PYTHON,
+        '.sql': Language.SQL,
+    }
+
+    def __init__(self, langs: Languages, path: Path):
+        self._languages: Languages = langs
+        self._path: Path = path
+
+    @cached_property
+    def _content(self) -> str:
+        return self._path.read_text()
+
+    def _file_language(self):
+        return self._EXT.get(self._path.suffix)
+
+    def _is_notebook(self):
+        language = self._file_language()
+        if not language:
+            return False
+        cell_language = CellLanguage.of_language(language)
+        return self._content.startswith(cell_language.file_magic_header)
+
+    def lint(self) -> Iterable[Advice]:
+        if self._is_notebook():
+            notebook = Notebook.parse(self._path, self._content, self._file_language())
+            notebook_linter = NotebookLinter(self._languages, notebook)
+            yield from notebook_linter.lint()
+        language = self._file_language()
+        if not language:
+            return
+        linter = self._languages.linter(language)
+        yield from linter.lint(self._content)

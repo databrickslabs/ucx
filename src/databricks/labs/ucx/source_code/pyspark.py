@@ -251,6 +251,7 @@ class SparkMatchers:
             TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("getTable", 1, 1, 0),
+            TableNameMatcher("table", 1, 1, 0),
             TableNameMatcher("isCached", 1, 1, 0),
             TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
             TableNameMatcher("tableExists", 1, 2, 0, "tableName"),

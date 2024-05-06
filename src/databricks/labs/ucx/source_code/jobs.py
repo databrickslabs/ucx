@@ -1,4 +1,5 @@
 import collections
+from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
@@ -10,9 +11,23 @@ from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import DependencyGraphBuilder
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
 from databricks.labs.ucx.source_code.site_packages import SitePackageContainer
 from databricks.labs.ucx.source_code.whitelist import Whitelist
+
+
+@dataclass
+class JobProblem:
+    job_id: int
+    job_name: str
+    task_key: str
+    path: str
+    code: str
+    message: str
+    start_line: int
+    start_col: int
+    end_line: int
+    end_col: int
 
 
 class WorkflowLinter:
@@ -28,14 +43,31 @@ class WorkflowLinter:
         self._migration_index = migration_index
         self._whitelist = whitelist
 
-    def lint(self, job_id: int):
+    def lint_job(self, job_id: int):
         job = self._ws.jobs.get(job_id)
-        problems: dict[Path, list[Advice]] = collections.defaultdict(list)
+        return list(self._lint_job(job))
+
+    def _lint_job(self, job: jobs.Job) -> list[JobProblem]:
+        problems: list[JobProblem] = []
         assert job.settings is not None
         assert job.settings.tasks is not None
         for task in job.settings.tasks:
             for path, advice in self._lint_task(task):
-                problems[path].append(advice)
+                absolute_path = path.absolute().as_posix() if path != self._UNKNOWN else 'UNKNOWN'
+                job_problem = JobProblem(
+                    job_id=job.job_id,
+                    job_name=job.settings.name,
+                    task_key=task.task_key,
+                    path=absolute_path,
+                    code=advice.code,
+                    message=advice.message,
+                    start_line=advice.start_line,
+                    start_col=advice.start_col,
+                    end_line=advice.end_line,
+                    end_col=advice.end_col,
+                )
+                problems.append(job_problem)
+        return problems
 
     def _lint_task(self, task: jobs.Task):
         yield from self._lint_notebook_task(task)
@@ -58,27 +90,31 @@ class WorkflowLinter:
             yield problem.source_path, problem.as_advisory()
         if not maybe.graph:
             return
+        session_state = CurrentSessionState()
+        state = Languages(self._migration_index, session_state)
         for dependency in maybe.graph.all_dependencies:
             container = dependency.load(maybe.graph.path_lookup)
             if not container:
                 continue
             if isinstance(container, Notebook):
-                yield from self._lint_notebook(container)
+                yield from self._lint_notebook(container, state)
             if isinstance(container, SitePackageContainer):
                 yield from self._lint_python_package(container)
             if isinstance(container, LocalFile):
-                # TODO: lint every path
-                yield path, Advice('not-yet-implemented', 'Local file is not yet implemented', 0, 0, 0, 0)
+                yield from self._lint_file(container, state)
 
     def _lint_python_package(self, site_package):
         for path in site_package.paths:
             # lint every path
             yield path, Advice('not-yet-implemented', 'Python package is not yet implemented', 0, 0, 0, 0)
 
-    def _lint_notebook(self, notebook: Notebook):
-        session_state = CurrentSessionState()
-        languages = Languages(self._migration_index, session_state)
-        linter = NotebookLinter(languages, notebook)
+    def _lint_file(self, file: LocalFile, state: Languages):
+        linter = FileLinter(state, file.path)
+        for advice in linter.lint():
+            yield file.path, advice
+
+    def _lint_notebook(self, notebook: Notebook, state: Languages):
+        linter = NotebookLinter(state, notebook)
         for advice in linter.lint():
             yield notebook.path, advice
 
