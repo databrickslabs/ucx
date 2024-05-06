@@ -17,6 +17,7 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.cli import (
     alias,
     cluster_remap,
@@ -371,13 +372,21 @@ def test_create_uber_principal(ws):
 
 
 def test_migrate_locations_azure(ws):
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    azurerm = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azurerm,
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
+    azurerm.storage_accounts.assert_called()
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
