@@ -541,4 +541,4 @@ def test_create_access_connectors_for_storage_accounts(sp_migration):
 
     assert len(validation_results) == 1
     assert validation_results[0].name.startswith("ac")
-    assert validation_results[0].failures is None
+    assert len(validation_results[0].failures) == 0
