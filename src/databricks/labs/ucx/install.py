@@ -121,10 +121,10 @@ def extract_major_minor(version_string):
 
 class WorkspaceInstaller(WorkspaceContext):
     def __init__(
-        self,
-        ws: WorkspaceClient,
-        environ: dict[str, str] | None = None,
-        tasks: list[Task] | None = None,
+            self,
+            ws: WorkspaceClient,
+            environ: dict[str, str] | None = None,
+            tasks: list[Task] | None = None,
     ):
         super().__init__(ws)
         if not environ:
@@ -155,10 +155,10 @@ class WorkspaceInstaller(WorkspaceContext):
             return Installation.assume_global(self.workspace_client, self.product_info.product_name())
 
     def run(
-        self,
-        default_config: WorkspaceConfig | None = None,
-        verify_timeout=timedelta(minutes=2),
-        config: WorkspaceConfig | None = None,
+            self,
+            default_config: WorkspaceConfig | None = None,
+            verify_timeout=timedelta(minutes=2),
+            config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
         if config is None:
@@ -401,16 +401,16 @@ class WorkspaceInstaller(WorkspaceContext):
 
 class WorkspaceInstallation(InstallationMixin):
     def __init__(  # pylint: disable=too-many-arguments
-        self,
-        config: WorkspaceConfig,
-        installation: Installation,
-        install_state: InstallState,
-        sql_backend: SqlBackend,
-        ws: WorkspaceClient,
-        workflows_installer: WorkflowsDeployment,
-        prompts: Prompts,
-        product_info: ProductInfo,
-        skip_dashboards=False,
+            self,
+            config: WorkspaceConfig,
+            installation: Installation,
+            install_state: InstallState,
+            sql_backend: SqlBackend,
+            ws: WorkspaceClient,
+            workflows_installer: WorkflowsDeployment,
+            prompts: Prompts,
+            product_info: ProductInfo,
+            skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -514,8 +514,8 @@ class WorkspaceInstallation(InstallationMixin):
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
-            "Do you want to uninstall ucx from the workspace too, this would "
-            "remove ucx project folder, dashboards, queries and jobs"
+                "Do you want to uninstall ucx from the workspace too, this would "
+                "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
@@ -536,7 +536,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _remove_database(self):
         if self._prompts and not self._prompts.confirm(
-            f"Do you want to delete the inventory database {self._config.inventory_database} too?"
+                f"Do you want to delete the inventory database {self._config.inventory_database} too?"
         ):
             return
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
@@ -611,36 +611,6 @@ class AccountInstaller(AccountContext):
         account_id = self.prompts.question("Please provide the Databricks account id")
         return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
-    def _can_administer(self, workspace: Workspace):
-        # TODO: move to AccountWorkspaces
-        try:
-            # check if user is a workspace admin
-            ws = self.account_client.get_workspace_client(workspace)
-            current_user = ws.current_user.me()
-            if current_user.groups is None:
-                return False
-            if "admins" not in [g.display for g in current_user.groups]:
-                logger.warning(
-                    f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
-                )
-                return False
-            # check if user has access to workspace
-        except (PermissionDenied, NotFound, ValueError) as err:
-            logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
-            return False
-        return True
-
-    def _get_accessible_workspaces(self):
-        """
-        Get all workspaces that the user has access to
-        """
-        # TODO: move to AccountWorkspaces
-        accessible_workspaces = []
-        for workspace in self.account_client.workspaces.list():
-            if self._can_administer(workspace):
-                accessible_workspaces.append(workspace)
-        return accessible_workspaces
-
     def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
@@ -650,11 +620,11 @@ class AccountInstaller(AccountContext):
         ctx = AccountContext(self._get_safe_account_client())
         default_config = None
         confirmed = False
-        accessible_workspaces = self._get_accessible_workspaces()
+        accessible_workspaces = self.account_workspaces.get_accessible_workspaces()
         msg = "\n".join([w.deployment_name for w in accessible_workspaces])
         installed_workspaces = []
         if not self.prompts.confirm(
-            f"UCX has detected the following workspaces available to install. \n{msg}\nDo you want to continue?"
+                f"UCX has detected the following workspaces available to install. \n{msg}\nDo you want to continue?"
         ):
             return
 

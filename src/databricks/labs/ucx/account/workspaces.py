@@ -24,17 +24,22 @@ class AccountWorkspaces:
                 continue
             yield workspace
 
-    def client_for(self, workspace: Workspace) -> WorkspaceClient:
-        return self._ac.get_workspace_client(workspace)
+    def client_for(self, workspace: Workspace) -> WorkspaceClient | None:
+        ws = self._ac.get_workspace_client(workspace)
+        try:
+            ws.current_user.me()
+        except (PermissionDenied, NotFound, ValueError):
+            if ws.config.auth_type != "azure-cli":  # retry with azure-cli
+                ws.config.auth_type = "azure-cli"
+        return ws
 
     def workspace_clients(self, workspaces: list[Workspace] | None = None) -> list[WorkspaceClient]:
         """
         Return a list of WorkspaceClient for each configured workspace in the account
         :return: list[WorkspaceClient]
         """
-        # TODO: move _can_administer() from account installer over here
         if workspaces is None:
-            workspaces = self._workspaces()
+            workspaces = self.get_accessible_workspaces()
         clients = []
         for workspace in workspaces:
             ws = self.client_for(workspace)
@@ -72,8 +77,37 @@ class AccountWorkspaces:
                 self._add_members_to_acc_group(self._ac, acc_group.id, group_name, valid_group)
             logger.info(f"Group {group_name} created in the account")
 
+    def get_accessible_workspaces(self) -> list[Workspace]:
+        """
+        Get all workspaces that the user has access to
+        :return: list[Workspace]
+        """
+        accessible_workspaces = []
+        for workspace in self._ac.workspaces.list():
+            if self._can_administer(workspace):
+                accessible_workspaces.append(workspace)
+        return accessible_workspaces
+
+    def _can_administer(self, workspace: Workspace) -> bool:
+        try:
+            # check if user is a workspace admin
+            ws = self._ac.get_workspace_client(workspace)
+            current_user = ws.current_user.me()
+            if current_user.groups is None:
+                return False
+            if "admins" not in [g.display for g in current_user.groups]:
+                logger.warning(
+                    f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
+                )
+                return False
+            # check if user has access to workspace
+        except (PermissionDenied, NotFound, ValueError) as err:
+            logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
+            return False
+        return True
+
     def _try_create_account_groups(
-        self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
+            self, group_name: str, acc_groups: dict[str | None, list[ComplexValue] | None]
     ) -> Group | None:
         try:
             if group_name in acc_groups:
@@ -105,7 +139,7 @@ class AccountWorkspaces:
         return valid_workspace_ids
 
     def _add_members_to_acc_group(
-        self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
+            self, acc_client: AccountClient, acc_group_id: str, group_name: str, valid_group: Group
     ):
         for chunk in self._chunks(valid_group.members, 20):
             logger.debug(f"Adding {len(chunk)} members to acc group {group_name}")
@@ -115,10 +149,11 @@ class AccountWorkspaces:
                 schemas=[PatchSchema.URN_IETF_PARAMS_SCIM_API_MESSAGES_2_0_PATCH_OP],
             )
 
-    def _chunks(self, lst, chunk_size):
+    @staticmethod
+    def _chunks(lst, chunk_size):
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(lst), chunk_size):
-            yield lst[i : i + chunk_size]
+            yield lst[i: i + chunk_size]
 
     def _get_valid_workspaces_groups(self, prompts: Prompts, workspace_ids: list[int]) -> dict[str, Group]:
         all_workspaces_groups: dict[str, Group] = {}
@@ -148,9 +183,9 @@ class AccountWorkspaces:
                     logger.info(f"Workspace group {group_name} already found, ignoring")
                     continue
                 if prompts.confirm(
-                    f"Group {group_name} does not have the same amount of members "
-                    f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
-                    f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
+                        f"Group {group_name} does not have the same amount of members "
+                        f"in workspace {client.config.host} than previous workspaces which contains the same group name,"
+                        f"it will be created at the account with name : {workspace.workspace_name}_{group_name}"
                 ):
                     all_workspaces_groups[f"{workspace.workspace_name}_{group_name}"] = full_workspace_group
                     continue
@@ -158,7 +193,8 @@ class AccountWorkspaces:
             all_workspaces_groups[group_name] = full_workspace_group
         logger.info(f"Found a total of {len(all_workspaces_groups)} groups to migrate to the account")
 
-    def _is_group_out_of_scope(self, group: Group) -> bool:
+    @staticmethod
+    def _is_group_out_of_scope(group: Group) -> bool:
         if group.display_name in {"users", "admins", "account users"}:
             logger.debug(f"Group {group.display_name} is a system group, ignoring")
             return True
@@ -170,7 +206,8 @@ class AccountWorkspaces:
             return True
         return False
 
-    def _has_same_members(self, group_1: Group, group_2: Group) -> bool:
+    @staticmethod
+    def _has_same_members(group_1: Group, group_2: Group) -> bool:
         ws_members_set_1 = set([m.display for m in group_1.members] if group_1.members else [])
         ws_members_set_2 = set([m.display for m in group_2.members] if group_2.members else [])
         return not bool((ws_members_set_1 - ws_members_set_2).union(ws_members_set_2 - ws_members_set_1))
@@ -190,7 +227,8 @@ class AccountWorkspaces:
         logger.info(f"{len(acc_groups)} account groups found")
         return acc_groups
 
-    def _safe_groups_get(self, interface, group_id) -> Group | None:
+    @staticmethod
+    def _safe_groups_get(interface, group_id) -> Group | None:
         try:
             if not group_id:
                 return None
