@@ -35,7 +35,7 @@ class CheckInitScriptMixin:
         if not init_script_data:
             return failures
         if azure_sp_conf_in_init_scripts(init_script_data):
-            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
+            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} in {source}.")
         return failures
 
 
