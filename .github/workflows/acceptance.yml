@@ -14,9 +14,6 @@ permissions:
   contents: read
   pull-requests: write
 
-concurrency:
-  group: single-acceptance-job-per-repo
-
 jobs:
   integration:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
