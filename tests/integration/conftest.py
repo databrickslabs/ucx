@@ -777,6 +777,9 @@ def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[st
 def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo]:
     tables: dict[str, TableInfo] = {
         "src_managed_table": context.make_table(schema_name=schema.name),
+        "src_managed_non_delta_table": context.make_table(
+            catalog_name=schema.catalog_name, non_delta=True, schema_name=schema.name
+        ),
         "src_external_table": context.make_table(schema_name=schema.name, external_csv=external_csv),
     }
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
