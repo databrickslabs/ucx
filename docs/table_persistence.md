@@ -1,6 +1,6 @@
-                                                # UCX Persistence
+# UCX objects
 
-Enumeration of all UCX persistence elements
+List of all UCX objects and their respective metadata.
 
 ## Overview
 
@@ -86,11 +86,11 @@ List of DBFS mount points.
 
 Workspace object level permissions
 
-| Column                 | Datatype | Description                                                                                                                                                                                                                                 | Comments |
-|------------------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| object_id              | string   | Either:<br/>Group ID<br/>Workspace Object ID<br/>Redash Object ID<br/>Scope name                                                                                                                                                            |          |
+| Column                 | Datatype | Description                                                                                                                                                                                     | Comments |
+|------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| object_id              | string   | Either:<br/>Group ID<br/>Workspace Object ID<br/>Redash Object ID<br/>Scope name                                                                                                                                                         |          |
 | supports               | string   | One of:<br/>AUTHORIZATION<br/><br/>CLUSTERS<br/>CLUSTER_POLICIES<br/>DIRECTORIES<br/>EXPERIMENTS<br/>FILES<br/>INSTANCE_POOLS<br/>JOBS<br/>NOTEBOOKS<br/>PIPELINES<br/>REGISTERED_MODELS<br/>REPOS<br/>SERVING_ENDPOINTS<br/>SQL_WAREHOUSES |          |
-| raw_object_permissions | JSON     | JSON-serialized response of:<br/>Generic Permissions<br/>Secret ACL<br/>Group roles and entitlements<br/>Redash permissions                                                                                                                 |          |
+| raw_object_permissions | JSON     | JSON-serialized response of:<br/>Generic Permissions<br/>Secret ACL<br/>Group roles and entitlements<br/>Redash permissions                                                                                                              |          |
 
 <br/>
 
