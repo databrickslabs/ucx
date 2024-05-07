@@ -3,10 +3,13 @@ Databricks Labs UCX
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
 The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
-so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). 
-[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
+so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow).
+
+After installation, [`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
 Then you can execute [table migration workflow](#table-migration-workflow).
-More workflows, like notebook code migration is coming in the future releases. 
+
+More workflows, like notebook code migration is coming in the future releases.
+
 UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
 
 For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](docs/troubleshooting.md) or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
