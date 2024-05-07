@@ -110,7 +110,7 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
             ['notebook_spark_conf_task'],
             ['simplest-autoscale'],
             '[123]',
-            '["unsupported config: spark.databricks.passthrough.enabled"]',
+            '["Uses passthrough config: spark.databricks.passthrough.enabled in notebook."]',
         ),
         (['spark_jar_task'], ['simplest-autoscale'], '[123]', '["task jar is a jar task"]'),
     ],
