@@ -26,10 +26,21 @@ def redash_ws():
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
-                            options=QueryOptions(catalog="hive_metastore", schema="default")
+                            options=QueryOptions(catalog="hive_metastore", schema="default"),
                         )
                     )
-                )
+                ),
+                Widget(
+                    visualization=Visualization(
+                        query=Query(
+                            id="1",
+                            name="test_query",
+                            query="SELECT * FROM old.things",
+                            tags=[Redash.MIGRATED_TAG, 'backup:123'],
+                        )
+                    )
+                ),
+                None,
             ],
         ),
         Dashboard(
@@ -45,7 +56,10 @@ def redash_ws():
                             tags=[Redash.MIGRATED_TAG, 'backup:123'],
                         )
                     )
-                )
+                ),
+                Widget(visualization=Visualization(query=Query(id="2", query="SELECT"))),
+                Widget(visualization=Visualization(query=Query(id="3", query="SELECT", tags=['backup:123']))),
+                Widget(visualization=Visualization(query=Query(id="3", query="SELECT", tags=[Redash.MIGRATED_TAG]))),
             ],
         ),
         Dashboard(id="3", tags=[]),
@@ -93,12 +107,22 @@ def test_fix_all_dashboards(redash_ws, empty_index):
 def test_fix_all_dashboards_error(redash_ws, empty_index, caplog):
     redash_ws.dashboards.list.side_effect = PermissionDenied("error")
     redash = Redash(empty_index, redash_ws, "backup")
-    with caplog.at_level("DEBUG"):
-        redash.migrate_dashboards()
-    assert "Cannot list dashboards: error" in caplog.text
+    redash.migrate_dashboards()
+    assert "Cannot list dashboards" in caplog.text
 
 
-def test_revert_dashboard(redash_ws, empty_index):
+def test_revert_single_dashboard(redash_ws, empty_index, caplog):
+    redash_ws.queries.get.return_value = Query(id="1", query="original_query")
+    redash = Redash(empty_index, redash_ws, "")
+    redash.revert_dashboards("2")
+    redash_ws.queries.update.assert_called_with("1", query="original_query", tags=[])
+    redash_ws.queries.delete.assert_called_once_with("123")
+    redash_ws.queries.update.side_effect = PermissionDenied("error")
+    redash.revert_dashboards("2")
+    assert "Cannot restore" in caplog.text
+
+
+def test_revert_dashboards(redash_ws, empty_index):
     redash_ws.queries.get.return_value = Query(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, "")
     redash.revert_dashboards()
