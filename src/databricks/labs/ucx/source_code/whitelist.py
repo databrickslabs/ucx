@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from yaml import load_all as load_yaml, Loader
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -17,6 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     BaseDependencyResolver,
     DependencyProblem,
+    MaybeDependency,
 )
 
 
@@ -30,36 +31,37 @@ class WhitelistResolver(BaseDependencyResolver):
         return WhitelistResolver(self._whitelist, resolver)
 
     # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        if self._is_whitelisted(name):
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        problem, is_known = self._is_whitelisted(name)
+        if problem is not None:
+            return MaybeDependency(None, [problem])
+        if is_known:
             container = StubContainer()
-            return Dependency(WrappingLoader(container), Path(name))
-        return super().resolve_import(name, problem_collector)
+            dependency = Dependency(WrappingLoader(container), Path(name))
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(path_lookup, name)
 
-    def _is_whitelisted(self, name: str) -> bool:
+    def _is_whitelisted(self, name: str) -> tuple[DependencyProblem | None, bool]:
         compatibility = self._whitelist.compatibility(name)
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         if compatibility is None:
-            return False
+            return None, False
         if compatibility == UCCompatibility.NONE:
             # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
-            self._problems.append(
+            return (
                 DependencyProblem(
                     code="dependency-check",
                     message=f"Use of dependency {name} is deprecated",
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=0,
-                )
+                ),
+                True,
             )
-        return True
+        return None, True
 
 
 class StubContainer(SourceContainer):
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
-        pass
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return []
 
 
 class UCCompatibility(Enum):

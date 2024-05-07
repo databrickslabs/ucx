@@ -558,7 +558,7 @@ def make_secret_scope_acl(ws):
 def make_notebook(ws, make_random):
     def create(
         *,
-        path: str | None = None,
+        path: str | Path | None = None,
         content: BinaryIO | None = None,
         language: Language = Language.PYTHON,
         format: ImportFormat = ImportFormat.SOURCE,  # pylint:  disable=redefined-builtin
@@ -566,6 +566,8 @@ def make_notebook(ws, make_random):
     ) -> str:
         if path is None:
             path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+        elif isinstance(path, pathlib.Path):
+            path = str(path)
         if content is None:
             content = io.BytesIO(b"print(1)")
         path = str(path)
@@ -754,43 +756,33 @@ def make_instance_pool(ws, make_random):
 
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
-    def create(**kwargs):
+    def create(notebook_path: str | Path | None = None, **kwargs):
         task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
+        if isinstance(notebook_path, pathlib.Path):
+            notebook_path = str(notebook_path)
+        if not notebook_path:
+            notebook_path = make_notebook()
+        assert notebook_path is not None
         if "tasks" not in kwargs:
-            if task_spark_conf:
-                kwargs["tasks"] = [
-                    jobs.Task(
-                        task_key=make_random(4),
-                        description=make_random(4),
-                        new_cluster=compute.ClusterSpec(
-                            num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                            spark_version=ws.clusters.select_spark_version(latest=True),
-                            spark_conf=task_spark_conf,
-                        ),
-                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                        timeout_seconds=0,
-                    )
-                ]
-            else:
-                kwargs["tasks"] = [
-                    jobs.Task(
-                        task_key=make_random(4),
-                        description=make_random(4),
-                        new_cluster=compute.ClusterSpec(
-                            num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                            spark_version=ws.clusters.select_spark_version(latest=True),
-                        ),
-                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                        timeout_seconds=0,
-                    )
-                ]
+            kwargs["tasks"] = [
+                jobs.Task(
+                    task_key=make_random(4),
+                    description=make_random(4),
+                    new_cluster=compute.ClusterSpec(
+                        num_workers=1,
+                        node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                        spark_version=ws.clusters.select_spark_version(latest=True),
+                        spark_conf=task_spark_conf,
+                    ),
+                    notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
+                    timeout_seconds=0,
+                )
+            ]
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
         return job

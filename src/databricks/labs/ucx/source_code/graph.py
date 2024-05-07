@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import abc
 import ast
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 
+from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -22,8 +24,12 @@ class DependencyGraph:
         self._dependency = dependency
         self._parent = parent
         self._resolver = resolver
-        self._path_lookup = path_lookup
+        self._path_lookup = path_lookup.change_directory(dependency.path.parent)
         self._dependencies: dict[Dependency, DependencyGraph] = {}
+
+    @property
+    def path_lookup(self):
+        return self._path_lookup
 
     @property
     def dependency(self):
@@ -33,47 +39,44 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def add_problems(self, problems: list[DependencyProblem]):
-        problems = [problem.replace(source_path=self.dependency.path) for problem in problems]
-        self._resolver.add_problems(problems)
+    def register_library(self, name: str) -> MaybeGraph:
+        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
+        # TODO: https://github.com/databrickslabs/ucx/issues/1642
+        # TODO: https://github.com/databrickslabs/ucx/issues/1643
+        # TODO: https://github.com/databrickslabs/ucx/issues/1640
+        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def register_notebook(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_notebook(path, problem_collector)
-        if resolved is None:
-            return None
-        return self.register_dependency(resolved)
+    def register_notebook(self, path: Path) -> MaybeGraph:
+        maybe = self._resolver.resolve_notebook(self.path_lookup, path)
+        if not maybe.dependency:
+            return MaybeGraph(None, maybe.problems)
+        return self.register_dependency(maybe.dependency)
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def register_import(
-        self, name: str, problem_collector: Callable[[DependencyProblem], None]
-    ) -> DependencyGraph | None:
-        resolved = self._resolver.resolve_import(name, problem_collector)
-        if resolved is None:
-            return None
-        return self.register_dependency(resolved)
+    def register_import(self, name: str) -> MaybeGraph:
+        maybe = self._resolver.resolve_import(self.path_lookup, name)
+        if not maybe.dependency:
+            return MaybeGraph(None, maybe.problems)
+        return self.register_dependency(maybe.dependency)
 
-    def register_dependency(self, dependency: Dependency):
-        # already registered ?
-        child_graph = self._locate_dependency(dependency)
-        if child_graph is not None:
-            self._dependencies[dependency] = child_graph
-            return child_graph
+    def register_dependency(self, dependency: Dependency) -> MaybeGraph:
+        # TODO: this has to be a private method, because we don't want to allow free-form dependencies.
+        # the only case we have for this method to be used outside of this class is for SitePackages (or DistInfo)
+        # See databricks.labs.ucx.source_code.site_packages.SitePackageContainer.build_dependency_graph for reference
+        maybe = self.locate_dependency(dependency.path)
+        if maybe.graph is not None:
+            self._dependencies[dependency] = maybe.graph
+            return maybe
         # nay, create the child graph and populate it
         child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
-        container = dependency.load()
+        container = dependency.load(self.path_lookup)
         if not container:
-            return None
-        container.build_dependency_graph(child_graph, self._path_lookup)
-        return child_graph
+            problem = DependencyProblem('dependency-register-failed', 'Failed to register dependency', dependency.path)
+            return MaybeGraph(child_graph, [problem])
+        problems = container.build_dependency_graph(child_graph)
+        return MaybeGraph(child_graph, problems)
 
-    def _locate_dependency(self, dependency: Dependency) -> DependencyGraph | None:
-        return self.locate_dependency(dependency.path)
-
-    def locate_dependency(self, path: Path) -> DependencyGraph | None:
+    def locate_dependency(self, path: Path) -> MaybeGraph:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
         # TODO https://github.com/databrickslabs/ucx/issues/1287
@@ -91,7 +94,9 @@ class DependencyGraph:
             return False
 
         self.root.visit(check_registered_dependency, set())
-        return found[0] if len(found) > 0 else None
+        if not found:
+            return MaybeGraph(None, [DependencyProblem('dependency-not-found', 'Dependency not found')])
+        return MaybeGraph(found[0], [])
 
     @property
     def root(self):
@@ -116,10 +121,17 @@ class DependencyGraph:
 
     @property
     def all_paths(self) -> set[Path]:
+        # TODO: remove this public method, as it'll throw false positives
+        # for package imports, like certifi. a WorkflowTask is also a dependency,
+        # but it does not exist on a filesyste
         return {d.path for d in self.all_dependencies}
 
+    def all_relative_names(self) -> set[str]:
+        """This method is intented to simplify testing"""
+        return {d.path.relative_to(self._path_lookup.cwd).as_posix() for d in self.all_dependencies}
+
     # when visit_node returns True it interrupts the visit
-    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool | None:
+    def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
         if self.path in visited:
             return False
         visited.add(self.path)
@@ -130,46 +142,54 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str, problem_collector: Callable[[DependencyProblem], None]):
+    def _traverse_notebook_run(self, call: ast.Call):
+        notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
+        if not isinstance(notebook_path_arg, ast.Constant):
+            yield DependencyProblem(
+                code='dependency-not-constant',
+                message="Can't check dependency not provided as a constant",
+                start_line=call.lineno,
+                start_col=call.col_offset,
+                end_line=call.end_lineno or 0,
+                end_col=call.end_col_offset or 0,
+            )
+            return
+        notebook_path = notebook_path_arg.value
+        maybe = self.register_notebook(Path(notebook_path))
+        for problem in maybe.problems:
+            yield problem.replace(
+                start_line=call.lineno,
+                start_col=call.col_offset,
+                end_line=call.end_lineno or 0,
+                end_col=call.end_col_offset or 0,
+            )
+
+    def build_graph_from_python_source(self, python_code: str) -> MaybeGraph:
         linter = ASTLinter.parse(python_code)
-        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
-        for call in calls:
+        problems: list[DependencyProblem] = []
+        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
+        for call in run_notebook_calls:
             assert isinstance(call, ast.Call)
-            path = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(path, ast.Constant):
-                path = path.value.strip().strip("'").strip('"')
-                call_problems: list[DependencyProblem] = []
-                self.register_notebook(Path(path), call_problems.append)
-                for problem in call_problems:
-                    problem = problem.replace(
-                        start_line=call.lineno,
-                        start_col=call.col_offset,
-                        end_line=call.end_lineno or 0,
-                        end_col=call.end_col_offset or 0,
-                    )
-                    problem_collector(problem)
-            else:
-                problem = DependencyProblem(
-                    code='dependency-not-constant',
-                    message="Can't check dependency not provided as a constant",
-                    start_line=call.lineno,
-                    start_col=call.col_offset,
-                    end_line=call.end_lineno or 0,
-                    end_col=call.end_col_offset or 0,
-                )
-                problem_collector(problem)
-        for pair in PythonLinter.list_import_sources(linter):
-            import_problems: list[DependencyProblem] = []
-            self.register_import(pair[0], import_problems.append)
-            node = pair[1]
-            for problem in import_problems:
-                problem = problem.replace(
+            for problem in self._traverse_notebook_run(call):
+                problems.append(problem)
+        for import_name, node in PythonLinter.list_import_sources(linter):
+            if import_name.split('.')[0] in {'databricks'} | sys.stdlib_module_names:
+                # TODO: redundant: see databricks.labs.ucx.source_code.whitelist.Whitelist.__init__
+                # we don't need to register stdlib or databricks.* imports
+                continue
+            maybe = self.register_import(import_name)
+            for problem in maybe.problems:
+                with_lines = problem.replace(
                     start_line=node.lineno,
                     start_col=node.col_offset,
                     end_line=node.end_lineno or 0,
                     end_col=node.end_col_offset or 0,
                 )
-                problem_collector(problem)
+                problems.append(with_lines)
+        return MaybeGraph(self, problems)
+
+    def __repr__(self):
+        return f"<DependencyGraph {self.path}>"
 
 
 class Dependency(abc.ABC):
@@ -188,25 +208,23 @@ class Dependency(abc.ABC):
     def __eq__(self, other):
         return isinstance(other, type(self)) and self.path == other.path
 
-    def load(self) -> SourceContainer | None:
-        return self._loader.load_dependency(self)
+    def load(self, path_lookup: PathLookup) -> SourceContainer | None:
+        return self._loader.load_dependency(path_lookup, self)
+
+    def __repr__(self):
+        return f"Dependency<{self.path}>"
 
 
 class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         raise NotImplementedError()
 
 
 class DependencyLoader(abc.ABC):
-
     @abc.abstractmethod
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def is_notebook(self, path: Path) -> bool:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         raise NotImplementedError()
 
 
@@ -215,47 +233,39 @@ class WrappingLoader(DependencyLoader):
     def __init__(self, source_container: SourceContainer):
         self._source_container = source_container
 
-    def is_notebook(self, path: Path) -> bool:
-        raise NotImplementedError()  # should never happen
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         return self._source_container
+
+    def __repr__(self):
+        return f"<WrappingLoader source_container={self._source_container}>"
 
 
 class BaseDependencyResolver(abc.ABC):
 
     def __init__(self, next_resolver: BaseDependencyResolver | None):
         self._next_resolver = next_resolver
-        self._problems: list[DependencyProblem] = []
 
     @abc.abstractmethod
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         raise NotImplementedError()
 
     @property
-    def problems(self):
-        return self._problems
-
-    def add_problems(self, problems: list[DependencyProblem]):
-        self._problems.extend(problems)
-
-    @property
     def next_resolver(self):
         return self._next_resolver
 
-    def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        # TODO: remove StubResolver and return MaybeDependency(None, [...])
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_notebook(path, problem_collector)
+        return self._next_resolver.resolve_notebook(path_lookup, path)
 
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_local_file(path, problem_collector)
+        return self._next_resolver.resolve_local_file(path_lookup, path)
 
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        # TODO: remove StubResolver and return MaybeDependency(None, [...])
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_import(name, problem_collector)
+        return self._next_resolver.resolve_import(path_lookup, name)
 
 
 class StubResolver(BaseDependencyResolver):
@@ -266,16 +276,24 @@ class StubResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         raise NotImplementedError("Should never happen!")
 
-    def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        return None
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
 
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
-        return None
+    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._fail('file-not-found', f"File not found: {path.as_posix()}")
 
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        return None
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        return self._fail('import-not-found', f"Could not locate import: {name}")
+
+    @staticmethod
+    def _fail(code: str, message: str):
+        return MaybeDependency(None, [DependencyProblem(code, message)])
+
+
+@dataclass
+class MaybeDependency:
+    dependency: Dependency | None
+    problems: list[DependencyProblem]
 
 
 class DependencyResolver:
@@ -286,60 +304,17 @@ class DependencyResolver:
             previous = resolver
         self._resolver: BaseDependencyResolver = previous
 
-    def resolve_notebook(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
-        problems: list[DependencyProblem] = []
-        dependency = self._resolver.resolve_notebook(path, problems.append)
-        if dependency is None:
-            problem = DependencyProblem('notebook-not-found', f"Notebook not found: {path.as_posix()}")
-            problems.append(problem)
-        if problem_collector:
-            for problem in problems:
-                problem_collector(problem)
-        else:
-            self.add_problems(problems)
-        return dependency
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._resolver.resolve_notebook(path_lookup, path)
 
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
-        problems: list[DependencyProblem] = []
-        dependency = self._resolver.resolve_local_file(path, problems.append)
-        if dependency is None:
-            problem = DependencyProblem('file-not-found', f"File not found: {path.as_posix()}")
-            problems.append(problem)
-        if problem_collector:
-            for problem in problems:
-                problem_collector(problem)
-        else:
-            self.add_problems(problems)
-        return dependency
+    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._resolver.resolve_local_file(path_lookup, path)
 
-    def resolve_import(
-        self, name: str, problem_collector: Callable[[DependencyProblem], None] | None = None
-    ) -> Dependency | None:
-        problems: list[DependencyProblem] = []
-        dependency = self._resolver.resolve_import(name, problems.append)
-        if dependency is None:
-            problem = DependencyProblem('import-not-found', f"Could not locate import: {name}")
-            problems.append(problem)
-        if problem_collector:
-            for problem in problems:
-                problem_collector(problem)
-        else:
-            self.add_problems(problems)
-        return dependency
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        return self._resolver.resolve_import(path_lookup, name)
 
-    @property
-    def problems(self) -> Iterable[DependencyProblem]:
-        resolver = self._resolver
-        while resolver is not None:
-            yield from resolver.problems
-            resolver = resolver.next_resolver
-
-    def add_problems(self, problems: list[DependencyProblem]):
-        self._resolver.add_problems(problems)
+    def __repr__(self):
+        return f"<DependencyResolver {self._resolver}>"
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"
@@ -354,6 +329,9 @@ class DependencyProblem:
     start_col: int = -1
     end_line: int = -1
     end_col: int = -1
+
+    def is_path_missing(self):
+        return self.source_path == Path(MISSING_SOURCE_PATH)
 
     def replace(
         self,
@@ -375,6 +353,26 @@ class DependencyProblem:
             end_col if end_col is not None else self.end_col,
         )
 
+    def as_advisory(self) -> 'Advisory':
+        return Advisory(
+            code=self.code,
+            message=self.message,
+            start_line=self.start_line,
+            start_col=self.start_col,
+            end_line=self.end_line,
+            end_col=self.end_col,
+        )
+
+
+@dataclass
+class MaybeGraph:
+    graph: DependencyGraph | None
+    problems: list[DependencyProblem]
+
+    @property
+    def failed(self):
+        return len(self.problems) > 0
+
 
 class DependencyGraphBuilder:
 
@@ -382,26 +380,29 @@ class DependencyGraphBuilder:
         self._resolver = resolver
         self._path_lookup = path_lookup
 
-    @property
-    def problems(self):
-        return self._resolver.problems
-
-    def build_local_file_dependency_graph(self, path: Path) -> DependencyGraph | None:
-        dependency = self._resolver.resolve_local_file(path)
-        if dependency is None:
-            return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
-        container = dependency.load()
+    def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
+        maybe = self._resolver.resolve_local_file(self._path_lookup, path)
+        if not maybe.dependency:
+            return MaybeGraph(None, maybe.problems)
+        graph = DependencyGraph(maybe.dependency, None, self._resolver, self._path_lookup)
+        container = maybe.dependency.load(graph.path_lookup)
         if container is not None:
-            container.build_dependency_graph(graph, self._path_lookup)
-        return graph
+            problems = container.build_dependency_graph(graph)
+            if problems:
+                return MaybeGraph(None, problems)
+        return MaybeGraph(graph, [])
 
-    def build_notebook_dependency_graph(self, path: Path) -> DependencyGraph | None:
-        dependency = self._resolver.resolve_notebook(path)
-        if dependency is None:
-            return None
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
-        container = dependency.load()
+    def build_notebook_dependency_graph(self, path: Path) -> MaybeGraph:
+        maybe = self._resolver.resolve_notebook(self._path_lookup, path)
+        if not maybe.dependency:
+            return MaybeGraph(None, maybe.problems)
+        graph = DependencyGraph(maybe.dependency, None, self._resolver, self._path_lookup)
+        container = maybe.dependency.load(graph.path_lookup)
         if container is not None:
-            container.build_dependency_graph(graph, self._path_lookup)
-        return graph
+            problems = container.build_dependency_graph(graph)
+            if problems:
+                return MaybeGraph(None, problems)
+        return MaybeGraph(graph, [])
+
+    def __repr__(self):
+        return f"<DependencyGraphBuilder resolver={self._resolver}, path_lookup={self._path_lookup}>"

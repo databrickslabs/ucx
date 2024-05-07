@@ -1,19 +1,18 @@
 from pathlib import Path
-from unittest.mock import create_autospec
 import re
 
 import pytest
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
-from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import (
+    NotebookResolver,
+    NotebookLoader,
+)
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
-from tests.unit import _load_sources, _download_side_effect
-
+from tests.unit import _load_sources, MockPathLookup
 
 # fmt: off
 # the following samples are real samples from https://github.com/databricks-industry-solutions
@@ -127,25 +126,15 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
 
 
 def test_notebook_builds_leaf_dependency_graph():
-    paths = ["leaf1.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.return_value = ObjectInfo(
-        object_type=ObjectType.NOTEBOOK, path="leaf1.py.txt", language=Language.PYTHON
-    )
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-        ]
-    )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
-    assert {str(path) for path in graph.all_paths} == {"leaf1.py.txt"}
+    lookup = MockPathLookup()
+    notebook_loader = NotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    maybe = dependency_resolver.resolve_notebook(lookup, Path("leaf1.py.txt"))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {lookup.cwd / "leaf1.py.txt"}
 
 
 def get_status_side_effect(*args):
@@ -155,109 +144,68 @@ def get_status_side_effect(*args):
 
 def test_notebook_builds_depth1_dependency_graph():
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-        ]
-    )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
-    assert actual == set(paths)
+    lookup = MockPathLookup()
+    notebook_loader = NotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {lookup.cwd / path for path in paths}
 
 
 def test_notebook_builds_depth2_dependency_graph():
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-        ]
-    )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
-    assert actual == set(paths)
+    lookup = MockPathLookup()
+    notebook_loader = NotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {lookup.cwd / path for path in paths}
 
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates():
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    visited = {}
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, visited, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-        ]
-    )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
+    lookup = MockPathLookup()
+    notebook_loader = NotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
     # if visited once only, set and list will have same len
-    assert len(set(visited)) == len(visited)
+    assert graph.all_paths == {lookup.cwd / path for path in paths}
 
 
 def test_notebook_builds_cyclical_dependency_graph():
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-        ]
-    )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
-    assert actual == set(paths)
+    lookup = MockPathLookup()
+    notebook_loader = NotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {lookup.cwd / path for path in paths}
 
 
 def test_notebook_builds_python_dependency_graph():
     paths = ["root4.py.txt", "leaf3.py.txt"]
-    sources: dict[str, str] = dict(zip(paths, _load_sources(SourceContainer, *paths)))
-    ws = create_autospec(WorkspaceClient)
-    ws.workspace.download.side_effect = lambda *args, **kwargs: _download_side_effect(sources, {}, *args, **kwargs)
-    ws.workspace.get_status.side_effect = get_status_side_effect
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-        ]
-    )
-    dependency = dependency_resolver.resolve_notebook(Path(paths[0]))
-    provider = PathLookup.from_sys_path(Path.cwd())
-    graph = DependencyGraph(dependency, None, dependency_resolver, provider)
-    container = dependency.load()
-    container.build_dependency_graph(graph, provider)
-    actual = {path[2:] if path.startswith('./') else path for path in (str(path) for path in graph.all_paths)}
-    assert actual == set(paths)
+    lookup = MockPathLookup()
+    notebook_loader = NotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)])
+    maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    container = maybe.dependency.load(lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {lookup.cwd / path for path in paths}
 
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():

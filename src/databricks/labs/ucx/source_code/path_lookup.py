@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import sys
-from collections.abc import Iterable
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class PathLookup:
@@ -17,8 +19,23 @@ class PathLookup:
         return PathLookup(cwd, [Path(path) for path in sys.path])
 
     def __init__(self, cwd: Path, sys_paths: list[Path]):
+        self._cwd = cwd
         self._sys_paths = sys_paths
-        self._cwds = [cwd]
+
+    def change_directory(self, new_working_directory: Path) -> PathLookup:
+        return PathLookup(new_working_directory, self._sys_paths)
+
+    def resolve(self, path: Path) -> Path | None:
+        if path.is_absolute() and path.exists():
+            return path
+        for parent in self.paths:
+            absolute_path = parent / path
+            try:
+                if absolute_path.exists():
+                    return absolute_path
+            except PermissionError:
+                logger.warning(f"Permission denied to access {absolute_path}")
+        return None
 
     def push_path(self, path: Path):
         self._sys_paths.insert(0, path)
@@ -35,20 +52,12 @@ class PathLookup:
         return result
 
     @property
-    def paths(self) -> Iterable[Path]:
-        yield self.cwd
-        yield from self._sys_paths
-
-    def push_cwd(self, path: Path):
-        self._cwds.append(path)
-
-    def pop_cwd(self):
-        result = self._cwds[0]
-        del self._cwds[0]
-        return result
+    def paths(self) -> list[Path]:
+        return [self.cwd] + self._sys_paths
 
     @property
     def cwd(self):
-        # the below might fail but that's better than returning an incorrect cwd
-        assert len(self._cwds) > 0
-        return self._cwds[-1]
+        return self._cwd
+
+    def __repr__(self):
+        return f"PathLookup(cwd={self._cwd}, sys_paths={self._sys_paths})"

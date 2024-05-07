@@ -1,21 +1,23 @@
 from __future__ import annotations
 
 import abc
+import logging
 from pathlib import Path
-from collections.abc import Callable
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectType, ObjectInfo, ExportFormat, Language
+from databricks.sdk.errors import NotFound
 
-from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     BaseDependencyResolver,
-    DependencyProblem,
     Dependency,
     DependencyLoader,
     SourceContainer,
+    MaybeDependency,
 )
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+logger = logging.getLogger(__name__)
 
 
 class NotebookResolver(BaseDependencyResolver):
@@ -27,55 +29,54 @@ class NotebookResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return NotebookResolver(self._notebook_loader, resolver)
 
-    def resolve_notebook(self, path: Path, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        if self._notebook_loader.is_notebook(path):
-            return Dependency(self._notebook_loader, path)
-        return super().resolve_notebook(path, problem_collector)
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        absolute_path = self._notebook_loader.resolve(path_lookup, path)
+        if not absolute_path:
+            return super().resolve_notebook(path_lookup, path)
+        dependency = Dependency(self._notebook_loader, absolute_path)
+        return MaybeDependency(dependency, [])
 
 
 class NotebookLoader(DependencyLoader, abc.ABC):
-    pass
+    def resolve(self, path_lookup: PathLookup, path: Path) -> Path | None:
+        """When exported through Git, notebooks are saved with a .py extension. If the path is a notebook, return the
+        path to the notebook. If the path is a Python file, return the path to the Python file. If the path is neither,
+        return None."""
+        for candidate in (self._adjust_path(path), path):
+            absolute_path = path_lookup.resolve(candidate)
+            if not absolute_path:
+                continue
+            return absolute_path
+        return None
 
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        # TODO: catch exceptions, and create MaybeContainer to follow the pattern - OSError and NotFound are common
+        absolute_path = self.resolve(path_lookup, dependency.path)
+        if not absolute_path:
+            return None
+        try:
+            content = absolute_path.read_text("utf-8")
+        except NotFound:
+            logger.warning(f"Could not read notebook from workspace: {absolute_path}")
+            return None
+        language = self._detect_language(content)
+        if not language:
+            logger.warning(f"Could not detect language for {absolute_path}")
+            return None
+        return Notebook.parse(absolute_path, content, language)
 
-class WorkspaceNotebookLoader(NotebookLoader):
-
-    def __init__(self, ws: WorkspaceClient):
-        self._ws = ws
-
-    def is_notebook(self, path: Path):
-        object_info = self._ws.workspace.get_status(str(path))
-        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        return object_info is not None and object_info.object_type is ObjectType.NOTEBOOK
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        object_info = self._ws.workspace.get_status(str(dependency.path))
-        # TODO check error conditions, see https://github.com/databrickslabs/ucx/issues/1361
-        return self._load_notebook(object_info)
-
-    def _load_notebook(self, object_info: ObjectInfo) -> SourceContainer:
-        assert object_info.path is not None
-        assert object_info.language is not None
-        source = self._load_source(object_info)
-        return Notebook.parse(Path(object_info.path), source, object_info.language)
-
-    def _load_source(self, object_info: ObjectInfo) -> str:
-        assert object_info.path is not None
-        with self._ws.workspace.download(object_info.path, format=ExportFormat.SOURCE) as f:
-            return f.read().decode("utf-8")
-
-
-class LocalNotebookLoader(NotebookLoader, FileLoader):
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        fullpath = self.full_path(self._adjust_path(dependency.path))
-        assert fullpath is not None
-        return Notebook.parse(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
-
-    def is_notebook(self, path: Path) -> bool:
-        return super().is_notebook(self._adjust_path(path))
+    @staticmethod
+    def _detect_language(content: str):
+        for language in CellLanguage:
+            if content.startswith(language.file_magic_header):
+                return language.language
+        return None
 
     @staticmethod
     def _adjust_path(path: Path):
         if path.suffix == ".py":
             return path
         return Path(path.as_posix() + ".py")
+
+    def __repr__(self):
+        return "NotebookLoader()"
