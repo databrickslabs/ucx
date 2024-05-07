@@ -12,28 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
-
-
-class AstHelper:
-    @staticmethod
-    def get_full_function_name(node):
-        if isinstance(node.func, ast.Attribute):
-            return AstHelper._get_value(node.func)
-
-        if isinstance(node.func, ast.Name):
-            return node.func.id
-
-        return None
-
-    @staticmethod
-    def _get_value(node):
-        if isinstance(node.value, ast.Name):
-            return node.value.id + '.' + node.attr
-
-        if isinstance(node.value, ast.Attribute):
-            return AstHelper._get_value(node.value) + '.' + node.attr
-
-        return None
+from databricks.labs.ucx.source_code.ast_helpers import AstHelper
 
 
 @dataclass

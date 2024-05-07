@@ -2,6 +2,8 @@ from functools import cached_property
 
 from databricks.sdk import AccountClient
 
+
+from databricks.labs.ucx.account.aggregate import AccountAggregate
 from databricks.labs.ucx.account.metastores import AccountMetastores
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.contexts.application import CliContext
@@ -23,6 +25,10 @@ class AccountContext(CliContext):
     @cached_property
     def account_workspaces(self):
         return AccountWorkspaces(self.account_client, self.workspace_ids)
+
+    @cached_property
+    def account_aggregate(self):
+        return AccountAggregate(self.account_workspaces)
 
     @cached_property
     def account_metastores(self):

@@ -10,31 +10,63 @@ class TableMigration(Workflow):
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_external_tables_sync(self, ctx: RuntimeContext):
-        """This workflow task migrates the *external tables that are supported by SYNC command* from the Hive Metastore to the Unity Catalog.
-        Following cli commands are required to be run before running this task:
-        - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
-        - For AWS: TBD
+        """This workflow task migrates the external tables that are supported by SYNC command from the Hive Metastore
+        to the Unity Catalog.
         """
-        ctx.tables_migrator.migrate_tables(what=What.EXTERNAL_SYNC, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(
+            what=What.EXTERNAL_SYNC,
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
+        )
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_dbfs_root_delta_tables(self, ctx: RuntimeContext):
-        """This workflow task migrates `delta tables stored in DBFS root` from the Hive Metastore to the Unity Catalog using deep clone.
-        Following cli commands are required to be run before running this task:
-        - For Azure: `principal-prefix-access`, `create-table-mapping`, `create-uber-principal`, `migrate-credentials`, `migrate-locations`, `create-catalogs-schemas`
-        - For AWS: TBD
+        """This workflow task migrates delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
+        using deep clone.
         """
-        ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(
+            what=What.DBFS_ROOT_DELTA,
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
+        )
+
+    @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
+    def migrate_dbfs_root_non_delta_tables(self, ctx: RuntimeContext):
+        """This workflow task migrates non delta tables stored in DBFS root from the Hive Metastore to the Unity Catalog
+        using CTAS.
+        """
+        ctx.tables_migrator.migrate_tables(
+            what=What.DBFS_ROOT_NON_DELTA,
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
+        )
 
     @job_task(
         job_cluster="table_migration",
-        depends_on=[Assessment.crawl_tables, migrate_external_tables_sync, migrate_dbfs_root_delta_tables],
+        depends_on=[
+            Assessment.crawl_tables,
+            migrate_external_tables_sync,
+            migrate_dbfs_root_delta_tables,
+            migrate_dbfs_root_non_delta_tables,
+        ],
     )
     def migrate_views(self, ctx: RuntimeContext):
-        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
-        It is dependent on the migration of the tables.
+        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql
+        statement. It is dependent on the migration of the tables.
         """
-        ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(
+            what=What.VIEW,
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
+        )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
     def refresh_migration_status(self, ctx: RuntimeContext):
@@ -53,10 +85,14 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_hive_serde_in_place(self, ctx: RuntimeContext):
-        """This workflow task migrates ParquetHiveSerDe, OrcSerde, AvroSerDe tables in place from the Hive Metastore to the Unity Catalog."""
+        """This workflow task migrates ParquetHiveSerDe, OrcSerde, AvroSerDe tables in place from
+        the Hive Metastore to the Unity Catalog."""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            acl_strategy=[AclMigrationWhat.LEGACY_TACL],
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
             mounts_crawler=ctx.mounts_crawler,
             hiveserde_in_place_migrate=True,
         )
@@ -69,7 +105,13 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
         """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
         It is dependent on the migration of the tables.
         """
-        ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(
+            what=What.VIEW,
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
+        )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
     def refresh_migration_status(self, ctx: RuntimeContext):
@@ -88,10 +130,13 @@ class MigrateExternalTablesCTAS(Workflow):
 
     @job_task(job_cluster="table_migration", depends_on=[Assessment.crawl_tables])
     def migrate_other_external_ctas(self, ctx: RuntimeContext):
-        """This workflow task migrates non SYNC supported and non HiveSerde external tables using CTAS"""
+        """This workflow task migrates non-SYNC supported and non HiveSerde external tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_NO_SYNC,
-            acl_strategy=[AclMigrationWhat.LEGACY_TACL],
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
             mounts_crawler=ctx.mounts_crawler,
         )
 
@@ -100,7 +145,10 @@ class MigrateExternalTablesCTAS(Workflow):
         """This workflow task migrates HiveSerde tables using CTAS"""
         ctx.tables_migrator.migrate_tables(
             what=What.EXTERNAL_HIVESERDE,
-            acl_strategy=[AclMigrationWhat.LEGACY_TACL],
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
             mounts_crawler=ctx.mounts_crawler,
         )
 
@@ -109,10 +157,16 @@ class MigrateExternalTablesCTAS(Workflow):
         depends_on=[Assessment.crawl_tables, migrate_other_external_ctas, migrate_hive_serde_ctas],
     )
     def migrate_views(self, ctx: RuntimeContext):
-        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql statement.
-        It is dependent on the migration of the tables.
+        """This workflow task migrates views from the Hive Metastore to the Unity Catalog using create view sql
+        statement. It is dependent on the migration of the tables.
         """
-        ctx.tables_migrator.migrate_tables(what=What.VIEW, acl_strategy=[AclMigrationWhat.LEGACY_TACL])
+        ctx.tables_migrator.migrate_tables(
+            what=What.VIEW,
+            acl_strategy=[
+                AclMigrationWhat.LEGACY_TACL,
+                AclMigrationWhat.PRINCIPAL,
+            ],
+        )
 
     @job_task(job_cluster="table_migration", depends_on=[migrate_views])
     def refresh_migration_status(self, ctx: RuntimeContext):

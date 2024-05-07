@@ -91,6 +91,14 @@ def sync_workspace_info(a: AccountClient):
 
 
 @ucx.command(is_account=True)
+def report_account_compatibility(a: AccountClient, ctx: AccountContext | None = None, **named_parameters):
+    """upload workspace config to all workspaces in the account where ucx is installed"""
+    if not ctx:
+        ctx = AccountContext(a, named_parameters)
+    ctx.account_aggregate.readiness_report()
+
+
+@ucx.command(is_account=True)
 def create_account_groups(
     a: AccountClient,
     prompts: Prompts,
@@ -334,10 +342,8 @@ def migrate_locations(w: WorkspaceClient, ctx: WorkspaceContext | None = None, *
     """
     if not ctx:
         ctx = WorkspaceContext(w, named_parameters)
-    if ctx.is_azure:
-        return ctx.azure_external_locations_migration.run()
-    if ctx.is_aws:
-        return ctx.aws_resource_permissions.create_external_locations()
+    if ctx.is_azure or ctx.is_aws:
+        return ctx.external_locations_migration.run()
     raise ValueError("Unsupported cloud provider")
 
 

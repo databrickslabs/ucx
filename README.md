@@ -41,6 +41,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
   * [`installations` command](#installations-command)
+  * [`report-account-compatibility` command](#report-account-compatibility-command)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
@@ -575,6 +576,30 @@ related to multiple installations of `ucx` on the same workspace.
 
 [[back to top](#databricks-labs-ucx)]
 
+
+## `report-account-compatibility` command
+
+```text
+databricks labs ucx report-account-compatibility --profile labs-azure-account
+12:56:09  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:09  INFO [d.l.u.account.aggregate] Generating readiness report
+12:56:10  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:10  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:15  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:15  INFO [d.l.u.account.aggregate] Querying Schema ucx
+12:56:21  WARN [d.l.u.account.aggregate] Workspace 4045495039142306 does not have UCX installed
+12:56:21  INFO [d.l.u.account.aggregate] UC compatibility: 30.303030303030297% (69/99)
+12:56:21  INFO [d.l.u.account.aggregate] cluster type not supported : LEGACY_TABLE_ACL: 22 objects
+12:56:21  INFO [d.l.u.account.aggregate] cluster type not supported : LEGACY_SINGLE_USER: 24 objects
+12:56:21  INFO [d.l.u.account.aggregate] unsupported config: spark.hadoop.javax.jdo.option.ConnectionURL: 10 objects
+12:56:21  INFO [d.l.u.account.aggregate] Uses azure service principal credentials config in cluster.: 1 objects
+12:56:21  INFO [d.l.u.account.aggregate] No isolation shared clusters not supported in UC: 1 objects
+12:56:21  INFO [d.l.u.account.aggregate] Data is in DBFS Root: 23 objects
+12:56:21  INFO [d.l.u.account.aggregate] Non-DELTA format: UNKNOWN: 5 objects
+```
+
+[[back to top](#databricks-labs-ucx)]
+
 # Metastore related commands
 
 These commands are used to assign a Unity Catalog metastore to a workspace. The metastore assignment is a pre-requisite
@@ -684,11 +709,15 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 databricks labs ucx create-uber-principal [--subscription-id X]
 ```
 
-**Requires Cloud IAM admin privileges.** Once the [`assessment` workflow](#assessment-workflow) complete, you should run 
-this command to creates a service principal with the _**read-only access to all storage**_ used by tables in this 
-workspace and configure the [UCX Cluster Policy](#installation) with the details of it. Once migration is complete, this
-service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
-assignment on every storage account using Azure Resource Manager APIs.
+**Requires Cloud IAM admin privileges.** 
+
+Once the [`assessment` workflow](#assessment-workflow) complete, you should run this command to create a service principal with the 
+_**read-only access to all storage**_ used by tables in this workspace. It will also configure the 
+[UCX Cluster Policy](#installation) & SQL Warehouse data access configuration to use this service principal for migration 
+workflows. Once migration is complete, this service principal should be unprovisioned. 
+
+On Azure, it creates a principal with `Storage Blob Data Contributor` role assignment on every storage account using 
+Azure Resource Manager APIs.
 
 This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
 

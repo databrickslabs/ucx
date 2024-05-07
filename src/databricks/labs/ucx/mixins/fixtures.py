@@ -1071,9 +1071,19 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 
 
 @pytest.fixture
-def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., FunctionInfo], None, None]:
+def make_udf(
+    ws,
+    env_or_skip,
+    sql_backend,
+    make_schema,
+    make_random,
+) -> Generator[Callable[..., FunctionInfo], None, None]:
     def create(
-        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
+        *,
+        catalog_name="hive_metastore",
+        schema_name: str | None = None,
+        name: str | None = None,
+        hive_udf: bool = False,
     ) -> FunctionInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1084,9 +1094,18 @@ def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., F
             name = f"ucx_T{make_random(4)}".lower()
 
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
-        ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
-
-        sql_backend.execute(ddl)
+        if hive_udf:
+            cmd_exec = CommandExecutor(
+                ws.clusters,
+                ws.command_execution,
+                lambda: env_or_skip("TEST_DEFAULT_CLUSTER_ID"),
+                language=compute.Language.SQL,
+            )
+            ddl = f"CREATE FUNCTION {full_name} AS 'org.apache.hadoop.hive.ql.udf.generic.GenericUDFAbs';"
+            cmd_exec.run(ddl)
+        else:
+            ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
+            sql_backend.execute(ddl)
         udf_info = FunctionInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,

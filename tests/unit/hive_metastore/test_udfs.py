@@ -14,6 +14,7 @@ def test_key():
         deterministic=True,
         data_access="",
         body="",
+        comment="",
     )
     assert udf.key == "catalog.db.function"
 

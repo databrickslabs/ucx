@@ -375,6 +375,7 @@ def test_migrate_locations_azure(ws):
     azurerm = create_autospec(AzureResources)
     ctx = WorkspaceContext(ws).replace(
         is_azure=True,
+        is_aws=False,
         azure_cli_authenticated=True,
         azure_subscription_id='test',
         azure_resources=azurerm,
@@ -385,7 +386,7 @@ def test_migrate_locations_azure(ws):
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
