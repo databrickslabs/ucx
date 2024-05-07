@@ -720,9 +720,7 @@ class MaxedStreamHandler(logging.StreamHandler):
     def install_handler(cls, logger_: logging.Logger):
         if logger_.handlers:
             # already installed ?
-            installed = next(
-                (h for h in logger_.handlers if isinstance(h, MaxedStreamHandler)), None
-            )
+            installed = next((h for h in logger_.handlers if isinstance(h, MaxedStreamHandler)), None)
             if installed:
                 return
             # any handler to override ?
