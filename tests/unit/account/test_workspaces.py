@@ -1,20 +1,19 @@
 import io
 import json
-
-
 from unittest.mock import create_autospec
-import pytest
 
-from databricks.labs.blueprint.installation import Installation, MockInstallation
+import pytest
+from databricks.labs.blueprint.installation import (Installation,
+                                                    MockInstallation)
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
 
-
-from databricks.labs.ucx.account.workspaces import AccountWorkspaces, WorkspaceInfo
+from databricks.labs.ucx.account.workspaces import (AccountWorkspaces,
+                                                    WorkspaceInfo)
 
 
 def test_sync_workspace_info(acc_client):
@@ -467,6 +466,7 @@ def test_get_accessible_workspaces():
     ws1.current_user.me.return_value = iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     # not an admin in workspace 2
     ws2 = create_autospec(WorkspaceClient)
+    ws2.current_user.me.return_value = iam.User(user_name="me@example.com")
 
     def get_workspace_client(workspace) -> WorkspaceClient:
         if workspace.workspace_id == 123:
@@ -483,3 +483,8 @@ def test_get_accessible_workspaces():
     ws2.current_user.me.assert_called_once()
     # get_workspace_client should be called once for 123 & 456, then twice for workspace 789
     assert acc.get_workspace_client.call_count == 4
+
+    acc.config.is_azure = False
+    acc.config.auth_type = "databricks-cli"
+    account_workspaces = AccountWorkspaces(acc)
+    assert len(account_workspaces.get_accessible_workspaces()) == 1
