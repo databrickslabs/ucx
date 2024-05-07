@@ -2,20 +2,22 @@ Databricks Labs UCX
 ===
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
-The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
+The companion for upgrading to Unity Catalog. 
+
+After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
 so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow).
 
-After installation, [`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
-Then you can execute [table migration workflow](#table-migration-workflow).
+The [README notebook](#readme-notebook), which can be found in the installation folder contains further instructions and explanations of the different ucx workflows & dashboards. 
+Once the migration is scoped, you can start executing the [table migration workflow](#table-migration-workflow).
 
-More workflows, like notebook code migration is coming in the future releases.
+More workflows, like notebook code migration are coming in future releases.
 
-UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
+UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
 
 For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](docs/troubleshooting.md) or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
-[![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)  [![lines of code](https://tokei.rs/b1/github/databrickslabs/ucx)]([https://codecov.io/github/databrickslabs/ucx](https://github.com/databrickslabs/ucx))
+[![build](https://github.com/databrickslabs/ucx/actions/workflows/push.yml/badge.svg)](https://github.com/databrickslabs/ucx/actions/workflows/push.yml) [![codecov](https://codecov.io/github/databrickslabs/ucx/graph/badge.svg?token=p0WKAfW5HQ)](https://codecov.io/github/databrickslabs/ucx)  ![linesofcode](https://aschey.tech/tokei/github/databrickslabs/ucx?category=code)
 
 <!-- TOC -->
 * [Databricks Labs UCX](#databricks-labs-ucx)
@@ -58,8 +60,9 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`migrate-locations` command](#migrate-locations-command)
   * [`create-table-mapping` command](#create-table-mapping-command)
   * [`skip` command](#skip-command)
-  * [`revert-migrated-tables` command](#revert-migrated-tables-command)
   * [`create-catalogs-schemas` command](#create-catalogs-schemas-command)
+  * [`migrate-tables` command](#migrate-tables-command)
+  * [`revert-migrated-tables` command](#revert-migrated-tables-command)
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
 * [Code migration commands](#code-migration-commands)
@@ -85,7 +88,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 - Account level Identity Setup. See instructions for [AWS](https://docs.databricks.com/en/administration-guide/users-groups/best-practices.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/administration-guide/users-groups/best-practices), and [GCP](https://docs.gcp.databricks.com/administration-guide/users-groups/best-practices.html).
 - Unity Catalog Metastore Created (per region). See instructions for [AWS](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html), [Azure](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/create-metastore), and [GCP](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html).
 - If your Databricks Workspace relies on an external Hive Metastore (such as AWS Glue), make sure to read [this guide](docs/external_hms_glue.md).
-- Databricks Workspace has to have network access to [pypi.org](https://pypi.org) to download `databricks-sdk` and `pyyaml` packages.
+- Databricks Workspace has to have network access to [pypi.org](https://pypi.org) to download `databricks-sdk`, `databricks-labs-lsql`, `databricks-labs-blueprint`, `sqlglot` and `pyyaml` packages.
 - A PRO or Serverless SQL Warehouse to render the [report](docs/assessment.md) for the [assessment workflow](#assessment-workflow).
 
 Once you [install UCX](#install-ucx), you can proceed to the [assessment workflow](#assessment-workflow) to ensure 
@@ -618,7 +621,7 @@ databricks labs ucx show-all-metastores [--workspace-id <workspace-id>]
 
 This command lists all the metastores available to be assigned to a workspace. If no workspace is specified, it lists
 all the metastores available in the account. This command is useful when there are multiple metastores available within
-a region and you want to see which ones are available for assignment.
+a region, and you want to see which ones are available for assignment.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -734,7 +737,7 @@ databricks labs ucx migrate-credentials
 
 For Azure, this command prompts to confirm performing the following credential migration steps:
 1. [RECOMMENDED] For each storage account, create access connectors with managed identities that have the
-   `Storage Blob Data Contributor` role on the respective storage account. An storage credential is created for each 
+   `Storage Blob Data Contributor` role on the respective storage account. A storage credential is created for each 
     access connector.
 2. Migrate Azure Service Principals, which have `Storage Blob Data Contributor`,
    `Storage Blob Data Reader`, `Storage Blob Data Owner`, or custom roles on ADLS Gen2 locations that are being used in
@@ -1064,7 +1067,7 @@ Please provide the cluster id's as comma separated value from the above list (de
 ```
 
 If a customer want's to revert the cluster remap done using the [`cluster-remap` command](#cluster-remap-command) they can use this command to revert 
-its configuration from UC to original one.It will iterate through the list of clusters from the back up folder and reverts the 
+its configuration from UC to original one.It will iterate through the list of clusters from the backup folder and reverts the 
 cluster configurations to original one.This will also ask the user to provide the list of clusters that has to be reverted as a prompt.
 By default, it will revert all the clusters present in the backup folder
 
