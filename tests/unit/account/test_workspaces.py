@@ -3,8 +3,7 @@ import json
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import (Installation,
-                                                    MockInstallation)
+from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict
@@ -12,8 +11,7 @@ from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
 from databricks.sdk.service.provisioning import Workspace
 
-from databricks.labs.ucx.account.workspaces import (AccountWorkspaces,
-                                                    WorkspaceInfo)
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces, WorkspaceInfo
 
 
 def test_sync_workspace_info(acc_client):
