@@ -94,3 +94,29 @@ def test_delete_backup_dashboards_not_confirmed(redash_ws, empty_index):
     mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "No"})
     redash.delete_backup_queries(mock_prompts)
     redash_ws.queries.delete.assert_not_called()
+
+
+def test_get_queries_from_dashboard(redash_ws):
+    empty_dashboard = Dashboard(
+        id="1",
+    )
+    assert len(list(Redash.get_queries_from_dashboard(empty_dashboard))) == 0
+    dashboard = Dashboard(
+        id="1",
+        widgets=[
+            Widget(),
+            Widget(visualization=Visualization()),
+            Widget(
+                visualization=Visualization(
+                    query=Query(
+                        id="1",
+                        name="test_query",
+                        query="SELECT * FROM old.things",
+                    )
+                )
+            ),
+        ],
+    )
+    queries = list(Redash.get_queries_from_dashboard(dashboard))
+    assert len(queries) == 1
+    assert queries[0].id == "1"
