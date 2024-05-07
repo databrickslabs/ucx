@@ -121,10 +121,10 @@ def extract_major_minor(version_string):
 
 class WorkspaceInstaller(WorkspaceContext):
     def __init__(
-            self,
-            ws: WorkspaceClient,
-            environ: dict[str, str] | None = None,
-            tasks: list[Task] | None = None,
+        self,
+        ws: WorkspaceClient,
+        environ: dict[str, str] | None = None,
+        tasks: list[Task] | None = None,
     ):
         super().__init__(ws)
         if not environ:
@@ -155,10 +155,10 @@ class WorkspaceInstaller(WorkspaceContext):
             return Installation.assume_global(self.workspace_client, self.product_info.product_name())
 
     def run(
-            self,
-            default_config: WorkspaceConfig | None = None,
-            verify_timeout=timedelta(minutes=2),
-            config: WorkspaceConfig | None = None,
+        self,
+        default_config: WorkspaceConfig | None = None,
+        verify_timeout=timedelta(minutes=2),
+        config: WorkspaceConfig | None = None,
     ) -> WorkspaceConfig:
         logger.info(f"Installing UCX v{self.product_info.version()}")
         if config is None:
@@ -401,16 +401,16 @@ class WorkspaceInstaller(WorkspaceContext):
 
 class WorkspaceInstallation(InstallationMixin):
     def __init__(  # pylint: disable=too-many-arguments
-            self,
-            config: WorkspaceConfig,
-            installation: Installation,
-            install_state: InstallState,
-            sql_backend: SqlBackend,
-            ws: WorkspaceClient,
-            workflows_installer: WorkflowsDeployment,
-            prompts: Prompts,
-            product_info: ProductInfo,
-            skip_dashboards=False,
+        self,
+        config: WorkspaceConfig,
+        installation: Installation,
+        install_state: InstallState,
+        sql_backend: SqlBackend,
+        ws: WorkspaceClient,
+        workflows_installer: WorkflowsDeployment,
+        prompts: Prompts,
+        product_info: ProductInfo,
+        skip_dashboards=False,
     ):
         self._config = config
         self._installation = installation
@@ -514,8 +514,8 @@ class WorkspaceInstallation(InstallationMixin):
 
     def uninstall(self):
         if self._prompts and not self._prompts.confirm(
-                "Do you want to uninstall ucx from the workspace too, this would "
-                "remove ucx project folder, dashboards, queries and jobs"
+            "Do you want to uninstall ucx from the workspace too, this would "
+            "remove ucx project folder, dashboards, queries and jobs"
         ):
             return
         # TODO: this is incorrect, fetch the remote version (that appeared only in Feb 2024)
@@ -536,7 +536,7 @@ class WorkspaceInstallation(InstallationMixin):
 
     def _remove_database(self):
         if self._prompts and not self._prompts.confirm(
-                f"Do you want to delete the inventory database {self._config.inventory_database} too?"
+            f"Do you want to delete the inventory database {self._config.inventory_database} too?"
         ):
             return
         logger.info(f"Deleting inventory database {self._config.inventory_database}")
@@ -624,7 +624,7 @@ class AccountInstaller(AccountContext):
         msg = "\n".join([w.deployment_name for w in accessible_workspaces])
         installed_workspaces = []
         if not self.prompts.confirm(
-                f"UCX has detected the following workspaces available to install. \n{msg}\nDo you want to continue?"
+            f"UCX has detected the following workspaces available to install. \n{msg}\nDo you want to continue?"
         ):
             return
 
