@@ -6,12 +6,12 @@ import pathlib
 from functools import cached_property
 
 # pylint: disable-next=import-private-name
-from pathlib import Path, _PosixFlavour, _Accessor  # type: ignore
+from pathlib import Path, _PosixFlavour  # type: ignore
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
 from io import BytesIO, StringIO
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, DatabricksError
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat, Language
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class _ScandirIterator:
         pass
 
 
-class _DatabricksAccessor(_Accessor):
+class _DatabricksAccessor:
     chmod = _na('accessor.chmod')
     getcwd = _na('accessor.getcwd')
     group = _na('accessor.group')
@@ -286,8 +286,11 @@ class WorkspacePath(Path):
         if not self.is_notebook():
             return ""
         for sfx, lang in self._SUFFIXES.items():
-            if self._object_info.language == lang:
-                return sfx
+            try:
+                if self._object_info.language == lang:
+                    return sfx
+            except DatabricksError:
+                return ""
         return ""
 
     def __lt__(self, other: pathlib.PurePath):
@@ -313,13 +316,22 @@ class WorkspacePath(Path):
     is_junction = _return_false
 
     def is_dir(self):
-        return self._object_info.object_type == ObjectType.DIRECTORY
+        try:
+            return self._object_info.object_type == ObjectType.DIRECTORY
+        except DatabricksError:
+            return False
 
     def is_file(self):
-        return self._object_info.object_type == ObjectType.FILE
+        try:
+            return self._object_info.object_type == ObjectType.FILE
+        except DatabricksError:
+            return False
 
     def is_notebook(self):
-        return self._object_info.object_type == ObjectType.NOTEBOOK
+        try:
+            return self._object_info.object_type == ObjectType.NOTEBOOK
+        except DatabricksError:
+            return False
 
     def __eq__(self, other):
         return isinstance(other, Path) and self.as_posix() == other.as_posix()

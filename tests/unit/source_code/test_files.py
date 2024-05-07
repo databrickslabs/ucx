@@ -5,8 +5,9 @@ from unittest.mock import Mock, create_autospec
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileResolver, FileLoader
 from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 def test_files_fix_ignores_unsupported_extensions():
@@ -71,3 +72,29 @@ def test_files_walks_directory():
     files.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
+
+
+def test_triple_dot_import():
+    file_loader = FileLoader()
+    file_resolver = LocalFileResolver(file_loader)
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
+    path_lookup.resolve.return_value = Path('/some/path/foo.py')
+
+    maybe = file_resolver.resolve_import(path_lookup, "...foo")
+    assert not maybe.problems
+    assert maybe.dependency.path == Path('/some/path/foo.py')
+    path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/../../foo.py'))
+
+
+def test_single_dot_import():
+    file_loader = FileLoader()
+    file_resolver = LocalFileResolver(file_loader)
+    path_lookup = create_autospec(PathLookup)
+    path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
+    path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')
+
+    maybe = file_resolver.resolve_import(path_lookup, ".foo")
+    assert not maybe.problems
+    assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
+    path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))

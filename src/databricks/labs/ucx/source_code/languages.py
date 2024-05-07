@@ -9,9 +9,9 @@ from databricks.labs.ucx.source_code.table_creation import DBRv8d0Linter
 
 
 class Languages:
-    def __init__(self, index: MigrationIndex):
+    def __init__(self, index: MigrationIndex, session_state: CurrentSessionState | None = None):
         self._index = index
-        session_state = CurrentSessionState()
+        session_state = CurrentSessionState() if not session_state else session_state
         from_table = FromTable(index, session_state=session_state)
         dbfs_from_folder = FromDbfsFolder()
         self._linters = {

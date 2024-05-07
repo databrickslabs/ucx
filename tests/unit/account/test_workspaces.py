@@ -1,12 +1,11 @@
 import io
 import json
-
 from unittest.mock import create_autospec
-import pytest
 
+import pytest
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.sdk import WorkspaceClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta, User
@@ -448,3 +447,50 @@ def test_create_acc_groups_should_not_throw_if_acc_grp_exists(acc_client):
 
     acc_client.groups.create.assert_called_with(display_name="de")
     acc_client.groups.patch.assert_not_called()
+
+
+def test_get_accessible_workspaces():
+    acc = create_autospec(AccountClient)
+    acc.workspaces.list.return_value = [
+        Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
+        Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
+        Workspace(workspace_name="bar", workspace_id=789, workspace_status_message="Running", deployment_name="def"),
+        Workspace(workspace_name="bar", workspace_id=000, workspace_status_message="Running", deployment_name="def"),
+    ]
+    acc.config.is_azure = True
+    acc.config.auth_type = "databricks-cli"
+
+    # admin in workspace 1
+    ws1 = create_autospec(WorkspaceClient)
+    ws1.current_user.me.return_value = iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    # not an admin in workspace 2
+    ws2 = create_autospec(WorkspaceClient)
+    ws2.current_user.me.return_value = iam.User(user_name="me@example.com")
+    # not an admin in workspace 3
+    ws3 = create_autospec(WorkspaceClient)
+    ws3.current_user.me.return_value = iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="users")])
+
+    def get_workspace_client(workspace) -> WorkspaceClient:
+        match workspace.workspace_id:
+            case 123:
+                return ws1
+            case 456:
+                return ws2
+            case 789:
+                return ws3
+            case _:
+                raise ValueError("unexpected workspace id")
+
+    acc.get_workspace_client.side_effect = get_workspace_client
+
+    account_workspaces = AccountWorkspaces(acc)
+    assert len(account_workspaces.get_accessible_workspaces()) == 1
+    ws1.current_user.me.assert_called_once()
+    ws2.current_user.me.assert_called_once()
+    # get_workspace_client should be called once for 123, 456, 789, then twice for workspace 000
+    assert acc.get_workspace_client.call_count == 5
+
+    acc.config.is_azure = False
+    acc.config.auth_type = "databricks-cli"
+    account_workspaces = AccountWorkspaces(acc)
+    assert len(account_workspaces.get_accessible_workspaces()) == 1

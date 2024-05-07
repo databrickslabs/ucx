@@ -216,6 +216,13 @@ class ASTLinter(Generic[T]):
             return False
         return self._root.value is None
 
+    def __repr__(self):
+        truncate_after = 32
+        code = ast.unparse(self._root)
+        if len(code) > truncate_after:
+            code = code[0:truncate_after] + "..."
+        return f"<ASTLinter: {code}>"
+
 
 class PythonLinter(Linter):
 
@@ -261,8 +268,10 @@ class PythonLinter(Linter):
     def list_import_sources(linter: ASTLinter) -> list[tuple[str, ast.AST]]:
         nodes = linter.locate(ast.Import, [])
         tuples = [(alias.name, node) for node in nodes for alias in node.names]
-        nodes = linter.locate(ast.ImportFrom, [])
-        tuples.extend((node.module, node) for node in nodes)
+        for node in linter.locate(ast.ImportFrom, []):
+            leading_dots = "." * node.level
+            import_name = f"{leading_dots}{node.module}" if node.module else leading_dots
+            tuples.append((import_name, node))
         nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
         tuples.extend((node.args[0].value, node) for node in nodes)
         nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
