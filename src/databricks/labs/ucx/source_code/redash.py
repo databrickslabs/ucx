@@ -6,7 +6,7 @@ from databricks.labs.blueprint.tui import Prompts
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
-from databricks.sdk.errors.platform import DatabricksError, NotFound, ResourceDoesNotExist
+from databricks.sdk.errors.platform import DatabricksError, NotFound
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -76,7 +76,7 @@ class Redash:
         # create the backup folder for queries if it does not exist
         try:
             self._ws.workspace.get_status(self._backup_path)
-        except ResourceDoesNotExist:
+        except NotFound:
             self._ws.workspace.mkdirs(self._backup_path)
         backup_query = self._ws.queries.create(
             data_source_id=query.data_source_id,

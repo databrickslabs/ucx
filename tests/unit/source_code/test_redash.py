@@ -8,12 +8,13 @@ from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization, 
 from databricks.labs.ucx.source_code.redash import Redash
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import PermissionDenied
+from databricks.sdk.errors import PermissionDenied, NotFound
 
 
 @pytest.fixture
 def redash_ws():
     workspace_client = create_autospec(WorkspaceClient)
+    workspace_client.workspace.get_status.side_effect = NotFound("error")
     workspace_client.queries.create.return_value = Query(id="123")
     workspace_client.dashboards.list.return_value = [
         Dashboard(
@@ -27,6 +28,7 @@ def redash_ws():
                             name="test_query",
                             query="SELECT * FROM old.things",
                             options=QueryOptions(catalog="hive_metastore", schema="default"),
+                            tags=["test_tag"],
                         )
                     )
                 ),
@@ -84,7 +86,7 @@ def redash_ws():
     return workspace_client
 
 
-def test_fix_all_dashboards(redash_ws, empty_index):
+def test_migrate_all_dashboards(redash_ws, empty_index):
     redash = Redash(empty_index, redash_ws, "backup")
     redash.migrate_dashboards()
     redash_ws.queries.create.assert_called_with(
@@ -100,11 +102,12 @@ def test_fix_all_dashboards(redash_ws, empty_index):
     redash_ws.queries.update.assert_called_with(
         "1",
         query='SELECT * FROM old.things',
-        tags=[Redash.MIGRATED_TAG, 'backup:123'],
+        tags=[Redash.MIGRATED_TAG, 'backup:123', 'test_tag'],
     )
+    redash_ws.workspace.mkdirs.assert_called_once_with("backup/backup_queries")
 
 
-def test_fix_all_dashboards_error(redash_ws, empty_index, caplog):
+def test_migrate_all_dashboards_error(redash_ws, empty_index, caplog):
     redash_ws.dashboards.list.side_effect = PermissionDenied("error")
     redash = Redash(empty_index, redash_ws, "backup")
     redash.migrate_dashboards()
