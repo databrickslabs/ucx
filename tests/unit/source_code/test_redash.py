@@ -8,6 +8,7 @@ from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization
 from databricks.labs.ucx.source_code.redash import Redash
 
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import PermissionDenied
 
 
 @pytest.fixture
@@ -30,7 +31,22 @@ def redash_ws():
                 )
             ],
         ),
-        Dashboard(id="2", tags=[Redash.MIGRATED_TAG]),
+        Dashboard(
+            id="2",
+            tags=[Redash.MIGRATED_TAG],
+            widgets=[
+                Widget(
+                    visualization=Visualization(
+                        query=Query(
+                            id="1",
+                            name="test_query",
+                            query="SELECT * FROM old.things",
+                            tags=[Redash.MIGRATED_TAG, 'backup:123'],
+                        )
+                    )
+                )
+            ],
+        ),
         Dashboard(id="3", tags=[]),
     ]
     workspace_client.dashboards.get.return_value = Dashboard(
@@ -73,16 +89,24 @@ def test_fix_all_dashboards(redash_ws, empty_index):
     )
 
 
+def test_fix_all_dashboards_error(redash_ws, empty_index, caplog):
+    redash_ws.dashboards.list.side_effect = PermissionDenied("error")
+    redash = Redash(empty_index, redash_ws, "backup")
+    with caplog.at_level("DEBUG"):
+        redash.migrate_dashboards()
+    assert "Cannot list dashboards: error" in caplog.text
+
+
 def test_revert_dashboard(redash_ws, empty_index):
     redash_ws.queries.get.return_value = Query(id="1", query="original_query")
     redash = Redash(empty_index, redash_ws, "")
-    redash.revert_dashboards("2")
+    redash.revert_dashboards()
     redash_ws.queries.update.assert_called_with("1", query="original_query", tags=[])
     redash_ws.queries.delete.assert_called_once_with("123")
 
 
 def test_delete_backup_dashboards(redash_ws, empty_index):
-    redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[])]
+    redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[]), Query()]
     redash = Redash(empty_index, redash_ws, "")
     mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "Yes"})
     redash.delete_backup_queries(mock_prompts)
