@@ -481,5 +481,5 @@ def test_get_accessible_workspaces():
     assert len(account_workspaces.get_accessible_workspaces()) == 1
     ws1.current_user.me.assert_called_once()
     ws2.current_user.me.assert_called_once()
-    # get_workspace_client should be called once for 123 & 456, then twice for workspace 3
+    # get_workspace_client should be called once for 123 & 456, then twice for workspace 789
     assert acc.get_workspace_client.call_count == 4

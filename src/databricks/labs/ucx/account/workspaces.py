@@ -33,8 +33,12 @@ class AccountWorkspaces:
             if self._ac.config.is_azure and self._ac.config.auth_type != "azure-cli":
                 current_auth_type = self._ac.config.auth_type
                 self._ac.config.auth_type = "azure-cli"
-                ws = self._ac.get_workspace_client(workspace)
-                self._ac.config.auth_type = current_auth_type
+                try:
+                    ws = self._ac.get_workspace_client(workspace)
+                except (PermissionDenied, NotFound, ValueError) as exc:
+                    raise PermissionDenied(f"Failed to create client for {workspace.deployment_name}: {exc}") from exc
+                finally:
+                    self._ac.config.auth_type = current_auth_type
                 return ws
             raise PermissionDenied(f"Failed to create client for {workspace.deployment_name}: {err}") from err
 
