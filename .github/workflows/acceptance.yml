@@ -15,7 +15,8 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: single-acceptance-job-per-repo
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration:
