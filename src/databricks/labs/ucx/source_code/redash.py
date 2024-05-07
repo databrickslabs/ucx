@@ -57,10 +57,10 @@ class Redash:
         if not prompts.confirm("Are you sure you want to delete all backup queries?"):
             return
         for query in self._ws.queries.list():
+            if query.id is None:
+                continue
             # not a backup query
             if query.tags is None or self.BACKUP_TAG not in query.tags:
-                continue
-            if query.id is None:
                 continue
             try:
                 self._ws.queries.delete(query.id)

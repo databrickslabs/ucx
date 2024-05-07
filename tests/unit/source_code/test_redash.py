@@ -138,6 +138,7 @@ def test_revert_dashboards(redash_ws, empty_index):
 
 def test_delete_backup_dashboards(redash_ws, empty_index):
     redash_ws.queries.list.return_value = [Query(id="1", tags=[Redash.BACKUP_TAG]), Query(id="2", tags=[]), Query()]
+    redash_ws.queries.delete.side_effect = NotFound("error")
     redash = Redash(empty_index, redash_ws, "")
     mock_prompts = MockPrompts({"Are you sure you want to delete all backup queries*": "Yes"})
     redash.delete_backup_queries(mock_prompts)
