@@ -3,7 +3,7 @@ from unittest.mock import create_autospec
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
-from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization
+from databricks.sdk.service.sql import Query, Dashboard, Widget, Visualization, QueryOptions
 
 from databricks.labs.ucx.source_code.redash import Redash
 
@@ -26,6 +26,7 @@ def redash_ws():
                             id="1",
                             name="test_query",
                             query="SELECT * FROM old.things",
+                            options=QueryOptions(catalog="hive_metastore", schema="default")
                         )
                     )
                 )
@@ -77,7 +78,7 @@ def test_fix_all_dashboards(redash_ws, empty_index):
         query='SELECT * FROM old.things',
         data_source_id=None,
         description=None,
-        options=None,
+        options=QueryOptions(catalog="hive_metastore", schema="default"),
         parent="backup/backup_queries",
         run_as_role=None,
         tags=[Redash.BACKUP_TAG],

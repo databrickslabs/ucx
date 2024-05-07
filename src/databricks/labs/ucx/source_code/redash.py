@@ -82,7 +82,7 @@ class Redash:
             data_source_id=query.data_source_id,
             description=query.description,
             name=str(query.name) + "_original",
-            options=query.options.as_dict() if query.options is not None else None,
+            options=query.options if query.options is not None else None,
             parent=self._backup_path,
             query=query.query,
             run_as_role=query.run_as_role,
