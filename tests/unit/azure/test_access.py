@@ -9,6 +9,7 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import Policy
+from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse, EndpointConfPair
 from databricks.sdk.service.workspace import GetSecretResponse
 
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -580,6 +581,7 @@ def test_create_global_spn_spn_present():
     w.secrets.put_secret.assert_not_called()
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def test_create_global_spn_no_storage():
@@ -613,6 +615,7 @@ def test_create_global_spn_no_storage():
     w.secrets.put_secret.assert_not_called()
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def test_create_global_spn_cluster_policy_not_found():
@@ -645,6 +648,7 @@ def test_create_global_spn_cluster_policy_not_found():
     w.secrets.put_secret.assert_called_with('ucx', 'uber_principal_secret', string_value='mypwd')
     w.cluster_policies.edit.assert_not_called()
     w.get_workspace_id.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_not_called()
 
 
 def test_create_global_spn():
@@ -654,6 +658,7 @@ def test_create_global_spn():
     )
     w.cluster_policies.get.return_value = cluster_policy
     w.secrets.get_secret.return_value = GetSecretResponse("uber_principal_secret", "mypwd")
+    w.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse
     rows = {"SELECT \\* FROM ucx.external_locations": [["abfss://container1@sto2.dfs.core.windows.net/folder1", "1"]]}
     backend = MockBackend(rows=rows)
     location = ExternalLocations(w, backend, "ucx")
@@ -708,6 +713,28 @@ def test_create_global_spn():
     )
     w.secrets.create_scope.assert_called_with("ucx")
     w.secrets.put_secret.assert_called_with("ucx", "uber_principal_secret", string_value="mypwd")
+    w.warehouses.get_workspace_warehouse_config.assert_called_once()
+    w.warehouses.set_workspace_warehouse_config.assert_called_with(
+        data_access_config=[
+            EndpointConfPair(
+                key='spark_conf.fs.azure.account.oauth2.client.id.sto2.dfs.core.windows.net', value='appIduser1'
+            ),
+            EndpointConfPair(
+                key='spark_conf.fs.azure.account.oauth.provider.type.sto2.dfs.core.windows.net',
+                value='org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider',
+            ),
+            EndpointConfPair(
+                key='spark_conf.fs.azure.account.oauth2.client.endpoint.sto2.dfs.core.windows.net',
+                value='https://login.microsoftonline.com/bar/oauth2/token',
+            ),
+            EndpointConfPair(key='spark_conf.fs.azure.account.auth.type.sto2.dfs.core.windows.net', value='OAuth'),
+            EndpointConfPair(
+                key='spark_conf.fs.azure.account.oauth2.client.secret.sto2.dfs.core.windows.net',
+                value='{{secrets/ucx/uber_principal_secret}}',
+            ),
+        ],
+        sql_configuration_parameters=None,
+    )
 
 
 def test_create_access_connectors_for_storage_accounts_logs_no_storage_accounts(caplog):

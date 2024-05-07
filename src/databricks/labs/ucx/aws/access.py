@@ -215,6 +215,20 @@ class AWSResourcePermissions:
 
         self._ws.cluster_policies.edit(str(policy.policy_id), str(policy.name), definition=json.dumps(definition_dict))
 
+    def _update_sql_dac_with_instance_profile(self, iam_instance_profile: AWSInstanceProfile, prompts: Prompts):
+        warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
+        if warehouse_config.instance_profile_arn is not None:
+            if not prompts.confirm(
+                f"There is an existing instance profile {warehouse_config.instance_profile_arn} specified in the "
+                f"workspace warehouse config. Do you want UCX to to update it with the uber instance profile?"
+            ):
+                return
+        self._ws.warehouses.set_workspace_warehouse_config(
+            data_access_config=warehouse_config.data_access_config,
+            sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+            instance_profile_arn=iam_instance_profile.instance_profile_arn,
+        )
+
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
         instance_profile_arn = self._aws_resources.get_instance_profile(instance_profile_name)
 
@@ -283,6 +297,7 @@ class AWSResourcePermissions:
             config.uber_instance_profile = iam_instance_profile.instance_profile_arn
             self._installation.save(config)
             self._update_cluster_policy_with_instance_profile(cluster_policy, iam_instance_profile)
+            self._update_sql_dac_with_instance_profile(iam_instance_profile, prompts)
             logger.info(f"Cluster policy \"{cluster_policy.name}\" updated successfully")
         except PermissionError:
             self._aws_resources.delete_instance_profile(iam_role_name, iam_role_name)

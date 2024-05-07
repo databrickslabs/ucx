@@ -16,6 +16,7 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
 )
 from databricks.sdk.service.compute import InstanceProfile, Policy
+from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse, EndpointConfPair
 
 from databricks.labs.ucx.assessment.aws import (
     AWSPolicyAction,
@@ -218,11 +219,19 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        instance_profile_arn="arn:aws:iam::12345:instance-profile/existing-role"
+    )
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws = create_autospec(AWSResources)
     aws.get_instance_profile.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
-    prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
+    prompts = MockPrompts(
+        {
+            "There is an existing instance profile *": "yes",
+            "We have identified existing UCX migration role *": "yes",
+        }
+    )
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
@@ -234,6 +243,11 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     mock_ws.cluster_policies.edit.assert_called_with(
         'foo', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
     )
+    mock_ws.warehouses.set_workspace_warehouse_config.assert_called_with(
+        data_access_config=None,
+        instance_profile_arn='arn:aws:iam::12345:instance-profile/role1',
+        sql_configuration_parameters=None,
+    )
 
 
 def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, backend, locations):
@@ -241,6 +255,9 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
         policy_id="foo", name="Unity Catalog Migration (ucx) (me@example.com)", definition=json.dumps({"foo": "bar"})
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
+    mock_ws.warehouses.get_workspace_warehouse_config.return_value = GetWorkspaceWarehouseConfigResponse(
+        data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")]
+    )
     aws = create_autospec(AWSResources)
     aws.role_exists.return_value = False
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
@@ -260,6 +277,11 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     definition = {"foo": "bar", "aws_attributes.instance_profile_arn": {"type": "fixed", "value": instance_profile_arn}}
     mock_ws.cluster_policies.edit.assert_called_with(
         'foo', 'Unity Catalog Migration (ucx) (me@example.com)', definition=json.dumps(definition)
+    )
+    mock_ws.warehouses.set_workspace_warehouse_config.assert_called_with(
+        data_access_config=[EndpointConfPair("jdbc", "jdbc:sqlserver://localhost:1433;databaseName=master")],
+        instance_profile_arn='arn:aws:iam::12345:instance-profile/role1',
+        sql_configuration_parameters=None,
     )
 
 

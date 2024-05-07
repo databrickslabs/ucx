@@ -12,6 +12,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceAlreadyExists
 from databricks.sdk.service.catalog import Privilege
+from databricks.sdk.service.sql import EndpointConfPair
 
 from databricks.labs.ucx.azure.resources import (
     AccessConnector,
@@ -22,7 +23,6 @@ from databricks.labs.ucx.azure.resources import (
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocations
-
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +203,48 @@ class AzureResourcePermissions:
             msg = f"cluster policy {policy_id} not found, please run UCX installation to create UCX cluster policy"
             raise NotFound(msg) from None
 
+    def _update_sql_dac_with_spn(
+        self,
+        storage_account_info: list[StorageAccount],
+        uber_principal: PrincipalSecret,
+        inventory_database: str,
+    ):
+
+        warehouse_config = self._ws.warehouses.get_workspace_warehouse_config()
+        sql_dac = warehouse_config.data_access_config
+        if sql_dac is None:
+            sql_dac = []
+        tenant_id = self._azurerm.tenant_id()
+        endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+        for storage in storage_account_info:
+            sql_dac.extend(
+                [
+                    EndpointConfPair(
+                        f"spark_conf.fs.azure.account.oauth2.client.id.{storage.name}.dfs.core.windows.net",
+                        uber_principal.client.client_id,
+                    ),
+                    EndpointConfPair(
+                        f"spark_conf.fs.azure.account.oauth.provider.type.{storage.name}.dfs.core.windows.net",
+                        "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider",
+                    ),
+                    EndpointConfPair(
+                        f"spark_conf.fs.azure.account.oauth2.client.endpoint.{storage.name}.dfs.core.windows.net",
+                        endpoint,
+                    ),
+                    EndpointConfPair(
+                        f"spark_conf.fs.azure.account.auth.type.{storage.name}.dfs.core.windows.net", "OAuth"
+                    ),
+                    EndpointConfPair(
+                        f"spark_conf.fs.azure.account.oauth2.client.secret.{storage.name}.dfs.core.windows.net",
+                        "{{secrets/" + inventory_database + "/uber_principal_secret}}",
+                    ),
+                ]
+            )
+        self._ws.warehouses.set_workspace_warehouse_config(
+            data_access_config=sql_dac,
+            sql_configuration_parameters=warehouse_config.sql_configuration_parameters,
+        )
+
     def create_uber_principal(self, prompts: Prompts):
         config = self._installation.load(WorkspaceConfig)
         inventory_database = config.inventory_database
@@ -242,6 +284,7 @@ class AzureResourcePermissions:
             )
             self._installation.save(config)
             self._update_cluster_policy_with_spn(policy_id, storage_account_info, uber_principal, inventory_database)
+            self._update_sql_dac_with_spn(storage_account_info, uber_principal, inventory_database)
         except PermissionError:
             self._azurerm.delete_service_principal(uber_principal.client.object_id)
         logger.info(f"Update UCX cluster policy {policy_id} with spn connection details for storage accounts")
