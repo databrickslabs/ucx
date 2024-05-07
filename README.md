@@ -67,6 +67,9 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`alias` command](#alias-command)
 * [Code migration commands](#code-migration-commands)
   * [`migrate-local-code` command](#migrate-local-code-command)
+  * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
+  * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
+  * [`delete-backup-dbsql-queries` command](#delete-backup-dbsql-queries-command)
 * [Cross-workspace installations](#cross-workspace-installations)
   * [`sync-workspace-info` command](#sync-workspace-info-command)
   * [`manual-workspace-info` command](#manual-workspace-info-command)
@@ -927,6 +930,49 @@ databricks labs ucx migrate-local-code
 migrate all python and SQL files in the current working directory. This command is highly experimental and
 at the moment only supports Python and SQL files and discards code comments and formatting during 
 the automated transformation process.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `migrate-dbsql-dashboards` command
+
+```text
+databricks labs ucx migrate-dbsql-dashboards [--dashboard-id <dashboard-id>]
+```
+
+**(Experimental)** Once [table migration](#table-migration-workflow) is complete, you can run this command to 
+migrate all Databricks SQL dashboards in the workspace. This command is highly experimental and at the moment discards
+formatting during the automated transformation process.
+
+This command tags dashboards & queries that have been migrated with `migrated by UCX` tag. The original queries are
+also backed up in the ucx installation folder, to allow for easy rollback.
+
+This command can be run with `--dashboard-id` flag to migrate a specific dashboard.
+
+This command is incremental and can be run multiple times to migrate new dashboards.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `revert-dbsql-dashboards` command
+
+```text
+databricks labs ucx revert-dbsql-dashboards [--dashboard-id <dashboard-id>]
+```
+
+**(Experimental)** This command reverts the migration of Databricks SQL dashboards in the workspace, after
+`migrate-dbsql-dashboards` command is executed.
+
+This command can be run with `--dashboard-id` flag to migrate a specific dashboard.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `delete-backup-dbsql-queries` command
+
+```text
+databricks labs ucx delete-backup-dbsql-queries
+```
+
+**(Experimental)** This command deletes the backup of the original Databricks SQL queries in the workspace, after
+migration is complete.
 
 [[back to top](#databricks-labs-ucx)]
 
