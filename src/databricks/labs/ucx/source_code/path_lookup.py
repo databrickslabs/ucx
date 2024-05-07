@@ -37,19 +37,20 @@ class PathLookup:
                 logger.warning(f"Permission denied to access {absolute_path}")
         return None
 
-    def push_path(self, path: Path):
+    def has_path(self, path: Path):
+        return next(p for p in self._sys_paths if path == p) is not None
+
+    def prepend_path(self, path: Path):
         self._sys_paths.insert(0, path)
 
     def insert_path(self, index: int, path: Path):
         self._sys_paths.insert(index, path)
 
+    def append_path(self, path: Path):
+        self._sys_paths.append(path)
+
     def remove_path(self, index: int):
         del self._sys_paths[index]
-
-    def pop_path(self) -> Path:
-        result = self._sys_paths[0]
-        del self._sys_paths[0]
-        return result
 
     @property
     def paths(self) -> list[Path]:

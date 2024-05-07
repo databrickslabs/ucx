@@ -33,11 +33,7 @@ class LocalFile(SourceContainer):
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return []
-        maybe = parent.build_graph_from_python_source(self._original_code)
-        problems = []
-        for problem in maybe.problems:
-            problems.append(problem.replace(source_path=self._path))
-        return problems
+        return parent.build_graph_from_python_source(self._original_code)
 
     @property
     def path(self) -> Path:
@@ -128,6 +124,8 @@ class LocalFileResolver(BaseDependencyResolver):
         return super().resolve_local_file(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        if not name:
+            return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
         parts = []
         # Relative imports use leading dots. A single leading dot indicates a relative import, starting with
         # the current package. Two or more leading dots indicate a relative import to the parent(s) of the current

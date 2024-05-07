@@ -20,7 +20,6 @@ from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.graph import SourceContainer
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -161,17 +160,14 @@ class MockPathLookup(PathLookup):
         return MockPathLookup(new_working_directory, self._sys_paths)
 
     def resolve(self, path: pathlib.Path) -> pathlib.Path | None:
-        if path.is_absolute() and path.exists():
-            return path
-        filename = path.as_posix()
-        candidates = [filename]
-        if not filename.endswith('.txt'):
-            candidates.append(f'{filename}.txt')
+        candidates = [path]
+        if not path.name.endswith('.txt'):
+            candidates.append(Path(f"{path}.txt"))
         for candidate in candidates:
-            some_file = self._cwd / candidate
-            if not some_file.exists():
+            absolute_path = super().resolve(candidate)
+            if not absolute_path:
                 continue
-            return some_file
+            return absolute_path
         return None
 
     def __repr__(self):
@@ -208,12 +204,6 @@ def table_mapping_mock(tables: list[str] | None = None):
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = _id_list(TableToMigrate, tables)
     return table_mapping
-
-
-def whitelist_mock():
-    wls = create_autospec(Whitelist)
-    wls.compatibility.return_value = None
-    return wls
 
 
 def locate_site_packages() -> pathlib.Path:

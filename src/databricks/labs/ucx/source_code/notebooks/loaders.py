@@ -42,7 +42,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         """When exported through Git, notebooks are saved with a .py extension. If the path is a notebook, return the
         path to the notebook. If the path is a Python file, return the path to the Python file. If the path is neither,
         return None."""
-        for candidate in (self._adjust_path(path), path):
+        for candidate in (path, self._adjust_path(path)):
             absolute_path = path_lookup.resolve(candidate)
             if not absolute_path:
                 continue

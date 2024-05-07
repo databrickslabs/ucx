@@ -111,6 +111,7 @@ skip-string-normalization = true
 cache-dir = ".venv/ruff-cache"
 target-version = "py310"
 line-length = 120
+exclude = ["tests/unit/source_code/samples/*"]
 
 [tool.ruff.lint]
 ignore = [

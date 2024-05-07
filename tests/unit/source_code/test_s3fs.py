@@ -5,7 +5,6 @@ import pytest
 from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     DependencyProblem,
-    DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
@@ -120,9 +119,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     resolvers = [NotebookResolver(notebook_loader), LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
-    dependency_resolver = DependencyResolver(resolvers)
-    builder = DependencyGraphBuilder(dependency_resolver, lookup)
-    maybe = builder.build_local_file_dependency_graph(sample)
+    dependency_resolver = DependencyResolver(resolvers, lookup)
+    maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
 
 
@@ -133,7 +131,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
             DependencyProblem(
                 code='dependency-check',
                 message='Use of dependency s3fs is deprecated',
-                source_path=Path('root9.py.txt'),
+                source_path=Path('leaf9.py.txt'),
                 start_line=1,
                 start_col=0,
                 end_line=1,
@@ -148,8 +146,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     file_loader = FileLoader()
     whitelist = Whitelist.parse(yml.read_text())
     resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
-    dependency_resolver = DependencyResolver(resolvers)
-    builder = DependencyGraphBuilder(dependency_resolver, lookup)
+    dependency_resolver = DependencyResolver(resolvers, lookup)
     sample = lookup.cwd / "root9.py.txt"
-    maybe = builder.build_local_file_dependency_graph(sample)
-    assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
+    maybe = dependency_resolver.build_local_file_dependency_graph(sample)
+    assert maybe.problems == expected

@@ -18,14 +18,6 @@ def test_lookup_is_initialized_with_handmade_string():
     assert ["what", "on", "earth"] == [path.as_posix() for path in paths]
 
 
-def test_lookup_pushes_path():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
-    provider.push_path(Path("is"))
-    provider.push_path(Path("this"))
-    paths = list(provider.paths)[1:]
-    assert [path.as_posix() for path in paths] == ["this", "is", "what", "on", "earth"]
-
-
 def test_lookup_inserts_path():
     provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
     provider.insert_path(1, Path("is"))
@@ -38,11 +30,3 @@ def test_lookup_removes_path():
     provider.remove_path(1)
     paths = list(provider.paths)[1:]
     assert [path.as_posix() for path in paths] == ["what", "on", "earth"]
-
-
-def test_lookup_pops_path():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
-    popped = provider.pop_path()
-    assert popped.as_posix() == "what"
-    paths = list(provider.paths)[1:]
-    assert [path.as_posix() for path in paths] == ["on", "earth"]

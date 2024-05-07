@@ -41,7 +41,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.graph import DependencyResolver, DependencyGraphBuilder
+from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
@@ -390,17 +390,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        # TODO: link back self.site_packages_resolver and self.whitelist_resolver,
-        return DependencyResolver(
-            [
-                self.notebook_resolver,
-                self.file_resolver,
-            ]
-        )
-
-    @cached_property
-    def dependency_graph_builder(self):
-        return DependencyGraphBuilder(self.dependency_resolver, self.path_lookup)
+        # TODO: link back self.site_packages_resolver
+        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver]
+        return DependencyResolver(resolvers, self.path_lookup)
 
     @cached_property
     def workflow_linter(self):

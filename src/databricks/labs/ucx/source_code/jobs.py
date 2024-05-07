@@ -109,13 +109,11 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
-            return
+            return []
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Disovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
-        maybe = graph.register_notebook(path)
-        if maybe.problems:
-            yield from maybe.problems
+        return graph.register_notebook(path)
 
     def _register_spark_python_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_python_task:

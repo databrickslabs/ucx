@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, MaybeGraph
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
@@ -53,9 +53,8 @@ class Cell(ABC):
     def is_runnable(self) -> bool:
         raise NotImplementedError()
 
-    @abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        raise NotImplementedError()
+    def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
+        return []
 
     def __repr__(self):
         return f"{self.language.name}: {self._original_code[:20]}"
@@ -74,7 +73,7 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         return parent.build_graph_from_python_source(self._original_code)
 
 
@@ -87,9 +86,6 @@ class RCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        return MaybeGraph(None, [])
-
 
 class ScalaCell(Cell):
 
@@ -99,9 +95,6 @@ class ScalaCell(Cell):
 
     def is_runnable(self) -> bool:
         return True  # TODO
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        return MaybeGraph(None, [])
 
 
 class SQLCell(Cell):
@@ -118,9 +111,6 @@ class SQLCell(Cell):
             sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        return MaybeGraph(None, [])
-
 
 class MarkdownCell(Cell):
 
@@ -130,9 +120,6 @@ class MarkdownCell(Cell):
 
     def is_runnable(self) -> bool:
         return True  # TODO
-
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        return MaybeGraph(None, [])
 
 
 class RunCell(Cell):
@@ -144,7 +131,7 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for idx, line in enumerate(lines):
@@ -155,14 +142,12 @@ class RunCell(Cell):
                 if len(path) == 0:
                     continue
                 notebook_path = Path(path)
-                maybe = parent.register_notebook(notebook_path)
-                if not maybe.problems:
-                    return maybe
                 start_line = self._original_offset + idx + 1
-                problems = self._adjust_problem_source_paths_and_line_numbers(parent, start_line, line, maybe.problems)
-                if problems:
-                    return MaybeGraph(None, problems)
-                return MaybeGraph(maybe.graph, [])
+                problems = parent.register_notebook(notebook_path)
+                return [
+                    problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
+                    for problem in problems
+                ]
         start_line = self._original_offset + 1
         problem = DependencyProblem(
             'invalid-run-cell',
@@ -172,27 +157,7 @@ class RunCell(Cell):
             end_line=start_line,
             end_col=len(self._original_code),
         )
-        return MaybeGraph(None, [problem])
-
-    @staticmethod
-    def _adjust_problem_source_paths_and_line_numbers(
-        parent: DependencyGraph,
-        line_number: int,
-        source_code_line: str,
-        raw_problems: list[DependencyProblem],
-    ):
-        problems: list[DependencyProblem] = []
-        for problem in raw_problems:
-            if problem.is_path_missing():
-                problem = problem.replace(source_path=parent.dependency.path.absolute())
-            problem = problem.replace(
-                start_line=line_number,
-                start_col=0,
-                end_line=line_number,
-                end_col=len(source_code_line),
-            )
-            problems.append(problem)
-        return problems
+        return [problem]
 
     def migrate_notebook_path(self):
         pass
@@ -207,9 +172,6 @@ class ShellCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        return MaybeGraph(None, [])
-
 
 class PipCell(Cell):
 
@@ -220,8 +182,9 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph) -> MaybeGraph:
-        return MaybeGraph(None, [])
+    def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
+        # TODO: https://github.com/databrickslabs/ucx/issues/1642
+        return []
 
 
 class CellLanguage(Enum):
