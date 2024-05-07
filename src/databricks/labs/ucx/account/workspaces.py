@@ -6,7 +6,6 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient, Workspace, AccountClient
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 from databricks.sdk.service.iam import ComplexValue, Group, Patch, PatchOp, PatchSchema
-from databricks.sdk import azure
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +31,11 @@ class AccountWorkspaces:
         except (PermissionDenied, NotFound, ValueError) as err:
             # on azure, we can retry with azure-cli auth
             if self._ac.config.is_azure and self._ac.config.auth_type != "azure-cli":
-                config = self._ac.config.deep_copy()
-                config.host = config.environment.deployment_url(workspace.deployment_name)
-                config.azure_workspace_resource_id = azure.get_azure_resource_id(workspace)
-                config.account_id = None
-                config.auth_type = "azure-cli"
-                config.init_auth()
-                return WorkspaceClient(config=config)
+                current_auth_type = self._ac.config.auth_type
+                self._ac.config.auth_type = "azure-cli"
+                ws = self._ac.get_workspace_client(workspace)
+                self._ac.config.auth_type = current_auth_type
+                return ws
             raise PermissionDenied(f"Failed to create client for {workspace.deployment_name}: {err}") from err
 
     def workspace_clients(self, workspaces: list[Workspace] | None = None) -> list[WorkspaceClient]:
