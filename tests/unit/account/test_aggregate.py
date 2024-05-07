@@ -1,13 +1,13 @@
 import logging
 from unittest.mock import create_autospec
+
 from databricks.sdk import Workspace, WorkspaceClient
+from databricks.sdk.service import iam, sql
+
 from databricks.labs.ucx.account.aggregate import AccountAggregate
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
-from databricks.sdk.service import sql
-from databricks.sdk.service import iam
 
 
 def test_basic_readiness_report_no_workspaces(acc_client, caplog):
