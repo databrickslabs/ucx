@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, create_autospec, patch
 import pytest
 import yaml
 from databricks.labs.blueprint.installation import Installation, MockInstallation
-from databricks.labs.blueprint.installer import InstallState, RawState
+from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import (
@@ -645,7 +645,7 @@ def test_remove_database(ws):
             r'Do you want to delete the inventory database.*': 'yes',
         }
     )
-    installation = create_autospec(Installation)
+    installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     workflow_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
@@ -664,7 +664,7 @@ def test_remove_database(ws):
     assert sql_backend.queries == ['DROP SCHEMA IF EXISTS hive_metastore.ucx CASCADE']
     ws.jobs.delete.assert_not_called()
     ws.cluster_policies.delete.assert_called_once()
-    installation.remove.assert_called_once()
+    installation.assert_removed()
     workflow_installer.create_jobs.assert_not_called()
 
 
@@ -677,7 +677,7 @@ def test_remove_jobs_no_state(ws):
             'Do you want to delete the inventory database ucx too?': 'no',
         }
     )
-    installation = create_autospec(Installation)
+    installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     install_state = InstallState.from_installation(installation)
     wheels = create_autospec(WheelsV2)
@@ -698,7 +698,7 @@ def test_remove_jobs_no_state(ws):
     workspace_installation.uninstall()
 
     ws.jobs.delete.assert_not_called()
-    installation.remove.assert_called_once()
+    installation.assert_removed()
     wheels.upload_to_wsfs.assert_not_called()
 
 
@@ -755,7 +755,7 @@ def test_remove_warehouse(ws):
             'Do you want to delete the inventory database ucx too?': 'no',
         }
     )
-    installation = create_autospec(Installation)
+    installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
@@ -772,7 +772,7 @@ def test_remove_warehouse(ws):
     workspace_installation.uninstall()
 
     ws.warehouses.delete.assert_called_once()
-    installation.remove.assert_called_once()
+    installation.assert_removed()
     workflows_installer.create_jobs.assert_not_called()
 
 
@@ -786,7 +786,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
             'Do you want to delete the inventory database ucx too?': 'no',
         }
     )
-    installation = create_autospec(Installation)
+    installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
@@ -804,7 +804,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
 
     ws.warehouses.delete.assert_not_called()
     workflows_installer.create_jobs.assert_not_called()
-    installation.remove.assert_called_once()
+    installation.assert_removed()
 
 
 def test_remove_secret_scope(ws, caplog):
@@ -869,7 +869,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
             'Do you want to delete the inventory database ucx too?': 'no',
         }
     )
-    installation = create_autospec(Installation)
+    installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     ws.cluster_policies.delete.side_effect = NotFound()
     workflows_installer = create_autospec(WorkflowsDeployment)
@@ -888,7 +888,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
         workspace_installation.uninstall()
         assert 'UCX Policy already deleted' in caplog.messages
 
-    installation.remove.assert_called_once()
+    installation.assert_removed()
     workflows_installer.create_jobs.assert_not_called()
 
 
@@ -902,7 +902,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
             'Do you want to delete the inventory database ucx too?': 'no',
         }
     )
-    installation = create_autospec(Installation)
+    installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     workflows_installer = create_autospec(WorkflowsDeployment)
     workspace_installation = WorkspaceInstallation(
@@ -920,7 +920,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
         workspace_installation.uninstall()
         assert 'Error accessing warehouse details' in caplog.messages
 
-    installation.remove.assert_called_once()
+    installation.assert_removed()
     workflows_installer.create_jobs.assert_not_called()
 
 
@@ -1643,9 +1643,6 @@ def test_check_inventory_database_exists(ws, mock_installation):
         }
     )
 
-    installation_type_mock = create_autospec(Installation)
-    installation_type_mock.load.side_effect = NotFound
-
     installation = Installation(ws, 'ucx')
     install = WorkspaceInstaller(ws).replace(
         prompts=prompts,
@@ -1686,8 +1683,15 @@ def test_user_not_admin(ws, mock_installation):
     ],
 )
 def test_validate_step(ws, result_state, expected):
-    installation = create_autospec(Installation)
-    installation.load.return_value = RawState({'jobs': {'assessment': '123'}})
+    installation = MockInstallation(
+        {
+            'state.json': {
+                'resources': {
+                    'jobs': {"assessment": "123"},
+                }
+            }
+        }
+    )
     install_state = InstallState.from_installation(installation)
     deployed = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
     ws.jobs.list_runs.return_value = [

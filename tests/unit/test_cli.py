@@ -5,7 +5,6 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -412,8 +411,6 @@ def test_cluster_remap(ws, caplog):
         ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
         ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
     ]
-    installation = create_autospec(Installation)
-    installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)
     assert "Remapping the Clusters to UC" in caplog.messages
 
@@ -422,8 +419,6 @@ def test_cluster_remap_error(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = []
-    installation = create_autospec(Installation)
-    installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)
     assert "No cluster information present in the workspace" in caplog.messages
 

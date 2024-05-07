@@ -4,7 +4,7 @@ from unittest import mock
 from unittest.mock import MagicMock, call, create_autospec
 
 import pytest
-from databricks.labs.blueprint.installation import Installation, MockInstallation
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
@@ -146,11 +146,24 @@ def test_create_external_locations(mock_ws, installation_multiple_roles, backend
 
 
 def test_create_external_locations_skip_existing(mock_ws, backend, locations):
-    install = create_autospec(Installation)
-    install.load.return_value = [
-        AWSRoleAction("arn:aws:iam::12345:role/uc-role1", "s3", "WRITE_FILES", "s3://BUCKET1"),
-        AWSRoleAction("arn:aws:iam::12345:role/uc-rolex", "s3", "WRITE_FILES", "s3://BUCKETX"),
-    ]
+    install = MockInstallation(
+        {
+            "uc_roles_access.csv": [
+                {
+                    'privilege': 'WRITE_FILES',
+                    'resource_path': 's3://BUCKET1',
+                    'resource_type': 's3',
+                    'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+                },
+                {
+                    'privilege': 'WRITE_FILES',
+                    'resource_path': 's3://BUCKETX',
+                    'resource_type': 's3',
+                    'role_arn': 'arn:aws:iam::12345:role/uc-role1',
+                },
+            ]
+        }
+    )
     mock_ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(
             id="1",
