@@ -128,6 +128,18 @@ By following these steps, you should be able to effectively locate, access, and 
 - Ensure you do not forget the `--profile <CONFIGPROFILENAME>` to authenticate. If the databricks command cannot authenticate, you may receive a lengthy stack traceback
 - Validate your login with `databricks auth env --profile <CONFIGPROFILENAME>` which should print out a json structure having about 8 different keys and values and secrets
 
+If Azure CLI has already been installed and authenticated, but you see the following error when running ucx commands:
+
+`14:50:33 ERROR [d.labs.ucx] In order to obtain AAD token, Please run azure cli to authenticate.`
+
+Resolve this in macOS by running the command with an explicit auth type set: `DATABRICKS_AUTH_TYPE=azure-cli databricks labs ucx ...`. 
+To resolve this issue in Windows, proceed with the following steps:
+
+1. Open `%userprofile%` (the path like `C:\Users\<username>`)
+2. Open `.databrickscfg`
+3. Change the profile definition by setting `auth_type=azure-cli`
+4. Save, close the file, re-run `databricks labs ucx ...`
+
 ### Resolving common errors on UCX install
 
 #### Error on installing the ucx inventory database
