@@ -114,7 +114,7 @@ def test_cluster_with_multiple_failures():
     assert len(result_set) == 1
     assert result_set[0].success == 0
     failures = json.loads(result_set[0].failures)
-    assert 'unsupported config: spark.databricks.passthrough.enabled' in failures
+    assert 'Uses passthrough config: spark.databricks.passthrough.enabled in cluster.' in failures
     assert 'not supported DBR: 9.3.x-cpu-ml-scala2.12' in failures
 
 
