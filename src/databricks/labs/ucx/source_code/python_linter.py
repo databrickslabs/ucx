@@ -281,3 +281,23 @@ class PythonLinter(Linter):
     @staticmethod
     def list_appended_sys_paths(linter: ASTLinter) -> list[SysPath]:
         return linter.collect_appended_sys_paths()
+
+
+class PythonWheelLinter(PythonLinter):
+
+    def __init__(self, wheel_file: str, temp_install_dir: str):
+        self._wheel_file = wheel_file
+        self._install_dir = temp_install_dir
+
+    def download_wheel_file(self, location: str) -> None:
+        pass
+
+    def install_wheel_file(self, location: str) -> None:
+        pass
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        self.download_wheel_file(self._wheel_file)
+        self.install_wheel_file(self._install_dir)
+
+        for code in self._install_dir:
+            return super().lint(code)
