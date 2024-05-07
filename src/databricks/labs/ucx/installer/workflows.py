@@ -713,56 +713,70 @@ class WorkflowsDeployment(InstallationMixin):
 
 class MaxedStreamHandler(logging.StreamHandler):
 
-    MAX_STREAM_SIZE = 2 ** 20
+    MAX_STREAM_SIZE = 2**20 - 2**6  # 1 Mb minus some buffer
     _installed_handlers: dict[str, tuple[logging.Logger, MaxedStreamHandler]] = {}
 
     @classmethod
-    def install_handler(cls, logger: logging.Logger):
-        if logger.handlers:
+    def install_handler(cls, logger_: logging.Logger):
+        if logger_.handlers:
             # already installed ?
-            handler = next((h for h in logger.handlers if isinstance(h, MaxedStreamHandler)), None)
-            if handler:
+            installed = next(
+                (h for h in logger_.handlers if isinstance(h, MaxedStreamHandler)), None
+            )
+            if installed:
                 return
             # any handler to override ?
-            handler = next((h for h in logger.handlers if isinstance(h, logging.StreamHandler)), None)
+            handler = next((h for h in logger_.handlers if isinstance(h, logging.StreamHandler)), None)
             if handler:
-                to_install = MaxedStreamHandler(2, handler)
-                cls._installed_handlers[logger.name] = (logger, to_install)
-                logger.removeHandler(handler)
-                logger.addHandler(to_install)
+                to_install = MaxedStreamHandler(cls.MAX_STREAM_SIZE, handler)
+                cls._installed_handlers[logger_.name] = (logger_, to_install)
+                logger_.removeHandler(handler)
+                logger_.addHandler(to_install)
                 return
-        if logger.parent:
-            cls.install_handler(logger.parent)
-        if logger.root:
-            cls.install_handler(logger.root)
+        if logger_.parent:
+            cls.install_handler(logger_.parent)
+        if logger_.root:
+            cls.install_handler(logger_.root)
 
     @classmethod
     def uninstall_handlers(cls):
-        for name, pair in cls._installed_handlers.items():
-            logger = pair[0]
+        for pair in cls._installed_handlers.values():
+            logger_ = pair[0]
             handler = pair[1]
-            logger.removeHandler(handler)
-            logger.addHandler(handler._original_handler)
+            logger_.removeHandler(handler)
+            logger_.addHandler(handler.original_handler)
         cls._installed_handlers.clear()
 
     def __init__(self, max_bytes: int, original_handler: logging.StreamHandler):
         super().__init__()
-        self._max_bytes = 2**20
+        self._max_bytes = max_bytes
         self._sent_bytes = 0
         self._original_handler = original_handler
+
+    @property
+    def original_handler(self):
+        return self._original_handler
 
     def emit(self, record):
         try:
             msg = self.format(record) + self.terminator
-            data = msg.encode("utf-8")
-            if self._sent_bytes + len(data) > self._max_bytes:
-                # ensure readers are aware of why the logs are incomplete
-                self.stream.write(f"MAX LOGS SIZE REACHED: {self._sent_bytes} bytes!!!")
-                self.flush()
+            if self._prevent_overflow(msg):
                 return
             self.stream.write(msg)
             self.flush()
         except RecursionError:  # See issue 36272
             raise
+        # the below is copied from Python source
+        # so ensuring not to break the logging logic
+        # pylint: disable=broad-exception-caught
         except Exception:
             self.handleError(record)
+
+    def _prevent_overflow(self, msg: str):
+        data = msg.encode("utf-8")
+        if self._sent_bytes + len(data) > self._max_bytes:
+            # ensure readers are aware of why the logs are incomplete
+            self.stream.write(f"MAX LOGS SIZE REACHED: {self._sent_bytes} bytes!!!")
+            self.flush()
+            return True
+        return False
