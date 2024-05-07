@@ -394,14 +394,17 @@ flowchart TB
     subgraph workflow[Table Migration Workflows]
       subgraph mt_workflow[workflow: migrate-tables]
         dbfs_root_delta_mt_task[migrate_dbfs_root_delta_tables]
+        dbfs_root_non_delta_mt_task[migrate_dbfs_root_non_delta_tables]
         external_tables_sync_mt_task[migrate_external_tables_sync]
         view_mt_task[roadmap: migrate_views]
         dbfs_root_delta_mt_task --> view_mt_task
+        dbfs_root_non_delta_mt_task --> view_mt_task
         external_tables_sync_mt_task --> view_mt_task
       end
       
       subgraph mt_ctas_wf[roadmap workflow: migrate-tables-ctas]
         ctas_mt_task[migrate_tables_ctas] --> view_mt_task_ctas[roadmap: migrate_views]
+        ctas_mt_task[migrate_hiveserde_ctas] --> view_mt_task_ctas[roadmap: migrate_views]
       end
   
       subgraph mt_serde_inplace_wf[roadmap workflow: migrate-external-hiveserde-tables-in-place-experimental]

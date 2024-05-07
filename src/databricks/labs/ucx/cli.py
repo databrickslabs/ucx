@@ -428,7 +428,7 @@ def assign_metastore(
 def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContext | None = None):
     """
     Trigger the migrate-tables workflow and, optionally, the migrate-external-hiveserde-tables-in-place-experimental
-    workflow.
+    workflow and migrate-external-tables-ctas.
     """
     if ctx is None:
         ctx = WorkspaceContext(w)
@@ -444,6 +444,15 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
             f"the migrate-external-hiveserde-tables-in-place-experimental workflow?"
         ):
             deployed_workflows.run_workflow("migrate-external-hiveserde-tables-in-place-experimental")
+
+    external_ctas_tables = [table for table in tables if table.what == What.EXTERNAL_NO_SYNC]
+    if len(external_ctas_tables) > 0:
+        percentage_external_ctas_tables = len(external_ctas_tables) / len(tables) * 100
+        if prompts.confirm(
+            f"Found {len(external_ctas_tables)} ({percentage_external_ctas_tables:.2f}%) external tables which cannot be migrated using sync"
+            f", do you want to run the migrate-external-tables-ctas workflow?"
+        ):
+            deployed_workflows.run_workflow("migrate-external-tables-ctas")
 
 
 if __name__ == "__main__":
