@@ -17,23 +17,35 @@ from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.resources import AzureResources
-from databricks.labs.ucx.cli import (alias, assign_metastore, cluster_remap,
-                                     create_account_groups,
-                                     create_catalogs_schemas,
-                                     create_missing_principals,
-                                     create_table_mapping,
-                                     create_uber_principal,
-                                     ensure_assessment_run, installations,
-                                     logs, manual_workspace_info,
-                                     migrate_credentials, migrate_locations,
-                                     migrate_tables, move, open_remote_config,
-                                     principal_prefix_access, repair_run,
-                                     revert_cluster_remap,
-                                     revert_migrated_tables,
-                                     show_all_metastores, skip,
-                                     sync_workspace_info,
-                                     validate_external_locations,
-                                     validate_groups_membership, workflows)
+from databricks.labs.ucx.cli import (
+    alias,
+    assign_metastore,
+    cluster_remap,
+    create_account_groups,
+    create_catalogs_schemas,
+    create_missing_principals,
+    create_table_mapping,
+    create_uber_principal,
+    ensure_assessment_run,
+    installations,
+    logs,
+    manual_workspace_info,
+    migrate_credentials,
+    migrate_locations,
+    migrate_tables,
+    move,
+    open_remote_config,
+    principal_prefix_access,
+    repair_run,
+    revert_cluster_remap,
+    revert_migrated_tables,
+    show_all_metastores,
+    skip,
+    sync_workspace_info,
+    validate_external_locations,
+    validate_groups_membership,
+    workflows,
+)
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
