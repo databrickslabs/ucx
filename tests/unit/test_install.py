@@ -5,67 +5,41 @@ from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 import yaml
-from databricks.labs.blueprint.installation import Installation, MockInstallation
+from databricks.labs.blueprint.installation import (Installation,
+                                                    MockInstallation)
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.labs.blueprint.wheels import (
-    ProductInfo,
-    WheelsV2,
-    find_project_root,
-)
+from databricks.labs.blueprint.wheels import (ProductInfo, WheelsV2,
+                                              find_project_root)
 from databricks.labs.lsql.backends import MockBackend
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
-    AlreadyExists,
-    InvalidParameterValue,
-    NotFound,
-    NotImplemented,
-    OperationFailed,
-    PermissionDenied,
-    Unknown,
-)
+    AlreadyExists, InvalidParameterValue, NotFound, NotImplemented,
+    OperationFailed, PermissionDenied, Unknown)
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.compute import (
-    ClusterDetails,
-    CreatePolicyResponse,
-    DataSecurityMode,
-    Policy,
-    State,
-)
-from databricks.sdk.service.jobs import (
-    BaseRun,
-    RunLifeCycleState,
-    RunResultState,
-    RunState,
-)
+from databricks.sdk.service.compute import (ClusterDetails,
+                                            CreatePolicyResponse,
+                                            DataSecurityMode, Policy, State)
+from databricks.sdk.service.jobs import (BaseRun, RunLifeCycleState,
+                                         RunResultState, RunState)
 from databricks.sdk.service.provisioning import Workspace
-from databricks.sdk.service.sql import (
-    Dashboard,
-    DataSource,
-    EndpointInfo,
-    EndpointInfoWarehouseType,
-    Query,
-    Visualization,
-    Widget,
-)
+from databricks.sdk.service.sql import (Dashboard, DataSource, EndpointInfo,
+                                        EndpointInfoWarehouseType, Query,
+                                        Visualization, Widget)
 from databricks.sdk.service.workspace import ObjectInfo
 
 import databricks.labs.ucx.installer.mixins
 import databricks.labs.ucx.uninstall  # noqa
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.framework.dashboards import DashboardFromFiles
-from databricks.labs.ucx.install import (
-    WorkspaceInstallation,
-    WorkspaceInstaller,
-    extract_major_minor,
-    AccountInstaller,
-)
-from databricks.labs.ucx.installer.workflows import (
-    DeployedWorkflows,
-    WorkflowsDeployment,
-)
+from databricks.labs.ucx.install import (AccountInstaller,
+                                         WorkspaceInstallation,
+                                         WorkspaceInstaller,
+                                         extract_major_minor)
+from databricks.labs.ucx.installer.workflows import (DeployedWorkflows,
+                                                     WorkflowsDeployment)
 from databricks.labs.ucx.runtime import Workflows
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)

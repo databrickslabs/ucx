@@ -3,11 +3,8 @@ from unittest.mock import create_autospec
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.compute import (
-    ClusterDetails,
-    ClusterSource,
-    DataSecurityMode,
-)
+from databricks.sdk.service.compute import (ClusterDetails, ClusterSource,
+                                            DataSecurityMode)
 
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 

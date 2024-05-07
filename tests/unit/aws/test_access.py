@@ -10,20 +10,15 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import iam
-from databricks.sdk.service.catalog import (
-    AwsIamRoleResponse,
-    ExternalLocationInfo,
-    StorageCredentialInfo,
-)
+from databricks.sdk.service.catalog import (AwsIamRoleResponse,
+                                            ExternalLocationInfo,
+                                            StorageCredentialInfo)
 from databricks.sdk.service.compute import InstanceProfile, Policy
-from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse, EndpointConfPair
+from databricks.sdk.service.sql import (EndpointConfPair,
+                                        GetWorkspaceWarehouseConfigResponse)
 
-from databricks.labs.ucx.assessment.aws import (
-    AWSPolicyAction,
-    AWSResources,
-    AWSRole,
-    AWSRoleAction,
-)
+from databricks.labs.ucx.assessment.aws import (AWSPolicyAction, AWSResources,
+                                                AWSRole, AWSRoleAction)
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
