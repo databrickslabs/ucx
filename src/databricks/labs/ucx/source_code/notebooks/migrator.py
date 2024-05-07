@@ -2,38 +2,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.workspace import ObjectInfo, ExportFormat, ObjectType
 
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import RunCell
-from databricks.labs.ucx.source_code.notebooks.loaders import WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class NotebookMigrator:
-    def __init__(
-        self,
-        ws: WorkspaceClient,
-        languages: Languages,
-    ):
-        self._ws = ws
+    def __init__(self, languages: Languages):
+        # TODO: move languages to `apply`
         self._languages = languages
 
-    def revert(self, object_info: ObjectInfo):
-        if not object_info.path:
+    def revert(self, path: Path):
+        backup_path = path.with_suffix(".bak")
+        if not backup_path.exists():
             return False
-        with self._ws.workspace.download(object_info.path + ".bak", format=ExportFormat.SOURCE) as f:
-            code = f.read().decode("utf-8")
-            self._ws.workspace.upload(object_info.path, code.encode("utf-8"))
-        return True
+        return path.write_text(backup_path.read_text()) > 0
 
-    def apply(self, object_info: ObjectInfo) -> bool:
-        if not object_info.path or not object_info.language or object_info.object_type is not ObjectType.NOTEBOOK:
+    def apply(self, path: Path) -> bool:
+        if not path.exists():
             return False
-        dependency = Dependency(WorkspaceNotebookLoader(self._ws), Path(object_info.path))
+        dependency = Dependency(NotebookLoader(), path)
         # TODO: the interface for this method has to be changed
         lookup = PathLookup.from_sys_path(Path.cwd())
         container = dependency.load(lookup)
@@ -56,7 +48,7 @@ class NotebookMigrator:
                 cell.migrated_code = migrated_code
                 changed = True
         if changed:
-            self._ws.workspace.upload(notebook.path.as_posix() + ".bak", notebook.original_code.encode("utf-8"))
-            self._ws.workspace.upload(notebook.path.as_posix(), notebook.to_migrated_code().encode("utf-8"))
             # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
+            notebook.path.rename(notebook.path.with_suffix(".bak"))
+            notebook.path.write_text(notebook.to_migrated_code())
         return changed

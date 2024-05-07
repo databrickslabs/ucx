@@ -7,7 +7,7 @@ from pathlib import Path
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.base import Advice, Failure
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.languages import Languages
@@ -133,11 +133,21 @@ class FileLinter:
 
     def lint(self) -> Iterable[Advice]:
         if self._is_notebook():
-            notebook = Notebook.parse(self._path, self._content, self._file_language())
-            notebook_linter = NotebookLinter(self._languages, notebook)
-            yield from notebook_linter.lint()
+            yield from self._lint_notebook()
+        else:
+            yield from self._lint_file()
+
+    def _lint_file(self):
         language = self._file_language()
         if not language:
-            return
-        linter = self._languages.linter(language)
-        yield from linter.lint(self._content)
+            yield Failure("unsupported-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+        try:
+            linter = self._languages.linter(language)
+            yield from linter.lint(self._content)
+        except ValueError as err:
+            yield Failure("unsupported-language", str(err), 0, 0, 1, 1)
+
+    def _lint_notebook(self):
+        notebook = Notebook.parse(self._path, self._content, self._file_language())
+        notebook_linter = NotebookLinter(self._languages, notebook)
+        yield from notebook_linter.lint()

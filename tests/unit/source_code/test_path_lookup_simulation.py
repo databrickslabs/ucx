@@ -4,8 +4,8 @@ import pytest
 from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraphBuilder, DependencyResolver
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, LocalNotebookLoader
-from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackageResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver
 from tests.unit import (
     _samples_path,
@@ -40,11 +40,11 @@ def test_locates_notebooks(source: list[str], expected: int):
     notebook_path = Path(*elems)
     lookup = MockPathLookup()
     file_loader = FileLoader()
-    notebook_loader = LocalNotebookLoader()
+    notebook_loader = NotebookLoader()
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, lookup),
+        SitePackageResolver(site_packages, file_loader, lookup),
         LocalFileResolver(file_loader),
     ]
     dependency_resolver = DependencyResolver(resolvers)
@@ -63,11 +63,11 @@ def test_locates_files(source: list[str], expected: int):
     whitelist = whitelist_mock()
     provider = PathLookup.from_sys_path(Path.cwd())
     file_loader = FileLoader()
-    notebook_loader = LocalNotebookLoader()
+    notebook_loader = NotebookLoader()
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, provider),
+        SitePackageResolver(site_packages, file_loader, provider),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]

@@ -1,18 +1,32 @@
+import functools
+import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
-from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.files import LocalFile
-from databricks.labs.ucx.source_code.graph import DependencyGraphBuilder
+from databricks.labs.ucx.source_code.graph import (
+    DependencyGraph,
+    SourceContainer,
+    DependencyProblem,
+    Dependency,
+    WrappingLoader,
+    DependencyResolver,
+)
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
-from databricks.labs.ucx.source_code.site_packages import SitePackageContainer
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,22 +43,154 @@ class JobProblem:
     end_col: int
 
 
+class WorkflowTask(Dependency):
+    def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
+        loader = WrappingLoader(WorkflowTaskContainer(ws, task))
+        super().__init__(loader, Path(f'/jobs/{task.task_key}'))
+        self._task = task
+        self._job = job
+
+    def load(self, path_lookup: PathLookup) -> SourceContainer | None:
+        return self._loader.load_dependency(path_lookup, self)
+
+    def __repr__(self):
+        return f'WorkflowTask<{self._task.task_key} of {self._job.settings.name}>'
+
+
+class WorkflowTaskContainer(SourceContainer):
+    def __init__(self, ws: WorkspaceClient, task: jobs.Task):
+        self._task = task
+        self._ws = ws
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return list(self._register_task_dependencies(parent))
+
+    def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+        yield from self._register_libraries(graph)
+        yield from self._register_notebook(graph)
+        yield from self._register_spark_python_task(graph)
+        yield from self._register_python_wheel_task(graph)
+        yield from self._register_spark_jar_task(graph)
+        yield from self._register_run_job_task(graph)
+        yield from self._register_pipeline_task(graph)
+        yield from self._register_existing_cluster_id(graph)
+        yield from self._register_spark_submit_task(graph)
+
+    def _register_libraries(self, graph: DependencyGraph):
+        if not self._task.libraries:
+            return
+        for library in self._task.libraries:
+            yield from self._lint_library(library, graph)
+
+    def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+        if library.pypi:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1642
+            maybe = graph.register_library(library.pypi.package)
+            if maybe.problems:
+                yield from maybe.problems
+        if library.jar:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1641
+            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
+        if library.egg:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1643
+            maybe = graph.register_library(library.egg)
+            if maybe.problems:
+                yield from maybe.problems
+        if library.whl:
+            # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
+            # TODO: https://github.com/databrickslabs/ucx/issues/1640
+            maybe = graph.register_library(library.whl)
+            if maybe.problems:
+                yield from maybe.problems
+        if library.requirements:
+            # TODO: download and add every entry via graph.register_library
+            # TODO: https://github.com/databrickslabs/ucx/issues/1644
+            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+
+    def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+        if not self._task.notebook_task:
+            return
+        notebook_path = self._task.notebook_task.notebook_path
+        logger.info(f'Disovering {self._task.task_key} entrypoint: {notebook_path}')
+        path = WorkspacePath(self._ws, notebook_path)
+        maybe = graph.register_notebook(path)
+        if maybe.problems:
+            yield from maybe.problems
+
+    def _register_spark_python_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.spark_python_task:
+            return
+        # TODO: https://github.com/databrickslabs/ucx/issues/1639
+        yield DependencyProblem('not-yet-implemented', 'Spark Python task is not yet implemented')
+
+    def _register_python_wheel_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.python_wheel_task:
+            return
+        # TODO: https://github.com/databrickslabs/ucx/issues/1640
+        yield DependencyProblem('not-yet-implemented', 'Python wheel task is not yet implemented')
+
+    def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.spark_jar_task:
+            return
+        # TODO: https://github.com/databrickslabs/ucx/issues/1641
+        yield DependencyProblem('not-yet-implemented', 'Spark Jar task is not yet implemented')
+
+    def _register_run_job_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.run_job_task:
+            return
+        # TODO: it's not clear how to terminate the graph
+        yield DependencyProblem('not-yet-implemented', 'Run job task is not yet implemented')
+
+    def _register_pipeline_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.pipeline_task:
+            return
+        # TODO: https://github.com/databrickslabs/ucx/issues/1638
+        yield DependencyProblem('not-yet-implemented', 'Pipeline task is not yet implemented')
+
+    def _register_existing_cluster_id(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.existing_cluster_id:
+            return
+        # TODO: https://github.com/databrickslabs/ucx/issues/1637
+        # load libraries installed on the referred cluster
+        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
+
+    def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.spark_submit_task:
+            return
+        yield DependencyProblem('not-yet-implemented', 'Spark submit task is not yet implemented')
+
+
 class WorkflowLinter:
     def __init__(
         self,
         ws: WorkspaceClient,
-        builder: DependencyGraphBuilder,
+        resolver: DependencyResolver,
+        path_lookup: PathLookup,
         migration_index: MigrationIndex,
-        whitelist: Whitelist,
     ):
         self._ws = ws
-        self._builder = builder
+        self._resolver = resolver
+        self._path_lookup = path_lookup
         self._migration_index = migration_index
-        self._whitelist = whitelist
 
-    def lint_job(self, job_id: int):
-        job = self._ws.jobs.get(job_id)
-        return list(self._lint_job(job))
+    def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
+        tasks = []
+        for job in self._ws.jobs.list():
+            tasks.append(functools.partial(self.lint_job, job.job_id))
+        problems: list[JobProblem] = []
+        for batch in Threads.strict('linting workflows', tasks):
+            problems.extend(batch)
+        sql_backend.save_table(f'{inventory_database}.workflow_problems', problems, JobProblem, mode='overwrite')
+
+    def lint_job(self, job_id: int) -> list[JobProblem]:
+        try:
+            job = self._ws.jobs.get(job_id)
+            return list(self._lint_job(job))
+        except NotFound:
+            logger.warning(f'Could not find job: {job_id}')
+            return []
+
+    _UNKNOWN = Path('<UNKNOWN>')
 
     def _lint_job(self, job: jobs.Job) -> list[JobProblem]:
         problems: list[JobProblem] = []
@@ -53,7 +199,7 @@ class WorkflowLinter:
         assert job.settings.name is not None
         assert job.settings.tasks is not None
         for task in job.settings.tasks:
-            for path, advice in self._lint_task(task):
+            for path, advice in self._lint_task(task, job):
                 absolute_path = path.absolute().as_posix() if path != self._UNKNOWN else 'UNKNOWN'
                 job_problem = JobProblem(
                     job_id=job.job_id,
@@ -70,44 +216,28 @@ class WorkflowLinter:
                 problems.append(job_problem)
         return problems
 
-    def _lint_task(self, task: jobs.Task):
-        yield from self._lint_notebook_task(task)
-        yield from self._lint_spark_python_task(task)
-        yield from self._lint_python_wheel_task(task)
-        yield from self._lint_spark_jar_task(task)
-        yield from self._lint_libraries(task)
-        yield from self._lint_run_job_task(task)
-        yield from self._lint_pipeline_task(task)
-        yield from self._lint_existing_cluster_id(task)
-        yield from self._lint_spark_submit_task(task)
-
-    def _lint_notebook_task(self, task: jobs.Task):
-        if not task.notebook_task:
-            return
-        notebook_path = task.notebook_task.notebook_path
-        path = WorkspacePath(self._ws, notebook_path)
-        maybe = self._builder.build_notebook_dependency_graph(path)
-        for problem in maybe.problems:
-            yield problem.source_path, problem.as_advisory()
-        if not maybe.graph:
+    def _lint_task(self, task: jobs.Task, job: jobs.Job):
+        dependency: Dependency = WorkflowTask(self._ws, task, job)
+        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
+        container = dependency.load(self._path_lookup)
+        assert container is not None  # because we just created it
+        problems = container.build_dependency_graph(graph)
+        if problems:
+            for problem in problems:
+                source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
+                yield source_path, problem
             return
         session_state = CurrentSessionState()
         state = Languages(self._migration_index, session_state)
-        for dependency in maybe.graph.all_dependencies:
-            container = dependency.load(maybe.graph.path_lookup)
+        for dependency in graph.all_dependencies:
+            logger.info(f'Linting {task.task_key} dependency: {dependency}')
+            container = dependency.load(graph.path_lookup)
             if not container:
                 continue
             if isinstance(container, Notebook):
                 yield from self._lint_notebook(container, state)
-            if isinstance(container, SitePackageContainer):
-                yield from self._lint_python_package(container)
             if isinstance(container, LocalFile):
                 yield from self._lint_file(container, state)
-
-    def _lint_python_package(self, site_package):
-        for path in site_package.paths:
-            # lint every path
-            yield path, Advice('not-yet-implemented', 'Python package is not yet implemented', 0, 0, 0, 0)
 
     def _lint_file(self, file: LocalFile, state: Languages):
         linter = FileLinter(state, file.path)
@@ -118,70 +248,3 @@ class WorkflowLinter:
         linter = NotebookLinter(state, notebook)
         for advice in linter.lint():
             yield notebook.path, advice
-
-    _UNKNOWN = Path('<MISSING>')
-
-    def _lint_spark_submit_task(self, task: jobs.Task):
-        if not task.spark_submit_task:
-            return
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Spark submit task is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_existing_cluster_id(self, task: jobs.Task):
-        if not task.existing_cluster_id:
-            return
-        # TODO: load pypi and dbfs libraries
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Existing cluster ID is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_pipeline_task(self, task: jobs.Task):
-        if not task.pipeline_task:
-            return
-        # TODO: ... load DLT
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Pipeline task is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_run_job_task(self, task: jobs.Task):
-        if not task.run_job_task:
-            return
-        # TODO: something like self.lint(task.run_job_task.job_id)
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Run job task is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_spark_python_task(self, task: jobs.Task):
-        if not task.spark_python_task:
-            return
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Spark Python task is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_python_wheel_task(self, task: jobs.Task):
-        if not task.python_wheel_task:
-            return
-        # TODO: ... load
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Python wheel task is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_spark_jar_task(self, task: jobs.Task):
-        if not task.spark_jar_task:
-            return
-        # TODO: ... load
-        yield self._UNKNOWN, Advice('not-yet-implemented', 'Spark Jar task is not yet implemented', 0, 0, 0, 0)
-
-    def _lint_libraries(self, task: jobs.Task):
-        if not task.libraries:
-            return
-        if task.libraries:
-            for library in task.libraries:
-                yield from self._lint_library(library)
-
-    def _lint_library(self, library: compute.Library):
-        if library.pypi:
-            yield self._UNKNOWN, Advice('not-yet-implemented', 'Pypi library is not yet implemented', 0, 0, 0, 0)
-        if library.jar:
-            yield self._UNKNOWN, Advice('not-yet-implemented', 'Jar library is not yet implemented', 0, 0, 0, 0)
-        if library.egg:
-            # TODO: load and lint
-            yield self._UNKNOWN, Advice('not-yet-implemented', 'Egg library is not yet implemented', 0, 0, 0, 0)
-        if library.whl:
-            # TODO: load from DBFS
-            # TODO: load and lint
-            yield self._UNKNOWN, Advice('not-yet-implemented', 'Whl library is not yet implemented', 0, 0, 0, 0)
-        if library.requirements:
-            # TODO: load and lint
-            yield self._UNKNOWN, Advice(
-                'not-yet-implemented', 'Requirements library is not yet implemented', 0, 0, 0, 0
-            )

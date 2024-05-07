@@ -39,6 +39,13 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
+    def register_library(self, name: str) -> MaybeGraph:
+        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
+        # TODO: https://github.com/databrickslabs/ucx/issues/1642
+        # TODO: https://github.com/databrickslabs/ucx/issues/1643
+        # TODO: https://github.com/databrickslabs/ucx/issues/1640
+        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
+
     def register_notebook(self, path: Path) -> MaybeGraph:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
         if not maybe.dependency:
@@ -52,7 +59,9 @@ class DependencyGraph:
         return self.register_dependency(maybe.dependency)
 
     def register_dependency(self, dependency: Dependency) -> MaybeGraph:
-        # already registered ?
+        # TODO: this has to be a private method, because we don't want to allow free-form dependencies.
+        # the only case we have for this method to be used outside of this class is for SitePackages (or DistInfo)
+        # See databricks.labs.ucx.source_code.site_packages.SitePackageContainer.build_dependency_graph for reference
         maybe = self.locate_dependency(dependency.path)
         if maybe.graph is not None:
             self._dependencies[dependency] = maybe.graph
@@ -163,8 +172,9 @@ class DependencyGraph:
             for problem in self._traverse_notebook_run(call):
                 problems.append(problem)
         for import_name, node in PythonLinter.list_import_sources(linter):
-            if import_name.split('.')[0] in sys.stdlib_module_names:
-                # we don't need to register stdlib imports
+            if import_name.split('.')[0] in {'databricks'} | sys.stdlib_module_names:
+                # TODO: redundant: see databricks.labs.ucx.source_code.whitelist.Whitelist.__init__
+                # we don't need to register stdlib or databricks.* imports
                 continue
             maybe = self.register_import(import_name)
             for problem in maybe.problems:

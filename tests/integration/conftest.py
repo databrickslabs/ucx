@@ -549,6 +549,8 @@ def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
 
 
 class TestInstallationContext(TestRuntimeContext):
+    __test__ = False
+
     def __init__(  # pylint: disable=too-many-arguments
         self,
         make_table_fixture,

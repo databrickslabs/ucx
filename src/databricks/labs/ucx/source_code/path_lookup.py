@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class PathLookup:
@@ -27,8 +30,11 @@ class PathLookup:
             return path
         for parent in self.paths:
             absolute_path = parent / path
-            if absolute_path.exists():
-                return absolute_path
+            try:
+                if absolute_path.exists():
+                    return absolute_path
+            except PermissionError:
+                logger.warning(f"Permission denied to access {absolute_path}")
         return None
 
     def push_path(self, path: Path):

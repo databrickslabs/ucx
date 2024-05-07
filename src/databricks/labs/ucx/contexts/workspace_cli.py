@@ -14,7 +14,6 @@ from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.files import LocalFileMigrator
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, LocalNotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
@@ -163,7 +162,3 @@ class WorkspaceContext(CliContext):
             self.workspace_client,
             self.aws_resource_permissions,
         )
-
-    @cached_property
-    def notebook_loader(self) -> NotebookLoader:
-        return LocalNotebookLoader()

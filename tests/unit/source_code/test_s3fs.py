@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyGraphBuilder,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.notebooks.loaders import LocalNotebookLoader, NotebookResolver
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     MockPathLookup,
@@ -117,7 +117,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     lookup = MockPathLookup(sys_paths=[tmp_path])
     yml = lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     whitelist = Whitelist.parse(yml.read_text())
-    notebook_loader = LocalNotebookLoader()
+    notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     resolvers = [NotebookResolver(notebook_loader), LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
     dependency_resolver = DependencyResolver(resolvers)

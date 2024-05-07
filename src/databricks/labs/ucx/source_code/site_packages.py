@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.graph import (
 )
 
 
-class SitePackagesResolver(BaseDependencyResolver):
+class SitePackageResolver(BaseDependencyResolver):
     # TODO: this is incorrect logic, remove this resolver
 
     def __init__(
@@ -31,9 +31,11 @@ class SitePackagesResolver(BaseDependencyResolver):
         self._path_lookup = path_lookup
 
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return SitePackagesResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
+        return SitePackageResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        # TODO: `resovle_import` is irrelevant for dist-info containers
+        # databricks-labs-ucx vs databricks.labs.ucx
         site_package = self._site_packages[name]
         if site_package is not None:
             container = SitePackageContainer(self._file_loader, site_package)

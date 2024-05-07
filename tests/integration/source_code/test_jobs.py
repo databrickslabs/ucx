@@ -1,41 +1,50 @@
 from pathlib import Path
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+import pytest
+
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-from databricks.labs.ucx.source_code.graph import DependencyGraphBuilder, DependencyResolver
-from databricks.labs.ucx.source_code.jobs import WorkflowLinter
-from databricks.labs.ucx.source_code.notebooks.loaders import (
-    WorkspaceNotebookLoader,
-    NotebookResolver,
-    LocalNotebookLoader,
-)
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
-def test_job_linter_no_problems(ws, make_job):
+def test_running_real_workflow_linter_job(installation_ctx):
+    ctx = installation_ctx
+    ctx.workspace_installation.run()
+    ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
+    ctx.deployed_workflows.validate_step("experimental-workflow-linter")
+    cursor = ctx.sql_backend.fetch(f"SELECT COUNT(*) AS count FROM {ctx.inventory_database}.workflow_problems")
+    result = next(cursor)
+    assert result['count'] > 0
+
+
+@pytest.fixture
+def simple_ctx(installation_ctx, sql_backend, ws):
+    return installation_ctx.replace(
+        sql_backend=sql_backend,
+        workspace_client=ws,
+        connect=ws.config,
+    )
+
+
+def test_linter_from_context(simple_ctx):
+    # This code is essentially the same as in test_running_real_workflow_linter_job,
+    # but it's executed on the caller side and is easier to debug.
+    simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
+
+    cursor = simple_ctx.sql_backend.fetch(
+        f"SELECT COUNT(*) AS count FROM {simple_ctx.inventory_database}.workflow_problems"
+    )
+    result = next(cursor)
+    assert result['count'] > 0
+
+
+def test_job_linter_no_problems(simple_ctx, ws, make_job):
     j = make_job()
 
-    file_loader = FileLoader()
-    notebook_loader = WorkspaceNotebookLoader(ws)
-    resolvers = [
-        NotebookResolver(notebook_loader),
-        LocalFileResolver(file_loader),
-    ]
-    dependency_resolver = DependencyResolver(resolvers)
-    path_lookup = PathLookup.from_sys_path(Path('/'))
-    builder = DependencyGraphBuilder(dependency_resolver, path_lookup)
-    whitelist = Whitelist([])
-    migration_index = MigrationIndex([])
-    job_linter = WorkflowLinter(ws, builder, migration_index, whitelist)
-
-    problems = job_linter.lint_job(j.job_id)
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     assert len(problems) == 0
 
 
-def test_job_linter_some_notebook_graph_with_problems(ws, make_job, make_notebook, make_random):
+def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random):
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
     entrypoint.mkdir()
 
@@ -54,20 +63,7 @@ display(spark.read.parquet("/mnt/something"))
     some_file = entrypoint / 'some_file.py'
     some_file.write_text('display(spark.read.parquet("/mnt/foo/bar"))')
 
-    file_loader = FileLoader()
-    notebook_loader = LocalNotebookLoader()
-    resolvers = [
-        NotebookResolver(notebook_loader),
-        LocalFileResolver(file_loader),
-    ]
-    dependency_resolver = DependencyResolver(resolvers)
-    path_lookup = PathLookup.from_sys_path(Path('/'))
-    builder = DependencyGraphBuilder(dependency_resolver, path_lookup)
-    whitelist = Whitelist([])
-    migration_index = MigrationIndex([])
-    job_linter = WorkflowLinter(ws, builder, migration_index, whitelist)
-
-    problems = job_linter.lint_job(j.job_id)
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     messages = {f'{Path(p.path).relative_to(entrypoint)}:{p.start_line} [{p.code}] {p.message}' for p in problems}
     assert messages == {
