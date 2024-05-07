@@ -558,7 +558,7 @@ def make_secret_scope_acl(ws):
 def make_notebook(ws, make_random):
     def create(
         *,
-        path: str | None = None,
+        path: str | Path | None = None,
         content: BinaryIO | None = None,
         language: Language = Language.PYTHON,
         format: ImportFormat = ImportFormat.SOURCE,  # pylint:  disable=redefined-builtin
@@ -756,7 +756,7 @@ def make_instance_pool(ws, make_random):
 
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
-    def create(notebook_path: str | None = None, **kwargs):
+    def create(notebook_path: str | Path | None = None, **kwargs):
         task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
