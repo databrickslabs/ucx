@@ -207,4 +207,4 @@ commands:
   - name: migrate-tables
     description: |
       Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental 
-      workflow.
+      workflow and migrate-external-tables-ctas workflow.

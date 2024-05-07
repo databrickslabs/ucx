@@ -73,6 +73,7 @@ def ws():
                         'assessment': '123',
                         'migrate-tables': '456',
                         'migrate-external-hiveserde-tables-in-place-experimental': '789',
+                        'migrate-external-tables-ctas': '987',
                     }
                 }
             }
@@ -485,6 +486,26 @@ def test_migrate_external_hiveserde_tables_in_place(ws):
     migrate_tables(ws, prompts, ctx=ctx)
 
     ws.jobs.run_now.assert_called_with(789)
+
+
+def test_migrate_external_tables_ctas(ws):
+    tables_crawler = create_autospec(TablesCrawler)
+    table = Table(
+        catalog="hive_metastore", database="test", name="externalctas", object_type="UNKNOWN", table_format="EXTERNAL"
+    )
+    tables_crawler.snapshot.return_value = [table]
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+
+    prompt = (
+        "Found 1 (.*) external tables which cannot be migrated using sync, do you want to run the "
+        "migrate-external-tables-ctas workflow?"
+    )
+
+    prompts = MockPrompts({prompt: "Yes"})
+
+    migrate_tables(ws, prompts, ctx=ctx)
+
+    ws.jobs.run_now.assert_called_with(987)
 
 
 def test_create_missing_principal_aws(ws):
