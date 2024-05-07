@@ -24,7 +24,7 @@ class Redash:
         self._ws = ws
         self._backup_path = backup_path + "/backup_queries"
 
-    def fix_dashboards(self, dashboard_id: str | None = None):
+    def migrate_dashboards(self, dashboard_id: str | None = None):
         for dashboard in self._list_dashboards(dashboard_id):
             assert dashboard.id is not None
             if dashboard.tags is not None and self.MIGRATED_TAG in dashboard.tags:
@@ -90,11 +90,14 @@ class Redash:
         )
         from_table = FromTable(self._index, self._get_session_state(query))
         new_query = from_table.apply(query.query)
+        new_tags = [f'backup:{backup_query.id}']
+        if query.tags:
+            new_tags.extend(query.tags)
         try:
             self._ws.queries.update(
                 query.id,
                 query=new_query,
-                tags=self._get_migrated_tags(query.tags, [f'backup:{backup_query.id}']),
+                tags=self._get_migrated_tags(new_tags),
             )
         except DatabricksError:
             logger.error(f"Cannot upgrade {query.name}")
@@ -142,12 +145,10 @@ class Redash:
             logger.error(f"Cannot restore {query.name} from backup query {backup_id}")
             return
 
-    def _get_migrated_tags(self, tags: list[str] | None, new_tags: list[str] | None = None) -> list[str]:
+    def _get_migrated_tags(self, tags: list[str] | None) -> list[str]:
         out = [self.MIGRATED_TAG]
         if tags:
             out.extend(tags)
-        if new_tags:
-            out.extend(new_tags)
         return out
 
     def _get_original_tags(self, tags: list[str] | None) -> list[str] | None:

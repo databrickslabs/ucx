@@ -459,7 +459,7 @@ def migrate_tables(w: WorkspaceClient, prompts: Prompts, *, ctx: WorkspaceContex
 def migrate_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None):
     """Migrate table references in DBSQL Dashboard queries"""
     ctx = WorkspaceContext(w)
-    ctx.redash.fix_dashboards(dashboard_id)
+    ctx.redash.migrate_dashboards(dashboard_id)
 
 
 @ucx.command

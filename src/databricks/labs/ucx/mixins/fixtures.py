@@ -1288,7 +1288,7 @@ def make_dashboard(ws, make_random, make_query):
             },
         )
 
-        dashboard_name = f"ucx_dashboard_D{make_random(4)}"
+        dashboard_name = f"ucx_D{make_random(4)}"
         dashboard = ws.dashboards.create(name=dashboard_name, tags=[dashboard_name])
         ws.dashboard_widgets.create(
             dashboard_id=dashboard.id,

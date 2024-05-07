@@ -6,7 +6,7 @@ def test_fix_dashboard(ws, installation_ctx, make_dashboard, make_query):
     dashboard: Dashboard = make_dashboard()
     another_query: Query = make_query()
     installation_ctx.workspace_installation.run()
-    installation_ctx.redash.fix_dashboards(dashboard.id)
+    installation_ctx.redash.migrate_dashboards(dashboard.id)
     # make sure the query is marked as migrated
     queries = Redash.get_queries_from_dashboard(dashboard)
     for query in queries:

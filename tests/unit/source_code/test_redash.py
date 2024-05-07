@@ -55,7 +55,7 @@ def redash_ws():
 
 def test_fix_all_dashboards(redash_ws, empty_index):
     redash = Redash(empty_index, redash_ws, "backup")
-    redash.fix_dashboards()
+    redash.migrate_dashboards()
     redash_ws.queries.create.assert_called_with(
         name='test_query_original',
         query='SELECT * FROM old.things',
