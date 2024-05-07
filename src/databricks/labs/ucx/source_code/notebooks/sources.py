@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from functools import cached_property
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.base import Advice, Failure
 
-from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph
+from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR, NOTEBOOK_HEADER
 
 
 class Notebook(SourceContainer):
@@ -61,13 +60,15 @@ class Notebook(SourceContainer):
             sources.append('')  # following join will append lf
         return '\n'.join(sources)
 
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
-        cwd_old = syspath_lookup.cwd
-        syspath_lookup.cwd = self.path.parent
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        problems: list[DependencyProblem] = []
         for cell in self._cells:
-            problems = cell.build_dependency_graph(parent, syspath_lookup)
-            parent.add_problems(problems)
-        syspath_lookup.cwd = cwd_old
+            cell_problems = cell.build_dependency_graph(parent)
+            problems.extend(cell_problems)
+        return problems
+
+    def __repr__(self):
+        return f"<Notebook {self._path}>"
 
 
 class NotebookLinter:
@@ -101,3 +102,49 @@ class NotebookLinter:
     @staticmethod
     def name() -> str:
         return "notebook-linter"
+
+
+class FileLinter:
+    _EXT = {
+        '.py': Language.PYTHON,
+        '.sql': Language.SQL,
+    }
+
+    def __init__(self, langs: Languages, path: Path):
+        self._languages: Languages = langs
+        self._path: Path = path
+
+    @cached_property
+    def _content(self) -> str:
+        return self._path.read_text()
+
+    def _file_language(self):
+        return self._EXT.get(self._path.suffix)
+
+    def _is_notebook(self):
+        language = self._file_language()
+        if not language:
+            return False
+        cell_language = CellLanguage.of_language(language)
+        return self._content.startswith(cell_language.file_magic_header)
+
+    def lint(self) -> Iterable[Advice]:
+        if self._is_notebook():
+            yield from self._lint_notebook()
+        else:
+            yield from self._lint_file()
+
+    def _lint_file(self):
+        language = self._file_language()
+        if not language:
+            yield Failure("unsupported-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+        try:
+            linter = self._languages.linter(language)
+            yield from linter.lint(self._content)
+        except ValueError as err:
+            yield Failure("unsupported-language", str(err), 0, 0, 1, 1)
+
+    def _lint_notebook(self):
+        notebook = Notebook.parse(self._path, self._content, self._file_language())
+        notebook_linter = NotebookLinter(self._languages, notebook)
+        yield from notebook_linter.lint()

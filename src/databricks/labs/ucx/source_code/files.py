@@ -2,14 +2,12 @@ from __future__ import annotations  # for type hints
 
 import logging
 from pathlib import Path
-from collections.abc import Callable
 
-from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
     SourceContainer,
@@ -17,6 +15,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyLoader,
     Dependency,
     BaseDependencyResolver,
+    MaybeDependency,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,19 +29,18 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    @property
-    def path(self):
-        return self._path
-
-    def build_dependency_graph(self, parent: DependencyGraph, syspath_lookup: SysPathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
-            return
-        cwd_old = syspath_lookup.cwd
-        syspath_lookup.cwd = self.path.parent
-        problems = parent.build_graph_from_python_source(self._original_code, syspath_lookup)
-        parent.add_problems(problems)
-        syspath_lookup.cwd = cwd_old
+            return []
+        return parent.build_graph_from_python_source(self._original_code)
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def __repr__(self):
+        return f"<LocalFile {self._path}>"
 
 
 class LocalFileMigrator:
@@ -97,34 +95,17 @@ class LocalFileMigrator:
 
 
 class FileLoader(DependencyLoader):
-
-    def __init__(self, syspath_lookup: SysPathLookup):
-        self._syspath_lookup = syspath_lookup
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        fullpath = self.full_path(dependency.path)
-        assert fullpath is not None
-        return LocalFile(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        absolute_path = path_lookup.resolve(dependency.path)
+        if not absolute_path:
+            return None
+        return LocalFile(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
 
     def exists(self, path: Path) -> bool:
-        return self.full_path(path) is not None
+        return path.exists()
 
-    def full_path(self, path: Path) -> Path | None:
-        if path.is_file():
-            return path
-        for parent in self._syspath_lookup.paths:
-            child = Path(parent, path)
-            if child.is_file():
-                return child
-        return None
-
-    def is_notebook(self, path: Path) -> bool:
-        fullpath = self.full_path(path)
-        if fullpath is None:
-            return False
-        with fullpath.open(mode="r", encoding="utf-8") as stream:
-            line = stream.readline()
-            return NOTEBOOK_HEADER in line
+    def __repr__(self):
+        return "FileLoader()"
 
 
 class LocalFileResolver(BaseDependencyResolver):
@@ -136,16 +117,36 @@ class LocalFileResolver(BaseDependencyResolver):
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
         return LocalFileResolver(self._file_loader, resolver)
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
-        if self._file_loader.exists(path) and not self._file_loader.is_notebook(path):
-            return Dependency(self._file_loader, path)
-        return super().resolve_local_file(path, problem_collector)
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+        absolute_path = path_lookup.resolve(path)
+        if absolute_path:
+            return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
+        return super().resolve_local_file(path_lookup, path)
 
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        fullpath = self._file_loader.full_path(Path(f"{name}.py"))
-        if fullpath is not None:
-            return Dependency(self._file_loader, fullpath)
-        return super().resolve_import(name, problem_collector)
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        if not name:
+            return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
+        parts = []
+        # Relative imports use leading dots. A single leading dot indicates a relative import, starting with
+        # the current package. Two or more leading dots indicate a relative import to the parent(s) of the current
+        # package, one level per dot after the first.
+        # see https://docs.python.org/3/reference/import.html#package-relative-imports
+        for i, rune in enumerate(name):
+            if not i and rune == '.':  # leading single dot
+                parts.append(path_lookup.cwd.as_posix())
+                continue
+            if rune != '.':
+                parts.append(name[i:].replace('.', '/'))
+                break
+            parts.append("..")
+        for candidate in (f'{"/".join(parts)}.py', f'{"/".join(parts)}/__init__.py'):
+            relative_path = Path(candidate)
+            absolute_path = path_lookup.resolve(relative_path)
+            if not absolute_path:
+                continue
+            dependency = Dependency(self._file_loader, absolute_path)
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(path_lookup, name)
+
+    def __repr__(self):
+        return "LocalFileResolver()"

@@ -72,6 +72,9 @@ class NodeBase(abc.ABC):
     def node(self):
         return self._node
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {ast.unparse(self._node)}>"
+
 
 class SysPathChange(NodeBase, abc.ABC):
 
@@ -240,6 +243,13 @@ class ASTLinter(Generic[T]):
             return False
         return self._root.value is None
 
+    def __repr__(self):
+        truncate_after = 32
+        code = ast.unparse(self._root)
+        if len(code) > truncate_after:
+            code = code[0:truncate_after] + "..."
+        return f"<ASTLinter: {code}>"
+
 
 class ImportSource(NodeBase):
 
@@ -303,15 +313,20 @@ class PythonLinter(Linter):
 
     @staticmethod
     def list_import_sources(linter: ASTLinter) -> list[ImportSource]:
-        nodes = linter.locate(ast.Import, [])
-        sources = [ImportSource(node, alias.name) for node in nodes for alias in node.names]
-        nodes = linter.locate(ast.ImportFrom, [])
-        sources.extend(ImportSource(node, node.module) for node in nodes)
-        nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
-        sources.extend(ImportSource(node, node.args[0].value) for node in nodes)
-        nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
-        sources.extend(ImportSource(node, node.args[0].value) for node in nodes)
-        return sources
+        # TODO: make this code more robust, because it fails detecting imports on UCX codebase
+        try:  # pylint: disable=too-many-try-statements
+            nodes = linter.locate(ast.Import, [])
+            sources = [ImportSource(node, alias.name) for node in nodes for alias in node.names]
+            nodes = linter.locate(ast.ImportFrom, [])
+            sources.extend(ImportSource(node, node.module) for node in nodes)
+            nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
+            sources.extend(ImportSource(node, node.args[0].value) for node in nodes)
+            nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
+            sources.extend(ImportSource(node, node.args[0].value) for node in nodes)
+            return sources
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning(f"{linter} imports: {e}")
+            return []
 
     @staticmethod
     def list_sys_path_changes(linter: ASTLinter) -> list[SysPathChange]:

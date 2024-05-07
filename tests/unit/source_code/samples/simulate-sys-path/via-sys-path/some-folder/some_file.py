@@ -1,2 +1,2 @@
 def stuff():
-    pass
+    print("stuff() was called from some_file.py")

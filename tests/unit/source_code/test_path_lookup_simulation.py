@@ -2,13 +2,17 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from databricks.labs.ucx.source_code.files import LocalFileResolver
-from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
+from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver
-from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackagesResolver
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.site_packages import SitePackages, SitePackageResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, VisitingNotebookLoader, locate_site_packages
+from tests.unit import (
+    _samples_path,
+    locate_site_packages,
+    MockPathLookup,
+)
 
 
 @pytest.mark.parametrize(
@@ -28,31 +32,30 @@ from tests.unit import _samples_path, whitelist_mock, VisitingFileLoader, Visiti
             ],
             3,
         ),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_1.py"], 2),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_2.py"], 2),
-        (["simulate-sys-path", "via-sys-path", "run_notebook_3.py"], 2),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_1.py"], 1),
+        (["simulate-sys-path", "via-sys-path", "run_notebook_2.py"], 1),
         (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
     ],
 )
 def test_locates_notebooks(source: list[str], expected: int):
-    visited: dict[str, bool] = {}
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
-    whitelist = Whitelist()
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(lookup, visited)
-    notebook_loader = VisitingNotebookLoader(lookup, visited)
+    lookup = MockPathLookup()
+    file_loader = FileLoader()
+    notebook_loader = NotebookLoader()
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, lookup),
-        WhitelistResolver(whitelist),
+        WhitelistResolver(Whitelist()),
+        SitePackageResolver(site_packages, file_loader, lookup),
         LocalFileResolver(file_loader),
     ]
-    resolver = DependencyResolver(resolvers, lookup)
-    resolver.build_notebook_dependency_graph(notebook_path)
-    assert len(visited) == expected
+    dependency_resolver = DependencyResolver(resolvers, lookup)
+    maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
+    assert not maybe.problems
+    assert maybe.graph is not None
+    assert len(maybe.graph.all_paths) == expected
 
 
 @pytest.mark.parametrize(
@@ -64,24 +67,25 @@ def test_locates_notebooks(source: list[str], expected: int):
     ],
 )
 def test_locates_files(source: list[str], expected: int):
-    visited: dict[str, bool] = {}
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     file_path = Path(*elems)
-    whitelist = whitelist_mock()
-    lookup = SysPathLookup.from_sys_path(Path.cwd())
-    file_loader = VisitingFileLoader(lookup, visited)
-    notebook_loader = VisitingNotebookLoader(lookup, visited)
+    whitelist = Whitelist()
+    provider = PathLookup.from_sys_path(Path.cwd())
+    file_loader = FileLoader()
+    notebook_loader = NotebookLoader()
     site_packages = SitePackages.parse(locate_site_packages())
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackagesResolver(site_packages, file_loader, lookup),
+        SitePackageResolver(site_packages, file_loader, provider),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
-    resolver = DependencyResolver(resolvers, lookup)
-    resolver.build_local_file_dependency_graph(file_path)
-    assert len(visited) == expected
+    resolver = DependencyResolver(resolvers, provider)
+    maybe = resolver.build_local_file_dependency_graph(file_path)
+    assert not maybe.problems
+    assert maybe.graph is not None
+    assert len(maybe.graph.all_dependencies) == expected
 
 
 def test_locates_notebooks_with_absolute_path():
@@ -109,21 +113,22 @@ sys.path.append('{child_dir_path.as_posix()}')
 """,
             "utf-8",
         )
-        visited: dict[str, bool] = {}
         whitelist = Whitelist()
-        lookup = SysPathLookup.from_sys_path(Path.cwd())
-        file_loader = VisitingFileLoader(lookup, visited)
-        notebook_loader = VisitingNotebookLoader(lookup, visited)
+        provider = PathLookup.from_sys_path(Path.cwd())
+        file_loader = FileLoader()
+        notebook_loader = NotebookLoader()
         site_packages = SitePackages.parse(locate_site_packages())
         resolvers = [
             NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, lookup),
+            SitePackageResolver(site_packages, file_loader, provider),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        resolver = DependencyResolver(resolvers, lookup)
-        resolver.build_notebook_dependency_graph(parent_file_path)
-        assert len(visited) == 2
+        resolver = DependencyResolver(resolvers, provider)
+        maybe = resolver.build_notebook_dependency_graph(parent_file_path)
+        assert not maybe.problems
+        assert maybe.graph is not None
+        assert len(maybe.graph.all_paths) == 2
 
 
 def test_locates_files_with_absolute_path():
@@ -140,8 +145,9 @@ def test_locates_files_with_absolute_path():
         )
         parent_file_path = Path(child_dir_path, "import_file.py")
         parent_file_path.write_text(
-            f"""import sys
+            f"""# Databricks notebook source
 
+import sys
 
 def func():
     sys.path.append("{child_file_path.as_posix()}")
@@ -150,18 +156,19 @@ def func():
 """,
             "utf-8",
         )
-        visited: dict[str, bool] = {}
         whitelist = Whitelist()
-        lookup = SysPathLookup.from_sys_path(Path.cwd())
-        file_loader = VisitingFileLoader(lookup, visited)
-        notebook_loader = VisitingNotebookLoader(lookup, visited)
+        provider = PathLookup.from_sys_path(Path.cwd())
+        file_loader = FileLoader()
+        notebook_loader = NotebookLoader()
         site_packages = SitePackages.parse(locate_site_packages())
         resolvers = [
             NotebookResolver(notebook_loader),
-            SitePackagesResolver(site_packages, file_loader, lookup),
+            SitePackageResolver(site_packages, file_loader, provider),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        resolver = DependencyResolver(resolvers, lookup)
-        resolver.build_local_file_dependency_graph(parent_file_path)
-        assert len(visited) == 2
+        resolver = DependencyResolver(resolvers, provider)
+        maybe = resolver.build_notebook_dependency_graph(parent_file_path)
+        assert not maybe.problems
+        assert maybe.graph is not None
+        assert maybe.graph.all_relative_names() == {"some_file.py", "import_file.py"}

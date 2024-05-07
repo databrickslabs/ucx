@@ -2,4 +2,7 @@
 import sys
 
 sys.path.append("./some-folder")
-dbutils.notebook.run("some_notebook")
+
+from some_file import stuff
+
+stuff()

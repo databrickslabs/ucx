@@ -10,7 +10,7 @@ from functools import cached_property
 from typing import Any
 
 import databricks.sdk.errors
-from databricks.labs.blueprint.entrypoint import get_logger
+from databricks.labs.blueprint.entrypoint import get_logger, is_in_debug
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError, Threads
@@ -62,6 +62,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -101,6 +102,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "submit_runs", SubmitRunInfo),
             functools.partial(table, "policies", PolicyInfo),
             functools.partial(table, "migration_status", MigrationStatus),
+            functools.partial(table, "workflow_problems", JobProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
         ],
@@ -611,34 +613,6 @@ class AccountInstaller(AccountContext):
         account_id = self.prompts.question("Please provide the Databricks account id")
         return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
-    def _can_administer(self, workspace: Workspace):
-        try:
-            # check if user is a workspace admin
-            ws = self.account_client.get_workspace_client(workspace)
-            current_user = ws.current_user.me()
-            if current_user.groups is None:
-                return False
-            if "admins" not in [g.display for g in current_user.groups]:
-                logger.warning(
-                    f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
-                )
-                return False
-            # check if user has access to workspace
-        except (PermissionDenied, NotFound, ValueError) as err:
-            logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
-            return False
-        return True
-
-    def _get_accessible_workspaces(self):
-        """
-        Get all workspaces that the user has access to
-        """
-        accessible_workspaces = []
-        for workspace in self.account_client.workspaces.list():
-            if self._can_administer(workspace):
-                accessible_workspaces.append(workspace)
-        return accessible_workspaces
-
     def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
@@ -648,7 +622,7 @@ class AccountInstaller(AccountContext):
         ctx = AccountContext(self._get_safe_account_client())
         default_config = None
         confirmed = False
-        accessible_workspaces = self._get_accessible_workspaces()
+        accessible_workspaces = self.account_workspaces.get_accessible_workspaces()
         msg = "\n".join([w.deployment_name for w in accessible_workspaces])
         installed_workspaces = []
         if not self.prompts.confirm(
@@ -684,7 +658,8 @@ class AccountInstaller(AccountContext):
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
-
+    if is_in_debug():
+        logging.getLogger('databricks').setLevel(logging.DEBUG)
     env = dict(os.environ.items())
     force_install = env.get("UCX_FORCE_INSTALL")
     if force_install == "account":

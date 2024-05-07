@@ -3,10 +3,13 @@ Databricks Labs UCX
 ![UCX by Databricks Labs](docs/logo-no-background.png)
 
 The companion for upgrading to Unity Catalog. After [installation](#install-ucx), ensure to [trigger](#ensure-assessment-run-command) the [assessment workflow](#assessment-workflow), 
-so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow). 
-[`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
+so that you'll be able to [scope the migration](docs/assessment.md) and execute the [group migration workflow](#group-migration-workflow).
+
+After installation, [`<installation_path>/README`](#readme-notebook) contains further instructions and explanations of these workflows. 
 Then you can execute [table migration workflow](#table-migration-workflow).
-More workflows, like notebook code migration is coming in the future releases. 
+
+More workflows, like notebook code migration is coming in the future releases.
+
 UCX exposes a number of command line utilities accessible via `databricks labs ucx`.
 
 For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](docs/troubleshooting.md) or submit [an issue](https://github.com/databrickslabs/ucx/issues). 
@@ -41,6 +44,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`workflows` command](#workflows-command)
   * [`open-remote-config` command](#open-remote-config-command)
   * [`installations` command](#installations-command)
+  * [`report-account-compatibility` command](#report-account-compatibility-command)
 * [Metastore related commands](#metastore-related-commands)
   * [`show-all-metastores` command](#show-all-metastores-command)
   * [`assign-metastore` command](#assign-metastore-command)
@@ -575,6 +579,30 @@ related to multiple installations of `ucx` on the same workspace.
 
 [[back to top](#databricks-labs-ucx)]
 
+
+## `report-account-compatibility` command
+
+```text
+databricks labs ucx report-account-compatibility --profile labs-azure-account
+12:56:09  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:09  INFO [d.l.u.account.aggregate] Generating readiness report
+12:56:10  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:10  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:15  INFO [databricks.sdk] Using Azure CLI authentication with AAD tokens
+12:56:15  INFO [d.l.u.account.aggregate] Querying Schema ucx
+12:56:21  WARN [d.l.u.account.aggregate] Workspace 4045495039142306 does not have UCX installed
+12:56:21  INFO [d.l.u.account.aggregate] UC compatibility: 30.303030303030297% (69/99)
+12:56:21  INFO [d.l.u.account.aggregate] cluster type not supported : LEGACY_TABLE_ACL: 22 objects
+12:56:21  INFO [d.l.u.account.aggregate] cluster type not supported : LEGACY_SINGLE_USER: 24 objects
+12:56:21  INFO [d.l.u.account.aggregate] unsupported config: spark.hadoop.javax.jdo.option.ConnectionURL: 10 objects
+12:56:21  INFO [d.l.u.account.aggregate] Uses azure service principal credentials config in cluster.: 1 objects
+12:56:21  INFO [d.l.u.account.aggregate] No isolation shared clusters not supported in UC: 1 objects
+12:56:21  INFO [d.l.u.account.aggregate] Data is in DBFS Root: 23 objects
+12:56:21  INFO [d.l.u.account.aggregate] Non-DELTA format: UNKNOWN: 5 objects
+```
+
+[[back to top](#databricks-labs-ucx)]
+
 # Metastore related commands
 
 These commands are used to assign a Unity Catalog metastore to a workspace. The metastore assignment is a pre-requisite
@@ -669,7 +697,10 @@ databricks labs ucx principal-prefix-access --subscription-id test-subscription-
 ```
 
 Use to identify all storage account used by tables, identify the relevant Azure service principals and their permissions 
-on each storage account. This requires Azure CLI to be installed and configured via `az login`. 
+on each storage account. The command is used to identify Azure Service Principals, which have `Storage Blob Data Contributor`,
+`Storage Blob Data Reader`, `Storage Blob Data Owner` roles, or custom read/write roles on ADLS Gen2 locations that are being 
+used in Databricks. This requires Azure CLI to be installed and configured via `az login`. It outputs azure_storage_account_info.csv
+which will be later used by migrate-credentials command to create UC storage credentials.
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
@@ -681,11 +712,15 @@ Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-c
 databricks labs ucx create-uber-principal [--subscription-id X]
 ```
 
-**Requires Cloud IAM admin privileges.** Once the [`assessment` workflow](#assessment-workflow) complete, you should run 
-this command to creates a service principal with the _**read-only access to all storage**_ used by tables in this 
-workspace and configure the [UCX Cluster Policy](#installation) with the details of it. Once migration is complete, this
-service principal should be unprovisioned. On Azure, it creates a principal with `Storage Blob Data Reader` role 
-assignment on every storage account using Azure Resource Manager APIs.
+**Requires Cloud IAM admin privileges.** 
+
+Once the [`assessment` workflow](#assessment-workflow) complete, you should run this command to create a service principal with the 
+_**read-only access to all storage**_ used by tables in this workspace. It will also configure the 
+[UCX Cluster Policy](#installation) & SQL Warehouse data access configuration to use this service principal for migration 
+workflows. Once migration is complete, this service principal should be unprovisioned. 
+
+On Azure, it creates a principal with `Storage Blob Data Contributor` role assignment on every storage account using 
+Azure Resource Manager APIs.
 
 This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
 
@@ -697,16 +732,20 @@ This command is one of prerequisites for the [table migration workflow](#table-m
 databricks labs ucx migrate-credentials
 ```
 
-For Azure, this command migrate Azure Service Principals, which have `Storage Blob Data Contributor`,
-`Storage Blob Data Reader`, `Storage Blob Data Owner` roles on ADLS Gen2 locations that are being used in
-Databricks, to UC storage credentials. The Azure Service Principals to location mapping are listed 
-in `/Users/{user_name}/.ucx/azure_storage_account_info.csv` which is generated 
-by [`principal-prefix-access` command](#principal-prefix-access-command). 
-Please review the file and delete the Service Principals you do not want to be migrated.
-The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
+For Azure, this command prompts to confirm performing the following credential migration steps:
+1. [RECOMMENDED] For each storage account, create access connectors with managed identities that have the
+   `Storage Blob Data Contributor` role on the respective storage account. An storage credential is created for each 
+    access connector.
+2. Migrate Azure Service Principals, which have `Storage Blob Data Contributor`,
+   `Storage Blob Data Reader`, `Storage Blob Data Owner`, or custom roles on ADLS Gen2 locations that are being used in
+   Databricks, to UC storage credentials. The Azure Service Principals to location mapping are listed
+   in `/Users/{user_name}/.ucx/azure_storage_account_info.csv` which is generated by
+   [`principal-prefix-access` command](#principal-prefix-access-command). Please review the file and delete the Service
+   Principals you do not want to be migrated. The command will only migrate the Service Principals that have client
+   secret stored in Databricks Secret.
 
-**Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
-recommend to use access connectors instead.
+  **Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
+  recommend to use access connectors instead.
 
 Once you're done with this command, run [`validate-external-locations` command](#validate-external-locations-command) after this one.
 

@@ -5,11 +5,10 @@ from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import iam, sql, jobs
+from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
@@ -17,34 +16,35 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.cli import (
     alias,
+    assign_metastore,
     cluster_remap,
     create_account_groups,
     create_catalogs_schemas,
+    create_missing_principals,
     create_table_mapping,
     create_uber_principal,
     ensure_assessment_run,
     installations,
+    logs,
     manual_workspace_info,
     migrate_credentials,
     migrate_locations,
+    migrate_tables,
     move,
     open_remote_config,
     principal_prefix_access,
     repair_run,
     revert_cluster_remap,
     revert_migrated_tables,
+    show_all_metastores,
     skip,
     sync_workspace_info,
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    logs,
-    show_all_metastores,
-    assign_metastore,
-    migrate_tables,
-    create_missing_principals,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -371,13 +371,21 @@ def test_create_uber_principal(ws):
 
 
 def test_migrate_locations_azure(ws):
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    azurerm = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azurerm,
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
+    azurerm.storage_accounts.assert_called()
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
@@ -403,8 +411,6 @@ def test_cluster_remap(ws, caplog):
         ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
         ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
     ]
-    installation = create_autospec(Installation)
-    installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)
     assert "Remapping the Clusters to UC" in caplog.messages
 
@@ -413,8 +419,6 @@ def test_cluster_remap_error(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = []
-    installation = create_autospec(Installation)
-    installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)
     assert "No cluster information present in the workspace" in caplog.messages
 

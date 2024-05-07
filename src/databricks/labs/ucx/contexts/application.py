@@ -9,7 +9,6 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.labs.ucx.source_code.syspath_lookup import SysPathLookup
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -26,6 +25,7 @@ from databricks.labs.ucx.hive_metastore.grants import (
     AwsACL,
 )
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.hive_metastore.table_migrate import (
     MigrationStatusRefresher,
     TablesMigrator,
@@ -34,11 +34,16 @@ from databricks.labs.ucx.hive_metastore.table_move import TableMove
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.hive_metastore.verification import VerifyHasMetastore
 from databricks.labs.ucx.installer.workflows import DeployedWorkflows
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader, WorkspaceNotebookLoader
+from databricks.labs.ucx.source_code.jobs import WorkflowLinter
+from databricks.labs.ucx.source_code.notebooks.loaders import (
+    NotebookResolver,
+    NotebookLoader,
+)
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackagesResolver, SitePackages
+from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -346,7 +351,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:
-        return WorkspaceNotebookLoader(self.workspace_client)
+        return NotebookLoader()
 
     @cached_property
     def notebook_resolver(self):
@@ -358,17 +363,17 @@ class GlobalContext(abc.ABC):
         return SitePackages([])
 
     @cached_property
-    def syspath_lookup(self):
+    def path_lookup(self):
         # TODO find a solution to enable a different cwd per job/task (maybe it's not necessary or possible?)
-        return SysPathLookup.from_sys_path(Path.cwd())
+        return PathLookup.from_sys_path(Path.cwd())
 
     @cached_property
     def file_loader(self):
-        return FileLoader(self.syspath_lookup)
+        return FileLoader()
 
     @cached_property
     def site_packages_resolver(self):
-        return SitePackagesResolver(self.site_packages, self.file_loader, self.syspath_lookup)
+        return SitePackageResolver(self.site_packages, self.file_loader, self.path_lookup)
 
     @cached_property
     def whitelist(self):
@@ -385,14 +390,17 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        return DependencyResolver(
-            [
-                self.notebook_resolver,
-                self.site_packages_resolver,
-                self.whitelist_resolver,
-                self.file_resolver,
-            ],
-            self.syspath_lookup,
+        # TODO: link back self.site_packages_resolver
+        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver]
+        return DependencyResolver(resolvers, self.path_lookup)
+
+    @cached_property
+    def workflow_linter(self):
+        return WorkflowLinter(
+            self.workspace_client,
+            self.dependency_resolver,
+            self.path_lookup,
+            MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
         )
 
 

@@ -99,7 +99,7 @@ def sql_fetch_all(sql_backend):
 def make_ucx_group(make_random, make_group, make_acc_group, make_user):
     def inner(workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_{make_random(4)}"
+            workspace_group_name = f"ucx_G{make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
@@ -229,8 +229,8 @@ class CommonUtils:
         instance_profile_mapping: list[AWSRoleAction],
         uc_roles_mapping: list[AWSRoleAction],
     ):
-        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
-        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAMES)
+        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME)
+        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
 
     @cached_property
     def installation(self):
@@ -255,8 +255,8 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         env_or_skip_fixture,
         ws_fixture,
     ):
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
         RuntimeContext.__init__(self)
-        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
         self._make_table = make_table_fixture
         self._make_schema = make_schema_fixture
         self._make_udf = make_udf_fixture
@@ -478,8 +478,8 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         env_or_skip_fixture,
         ws_fixture,
     ):
-        WorkspaceContext.__init__(self, ws_fixture, {})
-        CommonUtils.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        WorkspaceContext.__init__(self, ws_fixture)
 
     @cached_property
     def config(self) -> WorkspaceConfig:
@@ -503,9 +503,6 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
 
 
 class LocalAzureCliTest(TestWorkspaceContext):
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
-        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
-
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -526,9 +523,6 @@ def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
 
 
 class LocalAwsCliTest(TestWorkspaceContext):
-    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
-        TestWorkspaceContext.__init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture)
-
     @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
@@ -549,6 +543,8 @@ def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
 
 
 class TestInstallationContext(TestRuntimeContext):
+    __test__ = False
+
     def __init__(  # pylint: disable=too-many-arguments
         self,
         make_table_fixture,
@@ -575,7 +571,7 @@ class TestInstallationContext(TestRuntimeContext):
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_{self._make_random(4)}"
+            workspace_group_name = f"ucx_G{self._make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = self._make_user()
@@ -783,6 +779,9 @@ def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[st
 def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo]:
     tables: dict[str, TableInfo] = {
         "src_managed_table": context.make_table(schema_name=schema.name),
+        "src_managed_non_delta_table": context.make_table(
+            catalog_name=schema.catalog_name, non_delta=True, schema_name=schema.name
+        ),
         "src_external_table": context.make_table(schema_name=schema.name, external_csv=external_csv),
     }
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
