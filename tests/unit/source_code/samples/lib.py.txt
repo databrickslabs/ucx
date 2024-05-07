@@ -1,0 +1,2 @@
+# Databricks notebook source
+# MAGIC %pip install databricks-labs-blueprint

@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
@@ -13,15 +12,6 @@ def test_running_real_workflow_linter_job(installation_ctx):
     cursor = ctx.sql_backend.fetch(f"SELECT COUNT(*) AS count FROM {ctx.inventory_database}.workflow_problems")
     result = next(cursor)
     assert result['count'] > 0
-
-
-@pytest.fixture
-def simple_ctx(installation_ctx, sql_backend, ws):
-    return installation_ctx.replace(
-        sql_backend=sql_backend,
-        workspace_client=ws,
-        connect=ws.config,
-    )
 
 
 def test_linter_from_context(simple_ctx):

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import tempfile
+from functools import cached_property
 from pathlib import Path
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -13,6 +16,51 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     MaybeDependency,
 )
+
+
+class PipResolver(BaseDependencyResolver):
+    # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
+    # TODO: https://github.com/databrickslabs/ucx/issues/1642
+    # TODO: https://github.com/databrickslabs/ucx/issues/1643
+    # TODO: https://github.com/databrickslabs/ucx/issues/1640
+
+    def __init__(
+        self,
+        file_loader: FileLoader,
+        next_resolver: BaseDependencyResolver | None = None,
+    ):
+        super().__init__(next_resolver)
+        self._file_loader = file_loader
+
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+        return PipResolver(self._file_loader, resolver)
+
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        path_lookup.append_path(self._temporary_virtual_environment)
+        # invoke pip install via subprocess to install this library into lib_install_folder
+        try:
+            # TODO: add error handling for pip install
+            subprocess.run(['pip', 'install', name, '-t', self._temporary_virtual_environment])
+        except Exception as e:  # TODO: catch proper exception
+            problem = DependencyProblem('library-install-failed', f'Failed to install {name}: {e}')
+            return MaybeDependency(None, [problem])
+        dist_infos = SitePackages.parse(self._temporary_virtual_environment)
+        dist_info = dist_infos[name]
+        if not dist_info:
+            problem = DependencyProblem('library-install-failed', f'Failed to install {name}')
+            return MaybeDependency(None, [problem])
+        container = SitePackageContainer(self._file_loader, dist_info)
+        dependency = Dependency(WrappingLoader(container), Path(name))
+        return MaybeDependency(dependency, [])
+
+    @cached_property
+    def _temporary_virtual_environment(self):
+        # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
+        # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
+        # environment. If we don't have a virtual environment, create a temporary one.
+        # simulate notebook-scoped virtual environment
+        lib_install_folder = tempfile.mkdtemp(prefix='ucx-')
+        return Path(lib_install_folder)
 
 
 class SitePackageResolver(BaseDependencyResolver):
@@ -81,6 +129,7 @@ class SitePackages:
                 self._packages[top_level] = package
 
     def __getitem__(self, item: str) -> SitePackage | None:
+        item = item.replace("-", "_")
         return self._packages.get(item, None)
 
 

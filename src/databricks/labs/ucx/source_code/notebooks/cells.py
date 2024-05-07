@@ -182,9 +182,17 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         # TODO: https://github.com/databrickslabs/ucx/issues/1642
-        return []
+        # TODO: this is very basic code, we need to improve it
+        splits = self.original_code.split(' ')
+        if len(splits) < 3:
+            return []
+        if splits[1] != 'install':
+            return []
+        # TODO: we need to support different formats of the library name and etc
+        library = splits[2]
+        return graph.register_library(library)
 
 
 class CellLanguage(Enum):

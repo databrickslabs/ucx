@@ -85,23 +85,17 @@ class WorkflowTaskContainer(SourceContainer):
     def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if library.pypi:
             # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            maybe = graph.register_library(library.pypi.package)
-            if maybe.problems:
-                yield from maybe.problems
+            yield from graph.register_library(library.pypi.package)
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
         if library.egg:
             # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            maybe = graph.register_library(library.egg)
-            if maybe.problems:
-                yield from maybe.problems
+            yield from graph.register_library(library.egg)
         if library.whl:
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            maybe = graph.register_library(library.whl)
-            if maybe.problems:
-                yield from maybe.problems
+            yield from graph.register_library(library.whl)
         if library.requirements:
             # TODO: download and add every entry via graph.register_library
             # TODO: https://github.com/databrickslabs/ucx/issues/1644
@@ -111,7 +105,7 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.notebook_task:
             return []
         notebook_path = self._task.notebook_task.notebook_path
-        logger.info(f'Disovering {self._task.task_key} entrypoint: {notebook_path}')
+        logger.info(f'Dicsovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 

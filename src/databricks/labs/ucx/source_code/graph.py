@@ -44,12 +44,12 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_library(self, name: str) -> MaybeGraph:
-        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
-        # TODO: https://github.com/databrickslabs/ucx/issues/1642
-        # TODO: https://github.com/databrickslabs/ucx/issues/1643
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
+    def register_library(self, name: str) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_library(self.path_lookup, name)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -145,7 +145,15 @@ class DependencyGraph:
 
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
-        return {d.path.relative_to(self._path_lookup.cwd).as_posix() for d in self.all_dependencies}
+        all_names = set[str]()
+        dependencies = self.all_dependencies
+        for path in self._path_lookup.paths:
+            for dependency in dependencies:
+                if not dependency.path.is_relative_to(path):
+                    continue
+                relative_path = dependency.path.relative_to(path).as_posix()
+                all_names.add(relative_path)
+        return all_names
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
@@ -278,6 +286,11 @@ class BaseDependencyResolver(abc.ABC):
         assert self._next_resolver is not None
         return self._next_resolver.resolve_import(path_lookup, name)
 
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        # TODO: remove StubResolver and return MaybeDependency(None, [...])
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_library(path_lookup, name)
+
 
 class StubResolver(BaseDependencyResolver):
 
@@ -295,6 +308,9 @@ class StubResolver(BaseDependencyResolver):
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._fail('import-not-found', f"Could not locate import: {name}")
+
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        return self._fail('library-not-found', f"Could not locate library: {name}")
 
     @staticmethod
     def _fail(code: str, message: str):
@@ -324,6 +340,9 @@ class DependencyResolver:
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._resolver.resolve_import(path_lookup, name)
+
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        return self._resolver.resolve_library(path_lookup, name)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.

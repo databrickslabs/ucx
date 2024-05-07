@@ -43,7 +43,7 @@ from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
+from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages, PipResolver
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -389,9 +389,13 @@ class GlobalContext(abc.ABC):
         return LocalFileResolver(self.file_loader)
 
     @cached_property
+    def pip_resolver(self):
+        return PipResolver(self.file_loader)
+
+    @cached_property
     def dependency_resolver(self):
         # TODO: link back self.site_packages_resolver
-        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver]
+        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver, self.pip_resolver]
         return DependencyResolver(resolvers, self.path_lookup)
 
     @cached_property
