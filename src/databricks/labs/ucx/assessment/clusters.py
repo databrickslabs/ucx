@@ -59,10 +59,10 @@ class CheckClusterMixin(CheckInitScriptMixin):
         if policy:
             if policy.definition:
                 if azure_sp_conf_present_check(json.loads(policy.definition)):
-                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} in {source}.")
+                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
             if policy.policy_family_definition_overrides:
                 if azure_sp_conf_present_check(json.loads(policy.policy_family_definition_overrides)):
-                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} in {source}.")
+                    failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
     def _get_init_script_data(self, init_script_info: InitScriptInfo) -> str | None:
@@ -108,7 +108,7 @@ class CheckClusterMixin(CheckInitScriptMixin):
                 failures.append(f"using DBFS mount in configuration: {value}")
         # Checking if Azure cluster config is present in spark config
         if azure_sp_conf_present_check(conf):
-            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} in {source}.")
+            failures.append(f"{AZURE_SP_CONF_FAILURE_MSG} {source}.")
         return failures
 
     def _check_cluster_failures(self, cluster: ClusterDetails, source: str) -> list[str]:

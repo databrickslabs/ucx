@@ -16,7 +16,7 @@ AZURE_SP_CONF = [
     "fs.azure.account.oauth2.client.secret",
     "fs.azure.account.oauth2.client.endpoint",
 ]
-AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config"
+AZURE_SP_CONF_FAILURE_MSG = "Uses azure service principal credentials config in"
 INIT_SCRIPT_DBFS_PATH = 2
 INIT_SCRIPT_LOCAL_PATH = 2
 
