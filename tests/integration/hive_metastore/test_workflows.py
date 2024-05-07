@@ -27,7 +27,7 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow(workflow)
 
-    errors = []
+    asserts = []
     for table in tables.values():
         # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
         query_migration_status = (
@@ -38,12 +38,12 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
 
         assert_message_postfix = f" found for {table.table_type} {table.full_name}"
         if len(migration_status) == 0:
-            errors.append("No migration status" + assert_message_postfix)
+            asserts.append("No migration status" + assert_message_postfix)
         elif len(migration_status) > 1:
-            errors.append("Multiple migration statuses" + assert_message_postfix)
+            asserts.append("Multiple migration statuses" + assert_message_postfix)
         elif migration_status[0].dst_schema is None:
-            errors.append("No destination schema" + assert_message_postfix)
+            asserts.append("No destination schema" + assert_message_postfix)
         elif migration_status[0].dst_table is None:
-            errors.append("No destination table" + assert_message_postfix)
+            asserts.append("No destination table" + assert_message_postfix)
 
-    assert len(errors) == 0, "\n".join(errors)
+    assert len(asserts) == 0, "\n".join(asserts)
