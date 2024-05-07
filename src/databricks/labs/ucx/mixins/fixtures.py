@@ -779,7 +779,7 @@ def make_job(ws, make_random, make_notebook):
                         spark_version=ws.clusters.select_spark_version(latest=True),
                         spark_conf=task_spark_conf,
                     ),
-                    notebook_task=jobs.NotebookTask(notebook_path=notebook_path),
+                    notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
                     timeout_seconds=0,
                 )
             ]

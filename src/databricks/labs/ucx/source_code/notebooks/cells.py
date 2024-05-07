@@ -159,7 +159,7 @@ class RunCell(Cell):
                 if not maybe.problems:
                     return maybe
                 start_line = self._original_offset + idx + 1
-                problems = self._adjust_import_problems(parent, start_line, line, maybe.problems)
+                problems = self._adjust_problem_source_paths_and_line_numbers(parent, start_line, line, maybe.problems)
                 if problems:
                     return MaybeGraph(None, problems)
                 return MaybeGraph(maybe.graph, [])
@@ -174,8 +174,8 @@ class RunCell(Cell):
         )
         return MaybeGraph(None, [problem])
 
-    def _adjust_import_problems(
-        self,
+    @staticmethod
+    def _adjust_problem_source_paths_and_line_numbers(
         parent: DependencyGraph,
         line_number: int,
         source_code_line: str,

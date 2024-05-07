@@ -49,6 +49,6 @@ class NotebookMigrator:
                 changed = True
         if changed:
             # TODO https://github.com/databrickslabs/ucx/issues/1327 store 'migrated' status
-            notebook.path.rename(notebook.path.with_suffix(".bak"))
+            notebook.path.replace(notebook.path.with_suffix(".bak"))
             notebook.path.write_text(notebook.to_migrated_code())
         return changed

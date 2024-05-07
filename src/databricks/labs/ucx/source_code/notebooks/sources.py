@@ -63,6 +63,7 @@ class Notebook(SourceContainer):
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         for cell in self._cells:
+            # create
             maybe = cell.build_dependency_graph(parent)
             for problem in maybe.problems:
                 if problem.is_path_missing():
