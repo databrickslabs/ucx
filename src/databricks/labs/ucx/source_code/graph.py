@@ -122,7 +122,7 @@ class DependencyGraph:
     @property
     def all_paths(self) -> set[Path]:
         # TODO: remove this public method, as it'll throw false positives
-        # for package imports, like certifi. a WorkflowTask is also a dependency, 
+        # for package imports, like certifi. a WorkflowTask is also a dependency,
         # but it does not exist on a filesyste
         return {d.path for d in self.all_dependencies}
 
