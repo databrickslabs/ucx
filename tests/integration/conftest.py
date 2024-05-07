@@ -99,7 +99,7 @@ def sql_fetch_all(sql_backend):
 def make_ucx_group(make_random, make_group, make_acc_group, make_user):
     def inner(workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_{make_random(4)}"
+            workspace_group_name = f"ucx_G{make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
@@ -569,7 +569,7 @@ class TestInstallationContext(TestRuntimeContext):
 
     def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_{self._make_random(4)}"
+            workspace_group_name = f"ucx_G{self._make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = self._make_user()
