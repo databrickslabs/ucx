@@ -94,7 +94,10 @@ def test_migrate_all_dashboards(redash_ws, empty_index):
         query='SELECT * FROM old.things',
         data_source_id=None,
         description=None,
-        options=QueryOptions(catalog="hive_metastore", schema="default"),
+        options={
+            "catalog": "hive_metastore",
+            "schema": "default",
+        },
         parent="backup/backup_queries",
         run_as_role=None,
         tags=[Redash.BACKUP_TAG],
