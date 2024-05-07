@@ -30,7 +30,8 @@ class AccountWorkspaces:
             # get_workspace_client will raise an exception since it calls config.init_auth()
             return self._ac.get_workspace_client(workspace)
         except (PermissionDenied, NotFound, ValueError) as err:
-            if not self._ac.config.is_azure:
+            # on azure, we can retry with azure-cli auth
+            if self._ac.config.is_azure and self._ac.config.auth_type != "azure-cli":
                 config = self._ac.config.deep_copy()
                 config.host = config.environment.deployment_url(workspace.deployment_name)
                 config.azure_workspace_resource_id = azure.get_azure_resource_id(workspace)
@@ -97,19 +98,19 @@ class AccountWorkspaces:
 
     def _can_administer(self, workspace: Workspace) -> bool:
         try:
-            # check if user is a workspace admin
-            ws = self.client_for(workspace)
-            current_user = ws.current_user.me()
-            if current_user.groups is None:
-                return False
-            if "admins" not in [g.display for g in current_user.groups]:
-                logger.warning(
-                    f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
-                )
-                return False
             # check if user has access to workspace
+            ws = self.client_for(workspace)
         except (PermissionDenied, NotFound, ValueError) as err:
             logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
+            return False
+        current_user = ws.current_user.me()
+        if current_user.groups is None:
+            return False
+        # check if user is a workspace admin
+        if "admins" not in [g.display for g in current_user.groups]:
+            logger.warning(
+                f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
+            )
             return False
         return True
 
