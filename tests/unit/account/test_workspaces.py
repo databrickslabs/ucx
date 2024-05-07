@@ -455,6 +455,7 @@ def test_get_accessible_workspaces():
         Workspace(workspace_name="foo", workspace_id=123, workspace_status_message="Running", deployment_name="abc"),
         Workspace(workspace_name="bar", workspace_id=456, workspace_status_message="Running", deployment_name="def"),
         Workspace(workspace_name="bar", workspace_id=789, workspace_status_message="Running", deployment_name="def"),
+        Workspace(workspace_name="bar", workspace_id=000, workspace_status_message="Running", deployment_name="def"),
     ]
     acc.config.is_azure = True
     acc.config.auth_type = "databricks-cli"
@@ -465,13 +466,20 @@ def test_get_accessible_workspaces():
     # not an admin in workspace 2
     ws2 = create_autospec(WorkspaceClient)
     ws2.current_user.me.return_value = iam.User(user_name="me@example.com")
+    # not an admin in workspace 3
+    ws3 = create_autospec(WorkspaceClient)
+    ws3.current_user.me.return_value = iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="users")])
 
     def get_workspace_client(workspace) -> WorkspaceClient:
-        if workspace.workspace_id == 123:
-            return ws1
-        if workspace.workspace_id == 456:
-            return ws2
-        raise ValueError("unexpected workspace id")
+        match workspace.workspace_id:
+            case 123:
+                return ws1
+            case 456:
+                return ws2
+            case 789:
+                return ws3
+            case _:
+                raise ValueError("unexpected workspace id")
 
     acc.get_workspace_client.side_effect = get_workspace_client
 
@@ -479,8 +487,8 @@ def test_get_accessible_workspaces():
     assert len(account_workspaces.get_accessible_workspaces()) == 1
     ws1.current_user.me.assert_called_once()
     ws2.current_user.me.assert_called_once()
-    # get_workspace_client should be called once for 123 & 456, then twice for workspace 789
-    assert acc.get_workspace_client.call_count == 4
+    # get_workspace_client should be called once for 123, 456, 789, then twice for workspace 000
+    assert acc.get_workspace_client.call_count == 5
 
     acc.config.is_azure = False
     acc.config.auth_type = "databricks-cli"
