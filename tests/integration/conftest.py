@@ -580,9 +580,11 @@ class TestInstallationContext(TestRuntimeContext):
             display_name=workspace_group_name,
             members=members,
             entitlements=["allow-cluster-create"],
-            wait_for_provisioning=wait_for_provisioning
+            wait_for_provisioning=wait_for_provisioning,
         )
-        acc_group = self._make_acc_group(display_name=account_group_name, members=members, wait_for_provisioning=wait_for_provisioning)
+        acc_group = self._make_acc_group(
+            display_name=account_group_name, members=members, wait_for_provisioning=wait_for_provisioning
+        )
         return ws_group, acc_group
 
     @cached_property

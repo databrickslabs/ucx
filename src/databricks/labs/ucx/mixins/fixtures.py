@@ -642,7 +642,6 @@ def _make_group(name, cfg, interface, make_random):
         else:
             logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
 
-        # When
         @retried(on=[NotFound], timeout=timedelta(minutes=1))
         def _wait_for_provisioning() -> None:
             interface.get(group.id)
