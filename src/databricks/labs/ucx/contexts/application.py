@@ -409,7 +409,7 @@ class GlobalContext(abc.ABC):
         return Redash(
             self.migration_status_refresher.index(),
             self.workspace_client,
-            self.installation.install_folder(),
+            self.installation,
         )
 
 
