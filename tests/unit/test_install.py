@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, create_autospec, patch
 
@@ -301,6 +302,8 @@ def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
     installer = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    logger = logging.getLogger("databricks.labs.ucx.installer.workflows")
+    logger.setLevel(logging.DEBUG)
     with pytest.raises(Unknown) as failure:
         installer.run_workflow("assessment")
 
