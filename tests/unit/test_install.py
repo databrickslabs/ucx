@@ -1026,32 +1026,32 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
     "state,expected",
     [
         (
-                RunState(
-                    result_state=None,
-                    life_cycle_state=RunLifeCycleState.RUNNING,
-                ),
-                "RUNNING",
+            RunState(
+                result_state=None,
+                life_cycle_state=RunLifeCycleState.RUNNING,
+            ),
+            "RUNNING",
         ),
         (
-                RunState(
-                    result_state=RunResultState.SUCCESS,
-                    life_cycle_state=RunLifeCycleState.TERMINATED,
-                ),
-                "SUCCESS",
+            RunState(
+                result_state=RunResultState.SUCCESS,
+                life_cycle_state=RunLifeCycleState.TERMINATED,
+            ),
+            "SUCCESS",
         ),
         (
-                RunState(
-                    result_state=RunResultState.FAILED,
-                    life_cycle_state=RunLifeCycleState.TERMINATED,
-                ),
-                "FAILED",
+            RunState(
+                result_state=RunResultState.FAILED,
+                life_cycle_state=RunLifeCycleState.TERMINATED,
+            ),
+            "FAILED",
         ),
         (
-                RunState(
-                    result_state=None,
-                    life_cycle_state=None,
-                ),
-                "UNKNOWN",
+            RunState(
+                result_state=None,
+                life_cycle_state=None,
+            ),
+            "UNKNOWN",
         ),
     ],
 )
@@ -1739,8 +1739,8 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
 
     # raises runtime warning when versions match and no override provided
     with pytest.raises(
-            RuntimeWarning,
-            match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
+        RuntimeWarning,
+        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         install.configure()
 
