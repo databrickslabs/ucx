@@ -43,7 +43,6 @@ from databricks.sdk.service.sql import (
     GetResponse,
     ObjectTypePlural,
     Query,
-    QueryInfo,
     Dashboard,
     WidgetOptions,
     WidgetPosition,
@@ -1125,14 +1124,14 @@ def make_udf(
 
 @pytest.fixture
 def make_query(ws, make_table, make_random):
-    def create() -> QueryInfo:
+    def create() -> Query:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
         query = ws.queries.create(
             name=query_name,
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
-            tags=[query_name],
+            tags=["original_query_tag"],
         )
         logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
@@ -1289,7 +1288,7 @@ def make_dashboard(ws, make_random, make_query):
         )
 
         dashboard_name = f"ucx_D{make_random(4)}"
-        dashboard = ws.dashboards.create(name=dashboard_name, tags=[dashboard_name])
+        dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
         ws.dashboard_widgets.create(
             dashboard_id=dashboard.id,
             visualization_id=viz.id,
