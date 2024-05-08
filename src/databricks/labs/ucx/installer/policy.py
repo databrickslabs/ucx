@@ -39,7 +39,7 @@ class ClusterPolicyInstaller:
         instance_pool_id = self._get_instance_pool_id()
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
+            "We have identified one or more cluster policies set up for an external metastore. "
             "Would you like to set UCX to connect to the external metastore?"
         ):
             logger.info("Setting up an external metastore")
@@ -50,7 +50,7 @@ class ClusterPolicyInstaller:
         else:
             warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
             if warehouse_config and self._prompts.confirm(
-                "We have identified the workspace warehouse is set up for an external metastore"
+                "We have identified the workspace warehouse is set up for an external metastore. "
                 "Would you like to set UCX to connect to the external metastore?"
             ):
                 logger.info("Setting up an external metastore")
