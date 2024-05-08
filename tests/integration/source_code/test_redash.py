@@ -23,5 +23,3 @@ def test_fix_dashboard(ws, installation_ctx, make_dashboard, make_query):
     for query in queries:
         content = ws.queries.get(query.id)
         assert len(content.tags) == 1
-
-    installation_ctx.redash.delete_backup_queries(installation_ctx.prompts)

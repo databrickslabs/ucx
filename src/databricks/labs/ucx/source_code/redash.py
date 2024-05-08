@@ -2,11 +2,11 @@ import logging
 from collections.abc import Iterator
 from dataclasses import replace
 
-from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.blueprint.installation import Installation
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
-from databricks.sdk.errors.platform import DatabricksError, NotFound
+from databricks.sdk.errors.platform import DatabricksError
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -17,12 +17,11 @@ logger = logging.getLogger(__name__)
 
 class Redash:
     MIGRATED_TAG = "migrated by UCX"
-    BACKUP_TAG = "backup by UCX"
 
-    def __init__(self, index: MigrationIndex, ws: WorkspaceClient, backup_path: str):
+    def __init__(self, index: MigrationIndex, ws: WorkspaceClient, installation: Installation):
         self._index = index
         self._ws = ws
-        self._backup_path = backup_path + "/backup_queries"
+        self._installation = installation
 
     def migrate_dashboards(self, dashboard_id: str | None = None):
         for dashboard in self._list_dashboards(dashboard_id):
@@ -53,54 +52,24 @@ class Redash:
             logger.error(f"Cannot list dashboards: {e}")
             return []
 
-    def delete_backup_queries(self, prompts: Prompts):
-        if not prompts.confirm("Are you sure you want to delete all backup queries?"):
-            return
-        for query in self._ws.queries.list():
-            if query.id is None:
-                continue
-            # not a backup query
-            if query.tags is None or self.BACKUP_TAG not in query.tags:
-                continue
-            try:
-                self._ws.queries.delete(query.id)
-            except NotFound:
-                continue
-
     def _fix_query(self, query: Query):
         assert query.id is not None
         assert query.query is not None
         # query already migrated
         if query.tags is not None and self.MIGRATED_TAG in query.tags:
             return
-        # create the backup folder for queries if it does not exist
-        try:
-            self._ws.workspace.get_status(self._backup_path)
-        except NotFound:
-            self._ws.workspace.mkdirs(self._backup_path)
-        backup_query = self._ws.queries.create(
-            data_source_id=query.data_source_id,
-            description=query.description,
-            name=str(query.name) + "_original",
-            options=query.options.as_dict() if query.options is not None else None,
-            parent=self._backup_path,
-            query=query.query,
-            run_as_role=query.run_as_role,
-            tags=[self.BACKUP_TAG],
-        )
+        # backup the query
+        self._installation.save(query, filename=f'backup/queries/{query.id}.json')
         from_table = FromTable(self._index, self._get_session_state(query))
         new_query = from_table.apply(query.query)
-        new_tags = [f'backup:{backup_query.id}']
-        if query.tags:
-            new_tags.extend(query.tags)
         try:
             self._ws.queries.update(
                 query.id,
                 query=new_query,
-                tags=self._get_migrated_tags(new_tags),
+                tags=self._get_migrated_tags(query.tags),
             )
         except DatabricksError:
-            logger.error(f"Cannot upgrade {query.name}")
+            logger.warning(f"Cannot upgrade {query.name}")
             return
 
     @staticmethod
@@ -121,28 +90,19 @@ class Redash:
             return
         # find the backup query
         is_migrated = False
-        backup_id = None
         for tag in query.tags:
             if tag == self.MIGRATED_TAG:
                 is_migrated = True
-                continue
-            if tag.startswith("backup:"):
-                backup_id = tag.split(":")[1]
-                continue
 
         if not is_migrated:
             logger.debug(f"Query {query.name} was not migrated by UCX")
             return
 
-        if backup_id is None:
-            logger.debug(f"Cannot find backup query for query {query.name}")
-            return
+        backup_query = self._installation.load(Query, filename=f'backup/queries/{query.id}.json')
         try:
-            original_query = self._ws.queries.get(backup_id)
-            self._ws.queries.update(query.id, query=original_query.query, tags=self._get_original_tags(query.tags))
-            self._ws.queries.delete(backup_id)
+            self._ws.queries.update(query.id, query=backup_query.query, tags=self._get_original_tags(backup_query.tags))
         except DatabricksError:
-            logger.error(f"Cannot restore {query.name} from backup query {backup_id}")
+            logger.warning(f"Cannot restore {query.name} from backup")
             return
 
     def _get_migrated_tags(self, tags: list[str] | None) -> list[str]:
@@ -154,9 +114,7 @@ class Redash:
     def _get_original_tags(self, tags: list[str] | None) -> list[str] | None:
         if tags is None:
             return None
-        return [
-            tag for tag in tags if not tag.startswith("backup:") and tag not in (self.MIGRATED_TAG, self.BACKUP_TAG)
-        ]
+        return [tag for tag in tags if tag != self.MIGRATED_TAG]
 
     @staticmethod
     def get_queries_from_dashboard(dashboard: Dashboard) -> Iterator[Query]:

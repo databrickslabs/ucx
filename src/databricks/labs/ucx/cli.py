@@ -469,12 +469,5 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
     ctx.redash.revert_dashboards(dashboard_id)
 
 
-@ucx.command
-def delete_backup_dbsql_queries(w: WorkspaceClient, prompts: Prompts):
-    """Delete DBSQL queries that have been backed up by UCX"""
-    ctx = WorkspaceContext(w)
-    ctx.redash.delete_backup_queries(prompts)
-
-
 if __name__ == "__main__":
     ucx()

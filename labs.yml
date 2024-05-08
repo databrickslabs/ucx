@@ -220,6 +220,3 @@ commands:
     flags:
       - name: dashboard-id
         description: (Optional) DBSQL dashboard ID to revert. If no dashboard ID is provided, all migrated DBSQL dashboards in the workspace will be reverted.
-
-  - name: delete-backup-dbsql-queries
-    description: Delete backup DBSQL queries created during the migration process.

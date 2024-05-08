@@ -31,6 +31,7 @@ from databricks.labs.ucx.cli import (
     logs,
     manual_workspace_info,
     migrate_credentials,
+    migrate_dbsql_dashboards,
     migrate_locations,
     migrate_tables,
     move,
@@ -38,6 +39,7 @@ from databricks.labs.ucx.cli import (
     principal_prefix_access,
     repair_run,
     revert_cluster_remap,
+    revert_dbsql_dashboards,
     revert_migrated_tables,
     show_all_metastores,
     skip,
@@ -45,14 +47,6 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    logs,
-    show_all_metastores,
-    assign_metastore,
-    migrate_tables,
-    create_missing_principals,
-    migrate_dbsql_dashboards,
-    revert_dbsql_dashboards,
-    delete_backup_dbsql_queries,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -548,9 +542,3 @@ def test_migrate_dbsql_dashboards(ws, caplog):
 def test_revert_dbsql_dashboards(ws, caplog):
     revert_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
-
-
-def test_delete_backup_dbsql_queries(ws, caplog):
-    prompts = MockPrompts({'.*': 'yes'})
-    delete_backup_dbsql_queries(ws, prompts)
-    ws.queries.list.assert_called_once()
