@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, create_autospec, patch
 
@@ -301,6 +302,8 @@ def test_run_workflow_creates_proper_failure(ws, mocker, mock_installation_with_
     ws.jobs.wait_get_run_job_terminated_or_skipped.side_effect = OperationFailed("does not compute")
     install_state = InstallState.from_installation(mock_installation_with_jobs)
     installer = DeployedWorkflows(ws, install_state, timedelta(seconds=1))
+    logger = logging.getLogger("databricks.labs.ucx.installer.workflows")
+    logger.setLevel(logging.DEBUG)
     with pytest.raises(Unknown) as failure:
         installer.run_workflow("assessment")
 
@@ -1023,32 +1026,32 @@ def test_repair_run_result_state(ws, caplog, mock_installation_with_jobs):
     "state,expected",
     [
         (
-            RunState(
-                result_state=None,
-                life_cycle_state=RunLifeCycleState.RUNNING,
-            ),
-            "RUNNING",
+                RunState(
+                    result_state=None,
+                    life_cycle_state=RunLifeCycleState.RUNNING,
+                ),
+                "RUNNING",
         ),
         (
-            RunState(
-                result_state=RunResultState.SUCCESS,
-                life_cycle_state=RunLifeCycleState.TERMINATED,
-            ),
-            "SUCCESS",
+                RunState(
+                    result_state=RunResultState.SUCCESS,
+                    life_cycle_state=RunLifeCycleState.TERMINATED,
+                ),
+                "SUCCESS",
         ),
         (
-            RunState(
-                result_state=RunResultState.FAILED,
-                life_cycle_state=RunLifeCycleState.TERMINATED,
-            ),
-            "FAILED",
+                RunState(
+                    result_state=RunResultState.FAILED,
+                    life_cycle_state=RunLifeCycleState.TERMINATED,
+                ),
+                "FAILED",
         ),
         (
-            RunState(
-                result_state=None,
-                life_cycle_state=None,
-            ),
-            "UNKNOWN",
+                RunState(
+                    result_state=None,
+                    life_cycle_state=None,
+                ),
+                "UNKNOWN",
         ),
     ],
 )
@@ -1736,8 +1739,8 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
 
     # raises runtime warning when versions match and no override provided
     with pytest.raises(
-        RuntimeWarning,
-        match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
+            RuntimeWarning,
+            match="UCX workspace remote and local install versions are same and no override is requested. Exiting...",
     ):
         install.configure()
 
