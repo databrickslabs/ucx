@@ -212,8 +212,6 @@ class WorkspaceInstaller(WorkspaceContext):
         num_threads = int(self.prompts.question("Number of threads", default="8", valid_number=True))
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
-        # Check if terraform is being used
-        is_terraform_used = self.prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         return WorkspaceConfig(
@@ -226,7 +224,6 @@ class WorkspaceInstaller(WorkspaceContext):
             renamed_group_prefix=configure_groups.renamed_group_prefix,
             log_level=log_level,
             num_threads=num_threads,
-            is_terraform_used=is_terraform_used,
             include_databases=include_databases,
             trigger_job=trigger_job,
         )
