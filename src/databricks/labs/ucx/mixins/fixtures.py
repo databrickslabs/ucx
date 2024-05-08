@@ -625,6 +625,7 @@ def _make_group(name, cfg, interface, make_random):
         roles: list[str] | None = None,
         entitlements: list[str] | None = None,
         display_name: str | None = None,
+        wait_for_provisioning: bool = False,
         **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
@@ -640,6 +641,15 @@ def _make_group(name, cfg, interface, make_random):
             logger.info(f"Account group {group.display_name}: {cfg.host}/users/groups/{group.id}/members")
         else:
             logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
+
+        # When
+        @retried(on=[NotFound], timeout=timedelta(minutes=1))
+        def _wait_for_provisioning() -> None:
+            interface.get(group.id)
+
+        if wait_for_provisioning:
+            _wait_for_provisioning()
+
         return group
 
     yield from factory(name, create, lambda item: interface.delete(item.id))
