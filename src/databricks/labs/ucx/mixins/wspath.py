@@ -1,12 +1,15 @@
 import abc
+import fnmatch
 import locale
 import logging
 import os
 import pathlib
+import posixpath
+import re
+import sys
 from functools import cached_property
 
-# pylint: disable-next=import-private-name
-from pathlib import Path, _PosixFlavour  # type: ignore
+from pathlib import Path
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
 from io import BytesIO, StringIO
 
@@ -17,12 +20,84 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportForma
 logger = logging.getLogger(__name__)
 
 
-class _DatabricksFlavour(_PosixFlavour):
+class _DatabricksFlavour:
+    # adapted from pathlib._Flavour, where we ignore support for drives, as we
+    # don't have that concept in Databricks. We also ignore support for Windows
+    # paths, as we only support POSIX paths in Databricks.
+
+    sep = '/'
+    altsep = ''
+    has_drv = False
+    pathmod = posixpath
+    is_supported = True
+
     def __init__(self, ws: WorkspaceClient):
-        super().__init__()
+        self.join = self.sep.join
         self._ws = ws
 
-    def make_uri(self, path):
+    def parse_parts(self, parts: list[str]) -> tuple[str, str, list[str]]:
+        # adapted from pathlib._Flavour.parse_parts,
+        # where we ignore support for drives, as we
+        # don't have that concept in Databricks
+        parsed = []
+        drv = root = ''
+        for part in reversed(parts):
+            if not part:
+                continue
+            drv, root, rel = self.splitroot(part)
+            if self.sep not in rel:
+                if rel and rel != '.':
+                    parsed.append(sys.intern(rel))
+                continue
+            for part_ in reversed(rel.split(self.sep)):
+                if part_ and part_ != '.':
+                    parsed.append(sys.intern(part_))
+        if drv or root:
+            parsed.append(drv + root)
+        parsed.reverse()
+        return drv, root, parsed
+
+    @staticmethod
+    def join_parsed_parts(
+        drv: str,
+        root: str,
+        parts: list[str],
+        _,
+        root2: str,
+        parts2: list[str],
+    ) -> tuple[str, str, list[str]]:
+        # adapted from pathlib.PurePosixPath, where we ignore support for drives,
+        # as we don't have that concept in Databricks
+        if root2:
+            return drv, root2, [drv + root2] + parts2[1:]
+        return drv, root, parts + parts2
+
+    @staticmethod
+    def splitroot(part, sep=sep) -> tuple[str, str, str]:
+        if part and part[0] == sep:
+            stripped_part = part.lstrip(sep)
+            if len(part) - len(stripped_part) == 2:
+                return '', sep * 2, stripped_part
+            return '', sep, stripped_part
+        return '', '', part
+
+    @staticmethod
+    def casefold(value: str) -> str:
+        return value
+
+    @staticmethod
+    def casefold_parts(parts: list[str]) -> list[str]:
+        return parts
+
+    @staticmethod
+    def compile_pattern(pattern: str):
+        return re.compile(fnmatch.translate(pattern)).fullmatch
+
+    @staticmethod
+    def is_reserved(_) -> bool:
+        return False
+
+    def make_uri(self, path) -> str:
         return self._ws.config.host + '#workspace' + urlquote_from_bytes(bytes(path))
 
     def __repr__(self):
