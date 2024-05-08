@@ -170,4 +170,5 @@ def test_running_real_assessment_job_ext_hms(
     assert ext_hms_ctx.deployed_workflows.validate_step("assessment")
 
     after = ext_hms_ctx.generic_permissions_support.load_as_dict("cluster-policies", cluster_policy.policy_id)
+    assert ws_group_a.display_name in after, f"Group {ws_group_a.display_name} not found in cluster policy"
     assert after[ws_group_a.display_name] == PermissionLevel.CAN_USE
