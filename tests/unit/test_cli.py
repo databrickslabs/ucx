@@ -31,6 +31,7 @@ from databricks.labs.ucx.cli import (
     logs,
     manual_workspace_info,
     migrate_credentials,
+    migrate_dbsql_dashboards,
     migrate_locations,
     migrate_tables,
     move,
@@ -38,6 +39,7 @@ from databricks.labs.ucx.cli import (
     principal_prefix_access,
     repair_run,
     revert_cluster_remap,
+    revert_dbsql_dashboards,
     revert_migrated_tables,
     show_all_metastores,
     skip,
@@ -530,3 +532,13 @@ def test_create_missing_principal_azure(ws, caplog):
     with pytest.raises(ValueError) as failure:
         create_missing_principals(ws, prompts=prompts, ctx=ctx)
     assert str(failure.value) == "Unsupported cloud provider"
+
+
+def test_migrate_dbsql_dashboards(ws, caplog):
+    migrate_dbsql_dashboards(ws)
+    ws.dashboards.list.assert_called_once()
+
+
+def test_revert_dbsql_dashboards(ws, caplog):
+    revert_dbsql_dashboards(ws)
+    ws.dashboards.list.assert_called_once()

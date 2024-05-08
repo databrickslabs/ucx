@@ -43,7 +43,9 @@ from databricks.sdk.service.sql import (
     GetResponse,
     ObjectTypePlural,
     Query,
-    QueryInfo,
+    Dashboard,
+    WidgetOptions,
+    WidgetPosition,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -1122,13 +1124,14 @@ def make_udf(
 
 @pytest.fixture
 def make_query(ws, make_table, make_random):
-    def create() -> QueryInfo:
+    def create() -> Query:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
         query = ws.queries.create(
-            name=f"{query_name}",
+            name=query_name,
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
+            tags=["original_query_tag"],
         )
         logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
@@ -1264,3 +1267,49 @@ def make_storage_dir(ws, env_or_skip):
             ws.dbfs.delete(path, recursive=True)
 
     yield from factory("make_storage_dir", create, remove)
+
+
+@pytest.fixture
+def make_dashboard(ws, make_random, make_query):
+    def create() -> Dashboard:
+        query = make_query()
+        viz = ws.query_visualizations.create(
+            type="table",
+            query_id=query.id,
+            options={
+                "itemsPerPage": 1,
+                "condensed": True,
+                "withRowNumber": False,
+                "version": 2,
+                "columns": [
+                    {"name": "id", "title": "id", "allowSearch": True},
+                ],
+            },
+        )
+
+        dashboard_name = f"ucx_D{make_random(4)}"
+        dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
+        ws.dashboard_widgets.create(
+            dashboard_id=dashboard.id,
+            visualization_id=viz.id,
+            width=1,
+            options=WidgetOptions(
+                title="",
+                position=WidgetPosition(
+                    col=0,
+                    row=0,
+                    size_x=3,
+                    size_y=3,
+                ),
+            ),
+        )
+        logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
+        return dashboard
+
+    def remove(dashboard: Dashboard):
+        try:
+            ws.dashboards.delete(dashboard_id=dashboard.id)
+        except RuntimeError as e:
+            logger.info(f"Can't delete dashboard {e}")
+
+    yield from factory("dashboard", create, remove)

@@ -45,6 +45,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.manager import PermissionManager
@@ -401,6 +402,14 @@ class GlobalContext(abc.ABC):
             self.dependency_resolver,
             self.path_lookup,
             MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+        )
+
+    @cached_property
+    def redash(self):
+        return Redash(
+            self.migration_status_refresher.index(),
+            self.workspace_client,
+            self.installation,
         )
 
 

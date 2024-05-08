@@ -33,7 +33,7 @@ class FromTable(Linter, Fixer):
                 table                               -> Table(catalog='', db='', this='table')
         """
         self._index: MigrationIndex = index
-        self._session_state: CurrentSessionState = session_state if session_state else CurrentSessionState()
+        self._session_state: CurrentSessionState = session_state
 
     def name(self) -> str:
         return 'table-migrate'
