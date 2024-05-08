@@ -92,14 +92,14 @@ DEFAULT_SCHEMA = 'default'
 
 @dataclass
 class CurrentSessionState:
-    f"""
+    """
     A data class that represents the current state of a session.
 
     This class can be used to track various aspects of a session, such as the current schema.
 
     Attributes:
-        catalog (str): The current schema of the session. If not provided, it defaults to {DEFAULT_CATALOG}.
-        schema (str): The current schema of the session. If not provided, it defaults to {DEFAULT_SCHEMA}.
+        catalog (str): The current schema of the session. If not provided, it defaults to 'DEFAULT_CATALOG'.
+        schema (str): The current schema of the session. If not provided, it defaults to 'DEFAULT_SCHEMA'.
     """
 
     schema: str = DEFAULT_SCHEMA
