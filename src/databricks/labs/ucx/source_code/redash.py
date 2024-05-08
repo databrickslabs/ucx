@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Redash:
-    MIGRATED_TAG = "migrated by UCX"
+    MIGRATED_TAG = "Migrated by UCX"
 
     def __init__(self, index: MigrationIndex, ws: WorkspaceClient, installation: Installation):
         self._index = index
