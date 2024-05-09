@@ -171,15 +171,15 @@ def test_load_mapping():
     ws.tables.get.assert_not_called()
 
     assert [
-               Rule(
-                   workspace_name="foo-bar",
-                   catalog_name="foo_bar",
-                   src_schema="foo",
-                   dst_schema="foo",
-                   src_table="bar",
-                   dst_table="bar",
-               )
-           ] == rules
+        Rule(
+            workspace_name="foo-bar",
+            catalog_name="foo_bar",
+            src_schema="foo",
+            dst_schema="foo",
+            src_table="bar",
+            dst_table="bar",
+        )
+    ] == rules
 
 
 def test_skip_happy_path(caplog):
@@ -306,14 +306,14 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     assert len(tables_to_migrate) == 2
     tables = (table_to_migrate.src for table_to_migrate in tables_to_migrate)
     assert (
-            Table(
-                object_type="EXTERNAL",
-                table_format="DELTA",
-                catalog="hive_metastore",
-                database="test_schema3",
-                name="test_table4",
-            )
-            not in tables
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="test_schema3",
+            name="test_table4",
+        )
+        not in tables
     )
     assert (table for table in tables_to_migrate)
     assert call("fake_dest") in client.tables.get.call_args_list
@@ -606,8 +606,8 @@ def test_database_not_exists_when_checking_inscope(caplog):
     client.tables.get.assert_not_called()
     tables_crawler.snapshot.assert_called_once()
     assert (
-            "Schema hive_metastore.deleted_schema no longer exists. Skipping its properties check and migration."
-            in caplog.text
+        "Schema hive_metastore.deleted_schema no longer exists. Skipping its properties check and migration."
+        in caplog.text
     )
 
 
