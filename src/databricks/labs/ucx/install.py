@@ -214,6 +214,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
+
         return WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -475,12 +476,68 @@ class WorkspaceInstallation(InstallationMixin):
         readme_url = self._workflows_installer.create_jobs()
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
+        if not self._is_account_install and self._prompts.confirm(
+            "Do you want to join the current installation to an existing collection?"
+        ):
+            self._join_collection()
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
-
         if self.config.trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
         return True
+
+    def _join_collection(self):
+        acct_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
+        account_client = acct_installer.get_safe_account_client()
+        acct_ctx = AccountContext(account_client)
+        accessible_workspaces = acct_ctx.account_workspaces.get_accessible_workspaces()
+        collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
+        if collection_workspace is not None:
+            self._sync_collection(collection_workspace, account_client)
+
+    def _sync_collection(
+        self,
+        collection_workspace: Workspace,
+        account_client: AccountClient,
+    ):
+        workspace_client = account_client.get_workspace_client(collection_workspace)
+        installer = WorkspaceInstaller(workspace_client).replace(product_info=self._product_info)
+        installed_workspace_ids = installer.config.installed_workspace_ids
+        new_installed_workspace_ids = installed_workspace_ids.extend(collection_workspace.workspace_id)
+        installed_workspaces = []
+        for account_workspace in account_client.workspaces.list():
+            if account_workspace.workspace_id in new_installed_workspace_ids:
+                installed_workspaces.append(account_workspace)
+
+        for installed_workspace in installed_workspaces:
+            workspace_client = account_client.get_workspace_client(installed_workspace)
+            installer = WorkspaceInstaller(workspace_client).replace(product_info=self._product_info)
+            installer.replace_config(installed_workspace_ids=new_installed_workspace_ids)
+
+    def _get_collection_workspace(
+        self,
+        accessible_workspaces: list[Workspace],
+        account_client: AccountClient,
+    ) -> Workspace | None:
+        installed_workspaces = []
+        for workspace in accessible_workspaces:
+            workspace_client = account_client.get_workspace_client(workspace)
+            workspace_installation = Installation.existing(workspace_client, self._product_info.product_name())
+            if len(workspace_installation) > 0:
+                installed_workspaces.append(workspace)
+        if len(installed_workspaces) > 0:
+            workspaces = {
+                workspace.workspace_name: workspace
+                for workspace in installed_workspaces
+                if workspace.workspace_name is not None
+            }
+
+            workspace = self._prompts.choice_from_dict(
+                "Select the workspace to join current installation as a collection group", workspaces
+            )
+            return workspace
+        logger.warning("No existing installation found , setting up new installation without")
+        return None
 
     def _create_database(self):
         try:
@@ -599,7 +656,7 @@ class WorkspaceInstallation(InstallationMixin):
 
 
 class AccountInstaller(AccountContext):
-    def _get_safe_account_client(self) -> AccountClient:
+    def get_safe_account_client(self) -> AccountClient:
         """
         Get account client with the correct host based on the cloud provider
         """
@@ -616,7 +673,7 @@ class AccountInstaller(AccountContext):
         return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
 
     def install_on_account(self):
-        ctx = AccountContext(self._get_safe_account_client())
+        ctx = AccountContext(self.get_safe_account_client())
         default_config = None
         confirmed = False
         accessible_workspaces = self.account_workspaces.get_accessible_workspaces()
