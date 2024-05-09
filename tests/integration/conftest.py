@@ -686,6 +686,7 @@ class TestInstallationContext(TestRuntimeContext):
             self.workflows_deployment,
             self.prompts,
             self.product_info,
+            acc(self.workspace_client),
             skip_dashboards=self.skip_dashboards,
         )
 

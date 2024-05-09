@@ -204,7 +204,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         timedelta(seconds=1),
         [],
     )
-
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation,
@@ -214,6 +214,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         workflows_installation,
         any_prompt,
         PRODUCT_INFO,
+        account_client,
     )
 
     with pytest.raises(BadRequest) as failure:
@@ -594,6 +595,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         timedelta(seconds=1),
         [],
     )
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
@@ -603,6 +605,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
     workspace_installation.run()
 
@@ -628,6 +631,7 @@ def test_remove_database(ws):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     workflow_installer = create_autospec(WorkflowsDeployment)
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -637,6 +641,7 @@ def test_remove_database(ws):
         workflow_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
 
     workspace_installation.uninstall()
@@ -671,8 +676,17 @@ def test_remove_jobs_no_state(ws):
         timedelta(seconds=1),
         [],
     )
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
-        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        install_state,
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
+        account_client,
     )
 
     workspace_installation.uninstall()
@@ -706,6 +720,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         timedelta(seconds=1),
         [],
     )
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         mock_installation_with_jobs,
@@ -715,6 +730,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
 
     with caplog.at_level('ERROR'):
@@ -738,6 +754,7 @@ def test_remove_warehouse(ws):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -747,6 +764,7 @@ def test_remove_warehouse(ws):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
 
     workspace_installation.uninstall()
@@ -769,6 +787,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -778,6 +797,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
 
     workspace_installation.uninstall()
@@ -797,6 +817,7 @@ def test_remove_secret_scope(ws, caplog):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -806,6 +827,7 @@ def test_remove_secret_scope(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
     workspace_installation.uninstall()
     ws.secrets.delete_scope.assert_called_with('ucx')
@@ -823,6 +845,7 @@ def test_remove_secret_scope_no_scope(ws, caplog):
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
     ws.secrets.delete_scope.side_effect = NotFound()
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -832,6 +855,7 @@ def test_remove_secret_scope_no_scope(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
     with caplog.at_level('ERROR'):
         workspace_installation.uninstall()
@@ -853,6 +877,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
     config = WorkspaceConfig(inventory_database='ucx')
     ws.cluster_policies.delete.side_effect = NotFound()
     workflows_installer = create_autospec(WorkflowsDeployment)
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -862,6 +887,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
 
     with caplog.at_level('ERROR'):
@@ -885,6 +911,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     workflows_installer = create_autospec(WorkflowsDeployment)
+    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -894,6 +921,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
+        account_client,
     )
 
     with caplog.at_level('ERROR'):
@@ -1250,8 +1278,17 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         timedelta(seconds=1),
         Workflows.all().tasks(),
     )
+    acct_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
-        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        install_state,
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
+        acct_client,
     )
     workspace_installation.run()
     wheels.upload_to_wsfs.assert_called_once()
@@ -1283,8 +1320,17 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         timedelta(seconds=1),
         Workflows.all().tasks(),
     )
+    acct_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
-        config, installation, install_state, sql_backend, ws, workflows_installer, prompts, PRODUCT_INFO
+        config,
+        installation,
+        install_state,
+        sql_backend,
+        ws,
+        workflows_installer,
+        prompts,
+        PRODUCT_INFO,
+        acct_client,
     )
     workspace_installation.run()
     wheels.upload_to_wsfs.assert_called_once()
@@ -1402,7 +1448,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         timedelta(seconds=1),
         [],
     )
-
+    acct_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_extra_jobs,
@@ -1412,6 +1458,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         workflows_installation,
         any_prompt,
         PRODUCT_INFO,
+        acct_client,
     )
 
     workspace_installation.run()
@@ -1434,7 +1481,7 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         timedelta(seconds=1),
         [],
     )
-
+    acct_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_extra_jobs,
@@ -1444,6 +1491,7 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         workflows_installation,
         any_prompt,
         PRODUCT_INFO,
+        acct_client,
     )
 
     workspace_installation.run()

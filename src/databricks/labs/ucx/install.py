@@ -128,6 +128,7 @@ class WorkspaceInstaller(WorkspaceContext):
         environ: dict[str, str] | None = None,
         tasks: list[Task] | None = None,
     ):
+
         super().__init__(ws)
         if not environ:
             environ = dict(os.environ.items())
@@ -167,6 +168,7 @@ class WorkspaceInstaller(WorkspaceContext):
             config = self.configure(default_config)
         if self._is_testing():
             return config
+        acct_client = AccountClient(product="ucx", product_version=__version__)
         workflows_deployment = WorkflowsDeployment(
             config,
             self.installation,
@@ -186,6 +188,7 @@ class WorkspaceInstaller(WorkspaceContext):
             workflows_deployment,
             self.prompts,
             self.product_info,
+            acct_client,
         )
         try:
             workspace_installation.run()
@@ -410,6 +413,7 @@ class WorkspaceInstallation(InstallationMixin):
         workflows_installer: WorkflowsDeployment,
         prompts: Prompts,
         product_info: ProductInfo,
+        acct_client: AccountClient,
         skip_dashboards=False,
     ):
         self._config = config
@@ -423,23 +427,25 @@ class WorkspaceInstallation(InstallationMixin):
         environ = dict(os.environ.items())
         self._is_account_install = environ.get("UCX_FORCE_INSTALL") == "account"
         self._skip_dashboards = skip_dashboards
+        self._acct_client = acct_client
         super().__init__(config, installation, ws)
 
     @classmethod
     def current(cls, ws: WorkspaceClient):
         # TODO: remove this method, it's no longer needed
         product_info = ProductInfo.from_class(WorkspaceConfig)
-        installation = product_info.current_installation(ws)
-        install_state = InstallState.from_installation(installation)
-        config = installation.load(WorkspaceConfig)
+        install = product_info.current_installation(ws)
+        install_state = InstallState.from_installation(install)
+        config = install.load(WorkspaceConfig)
         sql_backend = StatementExecutionBackend(ws, config.warehouse_id)
         wheels = product_info.wheels(ws)
         prompts = Prompts()
         timeout = timedelta(minutes=2)
         tasks = Workflows.all().tasks()
+        acct_client = AccountClient(product="ucx", product_version=__version__)
         workflows_installer = WorkflowsDeployment(
             config,
-            installation,
+            install,
             install_state,
             ws,
             wheels,
@@ -450,13 +456,14 @@ class WorkspaceInstallation(InstallationMixin):
 
         return cls(
             config,
-            installation,
+            install,
             install_state,
             sql_backend,
             ws,
             workflows_installer,
             prompts,
             product_info,
+            acct_client,
         )
 
     @property
@@ -474,7 +481,7 @@ class WorkspaceInstallation(InstallationMixin):
             install_tasks.append(self._create_dashboards)
         Threads.strict("installing components", install_tasks)
         readme_url = self._workflows_installer.create_jobs()
-        if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+        if self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         if not self._is_account_install and self._prompts.confirm(
             "Do you want to join the current installation to an existing collection?"
@@ -487,13 +494,19 @@ class WorkspaceInstallation(InstallationMixin):
         return True
 
     def _join_collection(self):
-        acct_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
-        account_client = acct_installer.get_safe_account_client()
+        account_client = self._get_safe_account_client()
         acct_ctx = AccountContext(account_client)
         accessible_workspaces = acct_ctx.account_workspaces.get_accessible_workspaces()
         collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
         if collection_workspace is not None:
             self._sync_collection(collection_workspace, account_client)
+
+    def _get_safe_account_client(self) -> AccountClient:
+        if self._acct_client.config.is_account_client:
+            return self._acct_client
+        host = self._ws.config.environment.deployment_url("accounts")
+        account_id = self._prompts.question("Please provide the Databricks account id")
+        return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
     def _sync_collection(
         self,
