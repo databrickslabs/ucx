@@ -206,7 +206,7 @@ class TableMapping:
                 try:
                     self._sql_backend.execute(table.sql_unset_upgraded_to())
                 except DatabricksError as err:
-                    logger.info(f"Failed to unset upgraded_to property for Table {table.key}: {err}")
+                    logger.warning(f"Failed to unset upgraded_to property for Table {table.key}: {err}")
 
         return table_to_migrate
 

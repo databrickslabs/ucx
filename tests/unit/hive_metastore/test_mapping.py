@@ -171,15 +171,15 @@ def test_load_mapping():
     ws.tables.get.assert_not_called()
 
     assert [
-        Rule(
-            workspace_name="foo-bar",
-            catalog_name="foo_bar",
-            src_schema="foo",
-            dst_schema="foo",
-            src_table="bar",
-            dst_table="bar",
-        )
-    ] == rules
+               Rule(
+                   workspace_name="foo-bar",
+                   catalog_name="foo_bar",
+                   src_schema="foo",
+                   dst_schema="foo",
+                   src_table="bar",
+                   dst_table="bar",
+               )
+           ] == rules
 
 
 def test_skip_happy_path(caplog):
@@ -306,14 +306,14 @@ def test_skip_tables_marked_for_skipping_or_upgraded():
     assert len(tables_to_migrate) == 2
     tables = (table_to_migrate.src for table_to_migrate in tables_to_migrate)
     assert (
-        Table(
-            object_type="EXTERNAL",
-            table_format="DELTA",
-            catalog="hive_metastore",
-            database="test_schema3",
-            name="test_table4",
-        )
-        not in tables
+            Table(
+                object_type="EXTERNAL",
+                table_format="DELTA",
+                catalog="hive_metastore",
+                database="test_schema3",
+                name="test_table4",
+            )
+            not in tables
     )
     assert (table for table in tables_to_migrate)
     assert call("fake_dest") in client.tables.get.call_args_list
@@ -606,8 +606,8 @@ def test_database_not_exists_when_checking_inscope(caplog):
     client.tables.get.assert_not_called()
     tables_crawler.snapshot.assert_called_once()
     assert (
-        "Schema hive_metastore.deleted_schema no longer exists. Skipping its properties check and migration."
-        in caplog.text
+            "Schema hive_metastore.deleted_schema no longer exists. Skipping its properties check and migration."
+            in caplog.text
     )
 
 
@@ -672,3 +672,43 @@ def test_mapping_broken_table(caplog):
     ]
     table_mapping.get_tables_to_migrate(tables_crawler)
     assert "Failed to get properties for Table hive_metastore.schema1.table1" in caplog.text
+
+
+def test_table_with_no_target_reverted_failed(caplog):
+    errors = {"ALTER TABLE": "ALTER_TABLE_FAILED"}
+    rows = {
+        "SHOW TBLPROPERTIES schema1.table1": [
+            {"key": "upgraded_to", "value": "non.existing.table"},
+        ],
+    }
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+
+    installation = MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'workspace_name': "fake_ws",
+                    "catalog_name": 'cat1',
+                    'src_schema': 'schema1',
+                    'dst_schema': 'schema1',
+                    'src_table': 'table1',
+                    'dst_table': 'table1',
+                }
+            ]
+        }
+    )
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+        ),
+    ]
+    table_mapping.get_tables_to_migrate(tables_crawler)
+    assert "Failed to unset upgraded_to property" in caplog.text
