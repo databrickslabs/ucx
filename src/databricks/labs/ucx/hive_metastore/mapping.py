@@ -187,7 +187,7 @@ class TableMapping:
                 f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
             )
         except DatabricksError as err:
-            logger.info(f"Failed to get properties for Table {table.key}: {err!s}", exc_info=True)
+            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
             return None
         for value in result:
             if value["key"] == self.UCX_SKIP_PROPERTY:

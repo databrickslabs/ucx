@@ -638,3 +638,37 @@ def test_is_target_exists():
     )
     assert not table_mapping.exists_in_uc(src_table, "cat1.schema1.dest1")
     assert table_mapping.exists_in_uc(src_table, "cat1.schema2.dest2")
+
+
+def test_mapping_broken_table(caplog):
+    client = create_autospec(WorkspaceClient)
+    tables_crawler = create_autospec(TablesCrawler)
+    # When check table properties, raise token error
+    backend = MockBackend(fails_on_first={"SHOW TBLPROPERTIES": "tokentoken"})
+    installation = MockInstallation(
+        {
+            'mapping.csv': [
+                {
+                    'catalog_name': 'catalog',
+                    'dst_schema': 'schema1',
+                    'dst_table': 'table1',
+                    'src_schema': 'schema1',
+                    'src_table': 'table1',
+                    'workspace_name': 'workspace',
+                },
+            ]
+        }
+    )
+    client.tables.get.side_effect = NotFound()
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler.snapshot.return_value = [
+        Table(
+            object_type="EXTERNAL",
+            table_format="DELTA",
+            catalog="hive_metastore",
+            database="schema1",
+            name="table1",
+        ),
+    ]
+    table_mapping.get_tables_to_migrate(tables_crawler)
+    assert "Failed to get properties for Table hive_metastore.schema1.table1" in caplog.text
