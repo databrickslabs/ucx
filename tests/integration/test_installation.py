@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def new_installation(ws, env_or_skip, make_random):
+def new_installation(ws, env_or_skip, make_random, acc_client):
     # this fixture is used by test_user_installation_on_existing_global_install and
     # test_global_installation_on_existing_user_install
     cleanup = []
@@ -69,7 +69,7 @@ def new_installation(ws, env_or_skip, make_random):
 
         if not installation:
             installation = Installation(ws, product_info.product_name())
-        installer = WorkspaceInstaller(ws, environ).replace(
+        installer = WorkspaceInstaller(ws, acc_client, environ).replace(
             installation=installation,
             product_info=product_info,
             prompts=prompts,

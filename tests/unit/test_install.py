@@ -1,11 +1,9 @@
-import io
 import json
 import logging
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
-import yaml
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
@@ -22,21 +20,15 @@ from databricks.sdk.errors import (  # pylint: disable=redefined-builtin
     PermissionDenied,
     Unknown,
 )
-from databricks.sdk.service.workspace import ObjectInfo
 
 from databricks.sdk.errors.platform import BadRequest
 from databricks.sdk.service import iam, jobs, sql
-from databricks.sdk.service.compute import Policy, State, CreatePolicyResponse, DataSecurityMode, ClusterDetails
+from databricks.sdk.service.compute import Policy, State
 from databricks.sdk.service.jobs import BaseRun, RunLifeCycleState, RunResultState, RunState
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
-    Dashboard,
-    DataSource,
     EndpointInfo,
     EndpointInfoWarehouseType,
-    Query,
-    Visualization,
-    Widget,
 )
 
 import databricks.labs.ucx.installer.mixins
@@ -48,82 +40,6 @@ from databricks.labs.ucx.installer.workflows import DeployedWorkflows, Workflows
 from databricks.labs.ucx.runtime import Workflows
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
-
-
-def mock_clusters():
-    return [
-        ClusterDetails(
-            spark_version="13.3.x-dbrxxx",
-            cluster_name="zero",
-            data_security_mode=DataSecurityMode.USER_ISOLATION,
-            state=State.RUNNING,
-            cluster_id="1111-999999-userisol",
-        ),
-        ClusterDetails(
-            spark_version="13.3.x-dbrxxx",
-            cluster_name="one",
-            data_security_mode=DataSecurityMode.NONE,
-            state=State.RUNNING,
-            cluster_id='2222-999999-nosecuri',
-        ),
-        ClusterDetails(
-            spark_version="13.3.x-dbrxxx",
-            cluster_name="two",
-            data_security_mode=DataSecurityMode.LEGACY_TABLE_ACL,
-            state=State.RUNNING,
-            cluster_id='3333-999999-legacytc',
-        ),
-    ]
-
-
-@pytest.fixture
-def ws():
-    state = {
-        "/Applications/ucx/config.yml": yaml.dump(
-            {
-                'version': 1,
-                'inventory_database': 'ucx_exists',
-                'connect': {
-                    'host': '...',
-                    'token': '...',
-                },
-            }
-        ),
-    }
-
-    def download(path: str) -> io.StringIO | io.BytesIO:
-        if path not in state:
-            raise NotFound(path)
-        if ".csv" in path:
-            return io.BytesIO(state[path].encode('utf-8'))
-        return io.StringIO(state[path])
-
-    workspace_client = create_autospec(WorkspaceClient)
-
-    workspace_client.current_user.me = lambda: iam.User(
-        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
-    )
-    workspace_client.config.host = "https://foo"
-    workspace_client.config.is_aws = True
-    workspace_client.config.is_azure = False
-    workspace_client.config.is_gcp = False
-    workspace_client.workspace.get_status = lambda _: ObjectInfo(object_id=123)
-    workspace_client.data_sources.list = lambda: [DataSource(id="bcd", warehouse_id="abc")]
-    workspace_client.warehouses.list = lambda **_: [
-        EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
-    ]
-    workspace_client.dashboards.create.return_value = Dashboard(id="abc")
-    workspace_client.jobs.create.return_value = jobs.CreateResponse(job_id=123)
-    workspace_client.queries.create.return_value = Query(id="abc")
-    workspace_client.query_visualizations.create.return_value = Visualization(id="abc")
-    workspace_client.dashboard_widgets.create.return_value = Widget(id="abc")
-    workspace_client.clusters.list.return_value = mock_clusters()
-    workspace_client.cluster_policies.create.return_value = CreatePolicyResponse(policy_id="foo")
-    workspace_client.clusters.select_spark_version = lambda **_: "14.2.x-scala2.12"
-    workspace_client.clusters.select_node_type = lambda **_: "Standard_F4s"
-    workspace_client.workspace.download = download
-
-    return workspace_client
 
 
 def created_job(workspace_client, name):
@@ -189,7 +105,7 @@ def not_found(_):
     raise NotFound(msg)
 
 
-def test_create_database(ws, caplog, mock_installation, any_prompt):
+def test_create_database(ws, caplog, mock_installation, any_prompt, acc_client):
     sql_backend = MockBackend(
         fails_on_first={'CREATE TABLE': '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable is incorrect'}
     )
@@ -205,7 +121,6 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         timedelta(seconds=1),
         [],
     )
-    account_client = AccountClient(product="ucx")
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation,
@@ -215,7 +130,7 @@ def test_create_database(ws, caplog, mock_installation, any_prompt):
         workflows_installation,
         any_prompt,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     with pytest.raises(BadRequest) as failure:
@@ -427,7 +342,7 @@ def test_run_workflow_creates_failure_many_error(ws, mocker, mock_installation_w
     )
 
 
-def test_save_config(ws, mock_installation):
+def test_save_config(ws, mock_installation, acc_client):
     ws.workspace.get_status = not_found
     ws.warehouses.list = lambda **_: [
         EndpointInfo(name="abc", id="abc", warehouse_type=EndpointInfoWarehouseType.PRO, state=State.RUNNING)
@@ -442,7 +357,7 @@ def test_save_config(ws, mock_installation):
             r".*days to analyze submitted runs.*": "1",
         }
     )
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,
@@ -468,7 +383,7 @@ def test_save_config(ws, mock_installation):
     )
 
 
-def test_corrupted_config(ws, mock_installation, caplog):
+def test_corrupted_config(ws, mock_installation, caplog, acc_client):
     installation = MockInstallation({'config.yml': "corrupted"})
 
     prompts = MockPrompts(
@@ -479,7 +394,7 @@ def test_corrupted_config(ws, mock_installation, caplog):
             r".*days to analyze submitted runs.*": "1",
         }
     )
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -490,7 +405,7 @@ def test_corrupted_config(ws, mock_installation, caplog):
     assert 'Existing installation at ~/mock is corrupted' in caplog.text
 
 
-def test_save_config_strip_group_names(ws, mock_installation):
+def test_save_config_strip_group_names(ws, mock_installation, acc_client):
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -501,7 +416,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
     )
     ws.workspace.get_status = not_found
 
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,
@@ -528,7 +443,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
     )
 
 
-def test_create_cluster_policy(ws, mock_installation):
+def test_create_cluster_policy(ws, mock_installation, acc_client):
     ws.cluster_policies.list.return_value = [
         Policy(
             policy_id="foo1",
@@ -548,7 +463,7 @@ def test_create_cluster_policy(ws, mock_installation):
         }
     )
     ws.workspace.get_status = not_found
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,
@@ -574,7 +489,7 @@ def test_create_cluster_policy(ws, mock_installation):
     )
 
 
-def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_installation):
+def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_installation, acc_client):
     webbrowser_open = mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
     prompts = MockPrompts(
@@ -596,7 +511,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         timedelta(seconds=1),
         [],
     )
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database="...", policy_id='123'),
         mock_installation,
@@ -606,7 +521,7 @@ def test_main_with_existing_conf_does_not_recreate_config(ws, mocker, mock_insta
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
     workspace_installation.run()
 
@@ -620,7 +535,7 @@ def test_query_metadata(ws):
     DashboardFromFiles(ws, InstallState(ws, "any"), local_query_files, "any", "any").validate()
 
 
-def test_remove_database(ws):
+def test_remove_database(ws, acc_client):
     sql_backend = MockBackend()
     ws = create_autospec(WorkspaceClient)
     prompts = MockPrompts(
@@ -632,7 +547,7 @@ def test_remove_database(ws):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     workflow_installer = create_autospec(WorkflowsDeployment)
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -642,7 +557,7 @@ def test_remove_database(ws):
         workflow_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     workspace_installation.uninstall()
@@ -654,7 +569,7 @@ def test_remove_database(ws):
     workflow_installer.create_jobs.assert_not_called()
 
 
-def test_remove_jobs_no_state(ws):
+def test_remove_jobs_no_state(ws, acc_client):
     sql_backend = MockBackend()
     ws = create_autospec(WorkspaceClient)
     prompts = MockPrompts(
@@ -677,7 +592,7 @@ def test_remove_jobs_no_state(ws):
         timedelta(seconds=1),
         [],
     )
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -687,7 +602,7 @@ def test_remove_jobs_no_state(ws):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     workspace_installation.uninstall()
@@ -697,7 +612,7 @@ def test_remove_jobs_no_state(ws):
     wheels.upload_to_wsfs.assert_not_called()
 
 
-def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_jobs):
+def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_jobs, acc_client):
     ws.jobs.delete.side_effect = InvalidParameterValue("job id 123 not found")
 
     sql_backend = MockBackend()
@@ -721,7 +636,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         timedelta(seconds=1),
         [],
     )
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         mock_installation_with_jobs,
@@ -731,7 +646,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     with caplog.at_level('ERROR'):
@@ -742,7 +657,7 @@ def test_remove_jobs_with_state_missing_job(ws, caplog, mock_installation_with_j
     wheels.upload_to_wsfs.assert_not_called()
 
 
-def test_remove_warehouse(ws):
+def test_remove_warehouse(ws, acc_client):
     ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Unity Catalog Migration 123456")
 
     sql_backend = MockBackend()
@@ -755,7 +670,7 @@ def test_remove_warehouse(ws):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -765,7 +680,7 @@ def test_remove_warehouse(ws):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     workspace_installation.uninstall()
@@ -775,7 +690,7 @@ def test_remove_warehouse(ws):
     workflows_installer.create_jobs.assert_not_called()
 
 
-def test_not_remove_warehouse_with_a_different_prefix(ws):
+def test_not_remove_warehouse_with_a_different_prefix(ws, acc_client):
     ws.warehouses.get.return_value = sql.GetWarehouseResponse(id="123", name="Starter Endpoint")
 
     sql_backend = MockBackend()
@@ -788,7 +703,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', warehouse_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -798,7 +713,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     workspace_installation.uninstall()
@@ -808,7 +723,7 @@ def test_not_remove_warehouse_with_a_different_prefix(ws):
     installation.assert_removed()
 
 
-def test_remove_secret_scope(ws, caplog):
+def test_remove_secret_scope(ws, caplog, acc_client):
     prompts = MockPrompts(
         {
             r'Do you want to uninstall ucx.*': 'yes',
@@ -818,7 +733,7 @@ def test_remove_secret_scope(ws, caplog):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -828,14 +743,14 @@ def test_remove_secret_scope(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
     workspace_installation.uninstall()
     ws.secrets.delete_scope.assert_called_with('ucx')
     workflows_installer.create_jobs.assert_not_called()
 
 
-def test_remove_secret_scope_no_scope(ws, caplog):
+def test_remove_secret_scope_no_scope(ws, caplog, acc_client):
     prompts = MockPrompts(
         {
             r'Do you want to uninstall ucx.*': 'yes',
@@ -846,7 +761,7 @@ def test_remove_secret_scope_no_scope(ws, caplog):
     config = WorkspaceConfig(inventory_database='ucx', uber_spn_id="123")
     workflows_installer = create_autospec(WorkflowsDeployment)
     ws.secrets.delete_scope.side_effect = NotFound()
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -856,7 +771,7 @@ def test_remove_secret_scope_no_scope(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
     with caplog.at_level('ERROR'):
         workspace_installation.uninstall()
@@ -866,7 +781,7 @@ def test_remove_secret_scope_no_scope(ws, caplog):
     workflows_installer.create_jobs.assert_not_called()
 
 
-def test_remove_cluster_policy_not_exists(ws, caplog):
+def test_remove_cluster_policy_not_exists(ws, caplog, acc_client):
     sql_backend = MockBackend()
     prompts = MockPrompts(
         {
@@ -878,7 +793,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
     config = WorkspaceConfig(inventory_database='ucx')
     ws.cluster_policies.delete.side_effect = NotFound()
     workflows_installer = create_autospec(WorkflowsDeployment)
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -888,7 +803,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     with caplog.at_level('ERROR'):
@@ -899,7 +814,7 @@ def test_remove_cluster_policy_not_exists(ws, caplog):
     workflows_installer.create_jobs.assert_not_called()
 
 
-def test_remove_warehouse_not_exists(ws, caplog):
+def test_remove_warehouse_not_exists(ws, caplog, acc_client):
     ws.warehouses.delete.side_effect = InvalidParameterValue("warehouse id 123 not found")
 
     sql_backend = MockBackend()
@@ -912,7 +827,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
     installation = MockInstallation()
     config = WorkspaceConfig(inventory_database='ucx')
     workflows_installer = create_autospec(WorkflowsDeployment)
-    account_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -922,7 +837,7 @@ def test_remove_warehouse_not_exists(ws, caplog):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        account_client,
+        acc_client,
     )
 
     with caplog.at_level('ERROR'):
@@ -1194,7 +1109,7 @@ def test_latest_job_status_exception(ws, mock_installation_with_jobs):
     assert len(status) == 0
 
 
-def test_open_config(ws, mocker, mock_installation):
+def test_open_config(ws, mocker, mock_installation, acc_client):
     webbrowser_open = mocker.patch("webbrowser.open")
     prompts = MockPrompts(
         {
@@ -1207,7 +1122,7 @@ def test_open_config(ws, mocker, mock_installation):
     )
     ws.workspace.get_status = not_found
 
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,
@@ -1217,7 +1132,7 @@ def test_open_config(ws, mocker, mock_installation):
     webbrowser_open.assert_called_with('https://localhost/#workspace~/mock/config.yml')
 
 
-def test_save_config_should_include_databases(ws, mock_installation):
+def test_save_config_should_include_databases(ws, mock_installation, acc_client):
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1227,7 +1142,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
         }
     )
     ws.workspace.get_status = not_found
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,
@@ -1254,7 +1169,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
     )
 
 
-def test_triggering_assessment_wf(ws, mocker, mock_installation):
+def test_triggering_assessment_wf(ws, mocker, mock_installation, acc_client):
     ws.jobs.run_now = mocker.Mock()
     mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
@@ -1279,7 +1194,7 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         timedelta(seconds=1),
         Workflows.all().tasks(),
     )
-    acct_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -1289,14 +1204,14 @@ def test_triggering_assessment_wf(ws, mocker, mock_installation):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        acct_client,
+        acc_client,
     )
     workspace_installation.run()
     wheels.upload_to_wsfs.assert_called_once()
     ws.jobs.run_now.assert_not_called()
 
 
-def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
+def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation, acc_client):
     ws.jobs.run_now = mocker.Mock()
     mocker.patch("webbrowser.open")
     sql_backend = MockBackend()
@@ -1321,7 +1236,7 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         timedelta(seconds=1),
         Workflows.all().tasks(),
     )
-    acct_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
@@ -1331,14 +1246,14 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
         workflows_installer,
         prompts,
         PRODUCT_INFO,
-        acct_client,
+        acc_client,
     )
     workspace_installation.run()
     wheels.upload_to_wsfs.assert_called_once()
     ws.jobs.run_now.assert_called_once()
 
 
-def test_runs_upgrades_on_too_old_version(ws, any_prompt):
+def test_runs_upgrades_on_too_old_version(ws, any_prompt, acc_client):
     existing_installation = MockInstallation(
         {
             'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
@@ -1350,7 +1265,7 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
         }
     )
     wheels = create_autospec(WheelsV2)
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=any_prompt,
         installation=existing_installation,
         product_info=PRODUCT_INFO,
@@ -1365,7 +1280,7 @@ def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     wheels.upload_to_wsfs.assert_called_once()
 
 
-def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
+def test_runs_upgrades_on_more_recent_version(ws, any_prompt, acc_client):
     existing_installation = MockInstallation(
         {
             'version.json': {'version': '0.3.0', 'wheel': '...', 'date': '...'},
@@ -1378,7 +1293,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
         }
     )
     wheels = create_autospec(WheelsV2)
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=any_prompt,
         installation=existing_installation,
         product_info=PRODUCT_INFO,
@@ -1394,7 +1309,7 @@ def test_runs_upgrades_on_more_recent_version(ws, any_prompt):
     wheels.upload_to_wsfs.assert_called_once()
 
 
-def test_fresh_install(ws, mock_installation):
+def test_fresh_install(ws, mock_installation, acc_client):
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1408,7 +1323,7 @@ def test_fresh_install(ws, mock_installation):
     )
     ws.workspace.get_status = not_found
 
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,
@@ -1435,7 +1350,7 @@ def test_fresh_install(ws, mock_installation):
     )
 
 
-def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
+def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt, acc_client):
     sql_backend = MockBackend()
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
     wheels = create_autospec(WheelsV2)
@@ -1449,7 +1364,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         timedelta(seconds=1),
         [],
     )
-    acct_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_extra_jobs,
@@ -1459,7 +1374,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
         workflows_installation,
         any_prompt,
         PRODUCT_INFO,
-        acct_client,
+        acc_client,
     )
 
     workspace_installation.run()
@@ -1467,7 +1382,7 @@ def test_remove_jobs(ws, caplog, mock_installation_extra_jobs, any_prompt):
     wheels.upload_to_wsfs.assert_called_once()
 
 
-def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt):
+def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, any_prompt, acc_client):
     sql_backend = MockBackend()
     ws.jobs.delete.side_effect = InvalidParameterValue(...)
     install_state = InstallState.from_installation(mock_installation_extra_jobs)
@@ -1482,7 +1397,7 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         timedelta(seconds=1),
         [],
     )
-    acct_client = AccountClient(product="ucx")
+
     workspace_installation = WorkspaceInstallation(
         WorkspaceConfig(inventory_database='ucx'),
         mock_installation_extra_jobs,
@@ -1492,14 +1407,14 @@ def test_remove_jobs_already_deleted(ws, caplog, mock_installation_extra_jobs, a
         workflows_installation,
         any_prompt,
         PRODUCT_INFO,
-        acct_client,
+        acc_client,
     )
 
     workspace_installation.run()
     wheels.upload_to_wsfs.assert_called_once()
 
 
-def test_get_existing_installation_global(ws, mock_installation):
+def test_get_existing_installation_global(ws, mock_installation, acc_client):
     base_prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -1528,7 +1443,7 @@ def test_get_existing_installation_global(ws, mock_installation):
         }
     )
 
-    first_install = WorkspaceInstaller(ws).replace(
+    first_install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=first_prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1544,7 +1459,7 @@ def test_get_existing_installation_global(ws, mock_installation):
         }
     )
     # test for force user install variable without prompts
-    second_install = WorkspaceInstaller(ws, force_user_environ).replace(
+    second_install = WorkspaceInstaller(ws, acc_client, force_user_environ).replace(
         prompts=second_prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1559,7 +1474,7 @@ def test_get_existing_installation_global(ws, mock_installation):
             r"Inventory Database stored in hive_metastore.*": "ucx_user",
         }
     )
-    third_install = WorkspaceInstaller(ws, force_user_environ).replace(
+    third_install = WorkspaceInstaller(ws, acc_client, force_user_environ).replace(
         prompts=third_prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1568,7 +1483,7 @@ def test_get_existing_installation_global(ws, mock_installation):
     assert workspace_config.inventory_database == 'ucx_user'
 
 
-def test_existing_installation_user(ws, mock_installation):
+def test_existing_installation_user(ws, mock_installation, acc_client):
     # test configure on existing user install
     base_prompts = MockPrompts(
         {
@@ -1600,7 +1515,7 @@ def test_existing_installation_user(ws, mock_installation):
         },
         is_global=False,
     )
-    first_install = WorkspaceInstaller(ws).replace(
+    first_install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=first_prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1617,7 +1532,7 @@ def test_existing_installation_user(ws, mock_installation):
     )
 
     force_global_env = {'UCX_FORCE_INSTALL': 'global'}
-    second_install = WorkspaceInstaller(ws, force_global_env).replace(
+    second_install = WorkspaceInstaller(ws, acc_client, force_global_env).replace(
         prompts=second_prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1634,7 +1549,7 @@ def test_existing_installation_user(ws, mock_installation):
         }
     )
 
-    third_install = WorkspaceInstaller(ws, force_global_env).replace(
+    third_install = WorkspaceInstaller(ws, acc_client, force_global_env).replace(
         prompts=third_prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1643,7 +1558,7 @@ def test_existing_installation_user(ws, mock_installation):
         third_install.configure()
 
 
-def test_databricks_runtime_version_set(ws, mock_installation):
+def test_databricks_runtime_version_set(ws, mock_installation, acc_client):
     prompts = MockPrompts(
         {
             r".*": "",
@@ -1653,14 +1568,14 @@ def test_databricks_runtime_version_set(ws, mock_installation):
     environ = {'DATABRICKS_RUNTIME_VERSION': "13.3"}
 
     with pytest.raises(SystemExit, match="WorkspaceInstaller is not supposed to be executed in Databricks Runtime"):
-        WorkspaceInstaller(ws, environ).replace(
+        WorkspaceInstaller(ws, acc_client, environ).replace(
             prompts=prompts,
             installation=mock_installation,
             product_info=product_info,
         )
 
 
-def test_check_inventory_database_exists(ws, mock_installation):
+def test_check_inventory_database_exists(ws, mock_installation, acc_client):
     ws.current_user.me().user_name = "foo"
 
     prompts = MockPrompts(
@@ -1673,7 +1588,7 @@ def test_check_inventory_database_exists(ws, mock_installation):
     )
 
     installation = Installation(ws, 'ucx')
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=installation,
         product_info=PRODUCT_INFO,
@@ -1749,7 +1664,7 @@ def test_validate_step(ws, result_state, expected):
     assert deployed.validate_step("assessment") == expected
 
 
-def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
+def test_are_remote_local_versions_equal(ws, mock_installation, mocker, acc_client):
     ws.jobs.run_now = mocker.Mock()
 
     mocker.patch("webbrowser.open")
@@ -1780,7 +1695,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
         is_global=False,
     )
 
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=base_prompts,
         installation=installation,
         product_info=product_info,
@@ -1798,7 +1713,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
             r"Do you want to update the existing installation?": "yes",
         }
     )
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=first_prompts,
         installation=installation,
         product_info=product_info,
@@ -1810,7 +1725,7 @@ def test_are_remote_local_versions_equal(ws, mock_installation, mocker):
 
     # finishes successfully when versions don't match and no override is provided/needed
     product_info.released_version.return_value = "0.4.1"
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=base_prompts,
         installation=installation,
         product_info=product_info,
@@ -1877,13 +1792,13 @@ def test_global_workspace_installer(mock_ws):
     assert workspace_installer.install_state.install_folder().startswith("/Applications")
 
 
-def test_user_workspace_installer(mock_ws):
-    workspace_installer = WorkspaceInstaller(mock_ws, {'UCX_FORCE_INSTALL': 'user'})
+def test_user_workspace_installer(mock_ws, acc_client):
+    workspace_installer = WorkspaceInstaller(mock_ws, acc_client, {'UCX_FORCE_INSTALL': 'user'})
     # installation folder should start with /Users/
     assert workspace_installer.install_state.install_folder().startswith("/Users/")
 
 
-def test_save_config_ext_hms(ws, mock_installation):
+def test_save_config_ext_hms(ws, mock_installation, acc_client):
     ws.get_workspace_id.return_value = 12345678
     cluster_policy = {
         "spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL": {"value": "url"},
@@ -1910,7 +1825,7 @@ def test_save_config_ext_hms(ws, mock_installation):
         }
     )
     ws.workspace.get_status = not_found
-    install = WorkspaceInstaller(ws).replace(
+    install = WorkspaceInstaller(ws, acc_client).replace(
         prompts=prompts,
         installation=mock_installation,
         product_info=PRODUCT_INFO,

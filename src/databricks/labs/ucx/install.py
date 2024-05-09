@@ -125,6 +125,7 @@ class WorkspaceInstaller(WorkspaceContext):
     def __init__(
         self,
         ws: WorkspaceClient,
+        acct_client: AccountClient,
         environ: dict[str, str] | None = None,
         tasks: list[Task] | None = None,
     ):
@@ -139,6 +140,7 @@ class WorkspaceInstaller(WorkspaceContext):
 
         self._is_account_install = self._force_install == "account"
         self._tasks = tasks if tasks else Workflows.all().tasks()
+        self._acct_client = acct_client
 
     @cached_property
     def upgrades(self):
@@ -168,7 +170,6 @@ class WorkspaceInstaller(WorkspaceContext):
             config = self.configure(default_config)
         if self._is_testing():
             return config
-        acct_client = AccountClient(product="ucx", product_version=__version__)
         workflows_deployment = WorkflowsDeployment(
             config,
             self.installation,
@@ -188,7 +189,7 @@ class WorkspaceInstaller(WorkspaceContext):
             workflows_deployment,
             self.prompts,
             self.product_info,
-            acct_client,
+            self._acct_client,
         )
         try:
             workspace_installation.run()
@@ -514,7 +515,7 @@ class WorkspaceInstallation(InstallationMixin):
         account_client: AccountClient,
     ):
         workspace_client = account_client.get_workspace_client(collection_workspace)
-        installer = WorkspaceInstaller(workspace_client).replace(product_info=self._product_info)
+        installer = WorkspaceInstaller(workspace_client, account_client).replace(product_info=self._product_info)
         installed_workspace_ids = installer.config.installed_workspace_ids
         new_installed_workspace_ids = installed_workspace_ids.extend(collection_workspace.workspace_id)
         installed_workspaces = []
@@ -524,7 +525,7 @@ class WorkspaceInstallation(InstallationMixin):
 
         for installed_workspace in installed_workspaces:
             workspace_client = account_client.get_workspace_client(installed_workspace)
-            installer = WorkspaceInstaller(workspace_client).replace(product_info=self._product_info)
+            installer = WorkspaceInstaller(workspace_client, account_client).replace(product_info=self._product_info)
             installer.replace_config(installed_workspace_ids=new_installed_workspace_ids)
 
     def _get_collection_workspace(
@@ -662,7 +663,9 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws.warehouses.get(self._config.warehouse_id)
         except ResourceDoesNotExist:
             logger.critical(f"warehouse with id {self._config.warehouse_id} does not exists anymore")
-            installer = WorkspaceInstaller(self._ws).replace(product_info=self._product_info, prompts=self._prompts)
+            installer = WorkspaceInstaller(self._ws, self._acct_client).replace(
+                product_info=self._product_info, prompts=self._prompts
+            )
             warehouse_id = installer.configure_warehouse()
             self._config = installer.replace_config(warehouse_id=warehouse_id)
             self._sql_backend = StatementExecutionBackend(self._ws, self._config.warehouse_id)
@@ -683,7 +686,9 @@ class AccountInstaller(AccountContext):
     def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
-        return WorkspaceInstaller(workspace_client).replace(product_info=self.product_info, prompts=self.prompts)
+        return WorkspaceInstaller(workspace_client, self.account_client).replace(
+            product_info=self.product_info, prompts=self.prompts
+        )
 
     def install_on_account(self):
         ctx = AccountContext(self.get_safe_account_client())
@@ -733,5 +738,8 @@ if __name__ == "__main__":
         account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
         account_installer.install_on_account()
     else:
-        workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
+        workspace_installer = WorkspaceInstaller(
+            WorkspaceClient(product="ucx", product_version=__version__),
+            AccountClient(product="ucx", product_version=__version__),
+        )
         workspace_installer.run()
