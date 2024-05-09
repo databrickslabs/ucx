@@ -569,7 +569,7 @@ class TestInstallationContext(TestRuntimeContext):
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
 
-    def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
+    def make_ucx_group(self, workspace_group_name=None, account_group_name=None, wait_for_provisioning=False):
         if not workspace_group_name:
             workspace_group_name = f"ucx_G{self._make_random(4)}"
         if not account_group_name:
@@ -580,8 +580,11 @@ class TestInstallationContext(TestRuntimeContext):
             display_name=workspace_group_name,
             members=members,
             entitlements=["allow-cluster-create"],
+            wait_for_provisioning=wait_for_provisioning,
         )
-        acc_group = self._make_acc_group(display_name=account_group_name, members=members)
+        acc_group = self._make_acc_group(
+            display_name=account_group_name, members=members, wait_for_provisioning=wait_for_provisioning
+        )
         return ws_group, acc_group
 
     @cached_property
