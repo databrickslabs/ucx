@@ -18,6 +18,13 @@ def test_local_file_path():
     assert local_file.path == Path("test")
 
 
+def test_local_file_path_equality_raises_not_implemented_error():
+    """Raise a NotImplemented error when the other object is not a local file."""
+    local_file = LocalFile(Path("test"), "code", Language.PYTHON)
+    with pytest.raises(NotImplementedError):
+        local_file == object()
+
+
 def test_files_fix_ignores_unsupported_extensions():
     languages = Languages(MigrationIndex([]))
     files = LocalFileMigrator(languages)
