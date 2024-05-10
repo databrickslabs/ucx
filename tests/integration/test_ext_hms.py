@@ -94,7 +94,7 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
-@pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
+@pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
 def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
     # this test spins up clusters using ext hms cluster policy, which will have a startup time of ~ 7-10m
     # skip this test if not in nightly test job or debug mode
@@ -103,7 +103,7 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
 
     tables, dst_schema = prepare_tables_for_migration
     ext_hms_ctx = installation_ctx.replace(
-        config_transform=lambda wc: dataclasses.replace(wc, override_clusters=None),
+        config_transform=lambda wc: dataclasses.replace(wc, override_clusters={"main": "key:table_migration"}),
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
