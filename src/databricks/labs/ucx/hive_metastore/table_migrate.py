@@ -29,7 +29,7 @@ from databricks.labs.ucx.hive_metastore.view_migrate import (
     ViewToMigrate,
 )
 from databricks.labs.ucx.workspace_access.groups import GroupManager, MigratedGroup
-from databricks.sdk.errors.platform import BadRequest, NotFound, DatabricksError
+from databricks.sdk.errors.platform import DatabricksError
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,9 @@ class TablesMigrator:
         try:
             self._backend.execute(view_migrate_sql)
             self._backend.execute(src_view.src.sql_alter_to(src_view.rule.as_uc_table_key))
-            self._backend.execute(src_view.src.sql_alter_from(src_view.rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._backend.execute(
+                src_view.src.sql_alter_from(src_view.rule.as_uc_table_key, self._ws.get_workspace_id())
+            )
         except DatabricksError as e:
             logger.warning(f"Failed to migrate view {src_view.src.key}: {e}")
             return False
