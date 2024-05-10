@@ -74,6 +74,12 @@ def test_files_walks_directory():
     assert languages.fixer.call_count > 1
 
 
+def test_file_loader_exists():
+    """File exists"""
+    file_loader = FileLoader()
+    assert file_loader.exists(Path(__file__))
+
+
 def test_triple_dot_import():
     file_loader = FileLoader()
     file_resolver = LocalFileResolver(file_loader)
