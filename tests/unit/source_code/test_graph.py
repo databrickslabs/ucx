@@ -38,3 +38,16 @@ def test_dependency_graph_without_parent_root_is_self(mock_path_lookup, file_dep
     assert graph.root == graph
 
 
+def test_dependency_graph_no_visit_when_visited(mock_path_lookup, file_dependency):
+    """If node is visited, it should not be visited again."""
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+    graph = DependencyGraph(
+        dependency=file_dependency,
+        parent=None,
+        resolver=dependency_resolver,
+        path_lookup=mock_path_lookup
+    )
+
+    visited = graph.path
+
+    assert not graph.visit(lambda _: True, {})
