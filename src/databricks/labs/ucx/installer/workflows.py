@@ -540,25 +540,14 @@ class WorkflowsDeployment(InstallationMixin):
         overrides: dict[str, str],
         wheel_runner: str,
     ) -> dict:
-        # filter out overrides that point to non-existing key
-        overrides = overrides.copy()
-        for cluster_key, override in list(overrides.items()):
-            if "key:" not in override:
-                continue
-            if override.split(":")[1] not in [_.job_cluster_key for _ in settings["job_clusters"]]:
-                del overrides[cluster_key]
         settings["job_clusters"] = [_ for _ in settings["job_clusters"] if _.job_cluster_key not in overrides]
         for job_task in settings["tasks"]:
             if job_task.job_cluster_key is None:
                 continue
             if job_task.job_cluster_key in overrides:
-                override = overrides[job_task.job_cluster_key]
-                if "key:" in override:
-                    job_task.job_cluster_key = override.split(":")[1]
-                else:
-                    job_task.existing_cluster_id = override
-                    job_task.job_cluster_key = None
-                    job_task.libraries = None
+                job_task.existing_cluster_id = overrides[job_task.job_cluster_key]
+                job_task.job_cluster_key = None
+                job_task.libraries = None
             if job_task.python_wheel_task is not None:
                 job_task.python_wheel_task = None
                 widget_values = {"task": job_task.task_key, 'workflow': workflow_name} | EXTRA_TASK_PARAMS

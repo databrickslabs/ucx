@@ -103,7 +103,7 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
 
     tables, dst_schema = prepare_tables_for_migration
     ext_hms_ctx = installation_ctx.replace(
-        config_transform=lambda wc: dataclasses.replace(wc, override_clusters={"main": "key:table_migration"}),
+        config_transform=lambda wc: dataclasses.replace(wc, override_clusters=None),
         extend_prompts={
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
@@ -143,9 +143,16 @@ def test_running_real_assessment_job_ext_hms(
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
         env_or_skip("TEST_NIGHTLY")
 
+    ext_hms_cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
     ext_hms_ctx = installation_ctx.replace(
         skip_dashboards=True,
-        config_transform=lambda wc: dataclasses.replace(wc, override_clusters={"main": "key:table_migration"}),
+        config_transform=lambda wc: dataclasses.replace(
+            wc,
+            override_clusters={
+                "main": ext_hms_cluster_id,
+                "table_migration": ext_hms_cluster_id,
+            },
+        ),
         extend_prompts={
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
             r".*Do you want to update the existing installation?.*": 'yes',
