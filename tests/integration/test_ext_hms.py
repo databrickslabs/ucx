@@ -145,7 +145,7 @@ def test_running_real_assessment_job_ext_hms(
 
     ext_hms_ctx = installation_ctx.replace(
         skip_dashboards=True,
-        config_transform=lambda wc: dataclasses.replace(wc, override_clusters=None),
+        config_transform=lambda wc: dataclasses.replace(wc, override_clusters={"main": "key:table_migration"}),
         extend_prompts={
             r"Instance pool id to be set.*": env_or_skip("TEST_INSTANCE_POOL_ID"),
             r".*Do you want to update the existing installation?.*": 'yes',
