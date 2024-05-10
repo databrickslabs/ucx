@@ -18,7 +18,7 @@ from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob, BaseRun
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
+from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, ObjectInfo
 from databricks.sdk.service import iam
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.graph import SourceContainer
@@ -193,6 +193,7 @@ def workspace_client_mock(
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
     ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(EndpointConfPair, warehouse_config)
