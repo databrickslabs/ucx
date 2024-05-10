@@ -51,8 +51,9 @@ def test_dependency_graph_no_visit_when_visited(mock_path_lookup, file_dependenc
     assert not graph.visit(lambda _: True, {graph.path})
 
 
-def test_dependency_graph_visit(mock_path_lookup, file_dependency):
-    """Visit the node"""
+@pytest.mark.parametrize("visit", [True, False])
+def test_dependency_graph_visit(mock_path_lookup, file_dependency, visit):
+    """Visit the node, or not"""
     dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
     graph = DependencyGraph(
         dependency=file_dependency,
@@ -61,4 +62,4 @@ def test_dependency_graph_visit(mock_path_lookup, file_dependency):
         path_lookup=mock_path_lookup
     )
 
-    assert graph.visit(lambda _: True, set())
+    assert graph.visit(lambda _: visit, set()) == visit
