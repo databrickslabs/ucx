@@ -2,6 +2,7 @@ from __future__ import annotations  # for type hints
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
@@ -39,10 +40,10 @@ class LocalFile(SourceContainer):
     def path(self) -> Path:
         return self._path
 
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            raise NotImplementedError(f"Not implemented to compare {self} with {other}")
-        return self._path == other.path  # Path points to unique file
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, type(self)):
+            return self._path == other.path
+        return self._path == other
 
     def __repr__(self):
         return f"<LocalFile {self._path}>"

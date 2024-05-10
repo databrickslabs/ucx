@@ -18,11 +18,16 @@ def test_local_file_path():
     assert local_file.path == Path("test")
 
 
-def test_local_file_path_equality_raises_not_implemented_error():
-    """Raise a NotImplemented error when the other object is not a local file."""
+def test_local_file_equal_to_itself():
+    """Local file equals itself"""
     local_file = LocalFile(Path("test"), "code", Language.PYTHON)
-    with pytest.raises(NotImplementedError):
-        local_file == object()
+    assert local_file == local_file
+
+
+def test_local_file_equal_to_its_path():
+    """Local file equals itself"""
+    local_file = LocalFile(Path("test"), "code", Language.PYTHON)
+    assert local_file == Path("test")
 
 
 def test_files_fix_ignores_unsupported_extensions():
