@@ -80,6 +80,12 @@ def test_file_loader_exists():
     assert file_loader.exists(Path(__file__))
 
 
+def test_file_loader_not_exists():
+    """File does not exists"""
+    file_loader = FileLoader()
+    assert not file_loader.exists(Path("/some/path/that/does/not/exist"))
+
+
 def test_triple_dot_import():
     file_loader = FileLoader()
     file_resolver = LocalFileResolver(file_loader)
