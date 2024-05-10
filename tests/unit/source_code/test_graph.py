@@ -1,8 +1,18 @@
+from pathlib import Path
+
 from unittest.mock import create_autospec
 
 from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency, SourceContainer, WrappingLoader
+from databricks.labs.ucx.source_code.files import FileLoader
 
 from tests.unit import _load_sources
+
+
+def test_dependency_path():
+    """The dependency path should return the path."""
+    path = Path("test")
+    dependency = Dependency(FileLoader(), path)
+    assert dependency.path == path
 
 
 def test_wrapping_loader_load_dependency(mock_path_lookup):
