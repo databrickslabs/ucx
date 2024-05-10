@@ -6,6 +6,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileResolver, FileLoader
+from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -84,6 +85,15 @@ def test_file_loader_not_exists():
     """File does not exists"""
     file_loader = FileLoader()
     assert not file_loader.exists(Path("/some/path/that/does/not/exist"))
+
+
+def test_file_loader_load_dependency_calls_dependency_load(mock_path_lookup):
+    """The file loader load dependency points to the dependency load"""
+    file_loader = FileLoader()
+    dependency = Dependency(file_loader, Path("/some/path/that/does/not/exists"))
+    # TODO: Clarify if this is the right way to use it.
+    # It reads a bit convoluted to pass the file_loader to the dependency first and then the dependency to the file.
+    assert file_loader.load_dependency(mock_path_lookup, dependency) == dependency.load(mock_path_lookup)
 
 
 def test_triple_dot_import():
