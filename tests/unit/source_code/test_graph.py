@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pytest
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, SourceContainer, WrappingLoader
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, SourceContainer, \
+    WrappingLoader, DependencyProblem
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 
 from tests.unit import _load_sources
@@ -63,3 +64,19 @@ def test_dependency_graph_visit(mock_path_lookup, file_dependency, visit):
     )
 
     assert graph.visit(lambda _: visit, set()) == visit
+
+
+def test_dependency_graph_locate_dependency_not_found(mock_path_lookup, file_dependency):
+    """Locate a dependency that is not found"""
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+
+    graph = DependencyGraph(
+        dependency=file_dependency,
+        parent=None,
+        resolver=dependency_resolver,
+        path_lookup=mock_path_lookup
+    )
+
+    maybe = graph.locate_dependency(Path("/path/to/non/existing/dependency"))
+    assert len(maybe.problems) > 0
+    assert maybe.problems[0] == DependencyProblem("dependency-not-found", 'Dependency not found')
