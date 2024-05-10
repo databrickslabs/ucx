@@ -669,8 +669,10 @@ class AccountInstaller(AccountContext):
     ):
         installer = self._get_installer(collection_workspace)
         installed_workspace_ids = installer.config.installed_workspace_ids
-        if len(installed_workspace_ids)==0:
-            logger.warning(f"Workspace {collection_workspace.deployment_name} doesnt have any collection info, cannot join collection")
+        if installed_workspace_ids is None:
+            logger.warning(
+                f"Workspace {collection_workspace.deployment_name} doesnt have any collection info, cannot join collection"
+            )
             return
         installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []

@@ -187,9 +187,7 @@ def workspace_client_mock(
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
-    ws.current_user.me = lambda: iam.User(
-        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
-    )
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.list.return_value = _id_list(Policy, policy_ids)
     ws.cluster_policies.get = _cluster_policy
@@ -212,7 +210,7 @@ def workspace_client_mock(
                     'host': '...',
                     'token': '...',
                 },
-                'installed_workspace_ids': [123,456],
+                'installed_workspace_ids': [123, 456],
             }
         ),
     }
