@@ -541,9 +541,9 @@ class WorkspaceInstallation(InstallationMixin):
                 installed_workspaces.append(workspace)
         if len(installed_workspaces) > 0:
             workspaces = {
-                workspace.workspace_name: workspace
+                workspace.deployment_name: workspace
                 for workspace in installed_workspaces
-                if workspace.workspace_name is not None
+                if workspace.deployment_name is not None
             }
 
             workspace = self._prompts.choice_from_dict(
