@@ -56,7 +56,7 @@ def workspace_installation_prepare(ws_patcher, account_client, prompts):
     return workspace_installation
 
 
-def test_join_collection_prompt_no_join(ws):
+def test_join_collection_prompt_no_join(make_workspace_client):
     account_client = create_autospec(AccountClient)
     prompts = MockPrompts(
         {

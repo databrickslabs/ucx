@@ -447,7 +447,6 @@ class WorkspaceInstallation(InstallationMixin):
             timeout,
             tasks,
         )
-
         return cls(
             config,
             installation,
@@ -652,7 +651,7 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
-    def join_collection(self):
+    def join_collection(self, current_workspace_id: int):
         if not self.is_account_install and self.prompts.confirm(
             "Do you want to join the current installation to an existing collection?"
         ):
@@ -661,17 +660,18 @@ class AccountInstaller(AccountContext):
             accessible_workspaces = acct_ctx.account_workspaces.get_accessible_workspaces()
             collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
             if collection_workspace is not None:
-                self._sync_collection(collection_workspace, account_client)
+                self._sync_collection(collection_workspace, account_client, current_workspace_id)
 
     def _sync_collection(
         self,
         collection_workspace: Workspace,
         account_client: AccountClient,
+        current_workspace_id: int,
     ):
         workspace_client = account_client.get_workspace_client(collection_workspace)
         installer = WorkspaceInstaller(workspace_client).replace(product_info=self.product_info)
         installed_workspace_ids = installer.config.installed_workspace_ids
-        new_installed_workspace_ids = installed_workspace_ids.extend(collection_workspace.workspace_id)
+        new_installed_workspace_ids = installed_workspace_ids.extend(current_workspace_id)
         installed_workspaces = []
         for account_workspace in account_client.workspaces.list():
             if account_workspace.workspace_id in new_installed_workspace_ids:
@@ -720,4 +720,4 @@ if __name__ == "__main__":
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
         workspace_installer.run()
-        account_installer.join_collection()
+        account_installer.join_collection(workspace_installer.workspace_client.get_workspace_id())

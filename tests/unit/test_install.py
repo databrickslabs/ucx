@@ -673,7 +673,6 @@ def test_remove_jobs_no_state(ws):
         timedelta(seconds=1),
         [],
     )
-
     workspace_installation = WorkspaceInstallation(
         config,
         installation,
