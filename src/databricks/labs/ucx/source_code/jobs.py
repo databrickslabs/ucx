@@ -80,9 +80,9 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.libraries:
             return
         for library in self._task.libraries:
-            yield from self._lint_library(library, graph)
+            yield from self._register_library(library, graph)
 
-    def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+    def _register_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if library.pypi:
             # TODO: https://github.com/databrickslabs/ucx/issues/1642
             yield from graph.register_library(library.pypi.package)
