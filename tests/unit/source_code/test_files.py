@@ -6,10 +6,16 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileResolver, FileLoader
+from databricks.labs.ucx.source_code.files import LocalFile, LocalFileMigrator, LocalFileResolver, FileLoader
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+
+def test_local_file_path():
+    """Return the right local file path"""
+    local_file = LocalFile(Path("test"), "code", Language.PYTHON)
+    assert local_file.path == Path("test")
 
 
 def test_files_fix_ignores_unsupported_extensions():
