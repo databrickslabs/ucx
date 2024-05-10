@@ -80,3 +80,19 @@ def test_dependency_graph_locate_dependency_not_found(mock_path_lookup, file_dep
     maybe = graph.locate_dependency(Path("/path/to/non/existing/dependency"))
     assert len(maybe.problems) > 0
     assert maybe.problems[0] == DependencyProblem("dependency-not-found", 'Dependency not found')
+
+
+def test_dependency_graph_locate_dependency_found(mock_path_lookup, file_dependency):
+    """Dependency graph should be able to locate its dependency"""
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+
+    graph = DependencyGraph(
+        dependency=file_dependency,
+        parent=None,
+        resolver=dependency_resolver,
+        path_lookup=mock_path_lookup
+    )
+
+    maybe = graph.locate_dependency(file_dependency.path)
+    assert len(maybe.problems) == 0
+    assert maybe.graph == graph
