@@ -25,7 +25,7 @@ def test_local_file_equal_to_itself():
 
 
 def test_local_file_equal_to_its_path():
-    """Local file equals itself"""
+    """Local file equals its path"""
     local_file = LocalFile(Path("test"), "code", Language.PYTHON)
     assert local_file == Path("test")
 
