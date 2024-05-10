@@ -250,6 +250,33 @@ def test_install_cluster_override_jobs(ws, mock_installation):
     wheels.upload_to_dbfs.assert_not_called()
 
 
+def test_install_cluster_override_jobs_key(ws, mock_installation):
+    wheels = create_autospec(WheelsV2)
+    workflows_installation = WorkflowsDeployment(
+        WorkspaceConfig(
+            inventory_database='ucx',
+            override_clusters={"tacl": "key:main", "main": "key:nonexistingcluster"},
+            policy_id='123',
+        ),
+        mock_installation,
+        InstallState.from_installation(mock_installation),
+        ws,
+        wheels,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+        Workflows.all().tasks(),
+    )
+
+    workflows_installation.create_jobs()
+
+    tasks = created_job_tasks(ws, '[MOCK] assessment')
+    assert tasks['assess_jobs'].job_cluster_key == 'main'
+    assert tasks['crawl_grants'].job_cluster_key == 'main'
+    assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
+    wheels.upload_to_wsfs.assert_called_once()
+    wheels.upload_to_dbfs.assert_not_called()
+
+
 def test_writeable_dbfs(ws, tmp_path, mock_installation):
     """Ensure configure does not add cluster override for happy path of writable DBFS"""
     wheels = create_autospec(WheelsV2)
