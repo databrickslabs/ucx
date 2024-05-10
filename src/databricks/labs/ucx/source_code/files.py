@@ -39,6 +39,11 @@ class LocalFile(SourceContainer):
     def path(self) -> Path:
         return self._path
 
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            raise NotImplementedError(f"Not implemented to compare {self} with {other}")
+        return self._path == other.path  # Path points to unique file
+
     def __repr__(self):
         return f"<LocalFile {self._path}>"
 

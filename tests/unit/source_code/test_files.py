@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
+import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -87,10 +88,11 @@ def test_file_loader_not_exists():
     assert not file_loader.exists(Path("/some/path/that/does/not/exist"))
 
 
-def test_file_loader_load_dependency_calls_dependency_load(mock_path_lookup):
+@pytest.mark.parametrize("path", [Path("/some/path/that/does/not/exists"), Path("lib.py")])
+def test_file_loader_load_dependency_calls_dependency_load(mock_path_lookup, path):
     """The file loader load dependency points to the dependency load"""
     file_loader = FileLoader()
-    dependency = Dependency(file_loader, Path("/some/path/that/does/not/exists"))
+    dependency = Dependency(file_loader, path)
     # TODO: Clarify if this is the right way to use it.
     # It reads a bit convoluted to pass the file_loader to the dependency first and then the dependency to the file.
     assert file_loader.load_dependency(mock_path_lookup, dependency) == dependency.load(mock_path_lookup)
