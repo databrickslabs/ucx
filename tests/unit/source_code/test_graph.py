@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import pytest
-from databricks.labs.ucx.source_code.graph import DependencyGraph, Dependency, SourceContainer, WrappingLoader
-from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, SourceContainer, WrappingLoader
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 
 from tests.unit import _load_sources
 
@@ -28,10 +28,11 @@ def test_wrapping_loader_load_dependency(mock_path_lookup, file_dependency):
 
 def test_dependency_graph_without_parent_root_is_self(mock_path_lookup, file_dependency):
     """The dependency graph root should be itself when there is no parent."""
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
     graph = DependencyGraph(
         dependency=file_dependency,
         parent=None,
-        resolver=None,  # TODO: Replace None with object
+        resolver=dependency_resolver,
         path_lookup=mock_path_lookup
     )
     assert graph.root == graph
