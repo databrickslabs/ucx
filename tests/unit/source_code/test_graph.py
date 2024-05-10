@@ -1,8 +1,14 @@
 from pathlib import Path
 
 import pytest
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, SourceContainer, \
-    WrappingLoader, DependencyProblem
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyResolver,
+    SourceContainer,
+    WrappingLoader,
+    DependencyProblem,
+)
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 
 from tests.unit import _load_sources
@@ -31,10 +37,7 @@ def test_dependency_graph_without_parent_root_is_self(mock_path_lookup, file_dep
     """The dependency graph root should be itself when there is no parent."""
     dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
     graph = DependencyGraph(
-        dependency=file_dependency,
-        parent=None,
-        resolver=dependency_resolver,
-        path_lookup=mock_path_lookup
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
     )
     assert graph.root == graph
 
@@ -43,10 +46,7 @@ def test_dependency_graph_no_visit_when_visited(mock_path_lookup, file_dependenc
     """If node is visited, it should not be visited again."""
     dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
     graph = DependencyGraph(
-        dependency=file_dependency,
-        parent=None,
-        resolver=dependency_resolver,
-        path_lookup=mock_path_lookup
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
     )
 
     assert not graph.visit(lambda _: True, {graph.path})
@@ -57,10 +57,7 @@ def test_dependency_graph_visit(mock_path_lookup, file_dependency, visit):
     """Visit the node, or not"""
     dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
     graph = DependencyGraph(
-        dependency=file_dependency,
-        parent=None,
-        resolver=dependency_resolver,
-        path_lookup=mock_path_lookup
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
     )
 
     assert graph.visit(lambda _: visit, set()) == visit
@@ -71,10 +68,7 @@ def test_dependency_graph_locate_dependency_not_found(mock_path_lookup, file_dep
     dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
 
     graph = DependencyGraph(
-        dependency=file_dependency,
-        parent=None,
-        resolver=dependency_resolver,
-        path_lookup=mock_path_lookup
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
     )
 
     maybe = graph.locate_dependency(Path("/path/to/non/existing/dependency"))
@@ -87,10 +81,7 @@ def test_dependency_graph_locate_dependency_found(mock_path_lookup, file_depende
     dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
 
     graph = DependencyGraph(
-        dependency=file_dependency,
-        parent=None,
-        resolver=dependency_resolver,
-        path_lookup=mock_path_lookup
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
     )
 
     maybe = graph.locate_dependency(file_dependency.path)
