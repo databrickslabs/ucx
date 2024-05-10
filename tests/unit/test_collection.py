@@ -9,8 +9,9 @@ from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import AccountClient
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import WorkspaceInstallation
+from databricks.labs.ucx.install import WorkspaceInstallation, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from . import workspace_client_mock
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -56,8 +57,9 @@ def workspace_installation_prepare(ws_patcher, account_client, prompts):
     return workspace_installation
 
 
-def test_join_collection_prompt_no_join(make_workspace_client):
+def test_join_collection_prompt_no_join():
     account_client = create_autospec(AccountClient)
+    account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -66,13 +68,17 @@ def test_join_collection_prompt_no_join(make_workspace_client):
             r".*": "",
         }
     )
-    workspace_installation = workspace_installation_prepare(ws, account_client, prompts)
-    workspace_installation.run()
+    account_installer.replace(
+        prompts=prompts,
+        product_info=ProductInfo.for_testing(WorkspaceConfig),
+    )
+    account_installer.join_collection(123)
     account_client.workspaces.list.assert_not_called()
 
 
-def test_join_collection_no_sync_called(ws):
+def test_join_collection_no_sync_called():
     account_client = create_autospec(AccountClient)
+    account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -81,18 +87,24 @@ def test_join_collection_no_sync_called(ws):
             r".*": "",
         }
     )
-    workspace_installation = workspace_installation_prepare(ws, account_client, prompts)
-    workspace_installation.run()
+    account_installer.replace(
+        prompts=prompts,
+        product_info=ProductInfo.for_testing(WorkspaceConfig),
+    )
+    account_installer.join_collection(123)
+    account_client.workspaces.list.assert_called()
     account_client.get_workspace_client.assert_not_called()
 
 
-def test_join_collection_join_collection(ws, mocker):
+def test_join_collection_join_collection():
+    ws = workspace_client_mock()
     account_client = create_autospec(AccountClient)
     account_client.workspaces.list.return_value = [
         Workspace(workspace_id=123, deployment_name="test"),
         Workspace(workspace_id=456, deployment_name="test2"),
     ]
     account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
     prompts = MockPrompts(
         {
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
@@ -103,6 +115,10 @@ def test_join_collection_join_collection(ws, mocker):
         }
     )
     ws.config.installed_workspace_ids = [123, 456]
-    workspace_installation = workspace_installation_prepare(ws, account_client, prompts)
-    workspace_installation.run()
-    account_client.get_workspace_client.assert_not_called()
+    account_installer.replace(
+        prompts=prompts,
+        product_info=ProductInfo.for_testing(WorkspaceConfig),
+    )
+    account_installer.join_collection(789)
+    ws.workspace.upload.assert_called_any()
+    assert ws.workspace.upload.call_count == 3

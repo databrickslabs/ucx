@@ -660,27 +660,28 @@ class AccountInstaller(AccountContext):
             accessible_workspaces = acct_ctx.account_workspaces.get_accessible_workspaces()
             collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
             if collection_workspace is not None:
-                self._sync_collection(collection_workspace, account_client, current_workspace_id)
+                self._sync_collection(collection_workspace, current_workspace_id)
 
     def _sync_collection(
         self,
         collection_workspace: Workspace,
-        account_client: AccountClient,
         current_workspace_id: int,
     ):
-        workspace_client = account_client.get_workspace_client(collection_workspace)
-        installer = WorkspaceInstaller(workspace_client).replace(product_info=self.product_info)
+        installer = self._get_installer(collection_workspace)
         installed_workspace_ids = installer.config.installed_workspace_ids
-        new_installed_workspace_ids = installed_workspace_ids.extend(current_workspace_id)
+        if len(installed_workspace_ids)==0:
+            logger.warning(f"Workspace {collection_workspace.deployment_name} doesnt have any collection info, cannot join collection")
+            return
+        installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []
-        for account_workspace in account_client.workspaces.list():
-            if account_workspace.workspace_id in new_installed_workspace_ids:
+        for account_workspace in self.account_client.workspaces.list():
+            if account_workspace.workspace_id in installed_workspace_ids:
                 installed_workspaces.append(account_workspace)
 
         for installed_workspace in installed_workspaces:
-            workspace_client = account_client.get_workspace_client(installed_workspace)
+            workspace_client = self.account_client.get_workspace_client(installed_workspace)
             installer = WorkspaceInstaller(workspace_client).replace(product_info=self.product_info)
-            installer.replace_config(installed_workspace_ids=new_installed_workspace_ids)
+            installer.replace_config(installed_workspace_ids=installed_workspace_ids)
 
     def _get_collection_workspace(
         self,
