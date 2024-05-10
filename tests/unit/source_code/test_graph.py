@@ -48,6 +48,17 @@ def test_dependency_graph_no_visit_when_visited(mock_path_lookup, file_dependenc
         path_lookup=mock_path_lookup
     )
 
-    visited = graph.path
+    assert not graph.visit(lambda _: True, {graph.path})
 
-    assert not graph.visit(lambda _: True, {})
+
+def test_dependency_graph_visit(mock_path_lookup, file_dependency):
+    """Visit the node"""
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+    graph = DependencyGraph(
+        dependency=file_dependency,
+        parent=None,
+        resolver=dependency_resolver,
+        path_lookup=mock_path_lookup
+    )
+
+    assert graph.visit(lambda _: True, set())
