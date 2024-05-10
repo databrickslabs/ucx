@@ -2,7 +2,7 @@ from datetime import timedelta
 from unittest.mock import create_autospec
 from databricks.sdk.service.provisioning import Workspace
 
-from databricks.labs.blueprint.installation import MockInstallation, Installation
+from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
@@ -26,9 +26,8 @@ def workspace_installation_prepare(ws_patcher, account_client, prompts):
                 },
                 'inventory_database': 'ucx',
                 'warehouse_id': 'abc',
-                'installed_workspace_ids': [123, 456]
+                'installed_workspace_ids': [123, 456],
             },
-
         }
     )
     install_state = InstallState.from_installation(mock_install)
@@ -103,7 +102,6 @@ def test_join_collection_join_collection(ws, mocker):
             r".*": "",
         }
     )
-    mocker.patch("databricks.labs.blueprint.installation.Installation.current", [123, 456])
     ws.config.installed_workspace_ids = [123, 456]
     workspace_installation = workspace_installation_prepare(ws, account_client, prompts)
     workspace_installation.run()
