@@ -202,20 +202,18 @@ def workspace_client_mock(
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
     else:
         ws.secrets.get_secret = _secret_not_found
-    state = {
-        "/Applications/ucx/config.yml": yaml.dump(
-            {
-                'version': 1,
-                'inventory_database': 'ucx_exists',
-                'connect': {
-                    'host': '...',
-                    'token': '...',
-                },
-                'installed_workspace_ids': [123, 456],
-            }
-        ),
-    }
-    ws.workspace.download.return_value = io.StringIO(state['/Applications/ucx/config.yml'])
+    download_yaml = yaml.dump(
+        {
+            'version': 1,
+            'inventory_database': 'ucx_exists',
+            'connect': {
+                'host': '...',
+                'token': '...',
+            },
+            'installed_workspace_ids': [123, 456],
+        }
+    )
+    ws.workspace.download.return_value = io.StringIO(download_yaml)
     return ws
 
 
