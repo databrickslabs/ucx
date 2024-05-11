@@ -1,19 +1,15 @@
-from datetime import timedelta
 from unittest.mock import create_autospec
 from databricks.sdk.service.provisioning import Workspace
 
-from databricks.labs.blueprint.installation import MockInstallation
-from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import AccountClient
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.install import WorkspaceInstallation, AccountInstaller
-from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.install import AccountInstaller
 from . import workspace_client_mock
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
+
 
 def test_join_collection_prompt_no_join():
     account_client = create_autospec(AccountClient)
@@ -72,7 +68,7 @@ def test_join_collection_join_collection():
             r".*": "",
         }
     )
-    #ws.config.installed_workspace_ids = [123, 456]
+    # ws.config.installed_workspace_ids = [123, 456]
     account_installer.replace(
         prompts=prompts,
         product_info=ProductInfo.for_testing(WorkspaceConfig),
