@@ -214,7 +214,6 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
-
         return WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -473,7 +472,7 @@ class WorkspaceInstallation(InstallationMixin):
             install_tasks.append(self._create_dashboards)
         Threads.strict("installing components", install_tasks)
         readme_url = self._workflows_installer.create_jobs()
-        if self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
+        if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
         if self.config.trigger_job:

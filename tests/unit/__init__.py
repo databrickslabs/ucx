@@ -9,7 +9,6 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import yaml
-
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
