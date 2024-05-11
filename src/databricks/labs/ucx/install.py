@@ -446,6 +446,7 @@ class WorkspaceInstallation(InstallationMixin):
             timeout,
             tasks,
         )
+
         return cls(
             config,
             installation,
@@ -475,6 +476,7 @@ class WorkspaceInstallation(InstallationMixin):
         if not self._is_account_install and self._prompts.confirm(f"Open job overview in your browser? {readme_url}"):
             webbrowser.open(readme_url)
         logger.info(f"Installation completed successfully! Please refer to the {readme_url} for the next steps.")
+
         if self.config.trigger_job:
             logger.info("Triggering the assessment workflow")
             self._trigger_workflow("assessment")
