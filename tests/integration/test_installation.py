@@ -444,14 +444,14 @@ def test_compare_remote_local_install_versions(ws, installation_ctx):
     installation_ctx.workspace_installer.configure()
 
 
-def test_new_collection(ws, sql_backend, installation_ctx):
+def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
     installation_ctx.workspace_installation.run()
     workspace_id = installation_ctx.workspace_installer.workspace_client.get_workspace_id()
     acc_installer = installation_ctx.account_installer
     prompts = MockPrompts(
         {
             r"Do you want to join the current.*": "yes",
-            r"Please provide the Databricks account id.*": "304d4d89-9def-4c52-8448-e8528a11d2aa",
+            r"Please provide the Databricks account id.*": env_or_skip("DATABRICKS_ACCOUNT_ID"),
             r"Select the workspace to join current installation as a collection group": 0,
         }
     )
