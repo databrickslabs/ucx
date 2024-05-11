@@ -88,8 +88,9 @@ def test_join_collection_join_collection_no_installation_id():
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
 
-    account_installer.join_collection(789)
-    ws.workspace.upload.assert_not_called()
+    account_installer.join_collection(456)
+    ws.workspace.upload.assert_called()
+    assert ws.workspace.upload.call_count == 1
 
 
 def test_join_collection_join_collection():
