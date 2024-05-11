@@ -662,14 +662,12 @@ class AccountInstaller(AccountContext):
             accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
             collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
             if collection_workspace is not None:
-                installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id)
+                installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id, account_client)
             if installed_workspaces is not None:
                 ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
     def _sync_collection(
-        self,
-        collection_workspace: Workspace,
-        current_workspace_id: int,
+        self, collection_workspace: Workspace, current_workspace_id: int, account_client: AccountClient
     ) -> list[Workspace] | None:
         installer = self._get_installer(collection_workspace)
         installed_workspace_ids = installer.config.installed_workspace_ids
@@ -681,7 +679,7 @@ class AccountInstaller(AccountContext):
             )
         installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []
-        for account_workspace in self.account_client.workspaces.list():
+        for account_workspace in account_client.workspaces.list():
             if account_workspace.workspace_id in installed_workspace_ids:
                 installed_workspaces.append(account_workspace)
 
