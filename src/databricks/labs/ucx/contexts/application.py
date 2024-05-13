@@ -39,11 +39,11 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SitePackageResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -53,7 +53,7 @@ from databricks.labs.ucx.workspace_access.scim import ScimSupport
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-# "Service Factories" would always have a lot of pulic methods.
+# "Service Factories" would always have a lot of public methods.
 # This is because they are responsible for creating objects that are
 # used throughout the application. That being said, we'll do best
 # effort of splitting the instances between Global, Runtime,
@@ -359,9 +359,13 @@ class GlobalContext(abc.ABC):
         return NotebookResolver(self.notebook_loader)
 
     @cached_property
+    def site_packages_path(self):
+        lookup = self.path_lookup
+        return next(path for path in lookup.paths if "site-packages" in path.as_posix())
+
+    @cached_property
     def site_packages(self):
-        # TODO: actually load the site packages
-        return SitePackages([])
+        return SitePackages.parse(self.site_packages_path)
 
     @cached_property
     def path_lookup(self):
@@ -373,8 +377,8 @@ class GlobalContext(abc.ABC):
         return FileLoader()
 
     @cached_property
-    def site_packages_resolver(self):
-        return SitePackageResolver(self.site_packages, self.file_loader, self.path_lookup)
+    def site_package_resolver(self):
+        return SitePackageResolver(self.file_loader, self.path_lookup, self.site_packages_path)
 
     @cached_property
     def whitelist(self):
@@ -391,8 +395,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        # TODO: link back self.site_packages_resolver
-        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver]
+        resolvers = [self.notebook_resolver, self.site_package_resolver, self.file_resolver, self.whitelist_resolver]
         return DependencyResolver(resolvers, self.path_lookup)
 
     @cached_property

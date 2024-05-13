@@ -10,10 +10,10 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SitePackageResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 from tests.unit import (
     locate_site_packages,
     _samples_path,
@@ -210,18 +210,17 @@ def test_dependency_graph_builder_ignores_known_dependencies():
 
 
 def test_dependency_graph_builder_visits_site_packages(empty_index):
-    provider = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
+    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
     file_loader = FileLoader()
     site_packages_path = locate_site_packages()
-    site_packages = SitePackages.parse(site_packages_path)
     notebook_loader = NotebookLoader()
     resolvers = [
         NotebookResolver(notebook_loader),
+        SitePackageResolver(file_loader, site_packages_path),
         WhitelistResolver(Whitelist()),
-        SitePackageResolver(site_packages, file_loader, provider),
         LocalFileResolver(file_loader),
     ]
-    dependency_resolver = DependencyResolver(resolvers, provider)
+    dependency_resolver = DependencyResolver(resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
     assert not maybe.failed
     graph = maybe.graph
