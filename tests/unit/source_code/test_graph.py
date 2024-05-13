@@ -85,3 +85,21 @@ def test_dependency_graph_locate_dependency_found(mock_path_lookup, file_depende
     maybe = graph.locate_dependency(file_dependency.path)
     assert len(maybe.problems) == 0
     assert maybe.graph == graph
+
+
+def test_dependency_graph_register_dependency_not_found(mock_path_lookup, file_dependency):
+    """Register a dependency that is not found"""
+    dependency_not_found = Dependency(FileLoader(), Path("/path/to/non/existing/dependency"))
+    expected_dependency_problem = DependencyProblem(
+        "dependency-register-failed", 'Failed to register dependency', dependency_not_found.path
+    )
+
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+    graph = DependencyGraph(
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
+    )
+
+    maybe = graph.register_dependency(dependency_not_found)
+
+    assert len(maybe.problems) > 0
+    assert maybe.problems[0] == expected_dependency_problem
