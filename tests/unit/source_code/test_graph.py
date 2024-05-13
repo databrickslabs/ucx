@@ -130,3 +130,17 @@ def test_dependency_graph_register_new_dependency(mock_path_lookup, file_depende
 
     assert len(maybe.problems) == 0
     assert maybe.graph.dependency == new_dependency
+
+
+def test_dependency_graph_register_new_dependency_with_problem(mock_path_lookup, file_dependency):
+    """Register a new dependency with a problem."""
+    new_dependency = Dependency(FileLoader(), mock_path_lookup.resolve(Path("root10.py")))
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+    graph = DependencyGraph(
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
+    )
+
+    maybe = graph.register_dependency(new_dependency)
+
+    assert len(maybe.problems) == 1
+    assert maybe.problems[0].source_path == new_dependency.path
