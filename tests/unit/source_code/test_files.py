@@ -31,6 +31,15 @@ def test_local_file_equal_to_its_path():
     assert local_file == Path("test")
 
 
+def test_local_file_build_dependency_graph_for_python(caplog):
+    """Dependency graph for python should be called"""
+    code = "code"
+    local_file = LocalFile(Path("test"), code, Language.PYTHON)
+    dependency_graph = create_autospec(DependencyGraph)
+    local_file.build_dependency_graph(dependency_graph)
+    dependency_graph.build_graph_from_python_source.assert_called_once_with(code)
+
+
 @pytest.mark.parametrize("language", [Language.R, Language.SCALA, Language.SQL])
 def test_local_file_build_dependency_graph_warn_language_unsupported(caplog, language):
     """Warn for unsupported languages"""
