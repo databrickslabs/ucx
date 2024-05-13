@@ -103,3 +103,16 @@ def test_dependency_graph_register_dependency_not_found(mock_path_lookup, file_d
 
     assert len(maybe.problems) > 0
     assert maybe.problems[0] == expected_dependency_problem
+
+
+def test_dependency_graph_register_locatable_dependency(mock_path_lookup, file_dependency):
+    """Register a locatable dependency"""
+    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], mock_path_lookup)
+    graph = DependencyGraph(
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
+    )
+
+    maybe = graph.register_dependency(file_dependency)
+
+    assert len(maybe.problems) == 0
+    assert maybe.graph.dependency == file_dependency
