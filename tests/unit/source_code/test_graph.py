@@ -144,3 +144,11 @@ def test_dependency_graph_register_new_dependency_with_problem(mock_path_lookup,
 
     assert len(maybe.problems) == 1
     assert maybe.problems[0].source_path == new_dependency.path
+
+
+def test_dependency_resolver_resolve_library_not_found(mock_path_lookup):
+    """Resolve a not found library"""
+    dependency_resolver = DependencyResolver([], mock_path_lookup)
+    maybe = dependency_resolver.resolve_library(mock_path_lookup, "not-found")
+    assert len(maybe.problems) > 0
+    assert maybe.problems[0] == DependencyProblem("library-not-found", "Could not locate library: not-found")
