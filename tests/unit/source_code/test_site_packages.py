@@ -63,3 +63,19 @@ def test_site_package_parse(site_package_path_without_top_level):
     site_package = SitePackage.parse(site_package_path_without_top_level)
     assert site_package.top_levels == ["ucx"]
     assert site_package._dist_info_path == site_package_path_without_top_level
+
+
+@pytest.fixture
+def site_package_path_with_top_level(site_package_path_without_top_level) -> Path:
+    """Mock a site package with top level"""
+    top_level_file = site_package_path_without_top_level / "top_level.txt"
+    top_level_modules = ("ucx", "databricks")
+    top_level_file.write_text("\n".join(top_level_modules))
+    return site_package_path_without_top_level
+
+
+def test_site_package_parse(site_package_path_with_top_level):
+    """Parse a mock site package"""
+    site_package = SitePackage.parse(site_package_path_with_top_level)
+    assert site_package.top_levels == ["ucx", "databricks"]
+    assert site_package._dist_info_path == site_package_path_with_top_level
