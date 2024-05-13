@@ -39,7 +39,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SitePackageResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
@@ -377,6 +377,10 @@ class GlobalContext(abc.ABC):
         return FileLoader()
 
     @cached_property
+    def site_package_resolver(self):
+        return SitePackageResolver(self.file_loader, self.path_lookup, self.site_packages_path)
+
+    @cached_property
     def whitelist(self):
         # TODO: fill in the whitelist
         return Whitelist()
@@ -391,7 +395,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver]
+        resolvers = [self.notebook_resolver, self.site_package_resolver, self.file_resolver, self.whitelist_resolver]
         return DependencyResolver(resolvers, self.path_lookup)
 
     @cached_property

@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    SourceContainer,
+    DependencyGraph,
+    DependencyProblem,
+)
 
-COMMENTED_OUT_FOR_PR_1685 = """
+
 class SitePackageContainer(SourceContainer):
 
     def __init__(self, file_loader: FileLoader, site_package: SitePackage):

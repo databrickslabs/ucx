@@ -10,9 +10,10 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SitePackageResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
+from databricks.labs.ucx.source_code.site_packages import SitePackages
 from tests.unit import (
     locate_site_packages,
     _samples_path,
@@ -205,12 +206,14 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     assert not maybe_graph.graph
 
 
-def test_dependency_graph_builder_visits_site_packages():
+def test_dependency_graph_builder_visits_site_packages(empty_index):
+    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
     file_loader = FileLoader()
     site_packages_path = locate_site_packages()
-    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
-    lookup.append_path(site_packages_path)
+    notebook_loader = NotebookLoader()
     resolvers = [
+        NotebookResolver(notebook_loader),
+        SitePackageResolver(file_loader, site_packages_path),
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
