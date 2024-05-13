@@ -31,7 +31,7 @@ class LocalFile(SourceContainer):
         self._language = CellLanguage.of_language(language)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is not CellLanguage.PYTHON:
+        if self._language != CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
             return []
         return parent.build_graph_from_python_source(self._original_code)
