@@ -85,3 +85,10 @@ def test_site_packages_parse(site_package_path_without_top_level):
     """Parse mock site packages"""
     site_packages = SitePackages.parse(site_package_path_without_top_level.parent)
     assert len(site_packages._packages) == 1
+
+
+def test_site_packages_get(site_package_path_without_top_level):
+    """Get the ucx site package"""
+    site_packages = SitePackages.parse(site_package_path_without_top_level.parent)
+    ucx = site_packages["ucx"]
+    assert ucx.top_levels == ["ucx"]
