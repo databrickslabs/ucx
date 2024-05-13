@@ -79,3 +79,9 @@ def test_site_package_parse(site_package_path_with_top_level):
     site_package = SitePackage.parse(site_package_path_with_top_level)
     assert site_package.top_levels == ["ucx", "databricks"]
     assert site_package._dist_info_path == site_package_path_with_top_level
+
+
+def test_site_packages_parse(site_package_path_without_top_level):
+    """Parse mock site packages"""
+    site_packages = SitePackages.parse(site_package_path_without_top_level.parent)
+    assert len(site_packages._packages) == 1
