@@ -9,6 +9,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.site_packages import PipResolver, SitePackage, SitePackageContainer
 
 
 def test_dependency_path():
@@ -152,3 +153,18 @@ def test_dependency_resolver_resolve_library_not_found(mock_path_lookup):
     maybe = dependency_resolver.resolve_library(mock_path_lookup, "not-found")
     assert len(maybe.problems) > 0
     assert maybe.problems[0] == DependencyProblem("library-not-found", "Could not locate library: not-found")
+
+
+def test_dependency_resolver_resolve_library(mock_path_lookup):
+    """Resolve a found library"""
+    file_loader = FileLoader()
+    site_package = SitePackage(Path("test-0.1.0.dist-info/"), ["test"], [Path("test")])
+    container = SitePackageContainer(file_loader, site_package)
+    dependency = Dependency(WrappingLoader(container), Path("pytest"))
+
+    dependency_resolver = DependencyResolver([PipResolver(file_loader)], mock_path_lookup)
+    # TODO: Install pytest when resolving library, prefer to use a resolver without internet access
+    maybe = dependency_resolver.resolve_library(mock_path_lookup, "pytest")
+
+    assert len(maybe.problems) == 0
+    assert maybe.dependency == dependency
