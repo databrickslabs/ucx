@@ -14,8 +14,9 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     DependencyLoader,
     Dependency,
-    BaseDependencyResolver,
     MaybeDependency,
+    BaseImportResolver,
+    BaseFileResolver,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,20 +109,21 @@ class FileLoader(DependencyLoader):
         return "FileLoader()"
 
 
-class LocalFileResolver(BaseDependencyResolver):
+class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, next_resolver: BaseDependencyResolver | None = None):
+    def __init__(self, file_loader: FileLoader, next_resolver: BaseImportResolver | None = None):
         super().__init__(next_resolver)
         self._file_loader = file_loader
 
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         return LocalFileResolver(self._file_loader, resolver)
 
     def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
         absolute_path = path_lookup.resolve(path)
         if absolute_path:
             return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
-        return super().resolve_local_file(path_lookup, path)
+        problem = DependencyProblem("file-not-found", f"File not found: {path.as_posix()}")
+        return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         if not name:
@@ -152,19 +154,19 @@ class LocalFileResolver(BaseDependencyResolver):
         return "LocalFileResolver()"
 
 
-class SitePackageResolver(BaseDependencyResolver):
+class SitePackageResolver(BaseImportResolver):
 
     def __init__(
         self,
         file_loader: FileLoader,
         site_packages_path: Path,
-        next_resolver: BaseDependencyResolver | None = None,
+        next_resolver: BaseImportResolver | None = None,
     ):
         super().__init__(next_resolver)
         self._file_loader = file_loader
         self._site_packages_path = site_packages_path
 
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         return SitePackageResolver(self._file_loader, self._site_packages_path, resolver)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:

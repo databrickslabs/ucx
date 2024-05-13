@@ -18,7 +18,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.graph import SourceContainer
+from databricks.labs.ucx.source_code.graph import SourceContainer, BaseNotebookResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logging.getLogger("tests").setLevel("DEBUG")
@@ -211,3 +211,9 @@ def locate_site_packages() -> pathlib.Path:
     python_lib_path = pathlib.Path(project_path, ".venv", "lib")
     actual_python = next(file for file in os.listdir(str(python_lib_path)) if file.startswith("python3."))
     return pathlib.Path(python_lib_path, actual_python, "site-packages")
+
+
+def notebook_resolver_mock():
+    resolver = create_autospec(BaseNotebookResolver)
+    resolver.resolve_notebook.return_value = None
+    return resolver
