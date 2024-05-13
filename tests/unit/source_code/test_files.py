@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
@@ -7,7 +8,7 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import LocalFile, LocalFileMigrator, LocalFileResolver, FileLoader
-from databricks.labs.ucx.source_code.graph import Dependency
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -28,6 +29,18 @@ def test_local_file_equal_to_its_path():
     """Local file equals its path"""
     local_file = LocalFile(Path("test"), "code", Language.PYTHON)
     assert local_file == Path("test")
+
+
+@pytest.mark.parametrize("language", [Language.R, Language.SCALA, Language.SQL])
+def test_local_file_build_dependency_graph_warn_language_unsupported(caplog, language):
+    """Warn for unsupported languages"""
+    local_file = LocalFile(Path("test"), "code", language)
+    dependency_graph = create_autospec(DependencyGraph)
+    with caplog.at_level(logging.DEBUG, logger="databricks.labs.ucx.source_code.files"):
+        dependency_problems = local_file.build_dependency_graph(dependency_graph)
+    assert any(f"Unsupported language: {language}" in message for message in caplog.messages)
+    assert len(dependency_problems) == 0
+    dependency_graph.build_graph_from_python_source.assert_not_called()
 
 
 def test_files_fix_ignores_unsupported_extensions():
