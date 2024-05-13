@@ -5,13 +5,10 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
     DependencyResolver,
-    SourceContainer,
     WrappingLoader,
     DependencyProblem,
 )
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
-
-from tests.unit import _load_sources
 
 
 def test_dependency_path():
@@ -28,9 +25,10 @@ def file_dependency() -> Dependency:
 
 def test_wrapping_loader_load_dependency(mock_path_lookup, file_dependency):
     """Should return the source container"""
-    sources = _load_sources(SourceContainer, "root4.py.txt")
-    wrapping_loader = WrappingLoader(sources[0])
-    assert wrapping_loader.load_dependency(mock_path_lookup, file_dependency) == sources[0]
+    source_file = mock_path_lookup.resolve(Path("root4.py.txt"))
+    source = source_file.read_text()
+    wrapping_loader = WrappingLoader(source)
+    assert wrapping_loader.load_dependency(mock_path_lookup, file_dependency) == source
 
 
 def test_dependency_graph_without_parent_root_is_self(mock_path_lookup, file_dependency):
