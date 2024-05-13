@@ -168,3 +168,16 @@ def test_dependency_resolver_resolve_library(mock_path_lookup):
 
     assert len(maybe.problems) == 0
     assert maybe.dependency == dependency
+
+
+@pytest.mark.fail("Fails because pytest has a try-except ImportError")
+def test_dependency_graph_register_library(file_dependency, mock_path_lookup):
+    """Register a library given a graph."""
+    # TODO: Install pytest when resolving library, prefer to use a resolver without internet access
+    dependency_resolver = DependencyResolver([PipResolver(FileLoader())], mock_path_lookup)
+    graph = DependencyGraph(
+        dependency=file_dependency, parent=None, resolver=dependency_resolver, path_lookup=mock_path_lookup
+    )
+
+    problems = graph.register_library("pytest")
+    assert len(problems) == 0
