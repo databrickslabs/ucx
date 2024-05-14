@@ -212,9 +212,7 @@ def test_dependency_graph_builder_visits_site_packages():
     site_packages_path = locate_site_packages()
     lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
     lookup.append_path(site_packages_path)
-    notebook_loader = NotebookLoader()
     resolvers = [
-        NotebookResolver(notebook_loader),
         SitePackageResolver(file_loader),
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
@@ -241,8 +239,8 @@ def test_dependency_graph_builder_resolves_sub_site_package():
     resolvers = [
         NotebookResolver(notebook_loader),
         SitePackageResolver(file_loader),
-        WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
+        WhitelistResolver(whitelist),
     ]
     dependency_resolver = DependencyResolver(resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
