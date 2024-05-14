@@ -452,7 +452,7 @@ def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
         {
             r"Do you want to join the current.*": "yes",
             r"Please provide the Databricks account id.*": env_or_skip("DATABRICKS_ACCOUNT_ID"),
-            r"Select the workspace to join current installation as a collection group": 0,
+            r"Please select a workspace, the current installation.*": 0,
         }
     )
     acc_installer.replace(
