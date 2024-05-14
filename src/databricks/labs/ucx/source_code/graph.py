@@ -258,7 +258,7 @@ class BaseNotebookResolver(abc.ABC):
         raise NotImplementedError()
 
     @staticmethod
-    def _fail(code: str, message: str):
+    def _fail(code: str, message: str) -> MaybeDependency:
         return MaybeDependency(None, [DependencyProblem(code, message)])
 
 
