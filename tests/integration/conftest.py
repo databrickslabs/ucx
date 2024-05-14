@@ -34,7 +34,7 @@ from databricks.labs.ucx.hive_metastore.grants import Grant
 from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
@@ -608,6 +608,14 @@ class TestInstallationContext(TestRuntimeContext):
     @cached_property
     def installation(self):
         return Installation(self.workspace_client, self.product_info.product_name())
+
+    @cached_property
+    def account_client(self):
+        return AccountClient(product="ucx", product_version=__version__)
+
+    @cached_property
+    def account_installer(self):
+        return AccountInstaller(self.account_client)
 
     @cached_property
     def environ(self) -> dict[str, str]:
