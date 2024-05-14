@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, SitePackageResolver
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
@@ -47,7 +47,6 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-            SitePackageResolver(file_loader),
             WhitelistResolver(whi),
             LocalFileResolver(file_loader),
         ],
@@ -66,7 +65,6 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-            SitePackageResolver(file_loader),
             WhitelistResolver(whi),
             LocalFileResolver(file_loader),
         ],
@@ -213,7 +211,6 @@ def test_dependency_graph_builder_visits_site_packages():
     lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
     lookup.append_path(site_packages_path)
     resolvers = [
-        SitePackageResolver(file_loader),
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
@@ -238,7 +235,6 @@ def test_dependency_graph_builder_resolves_sub_site_package():
     notebook_loader = NotebookLoader()
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackageResolver(file_loader),
         LocalFileResolver(file_loader),
         WhitelistResolver(whitelist),
     ]

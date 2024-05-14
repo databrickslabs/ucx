@@ -150,31 +150,3 @@ class LocalFileResolver(BaseDependencyResolver):
 
     def __repr__(self):
         return "LocalFileResolver()"
-
-
-class SitePackageResolver(BaseDependencyResolver):
-
-    def __init__(
-        self,
-        file_loader: FileLoader,
-        next_resolver: BaseDependencyResolver | None = None,
-    ):
-        super().__init__(next_resolver)
-        self._file_loader = file_loader
-
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return SitePackageResolver(self._file_loader, resolver)
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        # relative imports are irrelevant for site-packages imports, so don't bother with leading dots
-        names = name.split(".")
-        for parent in path_lookup.paths:
-            path = Path(parent, *names)
-            if not path.is_dir():
-                continue
-            path = Path(path, "__init__.py")
-            if not path.is_file():
-                continue
-            dependency = Dependency(self._file_loader, path)
-            return MaybeDependency(dependency, [])
-        return super().resolve_import(path_lookup, name)

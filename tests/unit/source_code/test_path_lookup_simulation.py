@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader, SitePackageResolver
+from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
@@ -44,7 +44,6 @@ def test_locates_notebooks(source: list[str], expected: int):
     notebook_loader = NotebookLoader()
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackageResolver(file_loader),
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
@@ -73,7 +72,6 @@ def test_locates_files(source: list[str], expected: int):
     notebook_loader = NotebookLoader()
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackageResolver(file_loader),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
@@ -115,7 +113,6 @@ sys.path.append('{child_dir_path.as_posix()}')
         notebook_loader = NotebookLoader()
         resolvers = [
             NotebookResolver(notebook_loader),
-            SitePackageResolver(file_loader),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
@@ -157,7 +154,6 @@ def func():
         notebook_loader = NotebookLoader()
         resolvers = [
             NotebookResolver(notebook_loader),
-            SitePackageResolver(file_loader),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
