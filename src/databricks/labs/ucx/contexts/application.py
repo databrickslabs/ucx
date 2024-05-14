@@ -401,10 +401,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def workflow_linter(self):
         return WorkflowLinter(
-            self.workspace_client,
-            self.dependency_resolver,
-            self.path_lookup,
-            MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()
+            self.workspace_client, None, self.dependency_resolver, self.path_lookup, MigrationIndex([])
         )
 
     @cached_property

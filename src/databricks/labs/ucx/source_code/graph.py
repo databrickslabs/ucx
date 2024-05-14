@@ -24,7 +24,7 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        installer: BaseLibraryInstaller,
+        installer: BaseLibraryInstaller | None,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
     ):
@@ -49,6 +49,7 @@ class DependencyGraph:
 
     def install_library(self, library: str) -> list[DependencyProblem]:
         """Install a library and augment path look-up so that it is able to resolve the library."""
+        assert self._installer is not None
         return self._installer.install_library(self._path_lookup, library)
 
     def register_library(self, name: str) -> MaybeGraph:
@@ -83,7 +84,7 @@ class DependencyGraph:
             self._dependencies[dependency] = maybe.graph
             return maybe
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(dependency, self, None, self._resolver, self._path_lookup)
+        child_graph = DependencyGraph(dependency, self, self._installer, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
         container = dependency.load(self.path_lookup)
         if not container:

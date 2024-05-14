@@ -68,7 +68,7 @@ class WorkflowTaskContainer(SourceContainer):
             return installation_problems
         return list(self._register_task_dependencies(parent))
 
-    def _install_task_dependencies(self, graph: DependencyGraph) -> list[DependencyProblem]:
+    def _install_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._install_libraries(graph)
         yield from self._install_cluster_libraries(graph)
 
