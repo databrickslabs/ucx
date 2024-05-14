@@ -36,7 +36,7 @@ class PipResolver(BaseImportResolver):
     def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         return PipResolver(self._file_loader, resolver)
 
-    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         path_lookup.append_path(self._temporary_virtual_environment)
         # invoke pip install via subprocess to install this library into lib_install_folder
         try:
