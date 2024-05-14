@@ -218,7 +218,6 @@ class WorkspacePath(Path):
     _accessor: _DatabricksAccessor
 
     cwd = _na('cwd')
-    resolve = _na('resolve')
     stat = _na('stat')
     chmod = _na('chmod')
     lchmod = _na('lchmod')
@@ -389,6 +388,9 @@ class WorkspacePath(Path):
     is_socket = _return_false
     is_mount = _return_false
     is_junction = _return_false
+
+    def resolve(self, strict=False):
+        return self
 
     def is_dir(self):
         try:

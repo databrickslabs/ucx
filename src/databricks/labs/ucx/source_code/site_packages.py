@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
 )
 
-
+COMMENTED_OUT_FOR_PR_1685 = """
 class SitePackageContainer(SourceContainer):
 
     def __init__(self, file_loader: FileLoader, site_package: SitePackage):
@@ -31,6 +31,7 @@ class SitePackageContainer(SourceContainer):
 
     def __repr__(self):
         return f"<SitePackageContainer {self._site_package}>"
+"""
 
 
 class SitePackages:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
@@ -96,16 +97,9 @@ class DependencyGraph:
     def locate_dependency(self, path: Path) -> MaybeGraph:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
-        # TODO https://github.com/databrickslabs/ucx/issues/1287
-        posix_path = path.as_posix()
-        posix_path = posix_path[2:] if posix_path.startswith('./') else posix_path
 
         def check_registered_dependency(graph):
-            # TODO https://github.com/databrickslabs/ucx/issues/1287
-            graph_posix_path = graph.path.as_posix()
-            if graph_posix_path.startswith('./'):
-                graph_posix_path = graph_posix_path[2:]
-            if graph_posix_path == posix_path:
+            if graph.path == path:
                 found.append(graph)
                 return True
             return False
@@ -188,7 +182,9 @@ class DependencyGraph:
             else:
                 yield from self.register_notebook(Path(strpath))
         if isinstance(base_node, ImportSource):
-            yield from self.register_import(base_node.name)
+            prefix = ("." * base_node.node.level) if isinstance(base_node.node, ast.ImportFrom) else ""
+            name = base_node.name or ""
+            yield from self.register_import(prefix + name)
 
     def _mutate_path_lookup(self, change: SysPathChange):
         path = Path(change.path)
@@ -347,11 +343,13 @@ class DependencyResolver:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
-        if container is not None:
-            problems = container.build_dependency_graph(graph)
-            if problems:
-                return MaybeGraph(None, self._make_relative_paths(problems, path))
-        return MaybeGraph(graph, [])
+        if container is None:
+            problem = DependencyProblem('cannot-load-file', f"Could not load file {path}")
+            return MaybeGraph(None, [problem])
+        problems = container.build_dependency_graph(graph)
+        if problems:
+            problems = self._make_relative_paths(problems, path)
+        return MaybeGraph(graph, problems)
 
     def _local_file_resolver(self) -> BaseFileResolver | None:
         resolver = self._import_resolver
@@ -369,11 +367,13 @@ class DependencyResolver:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
-        if container is not None:
-            problems = container.build_dependency_graph(graph)
-            if problems:
-                return MaybeGraph(None, self._make_relative_paths(problems, path))
-        return MaybeGraph(graph, [])
+        if container is None:
+            problem = DependencyProblem('cannot-load-notebook', f"Could not load notebook {path}")
+            return MaybeGraph(None, [problem])
+        problems = container.build_dependency_graph(graph)
+        if problems:
+            problems = self._make_relative_paths(problems, path)
+        return MaybeGraph(graph, problems)
 
     def _make_relative_paths(self, problems: list[DependencyProblem], path: Path) -> list[DependencyProblem]:
         adjusted_problems = []

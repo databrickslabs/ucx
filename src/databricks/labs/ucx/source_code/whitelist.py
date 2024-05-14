@@ -148,21 +148,24 @@ class Whitelist:
             PythonBuiltinPackage(Identifier(**{"name": name, "version": python_version}), name)
             for name in sys.stdlib_module_names
         ]
-        if pips is not None:
+        if pips is None:
+            # default white list
+            known_packages.extend(
+                [
+                    PipPackage.compatible("click"),
+                    PipPackage.compatible("databricks"),
+                    PipPackage.compatible("google"),
+                    PipPackage.compatible("pandas"),
+                    PipPackage.compatible("pytest"),
+                    PipPackage.compatible("requests"),
+                    PipPackage.compatible("sqlglot"),
+                    PipPackage.compatible("urllib3"),
+                    PipPackage.compatible("yaml"),
+                ]
+            )
+        else:
             known_packages.extend(pips)
-        known_packages.extend(
-            [
-                PipPackage.compatible("click"),
-                PipPackage.compatible("databricks"),
-                PipPackage.compatible("google"),
-                PipPackage.compatible("pandas"),
-                PipPackage.compatible("pytest"),
-                PipPackage.compatible("requests"),
-                PipPackage.compatible("sqlglot"),
-                PipPackage.compatible("urllib3"),
-                PipPackage.compatible("yaml"),
-            ]
-        )
+
         self._known_packages: dict[str, list[KnownPackage]] = {}
         for known in known_packages:
             top_levels: list[str] = known.top_level if isinstance(known.top_level, list) else [known.top_level]

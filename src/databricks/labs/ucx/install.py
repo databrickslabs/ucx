@@ -652,6 +652,80 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
+    def join_collection(
+        self,
+        current_workspace_id: int,
+    ):
+        if not self.is_account_install and self.prompts.confirm(
+            "Do you want to join the current installation to an existing collection?"
+        ):
+
+            installed_workspaces: list[Workspace] | None = []
+            accessible_workspaces: list[Workspace] = []
+            account_client = self._get_safe_account_client()
+            ctx = AccountContext(account_client)
+            try:
+                accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
+            except PermissionDenied:
+                logger.warning("User doesnt have account admin permission, cant join a collection, skipping...")
+            collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
+            if collection_workspace is not None:
+                installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id, account_client)
+            if installed_workspaces is not None:
+                ctx.account_workspaces.sync_workspace_info(installed_workspaces)
+
+    def _sync_collection(
+        self,
+        collection_workspace: Workspace,
+        current_workspace_id: int,
+        account_client: AccountClient,
+    ) -> list[Workspace] | None:
+        installer = self._get_installer(collection_workspace)
+        installed_workspace_ids = installer.config.installed_workspace_ids
+        if installed_workspace_ids is None:
+            installed_workspace_ids = []
+            logger.warning(
+                f"Workspace {collection_workspace.deployment_name} does not belong to any existing "
+                f"collection, creating a new collection"
+            )
+        installed_workspace_ids.append(current_workspace_id)
+        installed_workspaces = []
+        for account_workspace in account_client.workspaces.list():
+            if account_workspace.workspace_id in installed_workspace_ids:
+                installed_workspaces.append(account_workspace)
+
+        for installed_workspace in installed_workspaces:
+            installer = self._get_installer(installed_workspace)
+            installer.replace_config(installed_workspace_ids=installed_workspace_ids)
+        return installed_workspaces
+
+    def _get_collection_workspace(
+        self,
+        accessible_workspaces: list[Workspace],
+        account_client: AccountClient,
+    ) -> Workspace | None:
+        installed_workspaces = []
+        for workspace in accessible_workspaces:
+            workspace_client = account_client.get_workspace_client(workspace)
+            workspace_installation = Installation.existing(workspace_client, self.product_info.product_name())
+            if len(workspace_installation) > 0:
+                installed_workspaces.append(workspace)
+
+        if len(installed_workspaces) == 0:
+            logger.warning("No existing installation found , setting up new installation without")
+            return None
+        workspaces = {
+            workspace.deployment_name: workspace
+            for workspace in installed_workspaces
+            if workspace.deployment_name is not None
+        }
+        workspace = self.prompts.choice_from_dict(
+            "Please select a workspace, the current installation of ucx will be grouped as a "
+            "collection with the selected workspace",
+            workspaces,
+        )
+        return workspace
+
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
@@ -659,9 +733,10 @@ if __name__ == "__main__":
         logging.getLogger('databricks').setLevel(logging.DEBUG)
     env = dict(os.environ.items())
     force_install = env.get("UCX_FORCE_INSTALL")
+    account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
     if force_install == "account":
-        account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
         account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
         workspace_installer.run()
+        account_installer.join_collection(workspace_installer.workspace_client.get_workspace_id())

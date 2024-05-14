@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, 
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     _samples_path,
-    locate_site_packages,
     MockPathLookup,
 )
 
@@ -156,7 +155,7 @@ def func():
             "utf-8",
         )
         whitelist = Whitelist()
-        provider = PathLookup.from_sys_path(Path.cwd())
+        lookup = PathLookup.from_sys_path(Path.cwd())
         file_loader = FileLoader()
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
