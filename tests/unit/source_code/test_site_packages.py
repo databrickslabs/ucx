@@ -2,29 +2,29 @@ from pathlib import Path
 
 import pytest
 
-from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.graph import DependencyProblem
-from databricks.labs.ucx.source_code.site_packages import PipResolver, SitePackages, SitePackage
+from databricks.labs.ucx.source_code.site_packages import PipInstaller, SitePackages, SitePackage
 from databricks.labs.ucx.mixins.fixtures import make_random
 from tests.unit import locate_site_packages
 
 
-def test_pip_resolver_resolve_library(mock_path_lookup):
-    """Verify pytest can be resolved"""
-    pip_resolver = PipResolver(FileLoader())
-    maybe = pip_resolver.resolve_import(mock_path_lookup, "pytest")
+def test_pip_installer_resolve_library(mock_path_lookup):
+    """Install and resolve pytest"""
+    pip_installer = PipInstaller()
+    problems = pip_installer.install_library(mock_path_lookup, "pytest")
 
-    assert len(maybe.problems) == 0
-    assert maybe.dependency.path.as_posix() == "pytest"
+    assert len(problems) == 0
+    assert mock_path_lookup.resolve(Path("pytest")).exists()
 
 
-def test_pip_resolver_resolve_library_unknown_library(mock_path_lookup):
-    """Verify installing unknown library."""
-    pip_resolver = PipResolver(FileLoader())
-    maybe = pip_resolver.resolve_import(mock_path_lookup, "unknown-library-name")
+def test_pip_installer_resolve_library_unknown_library(mock_path_lookup):
+    """Installing unknown library returns problem"""
+    pip_installer = PipInstaller()
+    problems = pip_installer.install_library(mock_path_lookup, "unknown-library-name")
 
-    assert len(maybe.problems) == 1
-    assert maybe.problems[0] == DependencyProblem("library-install-failed", "Failed to install unknown-library-name")
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install unknown-library-name")
+    assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
 
 
 def test_reads_site_packages():

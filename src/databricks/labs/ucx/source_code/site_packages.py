@@ -5,17 +5,15 @@ import subprocess
 import tempfile
 from functools import cached_property
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
-    BaseImportResolver,
     BaseLibraryInstaller,
     Dependency,
     DependencyGraph,
     DependencyProblem,
-    MaybeDependency,
     SourceContainer,
-    WrappingLoader,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -29,14 +27,14 @@ class PipInstaller(BaseLibraryInstaller):
     def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
         """Pip install library and augment path look-up so that is able to resolve the library"""
         # invoke pip install via subprocess to install this library into lib_install_folder
+        pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]
         try:
-            # TODO: add error handling for pip install
-            subprocess.run(["pip", "install", library, "-t", self._temporary_virtual_environment])
-        except Exception as e:  # TODO: catch proper exception
+            subprocess.run(pip_install_arguments, check=True)
+        except CalledProcessError as e:
             return [DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")]
-        finally:
-            path_lookup.append_path(self._temporary_virtual_environment)
-            return []
+
+        path_lookup.append_path(self._temporary_virtual_environment)
+        return []
 
     @cached_property
     def _temporary_virtual_environment(self) -> Path:
