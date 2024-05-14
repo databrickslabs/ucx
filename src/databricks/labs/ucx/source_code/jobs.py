@@ -15,12 +15,13 @@ from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import (
-    DependencyGraph,
-    SourceContainer,
-    DependencyProblem,
+    BaseLibraryInstaller,
     Dependency,
-    WrappingLoader,
+    DependencyGraph,
+    DependencyProblem,
     DependencyResolver,
+    SourceContainer,
+    WrappingLoader,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
@@ -168,7 +169,7 @@ class WorkflowLinter:
     def __init__(
         self,
         ws: WorkspaceClient,
-        installer,
+        installer: BaseLibraryInstaller,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
