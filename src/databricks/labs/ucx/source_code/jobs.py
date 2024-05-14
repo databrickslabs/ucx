@@ -68,6 +68,10 @@ class WorkflowTaskContainer(SourceContainer):
             return installation_problems
         return list(self._register_task_dependencies(parent))
 
+    def _install_task_dependencies(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        yield from self._install_libraries(graph)
+        yield from self._install_cluster_libraries(graph)
+
     def _install_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
             return
@@ -100,6 +104,13 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: https://github.com/databrickslabs/ucx/issues/1644
             yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
 
+    def _install_cluster_libraries(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+        if not self._task.existing_cluster_id:
+            return
+        # TODO: https://github.com/databrickslabs/ucx/issues/1637
+        # load libraries installed on the referred cluster
+        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
+
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._register_notebook(graph)
         yield from self._register_spark_python_task(graph)
@@ -107,7 +118,6 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_spark_jar_task(graph)
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
-        yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -147,13 +157,6 @@ class WorkflowTaskContainer(SourceContainer):
             return
         # TODO: https://github.com/databrickslabs/ucx/issues/1638
         yield DependencyProblem('not-yet-implemented', 'Pipeline task is not yet implemented')
-
-    def _register_existing_cluster_id(self, graph: DependencyGraph):  # pylint: disable=unused-argument
-        if not self._task.existing_cluster_id:
-            return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1637
-        # load libraries installed on the referred cluster
-        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
