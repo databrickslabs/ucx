@@ -63,10 +63,44 @@ class WorkflowTaskContainer(SourceContainer):
         self._ws = ws
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        installation_problems = list(self._install_libraries(parent))
+        if len(installation_problems) > 0:
+            return installation_problems
         return list(self._register_task_dependencies(parent))
 
+    def _install_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+        if not self._task.libraries:
+            return
+        for library in self._task.libraries:
+            yield from self._install_library(graph, library)
+
+    @staticmethod
+    def _install_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
+        if library.pypi:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1642
+            problems = graph.install_library(library.pypi.package)
+            if len(problems) > 0:
+                yield from problems
+        if library.jar:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1641
+            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
+        if library.egg:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1643
+            problems = graph.install_library(library.egg)
+            if len(problems) > 0:
+                yield from problems
+        if library.whl:
+            # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
+            # TODO: https://github.com/databrickslabs/ucx/issues/1640
+            problems = graph.install_library(library.whl)
+            if len(problems) > 0:
+                yield from problems
+        if library.requirements:
+            # TODO: download and add every entry via graph.register_library
+            # TODO: https://github.com/databrickslabs/ucx/issues/1644
+            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
-        yield from self._register_libraries(graph)
         yield from self._register_notebook(graph)
         yield from self._register_spark_python_task(graph)
         yield from self._register_python_wheel_task(graph)
@@ -75,37 +109,6 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_pipeline_task(graph)
         yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
-
-    def _register_libraries(self, graph: DependencyGraph):
-        if not self._task.libraries:
-            return
-        for library in self._task.libraries:
-            yield from self._lint_library(library, graph)
-
-    def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
-        if library.pypi:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            maybe = graph.register_library(library.pypi.package)
-            if maybe.problems:
-                yield from maybe.problems
-        if library.jar:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1641
-            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
-        if library.egg:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            maybe = graph.register_library(library.egg)
-            if maybe.problems:
-                yield from maybe.problems
-        if library.whl:
-            # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
-            # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            maybe = graph.register_library(library.whl)
-            if maybe.problems:
-                yield from maybe.problems
-        if library.requirements:
-            # TODO: download and add every entry via graph.register_library
-            # TODO: https://github.com/databrickslabs/ucx/issues/1644
-            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
@@ -216,7 +219,7 @@ class WorkflowLinter:
 
     def _lint_task(self, task: jobs.Task, job: jobs.Job):
         dependency: Dependency = WorkflowTask(self._ws, task, job)
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
+        graph = DependencyGraph(dependency, None, None, self._resolver, self._path_lookup)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)

@@ -131,7 +131,7 @@ def test_notebook_builds_leaf_dependency_graph():
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.resolve_notebook(lookup, Path("leaf1.py.txt"))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    graph = DependencyGraph(maybe.dependency, None, None, dependency_resolver, lookup)
     container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
@@ -150,7 +150,7 @@ def test_notebook_builds_depth1_dependency_graph():
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    graph = DependencyGraph(maybe.dependency, None, None, dependency_resolver, lookup)
     container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
@@ -164,7 +164,7 @@ def test_notebook_builds_depth2_dependency_graph():
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    graph = DependencyGraph(maybe.dependency, None, None, dependency_resolver, lookup)
     container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
@@ -178,7 +178,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates():
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    graph = DependencyGraph(maybe.dependency, None, None, dependency_resolver, lookup)
     container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
@@ -193,7 +193,7 @@ def test_notebook_builds_cyclical_dependency_graph():
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    graph = DependencyGraph(maybe.dependency, None, None, dependency_resolver, lookup)
     container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
@@ -207,7 +207,7 @@ def test_notebook_builds_python_dependency_graph():
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.resolve_notebook(lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, lookup)
+    graph = DependencyGraph(maybe.dependency, None, None, dependency_resolver, lookup)
     container = maybe.dependency.load(lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
