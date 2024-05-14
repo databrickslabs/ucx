@@ -70,7 +70,7 @@ def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make
         existing_cluster_id=created_cluster.cluster_id,
         notebook_task=jobs.NotebookTask(notebook_path=str(make_notebook())),
         timeout_seconds=0,
-        libraries=[Library(PythonPyPiLibrary("pandas"))],
+        libraries=[Library(pypi=PythonPyPiLibrary("pandas"))],
     )
     j = make_job(tasks=[task])
 
