@@ -12,6 +12,7 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.labs.ucx.assessment import jobs
 
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
@@ -59,6 +60,7 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
 
     assert len(problems) == 0
 
+
 def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make_cluster, make_notebook):
     created_cluster = make_cluster(single_node=True)
 
@@ -68,6 +70,7 @@ def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make
         existing_cluster_id=created_cluster.cluster_id,
         notebook_task=jobs.NotebookTask(notebook_path=str(make_notebook())),
         timeout_seconds=0,
+        libraries=[Library(PythonPyPiLibrary("pandas"))],
     )
     j = make_job(tasks=[task])
 
