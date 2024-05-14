@@ -280,6 +280,7 @@ class BaseFileResolver(abc.ABC):
     def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
         raise NotImplementedError()
 
+
 class StubImportResolver(BaseImportResolver):
 
     def __init__(self):
