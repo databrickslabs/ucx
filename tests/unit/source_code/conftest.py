@@ -1,9 +1,8 @@
 import pytest
 
-from databricks.labs.ucx.hive_metastore.migration_status import (
-    MigrationStatus,
-)
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatus
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from tests.unit import MockPathLookup
 
 
 @pytest.fixture
@@ -40,3 +39,8 @@ def extended_test_index():
             MigrationStatus('whatever', 'numbers', dst_catalog='cata4', dst_schema='counting', dst_table='numbers'),
         ]
     )
+
+
+@pytest.fixture
+def mock_path_lookup() -> MockPathLookup:
+    yield MockPathLookup()
