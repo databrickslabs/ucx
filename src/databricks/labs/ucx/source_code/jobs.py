@@ -85,23 +85,23 @@ class WorkflowTaskContainer(SourceContainer):
     def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if library.pypi:
             # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            maybe = graph.register_library(library.pypi.package)
-            if maybe.problems:
-                yield from maybe.problems
+            problems = graph.register_import(library.pypi.package)
+            if len(problems) > 0:
+                yield from problems
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
         if library.egg:
             # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            maybe = graph.register_library(library.egg)
-            if maybe.problems:
-                yield from maybe.problems
+            problems = graph.register_import(library.egg)
+            if len(problems) > 0:
+                yield from problems
         if library.whl:
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            maybe = graph.register_library(library.whl)
-            if maybe.problems:
-                yield from maybe.problems
+            problems = graph.register_import(library.whl)
+            if len(problems) > 0:
+                yield from problems
         if library.requirements:
             # TODO: download and add every entry via graph.register_library
             # TODO: https://github.com/databrickslabs/ucx/issues/1644
