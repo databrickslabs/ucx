@@ -247,6 +247,20 @@ class WrappingLoader(DependencyLoader):
         return f"<WrappingLoader source_container={self._source_container}>"
 
 
+class BaseLibraryInstaller(abc.ABC):
+    """
+    A library installer makes libraries available by installing them.
+
+    Installation is a pre-requisite for libraries that are not available on the system (yet). After installation,
+    they can be registered during dependency graph building.
+    """
+
+    @abc.abstractmethod
+    def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+        """Install a library and augment path look-up so that it is able to resolve the library."""
+        raise NotImplementedError()
+
+
 class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
