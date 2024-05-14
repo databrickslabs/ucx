@@ -44,12 +44,12 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_library(self, name: str) -> MaybeGraph:
-        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
-        # TODO: https://github.com/databrickslabs/ucx/issues/1642
-        # TODO: https://github.com/databrickslabs/ucx/issues/1643
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
+    def register_library(self, name: str) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_library(self.path_lookup, name)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
