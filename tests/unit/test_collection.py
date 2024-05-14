@@ -79,7 +79,7 @@ def test_join_collection_join_collection_no_installation_id():
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Open job overview.*": "no",
             r"Do you want to join the current.*": "yes",
-            r"Select the workspace to join current installation as a collection group": 1,
+            r"Please select a workspace, the current installation.*": 1,
             r".*": "",
         }
     )
@@ -107,7 +107,7 @@ def test_join_collection_join_collection():
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Open job overview.*": "no",
             r"Do you want to join the current.*": "yes",
-            r"Select the workspace to join current installation as a collection group": 1,
+            r"Please select a workspace, the current installation.*": 1,
             r".*": "",
         }
     )
