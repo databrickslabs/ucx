@@ -4,6 +4,8 @@ import logging
 import sys
 from pathlib import Path
 
+from databricks.labs.ucx.mixins.wspath import WorkspacePath
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,13 +30,13 @@ class PathLookup:
     def resolve(self, path: Path) -> Path | None:
         if path.is_absolute() and path.exists():
             # eliminate “..” components
-            return path.resolve()
+            return path if isinstance(path, WorkspacePath) else path.resolve()
         for parent in self.paths:
             absolute_path = parent / path
             try:
                 if absolute_path.exists():
                     # eliminate “..” components
-                    return absolute_path.resolve()
+                    return absolute_path if isinstance(absolute_path, WorkspacePath) else absolute_path.resolve()
             except PermissionError:
                 logger.warning(f"Permission denied to access {absolute_path}")
         return None
