@@ -1,5 +1,6 @@
 import base64
 import dataclasses
+import io
 import json
 import logging
 import os
@@ -7,6 +8,7 @@ import pathlib
 from pathlib import Path
 from unittest.mock import create_autospec
 
+import yaml
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
@@ -15,8 +17,8 @@ from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob, BaseRun
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse
-
+from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, ObjectInfo
+from databricks.sdk.service import iam
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
 from databricks.labs.ucx.source_code.graph import SourceContainer
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -184,11 +186,13 @@ def workspace_client_mock(
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.list.return_value = _id_list(Policy, policy_ids)
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
     ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(EndpointConfPair, warehouse_config)
@@ -197,6 +201,18 @@ def workspace_client_mock(
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
     else:
         ws.secrets.get_secret = _secret_not_found
+    download_yaml = yaml.dump(
+        {
+            'version': 1,
+            'inventory_database': 'ucx_exists',
+            'connect': {
+                'host': '...',
+                'token': '...',
+            },
+            'installed_workspace_ids': [123, 456],
+        }
+    )
+    ws.workspace.download.return_value = io.StringIO(download_yaml)
     return ws
 
 

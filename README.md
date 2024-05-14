@@ -143,6 +143,9 @@ process can handle exceptions and infer errors from job runs and task runs. The 
 and wheel runners to the workspace. It can also handle the creation of job tasks for a given task, such as job dashboard tasks, job notebook tasks, 
 and job wheel tasks. The class handles the installation of UCX, including configuring the workspace, installing necessary libraries, and verifying 
 the installation, making it easier for users to migrate their workspaces to UCX.
+At the end of the installation, the user will be prompted if the current installation needs to join an existing collection (create new collection if none present).
+For large organization with many workspaces, grouping workspaces into collection helps in managing UCX migration at collection level (instead of workspaces level)
+User should be an account admin to be able to join a collection.
 
 After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace. 
 These assets are available under the installation folder, i.e. `/Users/<your user>/.ucx/`.
