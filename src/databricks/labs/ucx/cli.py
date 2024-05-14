@@ -469,5 +469,10 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
     ctx.redash.revert_dashboards(dashboard_id)
 
 
+@ucx.command(is_account=True)
+def join_collection(a: AccountClient, workspace_id: str | None = None):
+    """Show all metastores in the account"""
+    #TODO
+
 if __name__ == "__main__":
     ucx()
