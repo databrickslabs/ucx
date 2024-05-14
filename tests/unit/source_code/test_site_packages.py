@@ -1,8 +1,7 @@
 from pathlib import Path
 
-import pytest
 
-from databricks.labs.ucx.source_code.site_packages import PipInstaller, SitePackages, SitePackage
+from databricks.labs.ucx.source_code.site_packages import PipInstaller, SitePackages
 from tests.unit import locate_site_packages
 
 

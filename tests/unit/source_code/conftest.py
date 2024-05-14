@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatus
@@ -42,5 +44,5 @@ def extended_test_index():
 
 
 @pytest.fixture
-def mock_path_lookup() -> MockPathLookup:
+def mock_path_lookup() -> Iterable[MockPathLookup]:
     yield MockPathLookup()
