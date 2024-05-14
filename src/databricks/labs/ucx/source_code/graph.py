@@ -24,7 +24,7 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        installer,
+        installer: BaseLibraryInstaller,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
     ):
