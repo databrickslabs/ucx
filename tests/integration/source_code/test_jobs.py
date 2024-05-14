@@ -34,7 +34,7 @@ def test_linter_from_context(simple_ctx):
     )
     result = next(cursor)
     # TODO clarify what problems were expected, setting to 0 since there aren't any
-    assert result['count'] == 0 # was > 0
+    assert result['count'] == 0  # was > 0
 
 
 def test_job_linter_no_problems(simple_ctx, ws, make_job):

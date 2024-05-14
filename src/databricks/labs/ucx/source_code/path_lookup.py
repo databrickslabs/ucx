@@ -4,7 +4,6 @@ import logging
 import sys
 from pathlib import Path
 
-from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 logger = logging.getLogger(__name__)
 

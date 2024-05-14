@@ -389,7 +389,7 @@ class WorkspacePath(Path):
     is_mount = _return_false
     is_junction = _return_false
 
-    def resolve(self, strict = False):
+    def resolve(self, strict=False):
         return self
 
     def is_dir(self):
