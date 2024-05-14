@@ -1,10 +1,10 @@
 from pathlib import Path
 
-
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
     DependencyProblem,
+    Dependency,
 )
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
@@ -267,4 +267,36 @@ def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook():
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("unknown_notebook"))
     assert list(maybe.problems) == [
         DependencyProblem('notebook-not-found', 'Notebook not found: unknown_notebook', Path("unknown_notebook"))
+    ]
+
+
+def test_dependency_graph_builder_raises_problem_with_unloadable_root_file():
+    lookup = MockPathLookup()
+
+    class FailingFileLoader(FileLoader):
+        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+            return None
+
+    file_loader = FailingFileLoader()
+    dependency_resolver = DependencyResolver([LocalFileResolver(file_loader)], lookup)
+    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
+    assert list(maybe.problems) == [
+        DependencyProblem(
+            'cannot-load-file', 'Could not load file import-sub-site-package.py.txt', Path('<MISSING_SOURCE_PATH>')
+        )
+    ]
+
+
+def test_dependency_graph_builder_raises_problem_with_unloadable_root_notebook():
+    lookup = MockPathLookup()
+
+    class FailingNotebookLoader(NotebookLoader):
+        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+            return None
+
+    notebook_loader = FailingNotebookLoader()
+    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    maybe = dependency_resolver.build_notebook_dependency_graph(Path("root5.py.txt"))
+    assert list(maybe.problems) == [
+        DependencyProblem('cannot-load-notebook', 'Could not load notebook root5.py.txt', Path('<MISSING_SOURCE_PATH>'))
     ]
