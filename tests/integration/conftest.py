@@ -615,7 +615,7 @@ class TestInstallationContext(TestRuntimeContext):
 
     @cached_property
     def account_installer(self):
-        return AccountInstaller(self.account_client).replace()
+        return AccountInstaller(self.account_client)
 
     @cached_property
     def environ(self) -> dict[str, str]:

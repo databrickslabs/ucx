@@ -661,19 +661,18 @@ class AccountInstaller(AccountContext):
         ):
 
             installed_workspaces: list[Workspace] | None = []
+            accessible_workspaces: list[Workspace] = []
             account_client = self._get_safe_account_client()
             ctx = AccountContext(account_client)
             try:
                 accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
-                collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
-                if collection_workspace is not None:
-                    installed_workspaces = self._sync_collection(
-                        collection_workspace, current_workspace_id, account_client
-                    )
-                if installed_workspaces is not None:
-                    ctx.account_workspaces.sync_workspace_info(installed_workspaces)
             except PermissionDenied:
-                logger.error("User doesnt have account admin permission, cant join a collection, skipping...")
+                logger.warning("User doesnt have account admin permission, cant join a collection, skipping...")
+            collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
+            if collection_workspace is not None:
+                installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id, account_client)
+            if installed_workspaces is not None:
+                ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
     def _sync_collection(
         self,
@@ -687,7 +686,7 @@ class AccountInstaller(AccountContext):
             installed_workspace_ids = []
             logger.warning(
                 f"Workspace {collection_workspace.deployment_name} does not belong to any existing "
-                f"collection, creating new collection"
+                f"collection, creating a new collection"
             )
         installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []
