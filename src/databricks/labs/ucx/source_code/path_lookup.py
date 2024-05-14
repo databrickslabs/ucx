@@ -27,7 +27,8 @@ class PathLookup:
 
     def resolve(self, path: Path) -> Path | None:
         if path.is_absolute() and path.exists():
-            return path
+            # eliminate “..” components
+            return path.resolve()
         for parent in self.paths:
             absolute_path = parent / path
             try:

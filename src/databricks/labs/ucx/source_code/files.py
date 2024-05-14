@@ -168,7 +168,9 @@ class SitePackageResolver(BaseDependencyResolver):
         return SitePackageResolver(self._file_loader, self._site_packages_path, resolver)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        path = Path(self._site_packages_path, name)
+        # relative imports are irrelevant for site-packages imports, so don't bother with leading dots
+        names = name.split(".")
+        path = Path(self._site_packages_path, *names)
         if not path.is_dir():
             return super().resolve_import(path_lookup, name)
         path = Path(path, "__init__.py")
