@@ -378,7 +378,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def site_package_resolver(self):
-        return SitePackageResolver(self.file_loader, self.site_packages_path)
+        return SitePackageResolver(self.file_loader)
 
     @cached_property
     def whitelist(self):

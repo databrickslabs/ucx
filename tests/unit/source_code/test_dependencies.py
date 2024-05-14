@@ -41,14 +41,13 @@ def test_dependency_graph_builder_visits_local_notebook_dependencies():
 
 def test_dependency_graph_builder_visits_workspace_file_dependencies():
     whi = Whitelist()
-    site_packages_path = locate_site_packages()
     file_loader = FileLoader()
     lookup = MockPathLookup()
     notebook_loader = NotebookLoader()
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-            SitePackageResolver(file_loader, site_packages_path),
+            SitePackageResolver(file_loader),
             WhitelistResolver(whi),
             LocalFileResolver(file_loader),
         ],
@@ -61,14 +60,13 @@ def test_dependency_graph_builder_visits_workspace_file_dependencies():
 
 def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook_dependency():
     whi = Whitelist()
-    site_packages_path = locate_site_packages()
     file_loader = FileLoader()
     lookup = MockPathLookup()
     notebook_loader = NotebookLoader()
     dependency_resolver = DependencyResolver(
         [
             NotebookResolver(notebook_loader),
-            SitePackageResolver(file_loader, site_packages_path),
+            SitePackageResolver(file_loader),
             WhitelistResolver(whi),
             LocalFileResolver(file_loader),
         ],
@@ -210,13 +208,14 @@ def test_dependency_graph_builder_ignores_known_dependencies():
 
 
 def test_dependency_graph_builder_visits_site_packages():
-    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
     file_loader = FileLoader()
     site_packages_path = locate_site_packages()
+    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
+    lookup.append_path(site_packages_path)
     notebook_loader = NotebookLoader()
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackageResolver(file_loader, site_packages_path),
+        SitePackageResolver(file_loader),
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
@@ -234,13 +233,14 @@ def test_dependency_graph_builder_resolves_sub_site_package():
     # need a custom whitelist to avoid filtering out databricks
     datas = _load_sources(SourceContainer, "minimal-compatibility-catalog.yml")
     whitelist = Whitelist.parse(datas[0])
-    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
-    file_loader = FileLoader()
     site_packages_path = locate_site_packages()
+    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
+    lookup.append_path(site_packages_path)
+    file_loader = FileLoader()
     notebook_loader = NotebookLoader()
     resolvers = [
         NotebookResolver(notebook_loader),
-        SitePackageResolver(file_loader, site_packages_path),
+        SitePackageResolver(file_loader),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]

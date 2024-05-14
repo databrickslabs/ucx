@@ -157,24 +157,24 @@ class SitePackageResolver(BaseDependencyResolver):
     def __init__(
         self,
         file_loader: FileLoader,
-        site_packages_path: Path,
         next_resolver: BaseDependencyResolver | None = None,
     ):
         super().__init__(next_resolver)
         self._file_loader = file_loader
-        self._site_packages_path = site_packages_path
 
     def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return SitePackageResolver(self._file_loader, self._site_packages_path, resolver)
+        return SitePackageResolver(self._file_loader, resolver)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         # relative imports are irrelevant for site-packages imports, so don't bother with leading dots
         names = name.split(".")
-        path = Path(self._site_packages_path, *names)
-        if not path.is_dir():
-            return super().resolve_import(path_lookup, name)
-        path = Path(path, "__init__.py")
-        if not path.is_file():
-            return super().resolve_import(path_lookup, name)
-        dependency = Dependency(self._file_loader, path)
-        return MaybeDependency(dependency, [])
+        for parent in path_lookup.paths:
+            path = Path(parent, *names)
+            if not path.is_dir():
+                continue
+            path = Path(path, "__init__.py")
+            if not path.is_file():
+                continue
+            dependency = Dependency(self._file_loader, path)
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(path_lookup, name)

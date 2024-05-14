@@ -33,7 +33,8 @@ class PathLookup:
             absolute_path = parent / path
             try:
                 if absolute_path.exists():
-                    return absolute_path
+                    # eliminate “..” components
+                    return absolute_path.resolve()
             except PermissionError:
                 logger.warning(f"Permission denied to access {absolute_path}")
         return None
