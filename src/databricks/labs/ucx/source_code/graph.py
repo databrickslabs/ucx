@@ -97,16 +97,9 @@ class DependencyGraph:
     def locate_dependency(self, path: Path) -> MaybeGraph:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
-        # TODO https://github.com/databrickslabs/ucx/issues/1287
-        posix_path = path.as_posix()
-        posix_path = posix_path[2:] if posix_path.startswith('./') else posix_path
 
         def check_registered_dependency(graph):
-            # TODO https://github.com/databrickslabs/ucx/issues/1287
-            graph_posix_path = graph.path.as_posix()
-            if graph_posix_path.startswith('./'):
-                graph_posix_path = graph_posix_path[2:]
-            if graph_posix_path == posix_path:
+            if graph.path == path:
                 found.append(graph)
                 return True
             return False
