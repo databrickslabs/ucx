@@ -9,6 +9,7 @@ from pathlib import Path
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
+    BaseLibraryInstaller,
     Dependency,
     DependencyGraph,
     DependencyProblem,
@@ -19,48 +20,31 @@ from databricks.labs.ucx.source_code.graph import (
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
-class PipResolver(BaseImportResolver):
+class PipInstaller(BaseLibraryInstaller):
     # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
     # TODO: https://github.com/databrickslabs/ucx/issues/1642
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(
-        self,
-        file_loader: FileLoader,
-        next_resolver: BaseImportResolver | None = None,
-    ):
-        super().__init__(next_resolver)
-        self._file_loader = file_loader
-
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        return PipResolver(self._file_loader, resolver)
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        path_lookup.append_path(self._temporary_virtual_environment)
+    def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+        """Pip install library and augment path look-up so that is able to resolve the library"""
         # invoke pip install via subprocess to install this library into lib_install_folder
         try:
             # TODO: add error handling for pip install
-            subprocess.run(['pip', 'install', name, '-t', self._temporary_virtual_environment])
+            subprocess.run(["pip", "install", library, "-t", self._temporary_virtual_environment])
         except Exception as e:  # TODO: catch proper exception
-            problem = DependencyProblem('library-install-failed', f'Failed to install {name}: {e}')
-            return MaybeDependency(None, [problem])
-        dist_infos = SitePackages.parse(self._temporary_virtual_environment)
-        dist_info = dist_infos[name]
-        if not dist_info:
-            problem = DependencyProblem('library-install-failed', f'Failed to install {name}')
-            return MaybeDependency(None, [problem])
-        container = SitePackageContainer(self._file_loader, dist_info)
-        dependency = Dependency(WrappingLoader(container), Path(name))
-        return MaybeDependency(dependency, [])
+            return [DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")]
+        finally:
+            path_lookup.append_path(self._temporary_virtual_environment)
+            return []
 
     @cached_property
-    def _temporary_virtual_environment(self):
+    def _temporary_virtual_environment(self) -> Path:
         # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
         # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
         # environment. If we don't have a virtual environment, create a temporary one.
         # simulate notebook-scoped virtual environment
-        lib_install_folder = tempfile.mkdtemp(prefix='ucx-')
+        lib_install_folder = tempfile.mkdtemp(prefix="ucx-")
         return Path(lib_install_folder)
 
 
