@@ -78,6 +78,8 @@ class SitePackages:
                 self._packages[top_level] = package
 
     def __getitem__(self, item: str) -> SitePackage | None:
+        # TODO: Replace hyphen with underscores
+        # TODO: Don't use get, raise KeyError
         return self._packages.get(item, None)
 
 
