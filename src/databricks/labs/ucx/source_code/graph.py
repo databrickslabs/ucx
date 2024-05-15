@@ -80,6 +80,7 @@ class DependencyGraph:
         child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
         container = dependency.load(self.path_lookup)
+        # TODO: Retrun either (child) graph OR problems
         if not container:
             problem = DependencyProblem('dependency-register-failed', 'Failed to register dependency', dependency.path)
             return MaybeGraph(child_graph, [problem])
