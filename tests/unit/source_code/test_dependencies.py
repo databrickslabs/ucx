@@ -284,3 +284,17 @@ def test_dependency_graph_builder_raises_problem_with_unloadable_root_notebook(p
     assert list(maybe.problems) == [
         DependencyProblem('cannot-load-notebook', 'Could not load notebook root5.py.txt', Path('<MISSING_SOURCE_PATH>'))
     ]
+
+
+def test_dependency_graph_builder_raises_problem_with_missing_file_loader(notebook_resolver, path_lookup):
+    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
+    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
+    assert list(maybe.problems) == [
+        DependencyProblem('missing-file-resolver', 'Missing resolver for local files', Path('<MISSING_SOURCE_PATH>'))
+    ]
+
+
+def test_dependency_graph_builder_repr(notebook_resolver, path_lookup):
+    # improve test coverage
+    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
+    assert len(repr(dependency_resolver)) > 0
