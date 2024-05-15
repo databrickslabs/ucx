@@ -402,6 +402,7 @@ class GlobalContext(abc.ABC):
     def workflow_linter(self):
         return WorkflowLinter(
             self.workspace_client,
+            self.pip_installer,
             self.dependency_resolver,
             self.path_lookup,
             MigrationIndex([]),  # TODO: bring back self.tables_migrator.index()

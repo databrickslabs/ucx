@@ -162,11 +162,13 @@ class WorkflowLinter:
     def __init__(
         self,
         ws: WorkspaceClient,
+        installer: BaseLibraryInstaller,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
         migration_index: MigrationIndex,
     ):
         self._ws = ws
+        self._installer = installer
         self._resolver = resolver
         self._path_lookup = path_lookup
         self._migration_index = migration_index
@@ -216,7 +218,7 @@ class WorkflowLinter:
 
     def _lint_task(self, task: jobs.Task, job: jobs.Job):
         dependency: Dependency = WorkflowTask(self._ws, task, job)
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
+        graph = DependencyGraph(dependency, None, None, self._resolver, self._path_lookup)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
