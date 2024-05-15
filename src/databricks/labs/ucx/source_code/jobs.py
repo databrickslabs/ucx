@@ -165,7 +165,6 @@ class WorkflowTaskContainer(SourceContainer):
 
         libraries_from_cluster = []
         # TODO: Lint the libraries obtained from the cluster
-        # adding library to task is not showing up in cluster libs
         for library in response['library_statuses']:
             if 'pypi' in library['library']:
                 libraries_from_cluster.append(library['library']['pypi']['package'])

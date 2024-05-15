@@ -12,7 +12,7 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.sdk.service.compute import Library, PythonPyPiLibrary
+from databricks.sdk.service.compute import Library, PythonPyPiLibrary, LibrariesAPI
 from databricks.labs.ucx.assessment import jobs
 
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
@@ -21,7 +21,6 @@ from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.sdk.service import jobs, compute
-
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -64,13 +63,15 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
 def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make_cluster, make_notebook):
     created_cluster = make_cluster(single_node=True)
 
+    libraries_api = LibrariesAPI(ws.api_client)
+    libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("pandas"))])
+
     task = jobs.Task(
         task_key=make_random(4),
         description=make_random(4),
         existing_cluster_id=created_cluster.cluster_id,
         notebook_task=jobs.NotebookTask(notebook_path=str(make_notebook())),
         timeout_seconds=0,
-        libraries=[Library(pypi=PythonPyPiLibrary("pandas"))],
     )
     j = make_job(tasks=[task])
 
