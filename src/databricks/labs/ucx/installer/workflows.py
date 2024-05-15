@@ -69,7 +69,7 @@ DEBUG_NOTEBOOK = """# Databricks notebook source
 
 # COMMAND ----------
 
-# MAGIC %pip install /Workspace{remote_wheel}
+# MAGIC %pip install {remote_wheel}
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -92,7 +92,7 @@ print(__version__)
 """
 
 TEST_RUNNER_NOTEBOOK = """# Databricks notebook source
-# MAGIC %pip install /Workspace{remote_wheel}
+# MAGIC %pip install {remote_wheel}
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -530,12 +530,17 @@ class WorkflowsDeployment(InstallationMixin):
         return None
 
     def _upload_wheel(self):
+        wheel_paths = []
         with self._wheels:
-            return self._wheels.upload_to_wsfs()
+            if self._config.upload_dependencies:
+                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks_sdk", "sqlglot"])
+            wheel_paths.append(f"/Workspace{self._wheels.upload_to_wsfs()}")
+            return wheel_paths
 
-    def _upload_wheel_runner(self, remote_wheel: str):
+    def _upload_wheel_runner(self, remote_wheel: list[str]):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        remote_wheels_str = ", ".join(list(remote_wheel))
+        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
         return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
     @staticmethod
@@ -559,8 +564,7 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=widget_values)
         return settings
 
-    def _job_settings(self, step_name: str, remote_wheel: str):
-
+    def _job_settings(self, step_name: str, remote_wheel: list[str]):
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -594,7 +598,7 @@ class WorkflowsDeployment(InstallationMixin):
             "tasks": job_tasks,
         }
 
-    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
+    def _job_task(self, task: Task, remote_wheel: list[str]) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
@@ -639,8 +643,10 @@ class WorkflowsDeployment(InstallationMixin):
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
-        libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
+    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: list[str]) -> jobs.Task:
+        libraries = []
+        for wheel in remote_wheel:
+            libraries.append(compute.Library(whl=wheel))
         named_parameters = {
             "config": f"/Workspace{self._config_file}",
             "workflow": workflow,
@@ -701,7 +707,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheel: str) -> jobs.Task:
+    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheel: list[str]) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key="parse_logs",
             job_cluster_key=Task.job_cluster,

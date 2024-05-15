@@ -1898,3 +1898,25 @@ def test_save_config_ext_hms(ws, mock_installation):
             'recon_tolerance_percent': 5,
         },
     )
+
+
+def test_upload_dependencies(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*": "",
+            r"Choose how to map the workspace groups.*": "0",
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r".*Does given workspace block Internet access.*": "Yes",
+        }
+    )
+    wheels = create_autospec(WheelsV2)
+    workspace_installation = WorkspaceInstaller(ws).replace(
+        prompts=prompts,
+        installation=mock_installation,
+        product_info=PRODUCT_INFO,
+        sql_backend=MockBackend(),
+        wheels=wheels,
+    )
+    workspace_installation.run()
+    wheels.upload_wheel_dependencies.assert_called_once()
+    wheels.upload_to_wsfs.assert_called_once()

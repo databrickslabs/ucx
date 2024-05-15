@@ -61,6 +61,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     # Threshold for row count comparison during data reconciliation, in percentage
     recon_tolerance_percent: int = 5
 
+    # Whether to upload dependent libraries to the workspace
+    upload_dependencies: bool = False
+
     # [INTERNAL ONLY] Whether the assessment should capture only specific object permissions.
     include_object_permissions: list[str] | None = None
 
