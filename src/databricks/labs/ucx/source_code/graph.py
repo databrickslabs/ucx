@@ -217,7 +217,6 @@ class BaseLibraryInstaller(abc.ABC):
     @abc.abstractmethod
     def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
         """Install a library and augment path look-up so that it is able to resolve the library."""
-        raise NotImplementedError()
 
 
 class Dependency(abc.ABC):
