@@ -25,7 +25,6 @@ class StandardDataComparator(DataComparator):
         count_row = next(query_result)
         source_to_target_mismatch_count = int(count_row["source_to_target_mismatch_count"])
         target_to_source_mismatch_count = int(count_row["target_to_source_mismatch_count"])
-
         return DataComparisonResult(
             source_row_count=source_data_profile.row_count,
             target_row_count=target_data_profile.row_count,
@@ -71,8 +70,8 @@ def _prepare_comparison_query(
         )
         SELECT 
             COUNT(*) AS total_mismatches,
-            SUM(source_to_target_mismatch_count) AS source_to_target_mismatch_count,
-            SUM(target_to_source_mismatch_count) AS target_to_source_mismatch_count
+            COALESCE(SUM(source_to_target_mismatch_count), 0) AS source_to_target_mismatch_count,
+            COALESCE(SUM(target_to_source_mismatch_count), 0) AS target_to_source_mismatch_count
         FROM compare_results
         WHERE is_match IS FALSE;
         """
