@@ -43,7 +43,7 @@ from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackages
+from databricks.labs.ucx.source_code.site_packages import PipInstaller, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -349,6 +349,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def verify_has_metastore(self):
         return VerifyHasMetastore(self.workspace_client)
+
+    @cached_property
+    def pip_installer(self):
+        return PipInstaller()
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:
