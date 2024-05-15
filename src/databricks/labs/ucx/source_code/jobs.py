@@ -159,15 +159,16 @@ class WorkflowTaskContainer(SourceContainer):
             return
         # TODO: https://github.com/databrickslabs/ucx/issues/1637
         # load libraries installed on the referred cluster
-        body = {'cluster_id': self._task.existing_cluster_id}
-        headers = {'Accept': 'application/json', 'Content-Type': 'application/json', }
-        response = self._ws.api_client.do('GET', '/api/2.0/libraries/cluster-status', body=body, headers=headers)
+
+        libraries_api = compute.LibrariesAPI(self._ws.api_client)
+        library_full_status_list = libraries_api.cluster_status(self._task.existing_cluster_id)
 
         libraries_from_cluster = []
         # TODO: Lint the libraries obtained from the cluster
-        for library in response['library_statuses']:
-            if 'pypi' in library['library']:
-                libraries_from_cluster.append(library['library']['pypi']['package'])
+        for library_full_status in library_full_status_list:
+            if library_full_status.library:
+                if library_full_status.library.pypi:
+                    libraries_from_cluster.append(library_full_status.library.pypi.package)
 
         yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
 
