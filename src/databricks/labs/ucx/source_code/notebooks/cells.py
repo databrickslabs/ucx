@@ -189,7 +189,7 @@ class PipCell(Cell):
         if len(splits) < 3:
             return [DependencyProblem("library-install-failed", f"Missing arguments in '{self.original_code}'")]
         if splits[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Missing install in '{self.original_code}'")]
+            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {splits[1]}")]
         # TODO: we need to support different formats of the library name and etc
         library = splits[2]
 
