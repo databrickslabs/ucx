@@ -22,7 +22,7 @@ def test_pip_cell_build_dependency_graph_register_pip_install_library():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.register_library.assert_called_once_with("databricks")
+    graph.install_library.assert_called_once_with("databricks")
 
 
 def test_pip_cell_build_dependency_graph_register_pip_install_missing_library():
@@ -37,7 +37,7 @@ def test_pip_cell_build_dependency_graph_register_pip_install_missing_library():
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
     assert problems[0].message == "Missing arguments in '%pip install'"
-    graph.register_library.assert_not_called()
+    graph.install_library.assert_not_called()
 
 
 def test_pip_cell_build_dependency_graph_register_pip_missing_install():
@@ -52,7 +52,7 @@ def test_pip_cell_build_dependency_graph_register_pip_missing_install():
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
     assert problems[0].message == "Missing install in '%pip installl pytest'"
-    graph.register_library.assert_not_called()
+    graph.install_library.assert_not_called()
 
 
 def test_pip_cell_build_dependency_graph_register_pip_install_unknown_library(mock_path_lookup):

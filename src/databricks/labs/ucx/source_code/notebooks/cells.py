@@ -193,10 +193,7 @@ class PipCell(Cell):
         # TODO: we need to support different formats of the library name and etc
         library = splits[2]
 
-        problems = graph.install_library(library)
-        if len(problems) > 0:
-            return problems
-        return graph.register_library(library)
+        return graph.install_library(library)
 
 
 class CellLanguage(Enum):
