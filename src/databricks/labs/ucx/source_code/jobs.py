@@ -105,7 +105,8 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: https://github.com/databrickslabs/ucx/issues/1644
             yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
 
-    def _install_cluster_libraries(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _install_cluster_libraries(self, graph: DependencyGraph):
+        _ = graph
         if not self._task.existing_cluster_id:
             return
         # TODO: https://github.com/databrickslabs/ucx/issues/1637
