@@ -17,7 +17,7 @@ from tests.unit import (
     locate_site_packages,
     _samples_path,
     MockPathLookup,
-    notebook_resolver_mock,
+    mock_notebook_resolver,
     _load_sources,
 )
 
@@ -258,7 +258,7 @@ def test_dependency_graph_builder_resolves_sub_site_package():
 
 def test_dependency_graph_builder_raises_problem_with_unfound_root_file():
     lookup = MockPathLookup()
-    notebook_resolver = notebook_resolver_mock()
+    notebook_resolver = mock_notebook_resolver()
     import_resolvers = [LocalFileResolver(FileLoader())]
     dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("non-existing.py.txt"))

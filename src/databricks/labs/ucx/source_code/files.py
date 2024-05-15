@@ -9,14 +9,14 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.graph import (
-    DependencyGraph,
-    SourceContainer,
-    DependencyProblem,
-    DependencyLoader,
-    Dependency,
-    MaybeDependency,
     BaseImportResolver,
     BaseFileResolver,
+    Dependency,
+    DependencyGraph,
+    DependencyLoader,
+    DependencyProblem,
+    MaybeDependency,
+    SourceContainer,
 )
 
 logger = logging.getLogger(__name__)
@@ -153,28 +153,3 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
     def __repr__(self):
         return "LocalFileResolver()"
 
-
-class SitePackageResolver(BaseImportResolver):
-
-    def __init__(
-        self,
-        file_loader: FileLoader,
-        site_packages_path: Path,
-        next_resolver: BaseImportResolver | None = None,
-    ):
-        super().__init__(next_resolver)
-        self._file_loader = file_loader
-        self._site_packages_path = site_packages_path
-
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        return SitePackageResolver(self._file_loader, self._site_packages_path, resolver)
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        path = Path(self._site_packages_path, name)
-        if not path.is_dir():
-            return super().resolve_import(path_lookup, name)
-        path = Path(path, "__init__.py")
-        if not path.is_file():
-            return super().resolve_import(path_lookup, name)
-        dependency = Dependency(self._file_loader, path)
-        return MaybeDependency(dependency, [])

@@ -12,11 +12,11 @@ from yaml import load_all as load_yaml, Loader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 from databricks.labs.ucx.source_code.graph import (
-    SourceContainer,
+    BaseImportResolver,
     DependencyGraph,
     DependencyProblem,
     MaybeDependency,
-    BaseImportResolver,
+    SourceContainer,
 )
 
 logger = logging.getLogger(__name__)

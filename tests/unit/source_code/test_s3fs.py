@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, No
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     MockPathLookup,
-    notebook_resolver_mock,
+    mock_notebook_resolver,
 )
 
 
@@ -147,7 +147,7 @@ def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[Dependen
     yml = lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     file_loader = FileLoader()
     whitelist = Whitelist.parse(yml.read_text())
-    notebook_resolver = notebook_resolver_mock()
+    notebook_resolver = mock_notebook_resolver()
     import_resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
     dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
     sample = lookup.cwd / "root9.py.txt"

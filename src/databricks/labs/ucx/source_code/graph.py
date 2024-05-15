@@ -324,7 +324,7 @@ class DependencyResolver:
         self._path_lookup = path_lookup
 
     @staticmethod
-    def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]):
+    def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]) -> BaseImportResolver:
         previous: BaseImportResolver = StubImportResolver()
         for resolver in import_resolvers:
             resolver = resolver.with_next_resolver(previous)

@@ -20,7 +20,7 @@ from databricks.sdk.service.sql import EndpointConfPair
 from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, ObjectInfo
 from databricks.sdk.service import iam
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.graph import SourceContainer, BaseNotebookResolver
+from databricks.labs.ucx.source_code.graph import BaseNotebookResolver, SourceContainer
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logging.getLogger("tests").setLevel("DEBUG")
@@ -176,7 +176,7 @@ class MockPathLookup(PathLookup):
         return f"<MockPathLookup {self._cwd}>"
 
 
-def workspace_client_mock(
+def mock_workspace_client(
     cluster_ids: list[str] | None = None,
     pipeline_ids: list[str] | None = None,
     job_ids: list[str] | None = None,
@@ -216,7 +216,7 @@ def workspace_client_mock(
     return ws
 
 
-def table_mapping_mock(tables: list[str] | None = None):
+def mock_table_mapping(tables: list[str] | None = None):
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = _id_list(TableToMigrate, tables)
     return table_mapping
@@ -229,7 +229,7 @@ def locate_site_packages() -> pathlib.Path:
     return pathlib.Path(python_lib_path, actual_python, "site-packages")
 
 
-def notebook_resolver_mock():
+def mock_notebook_resolver():
     resolver = create_autospec(BaseNotebookResolver)
     resolver.resolve_notebook.return_value = None
     return resolver

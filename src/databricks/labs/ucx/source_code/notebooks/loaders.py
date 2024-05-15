@@ -7,11 +7,11 @@ from pathlib import Path
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.source_code.graph import (
+    BaseNotebookResolver,
     Dependency,
     DependencyLoader,
-    SourceContainer,
     MaybeDependency,
-    BaseNotebookResolver,
+    SourceContainer,
 )
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
