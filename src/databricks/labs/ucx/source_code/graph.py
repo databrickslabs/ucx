@@ -306,7 +306,13 @@ class MaybeDependency:
     problems: list[DependencyProblem]
 
 
+# the DependencyResolver is responsible for locating "stuff", mimicking the Databricks runtime behavior
+# there are specific resolution algorithms for import and for Notebooks (executed via %run or dbutils.notebook.run)
+# so we're using 2 distinct resolvers for notebooks (instance) and imports (linked list of specialized sub-resolvers)
+# resolving imports is affected by cwd and sys.paths, the latter being itself influenced by Python code
+# we therefore need a PathLookup to convey these during import resolution
 class DependencyResolver:
+
     def __init__(
         self,
         notebook_resolver: BaseNotebookResolver,
