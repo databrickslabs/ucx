@@ -7,4 +7,4 @@ def test_cached_properties():
     assert ctx.site_packages is not None
     assert ctx.site_packages_path is not None
     assert ctx.dependency_resolver is not None
-    assert ctx.dependency_resolver is not None
+    assert ctx.pip_installer is not None
