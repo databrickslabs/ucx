@@ -12,23 +12,23 @@ from yaml import load_all as load_yaml, Loader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 from databricks.labs.ucx.source_code.graph import (
-    SourceContainer,
+    BaseImportResolver,
     DependencyGraph,
-    BaseDependencyResolver,
     DependencyProblem,
     MaybeDependency,
+    SourceContainer,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class WhitelistResolver(BaseDependencyResolver):
+class WhitelistResolver(BaseImportResolver):
 
-    def __init__(self, whitelist: Whitelist, next_resolver: BaseDependencyResolver | None = None):
+    def __init__(self, whitelist: Whitelist, next_resolver: BaseImportResolver | None = None):
         super().__init__(next_resolver)
         self._whitelist = whitelist
 
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         return WhitelistResolver(self._whitelist, resolver)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
@@ -82,7 +82,7 @@ class KnownPackage(abc.ABC):
 
     @abc.abstractmethod
     def compatibility_of(self, name: str) -> UCCompatibility:
-        raise NotImplementedError()
+        """returns the compatibility of a symbol"""
 
 
 @dataclass

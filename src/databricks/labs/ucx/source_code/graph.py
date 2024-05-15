@@ -226,13 +226,13 @@ class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        raise NotImplementedError()
+        """builds a dependency graph from the contents of this container"""
 
 
 class DependencyLoader(abc.ABC):
     @abc.abstractmethod
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
+        """loads a dependency"""
 
 
 class WrappingLoader(DependencyLoader):
@@ -247,27 +247,29 @@ class WrappingLoader(DependencyLoader):
         return f"<WrappingLoader source_container={self._source_container}>"
 
 
-class BaseDependencyResolver(abc.ABC):
+class BaseNotebookResolver(abc.ABC):
 
-    def __init__(self, next_resolver: BaseDependencyResolver | None):
+    @abc.abstractmethod
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        """locates a notebook"""
+
+    @staticmethod
+    def _fail(code: str, message: str) -> MaybeDependency:
+        return MaybeDependency(None, [DependencyProblem(code, message)])
+
+
+class BaseImportResolver(abc.ABC):
+
+    def __init__(self, next_resolver: BaseImportResolver | None):
         self._next_resolver = next_resolver
 
     @abc.abstractmethod
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        raise NotImplementedError()
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
+        """required to create a linked list of resolvers"""
 
     @property
     def next_resolver(self):
         return self._next_resolver
-
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        # TODO: remove StubResolver and return MaybeDependency(None, [...])
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_notebook(path_lookup, path)
-
-    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_local_file(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         # TODO: remove StubResolver and return MaybeDependency(None, [...])
@@ -275,19 +277,20 @@ class BaseDependencyResolver(abc.ABC):
         return self._next_resolver.resolve_import(path_lookup, name)
 
 
-class StubResolver(BaseDependencyResolver):
+class BaseFileResolver(abc.ABC):
+
+    @abc.abstractmethod
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+        """locates a file"""
+
+
+class StubImportResolver(BaseImportResolver):
 
     def __init__(self):
         super().__init__(None)
 
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         raise NotImplementedError("Should never happen!")
-
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
-
-    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._fail('file-not-found', f"File not found: {path.as_posix()}")
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._fail('import-not-found', f"Could not locate import: {name}")
@@ -304,27 +307,45 @@ class MaybeDependency:
 
 
 class DependencyResolver:
-    def __init__(self, resolvers: list[BaseDependencyResolver], path_lookup: PathLookup):
-        previous: BaseDependencyResolver = StubResolver()
-        for resolver in resolvers:
-            resolver = resolver.with_next_resolver(previous)
-            previous = resolver
-        self._resolver: BaseDependencyResolver = previous
+    """the DependencyResolver is responsible for locating "stuff", mimicking the Databricks runtime behavior.
+    There are specific resolution algorithms for import and for Notebooks (executed via %run or dbutils.notebook.run)
+    so we're using 2 distinct resolvers for notebooks (instance) and imports (linked list of specialized sub-resolvers)
+    resolving imports is affected by cwd and sys.paths, the latter being itself influenced by Python code
+    we therefore need a PathLookup to convey these during import resolution
+    """
+
+    def __init__(
+        self,
+        notebook_resolver: BaseNotebookResolver,
+        import_resolvers: list[BaseImportResolver],
+        path_lookup: PathLookup,
+    ):
+        self._notebook_resolver = notebook_resolver
+        self._import_resolver = self._chain_import_resolvers(import_resolvers)
         self._path_lookup = path_lookup
 
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._resolver.resolve_notebook(path_lookup, path)
+    @staticmethod
+    def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]) -> BaseImportResolver:
+        previous: BaseImportResolver = StubImportResolver()
+        for resolver in import_resolvers:
+            resolver = resolver.with_next_resolver(previous)
+            previous = resolver
+        return previous
 
-    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._resolver.resolve_local_file(path_lookup, path)
+    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
+        return self._notebook_resolver.resolve_notebook(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        return self._resolver.resolve_import(path_lookup, name)
+        return self._import_resolver.resolve_import(path_lookup, name)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._resolver.resolve_local_file(self._path_lookup, path)
+        resolver = self._local_file_resolver
+        if not resolver:
+            problem = DependencyProblem("missing-file-resolver", "Missing resolver for local files")
+            return MaybeGraph(None, [problem])
+        maybe = resolver.resolve_local_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
@@ -337,10 +358,19 @@ class DependencyResolver:
             problems = self._make_relative_paths(problems, path)
         return MaybeGraph(graph, problems)
 
+    @property
+    def _local_file_resolver(self) -> BaseFileResolver | None:
+        resolver = self._import_resolver
+        while resolver is not None:
+            if isinstance(resolver, BaseFileResolver):
+                return resolver
+            resolver = resolver.next_resolver
+        return None
+
     def build_notebook_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._resolver.resolve_notebook(self._path_lookup, path)
+        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
@@ -363,7 +393,7 @@ class DependencyResolver:
         return adjusted_problems
 
     def __repr__(self):
-        return f"<DependencyResolver {self._resolver} {self._path_lookup}>"
+        return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._path_lookup}>"
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"

@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, 
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     _samples_path,
-    MockPathLookup,
 )
 
 
@@ -35,19 +34,18 @@ from tests.unit import (
         (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
     ],
 )
-def test_locates_notebooks(source: list[str], expected: int):
+def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
-    lookup = MockPathLookup()
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
-    resolvers = [
-        NotebookResolver(notebook_loader),
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
     assert maybe.graph is not None
@@ -67,15 +65,15 @@ def test_locates_files(source: list[str], expected: int):
     elems.extend(source)
     file_path = Path(*elems)
     whitelist = Whitelist()
-    provider = PathLookup.from_sys_path(Path.cwd())
+    lookup = PathLookup.from_sys_path(Path.cwd())
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
-    resolvers = [
-        NotebookResolver(notebook_loader),
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
-    resolver = DependencyResolver(resolvers, provider)
+    resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path)
     assert not maybe.problems
     assert maybe.graph is not None
@@ -111,12 +109,12 @@ sys.path.append('{child_dir_path.as_posix()}')
         lookup = PathLookup.from_sys_path(Path.cwd())
         file_loader = FileLoader()
         notebook_loader = NotebookLoader()
-        resolvers = [
-            NotebookResolver(notebook_loader),
+        notebook_resolver = NotebookResolver(notebook_loader)
+        import_resolvers = [
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        resolver = DependencyResolver(resolvers, lookup)
+        resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
         assert maybe.graph is not None
@@ -152,12 +150,12 @@ def func():
         lookup = PathLookup.from_sys_path(Path.cwd())
         file_loader = FileLoader()
         notebook_loader = NotebookLoader()
-        resolvers = [
-            NotebookResolver(notebook_loader),
+        notebook_resolver = NotebookResolver(notebook_loader)
+        import_resolvers = [
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        resolver = DependencyResolver(resolvers, lookup)
+        resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
         assert maybe.graph is not None

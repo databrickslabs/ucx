@@ -13,11 +13,11 @@ from databricks.sdk.service.sql import (
 )
 
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
-from tests.unit import workspace_client_mock
+from tests.unit import mock_workspace_client
 
 
 def common():
-    w = workspace_client_mock(policy_ids=["ext-hms"])
+    w = mock_workspace_client(policy_ids=["ext-hms"])
     w.cluster_policies.create.return_value = Policy(
         policy_id="foo1",
         name="Unity Catalog Migration (ucx) (me@example.com)",

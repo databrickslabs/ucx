@@ -9,13 +9,14 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.graph import (
-    DependencyGraph,
-    SourceContainer,
-    DependencyProblem,
-    DependencyLoader,
+    BaseImportResolver,
+    BaseFileResolver,
     Dependency,
-    BaseDependencyResolver,
+    DependencyGraph,
+    DependencyLoader,
+    DependencyProblem,
     MaybeDependency,
+    SourceContainer,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,20 +109,21 @@ class FileLoader(DependencyLoader):
         return "FileLoader()"
 
 
-class LocalFileResolver(BaseDependencyResolver):
+class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, next_resolver: BaseDependencyResolver | None = None):
+    def __init__(self, file_loader: FileLoader, next_resolver: BaseImportResolver | None = None):
         super().__init__(next_resolver)
         self._file_loader = file_loader
 
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         return LocalFileResolver(self._file_loader, resolver)
 
     def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
         absolute_path = path_lookup.resolve(path)
         if absolute_path:
             return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
-        return super().resolve_local_file(path_lookup, path)
+        problem = DependencyProblem("file-not-found", f"File not found: {path.as_posix()}")
+        return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         if not name:

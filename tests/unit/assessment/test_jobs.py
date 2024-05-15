@@ -4,11 +4,11 @@ from databricks.labs.lsql.backends import MockBackend
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 
-from .. import workspace_client_mock
+from .. import mock_workspace_client
 
 
 def test_job_assessment():
-    ws = workspace_client_mock(
+    ws = mock_workspace_client(
         job_ids=['on-simplest-autoscale', 'on-outdated-autoscale'],
         cluster_ids=['simplest-autoscale', 'outdated-autoscale'],
     )
@@ -20,7 +20,7 @@ def test_job_assessment():
 
 
 def test_job_assessment_no_job_tasks():
-    ws = workspace_client_mock(job_ids=['no-tasks'])
+    ws = mock_workspace_client(job_ids=['no-tasks'])
     sql_backend = MockBackend()
     result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 1
@@ -28,14 +28,14 @@ def test_job_assessment_no_job_tasks():
 
 
 def test_job_assessment_no_job_settings():
-    ws = workspace_client_mock(job_ids=['no-settings'])
+    ws = mock_workspace_client(job_ids=['no-settings'])
     sql_backend = MockBackend()
     result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 0
 
 
 def test_spark_jar_task_failures():
-    ws = workspace_client_mock(job_ids=['spark-jar-task'], cluster_ids=['azure-spn-secret'])
+    ws = mock_workspace_client(job_ids=['spark-jar-task'], cluster_ids=['azure-spn-secret'])
     sql_backend = MockBackend()
     result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 1
@@ -44,7 +44,7 @@ def test_spark_jar_task_failures():
 
 
 def test_job_assessment_for_azure_spark_config():
-    ws = workspace_client_mock(job_ids=['on-azure-spn-secret'], cluster_ids=['azure-spn-secret'])
+    ws = mock_workspace_client(job_ids=['on-azure-spn-secret'], cluster_ids=['azure-spn-secret'])
     sql_backend = MockBackend()
     result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 1
@@ -52,7 +52,7 @@ def test_job_assessment_for_azure_spark_config():
 
 
 def test_jobs_assessment_with_spn_cluster_no_job_tasks():
-    ws = workspace_client_mock(job_ids=['no-tasks'])
+    ws = mock_workspace_client(job_ids=['no-tasks'])
     sql_backend = MockBackend()
     result_set = JobsCrawler(ws, sql_backend, "ucx").snapshot()
     assert len(result_set) == 1
@@ -60,7 +60,7 @@ def test_jobs_assessment_with_spn_cluster_no_job_tasks():
 
 
 def test_job_crawler_with_no_owner_should_have_empty_creator_name():
-    ws = workspace_client_mock(job_ids=['no-tasks'])
+    ws = mock_workspace_client(job_ids=['no-tasks'])
     sql_backend = MockBackend()
     JobsCrawler(ws, sql_backend, "ucx").snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.jobs", "append")
@@ -116,7 +116,7 @@ def test_job_crawler_with_no_owner_should_have_empty_creator_name():
     ],
 )
 def test_job_run_crawler(jobruns_ids, cluster_ids, run_ids, failures):
-    ws = workspace_client_mock(jobruns_ids=jobruns_ids, cluster_ids=cluster_ids)
+    ws = mock_workspace_client(jobruns_ids=jobruns_ids, cluster_ids=cluster_ids)
     sql_backend = MockBackend()
     SubmitRunsCrawler(ws, sql_backend, "ucx", 10).snapshot()
     result = sql_backend.rows_written_for("hive_metastore.ucx.submit_runs", "append")
