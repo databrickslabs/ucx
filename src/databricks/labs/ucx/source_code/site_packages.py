@@ -7,33 +7,34 @@ from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
-from databricks.labs.ucx.source_code.graph import BaseLibraryInstaller, DependencyProblem
+from databricks.labs.ucx.source_code.graph import BaseDependencyResolver, DependencyProblem, MaybeDependency
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
-class PipInstaller(BaseLibraryInstaller):
+class PipResolver(BaseDependencyResolver):
     # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
     # TODO: https://github.com/databrickslabs/ucx/issues/1642
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(self, next_installer: BaseLibraryInstaller | None = None) -> None:
-        super().__init__(next_installer)
+    def __init__(self, next_resolver: BaseDependencyResolver | None = None) -> None:
+        super().__init__(next_resolver)
 
-    def with_next_installer(self, installer: BaseLibraryInstaller) -> PipInstaller:
-        return PipInstaller(self._next_installer)
+    def with_next_resolver(self, resolver: BaseDependencyResolver) -> PipResolver:
+        return PipResolver(resolver)
 
-    def install_library_pip(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
-        """Pip install library and augment path look-up so that is able to resolve the library"""
+    def resolve_library_pip(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        """Pip install library and augment path look-up to resolve the library at import"""
         # invoke pip install via subprocess to install this library into lib_install_folder
-        pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]
+        pip_install_arguments = ["pip", "install", name, "-t", self._temporary_virtual_environment.as_posix()]
         try:
             subprocess.run(pip_install_arguments, check=True)
         except CalledProcessError as e:
-            return [DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")]
+            problem = DependencyProblem("library-install-failed", f"Failed to install {name}: {e}")
+            return MaybeDependency(None, [problem])
 
         path_lookup.append_path(self._temporary_virtual_environment)
-        return []
+        return MaybeDependency(None, [])
 
     @cached_property
     def _temporary_virtual_environment(self) -> Path:

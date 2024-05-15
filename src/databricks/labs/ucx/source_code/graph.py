@@ -24,13 +24,11 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        installer: LibraryInstaller | None,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
     ):
         self._dependency = dependency
         self._parent = parent
-        self._installer = installer
         self._resolver = resolver
         self._path_lookup = path_lookup.change_directory(dependency.path.parent)
         self._dependencies: dict[Dependency, DependencyGraph] = {}
@@ -47,17 +45,12 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def install_library(self, library: str) -> list[DependencyProblem]:
-        """Install a library and augment path look-up so that it is able to resolve the library."""
-        assert self._installer is not None
-        return self._installer.install_library(self._path_lookup, library)
-
-    def register_library(self, name: str) -> MaybeGraph:
-        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
-        # TODO: https://github.com/databrickslabs/ucx/issues/1642
-        # TODO: https://github.com/databrickslabs/ucx/issues/1643
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
+    def register_library(self, library: str) -> list[DependencyProblem]:
+        maybe = self._resolver.resolve_library(self.path_lookup, library)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -84,7 +77,7 @@ class DependencyGraph:
             self._dependencies[dependency] = maybe.graph
             return maybe
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(dependency, self, self._installer, self._resolver, self._path_lookup)
+        child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
         container = dependency.load(self.path_lookup)
         if not container:
@@ -206,65 +199,6 @@ class DependencyGraph:
         return f"<DependencyGraph {self.path}>"
 
 
-class BaseLibraryInstaller(abc.ABC):
-    """
-    A library installer makes libraries available by installing them.
-
-    Installation is a pre-requisite for libraries that are not available on the system (yet). After installation,
-    they can be registered during dependency graph building.
-    """
-
-    def __init__(self, next_installer: BaseLibraryInstaller | None) -> None:
-        self._next_installer = next_installer
-
-    @abc.abstractmethod
-    def with_next_installer(self, installer: BaseLibraryInstaller) -> BaseLibraryInstaller:
-        """Chain next installer."""
-
-    @property
-    def next_installer(self):
-        return self._next_installer
-
-    def install_library_pip(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
-        """Install a library with pip and augment path look-up so that it is able to resolve the library."""
-        assert self._next_installer is not None
-        return self._next_installer.install_library_pip(path_lookup, library)
-
-
-class StubInstaller(BaseLibraryInstaller):
-    """Last installer in the chain"""
-
-    def __init__(self):
-        super().__init__(None)
-
-    def with_next_installer(self, installer: BaseLibraryInstaller) -> BaseLibraryInstaller:
-        raise NotImplementedError("Should never happen!")
-
-
-class LibraryInstaller:
-    def __init__(self, installers: list[BaseLibraryInstaller]):
-        previous: BaseLibraryInstaller = StubInstaller()
-        for installer in installers:
-            installer = installer.with_next_installer(previous)
-            previous = installer
-        self._installer: BaseLibraryInstaller = previous
-
-    def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
-        """Install a library and augment path look-up so that it is able to resolve the library."""
-        if library.endswith(".jar"):
-            return [DependencyProblem("not-yet-implemented", "Jar library is not yet implemented")]
-        if library.endswith(".egg"):
-            return [DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")]
-        if library.endswith(".whl"):
-            return [DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")]
-        if library.endswith(".txt"):
-            return [DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")]
-        return self._installer.install_library_pip(path_lookup, library)
-
-    def __repr__(self):
-        return f"<LibraryInstaller {self._installer}>"
-
-
 class Dependency(abc.ABC):
 
     def __init__(self, loader: DependencyLoader, path: Path):
@@ -342,6 +276,11 @@ class BaseImportResolver(abc.ABC):
         assert self._next_resolver is not None
         return self._next_resolver.resolve_import(path_lookup, name)
 
+    def resolve_library_pip(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        # TODO: remove StubResolver and return MaybeDependency(None, [...])
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_library_pip(path_lookup, name)
+
 
 class BaseFileResolver(abc.ABC):
 
@@ -360,6 +299,9 @@ class StubImportResolver(BaseImportResolver):
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._fail('import-not-found', f"Could not locate import: {name}")
+
+    def resolve_library_pip(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        return self._fail('library-not-found', f"Could not resolve library: {name}")
 
     @staticmethod
     def _fail(code: str, message: str):
@@ -404,6 +346,21 @@ class DependencyResolver:
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
 
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        if library.endswith(".jar"):
+            problem = DependencyProblem("not-yet-implemented", "Jar library is not yet implemented")
+            return MaybeDependency(None, [problem])
+        if library.endswith(".egg"):
+            problem = DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
+            return MaybeDependency(None, [problem])
+        if library.endswith(".whl"):
+            problem = DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
+            return MaybeDependency(None, [problem])
+        if library.endswith(".txt"):
+            problem = DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")
+            return MaybeDependency(None, [problem])
+        return self._resolver.resolve_library_pip(path_lookup, library)
+
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
@@ -414,7 +371,7 @@ class DependencyResolver:
         maybe = resolver.resolve_local_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, None, self, self._path_lookup)
+        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
             problem = DependencyProblem('cannot-load-file', f"Could not load file {path}")
@@ -439,7 +396,7 @@ class DependencyResolver:
         maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, None, self, self._path_lookup)
+        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
             problem = DependencyProblem('cannot-load-notebook', f"Could not load notebook {path}")

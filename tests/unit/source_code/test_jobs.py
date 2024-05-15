@@ -6,17 +6,16 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, LibraryInstaller
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowTaskContainer
-from databricks.labs.ucx.source_code.site_packages import PipInstaller
+from databricks.labs.ucx.source_code.site_packages import PipResolver
 
 
 @pytest.fixture
 def graph(mock_path_lookup) -> DependencyGraph:
     dependency = Dependency(FileLoader(), Path("test"))
-    installer = LibraryInstaller([PipInstaller()])
-    dependency_resolver = DependencyResolver([], mock_path_lookup)
-    dependency_graph = DependencyGraph(dependency, None, installer, dependency_resolver, mock_path_lookup)
+    dependency_resolver = DependencyResolver([PipResolver()], mock_path_lookup)
+    dependency_graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
     return dependency_graph
 
 
