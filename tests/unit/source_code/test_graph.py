@@ -1,7 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, LibraryInstaller
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, LibraryInstaller, StubInstaller
 from databricks.labs.ucx.source_code.site_packages import PipInstaller
 
 
@@ -16,3 +18,10 @@ def test_dependency_graph_install_library_pytest(mock_path_lookup):
 
     assert len(dependency_problems) == 0
     assert graph.path_lookup.resolve(Path("pytest")).exists()
+
+
+def test_stub_installer_raises_not_implemented_error():
+    """Raise NotImplementedError"""
+    installer = StubInstaller()
+    with pytest.raises(NotImplementedError):
+        installer.with_next_installer(installer)
