@@ -2,48 +2,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.graph import (
-    Dependency,
-    WrappingLoader,
-    SourceContainer,
-    DependencyGraph,
-    BaseDependencyResolver,
-    DependencyProblem,
-    MaybeDependency,
-)
 
-
-class SitePackageResolver(BaseDependencyResolver):
-    # TODO: this is incorrect logic, remove this resolver
-
-    def __init__(
-        self,
-        site_packages: SitePackages,
-        file_loader: FileLoader,
-        path_lookup: PathLookup,
-        next_resolver: BaseDependencyResolver | None = None,
-    ):
-        super().__init__(next_resolver)
-        self._site_packages = site_packages
-        self._file_loader = file_loader
-        self._path_lookup = path_lookup
-
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return SitePackageResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        # TODO: `resovle_import` is irrelevant for dist-info containers
-        # databricks-labs-ucx vs databricks.labs.ucx
-        site_package = self._site_packages[name]
-        if site_package is not None:
-            container = SitePackageContainer(self._file_loader, site_package)
-            dependency = Dependency(WrappingLoader(container), Path(name))
-            return MaybeDependency(dependency, [])
-        return super().resolve_import(path_lookup, name)
-
-
+COMMENTED_OUT_FOR_PR_1685 = """
 class SitePackageContainer(SourceContainer):
 
     def __init__(self, file_loader: FileLoader, site_package: SitePackage):
@@ -64,6 +24,7 @@ class SitePackageContainer(SourceContainer):
 
     def __repr__(self):
         return f"<SitePackageContainer {self._site_package}>"
+"""
 
 
 class SitePackages:

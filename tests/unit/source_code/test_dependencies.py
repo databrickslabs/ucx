@@ -1,10 +1,10 @@
 from pathlib import Path
 
-
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
     DependencyProblem,
+    Dependency,
 )
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
@@ -13,67 +13,56 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
 from tests.unit import (
     locate_site_packages,
     _samples_path,
-    MockPathLookup,
+    _load_sources,
 )
 
 
-def test_dependency_graph_builder_visits_workspace_notebook_dependencies():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_visits_workspace_notebook_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root3.run.py"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"}
 
 
-def test_dependency_graph_builder_visits_local_notebook_dependencies():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_visits_local_notebook_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root4.py.txt"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root4.py.txt", "leaf3.py.txt"}
 
 
-def test_dependency_graph_builder_visits_workspace_file_dependencies():
+def test_dependency_graph_builder_visits_workspace_file_dependencies(mock_path_lookup):
     whi = Whitelist()
-    site_packages = SitePackages.parse(locate_site_packages())
     file_loader = FileLoader()
-    lookup = MockPathLookup()
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-            SitePackageResolver(site_packages, file_loader, lookup),
-            WhitelistResolver(whi),
-            LocalFileResolver(file_loader),
-        ],
-        lookup,
-    )
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [
+        WhitelistResolver(whi),
+        LocalFileResolver(file_loader),
+    ]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path('./root8.py'))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {'leaf1.py.txt', 'leaf2.py.txt', 'root8.py.txt'}
 
 
-def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook_dependency():
+def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook_dependency(mock_path_lookup):
     whi = Whitelist()
-    site_packages = SitePackages.parse(locate_site_packages())
     file_loader = FileLoader()
-    lookup = MockPathLookup()
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [
-            NotebookResolver(notebook_loader),
-            SitePackageResolver(site_packages, file_loader, lookup),
-            WhitelistResolver(whi),
-            LocalFileResolver(file_loader),
-        ],
-        lookup,
-    )
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [
+        WhitelistResolver(whi),
+        LocalFileResolver(file_loader),
+    ]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root1-no-leaf.run.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -88,10 +77,10 @@ def test_dependency_graph_builder_raises_problem_with_unfound_workspace_notebook
     ]
 
 
-def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dependency():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dependency(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root4-no-leaf.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -100,10 +89,10 @@ def test_dependency_graph_builder_raises_problem_with_unfound_local_notebook_dep
     ]
 
 
-def test_dependency_graph_builder_raises_problem_with_non_constant_local_notebook_dependency():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_raises_problem_with_non_constant_local_notebook_dependency(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path('root10.py.txt'))
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -118,33 +107,31 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_local_noteboo
     ]
 
 
-def test_dependency_graph_builder_raises_problem_with_invalid_run_cell():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_raises_problem_with_invalid_run_cell(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path('leaf6.py.txt'))
     assert list(maybe.problems) == [
         DependencyProblem('invalid-run-cell', 'Missing notebook path in %run command', Path('leaf6.py.txt'), 5, 0, 5, 4)
     ]
 
 
-def test_dependency_graph_builder_visits_recursive_file_dependencies():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_visits_recursive_file_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [NotebookResolver(notebook_loader), LocalFileResolver(FileLoader())], lookup
-    )
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("root6.py.txt"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root6.py.txt", "root5.py.txt", "leaf4.py.txt"}
 
 
-def test_dependency_graph_builder_raises_problem_with_unresolved_import():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_raises_problem_with_unresolved_import(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [NotebookResolver(notebook_loader), LocalFileResolver(FileLoader())], lookup
-    )
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path('root7.py.txt'))
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -153,11 +140,11 @@ def test_dependency_graph_builder_raises_problem_with_unresolved_import():
     ]
 
 
-def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argument():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argument(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    resolvers = [NotebookResolver(notebook_loader), WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("run_notebooks.py.txt"))
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -172,22 +159,21 @@ def test_dependency_graph_builder_raises_problem_with_non_constant_notebook_argu
     ]
 
 
-def test_dependency_graph_builder_visits_file_dependencies():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_visits_file_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver(
-        [NotebookResolver(notebook_loader), LocalFileResolver(FileLoader())], lookup
-    )
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("root5.py.txt"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root5.py.txt", "leaf4.py.txt"}
 
 
-def test_dependency_graph_builder_skips_builtin_dependencies():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_skips_builtin_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    resolvers = [NotebookResolver(notebook_loader), WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert not maybe.failed
     graph = maybe.graph
@@ -197,11 +183,11 @@ def test_dependency_graph_builder_skips_builtin_dependencies():
     assert maybe.failed
 
 
-def test_dependency_graph_builder_ignores_known_dependencies():
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_ignores_known_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    resolvers = [NotebookResolver(notebook_loader), WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert maybe.graph
     graph = maybe.graph
@@ -209,42 +195,106 @@ def test_dependency_graph_builder_ignores_known_dependencies():
     assert not maybe_graph.graph
 
 
-def test_dependency_graph_builder_visits_site_packages(empty_index):
-    provider = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
-    file_loader = FileLoader()
+def test_dependency_graph_builder_visits_site_packages(empty_index, mock_notebook_resolver):
     site_packages_path = locate_site_packages()
-    site_packages = SitePackages.parse(site_packages_path)
-    notebook_loader = NotebookLoader()
-    resolvers = [
-        NotebookResolver(notebook_loader),
+    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
+    lookup.append_path(site_packages_path)
+    file_loader = FileLoader()
+    import_resolvers = [
         WhitelistResolver(Whitelist()),
-        SitePackageResolver(site_packages, file_loader, provider),
         LocalFileResolver(file_loader),
     ]
-    dependency_resolver = DependencyResolver(resolvers, provider)
+    dependency_resolver = DependencyResolver(mock_notebook_resolver, import_resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
     assert not maybe.failed
     graph = maybe.graph
-    maybe = graph.locate_dependency(Path(site_packages_path, "certifi/core.py"))
+    maybe = graph.locate_dependency(Path(site_packages_path, "certifi", "core.py"))
     assert not maybe.failed
     maybe = graph.locate_dependency(Path("core.py"))
     assert maybe.failed
 
 
-def test_dependency_graph_builder_raises_problem_with_unfound_root_file(empty_index):
-    lookup = MockPathLookup()
-    dependency_resolver = DependencyResolver([LocalFileResolver(FileLoader())], lookup)
+def test_dependency_graph_builder_resolves_sub_site_package():
+    # need a custom whitelist to avoid filtering out databricks
+    datas = _load_sources(SourceContainer, "minimal-compatibility-catalog.yml")
+    whitelist = Whitelist.parse(datas[0])
+    site_packages_path = locate_site_packages()
+    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
+    lookup.append_path(site_packages_path)
+    file_loader = FileLoader()
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [
+        LocalFileResolver(file_loader),
+        WhitelistResolver(whitelist),
+    ]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
+    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
+    assert maybe.graph
+    maybe = maybe.graph.locate_dependency(Path(site_packages_path, "databricks", "labs", "lsql", "core.py"))
+    assert maybe.graph
+
+
+def test_dependency_graph_builder_raises_problem_with_unfound_root_file(mock_path_lookup, mock_notebook_resolver):
+    import_resolvers = [LocalFileResolver(FileLoader())]
+    dependency_resolver = DependencyResolver(mock_notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("non-existing.py.txt"))
     assert list(maybe.problems) == [
         DependencyProblem('file-not-found', 'File not found: non-existing.py.txt', Path("non-existing.py.txt"))
     ]
 
 
-def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(empty_index):
-    lookup = MockPathLookup()
+def test_dependency_graph_builder_raises_problem_with_unfound_root_notebook(mock_path_lookup):
     notebook_loader = NotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("unknown_notebook"))
     assert list(maybe.problems) == [
         DependencyProblem('notebook-not-found', 'Notebook not found: unknown_notebook', Path("unknown_notebook"))
     ]
+
+
+def test_dependency_graph_builder_raises_problem_with_unloadable_root_file(mock_path_lookup, mock_notebook_resolver):
+
+    class FailingFileLoader(FileLoader):
+        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+            return None
+
+    file_loader = FailingFileLoader()
+    import_resolvers = [LocalFileResolver(file_loader)]
+    dependency_resolver = DependencyResolver(mock_notebook_resolver, import_resolvers, mock_path_lookup)
+    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
+    assert list(maybe.problems) == [
+        DependencyProblem(
+            'cannot-load-file', 'Could not load file import-sub-site-package.py.txt', Path('<MISSING_SOURCE_PATH>')
+        )
+    ]
+
+
+def test_dependency_graph_builder_raises_problem_with_unloadable_root_notebook(mock_path_lookup):
+
+    class FailingNotebookLoader(NotebookLoader):
+        def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+            return None
+
+    notebook_loader = FailingNotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.build_notebook_dependency_graph(Path("root5.py.txt"))
+    assert list(maybe.problems) == [
+        DependencyProblem('cannot-load-notebook', 'Could not load notebook root5.py.txt', Path('<MISSING_SOURCE_PATH>'))
+    ]
+
+
+def test_dependency_graph_builder_raises_problem_with_missing_file_loader(mock_notebook_resolver, mock_path_lookup):
+    dependency_resolver = DependencyResolver(mock_notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
+    assert list(maybe.problems) == [
+        DependencyProblem('missing-file-resolver', 'Missing resolver for local files', Path('<MISSING_SOURCE_PATH>'))
+    ]
+
+
+def test_dependency_graph_builder_repr(mock_notebook_resolver, mock_path_lookup):
+    # improve test coverage
+    dependency_resolver = DependencyResolver(mock_notebook_resolver, [], mock_path_lookup)
+    assert len(repr(dependency_resolver)) > 0

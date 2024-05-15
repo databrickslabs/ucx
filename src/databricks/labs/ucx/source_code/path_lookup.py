@@ -4,6 +4,7 @@ import logging
 import sys
 from pathlib import Path
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,12 +28,14 @@ class PathLookup:
 
     def resolve(self, path: Path) -> Path | None:
         if path.is_absolute() and path.exists():
-            return path
+            # eliminate “..” components
+            return path.resolve()
         for parent in self.paths:
             absolute_path = parent / path
             try:
                 if absolute_path.exists():
-                    return absolute_path
+                    # eliminate “..” components
+                    return absolute_path.resolve()
             except PermissionError:
                 logger.warning(f"Permission denied to access {absolute_path}")
         return None
