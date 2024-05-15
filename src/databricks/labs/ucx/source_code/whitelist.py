@@ -82,7 +82,7 @@ class KnownPackage(abc.ABC):
 
     @abc.abstractmethod
     def compatibility_of(self, name: str) -> UCCompatibility:
-        raise NotImplementedError()
+        """abstract method"""
 
 
 @dataclass

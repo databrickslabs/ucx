@@ -226,13 +226,13 @@ class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        raise NotImplementedError()
+        """abstract method"""
 
 
 class DependencyLoader(abc.ABC):
     @abc.abstractmethod
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
+        """abstract method"""
 
 
 class WrappingLoader(DependencyLoader):
@@ -251,7 +251,7 @@ class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        raise NotImplementedError()
+        """abstract method"""
 
     @staticmethod
     def _fail(code: str, message: str) -> MaybeDependency:
@@ -265,7 +265,7 @@ class BaseImportResolver(abc.ABC):
 
     @abc.abstractmethod
     def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        raise NotImplementedError()
+        """abstract method"""
 
     @property
     def next_resolver(self):
@@ -281,7 +281,7 @@ class BaseFileResolver(abc.ABC):
 
     @abc.abstractmethod
     def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
-        raise NotImplementedError()
+        """abstract method"""
 
 
 class StubImportResolver(BaseImportResolver):

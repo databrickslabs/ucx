@@ -33,11 +33,11 @@ class Matcher(ABC):
 
     @abstractmethod
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
-        raise NotImplementedError()
+        """abstract method"""
 
     @abstractmethod
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
-        raise NotImplementedError()
+        """abstract method"""
 
     def _get_table_arg(self, node: ast.Call):
         if len(node.args) > 0:
