@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import create_autospec
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
@@ -10,7 +11,7 @@ from databricks.labs.ucx.source_code.jobs import WorkflowTaskContainer
 
 def test_workflow_task_container_build_dependency_graph_no_dependency_problems(mock_path_lookup):
     """No dependency problems"""
-    ws = WorkspaceClient()
+    ws = create_autospec(WorkspaceClient)
     task = jobs.Task(task_key="test")
 
     file_resolver = LocalFileResolver(FileLoader())
@@ -22,3 +23,4 @@ def test_workflow_task_container_build_dependency_graph_no_dependency_problems(m
     dependency_problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(dependency_problems) == 0
+    ws.assert_not_called()
