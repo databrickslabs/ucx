@@ -244,12 +244,12 @@ def test_dependency_graph_builder_resolves_sub_site_package():
     lookup.append_path(site_packages_path)
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
-    resolvers = [
-        NotebookResolver(notebook_loader),
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolvers = [
         LocalFileResolver(file_loader),
         WhitelistResolver(whitelist),
     ]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
     assert maybe.graph
     maybe = maybe.graph.locate_dependency(Path(site_packages_path, "databricks", "labs", "lsql", "core.py"))
@@ -286,7 +286,9 @@ def test_dependency_graph_builder_raises_problem_with_unloadable_root_file():
             return None
 
     file_loader = FailingFileLoader()
-    dependency_resolver = DependencyResolver([LocalFileResolver(file_loader)], lookup)
+    notebook_resolver = NotebookResolver(NotebookLoader())
+    import_resolvers = [LocalFileResolver(file_loader)]
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py.txt"))
     assert list(maybe.problems) == [
         DependencyProblem(
@@ -303,7 +305,8 @@ def test_dependency_graph_builder_raises_problem_with_unloadable_root_notebook()
             return None
 
     notebook_loader = FailingNotebookLoader()
-    dependency_resolver = DependencyResolver([NotebookResolver(notebook_loader)], lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root5.py.txt"))
     assert list(maybe.problems) == [
         DependencyProblem('cannot-load-notebook', 'Could not load notebook root5.py.txt', Path('<MISSING_SOURCE_PATH>'))

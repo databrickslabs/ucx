@@ -10,6 +10,7 @@ from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whiteli
 from tests.unit import (
     _samples_path,
     MockPathLookup,
+    locate_site_packages,
 )
 
 
@@ -161,11 +162,11 @@ def func():
         notebook_resolver = NotebookResolver(notebook_loader)
         site_packages_path = locate_site_packages()
         import_resolvers = [
-            SitePackageResolver(file_loader, site_packages_path, provider),
+            SitePackageResolver(file_loader, site_packages_path, lookup),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
-        resolver = DependencyResolver(notebook_resolver, import_resolvers, provider)
+        resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
         assert maybe.graph is not None
