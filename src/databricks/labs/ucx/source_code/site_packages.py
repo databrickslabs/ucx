@@ -1,7 +1,43 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import tempfile
+from functools import cached_property
 from pathlib import Path
+from subprocess import CalledProcessError
+
+from databricks.labs.ucx.source_code.graph import BaseLibraryInstaller, DependencyProblem
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+
+class PipInstaller(BaseLibraryInstaller):
+    # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
+    # TODO: https://github.com/databrickslabs/ucx/issues/1642
+    # TODO: https://github.com/databrickslabs/ucx/issues/1643
+    # TODO: https://github.com/databrickslabs/ucx/issues/1640
+
+    def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+        """Pip install library and augment path look-up so that is able to resolve the library"""
+        # invoke pip install via subprocess to install this library into lib_install_folder
+        pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]
+        try:
+            subprocess.run(pip_install_arguments, check=True)
+        except CalledProcessError as e:
+            return [DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")]
+
+        path_lookup.append_path(self._temporary_virtual_environment)
+        return []
+
+    @cached_property
+    def _temporary_virtual_environment(self) -> Path:
+        # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
+        # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
+        # environment. If we don't have a virtual environment, create a temporary one.
+        # simulate notebook-scoped virtual environment
+        lib_install_folder = tempfile.mkdtemp(prefix="ucx-")
+        return Path(lib_install_folder)
+
 
 COMMENTED_OUT_FOR_PR_1685 = """
 class SitePackageContainer(SourceContainer):
