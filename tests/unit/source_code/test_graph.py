@@ -20,7 +20,7 @@ def test_dependency_graph_register_library(mock_path_lookup):
 
 def test_stub_import_resolver_fails_with_library_not_found_dependency_problem(mock_path_lookup):
     resolver = StubImportResolver()
-    maybe = resolver.resolve_library_pip(mock_path_lookup, "test")
+    maybe = resolver.resolve_library(mock_path_lookup, "test")
 
     assert len(maybe.problems) == 1
     assert maybe.problems[0].code == "library-not-found"

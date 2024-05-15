@@ -23,7 +23,7 @@ class PipResolver(BaseImportResolver):
     def with_next_resolver(self, resolver: BaseImportResolver) -> PipResolver:
         return PipResolver(resolver)
 
-    def resolve_library_pip(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         """Pip install library and augment path look-up to resolve the library at import"""
         # invoke pip install via subprocess to install this library into lib_install_folder
         pip_install_arguments = ["pip", "install", name, "-t", self._temporary_virtual_environment.as_posix()]

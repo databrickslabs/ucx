@@ -6,7 +6,7 @@ from tests.unit import locate_site_packages
 
 def test_pip_resolver_library(mock_path_lookup):
     pip_installer = PipResolver()
-    maybe = pip_installer.resolve_library_pip(mock_path_lookup, "pytest")
+    maybe = pip_installer.resolve_library(mock_path_lookup, "pytest")
 
     assert len(maybe.problems) == 0
     assert mock_path_lookup.resolve(Path("pytest")).exists()
@@ -14,7 +14,7 @@ def test_pip_resolver_library(mock_path_lookup):
 
 def test_pip_resolver_unknown_library(mock_path_lookup):
     pip_installer = PipResolver()
-    maybe = pip_installer.resolve_library_pip(mock_path_lookup, "unknown-library-name")
+    maybe = pip_installer.resolve_library(mock_path_lookup, "unknown-library-name")
 
     assert len(maybe.problems) == 1
     assert maybe.problems[0].code == "library-install-failed"

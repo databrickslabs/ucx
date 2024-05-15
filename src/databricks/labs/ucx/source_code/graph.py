@@ -277,10 +277,10 @@ class BaseImportResolver(abc.ABC):
         assert self._next_resolver is not None
         return self._next_resolver.resolve_import(path_lookup, name)
 
-    def resolve_library_pip(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         # TODO: remove StubResolver and return MaybeDependency(None, [...])
         assert self._next_resolver is not None
-        return self._next_resolver.resolve_library_pip(path_lookup, name)
+        return self._next_resolver.resolve_library(path_lookup, name)
 
 
 class BaseFileResolver(abc.ABC):
@@ -301,7 +301,7 @@ class StubImportResolver(BaseImportResolver):
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._fail('import-not-found', f"Could not locate import: {name}")
 
-    def resolve_library_pip(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._fail('library-not-found', f"Could not resolve library: {name}")
 
     @staticmethod
@@ -360,7 +360,7 @@ class DependencyResolver:
         if library.endswith(".txt"):
             problem = DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")
             return MaybeDependency(None, [problem])
-        return self._import_resolver.resolve_library_pip(path_lookup, library)
+        return self._import_resolver.resolve_library(path_lookup, library)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
