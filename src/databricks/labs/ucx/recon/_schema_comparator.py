@@ -1,10 +1,10 @@
-from databricks.labs.ucx.recon import (
+from ._base import (
     SchemaComparator,
     SchemaComparisonEntry,
     SchemaComparisonResult,
     TableMetadataRetriever,
-    TableDescriptor,
     ColumnMetadata,
+    TableIdentifier,
 )
 
 
@@ -12,12 +12,12 @@ class StandardSchemaComparator(SchemaComparator):
     def __init__(self, metadata_retriever: TableMetadataRetriever):
         self._metadata_retriever = metadata_retriever
 
-    def compare_schema(self, source: TableDescriptor, target: TableDescriptor) -> SchemaComparisonResult:
+    def compare_schema(self, source: TableIdentifier, target: TableIdentifier) -> SchemaComparisonResult:
         comparison_result = self._eval_schema_diffs(source, target)
         is_matching = all(entry.is_matching for entry in comparison_result)
         return SchemaComparisonResult(is_matching, comparison_result)
 
-    def _eval_schema_diffs(self, source: TableDescriptor, target: TableDescriptor) -> list[SchemaComparisonEntry]:
+    def _eval_schema_diffs(self, source: TableIdentifier, target: TableIdentifier) -> list[SchemaComparisonEntry]:
         source_metadata = self._metadata_retriever.get_metadata(source)
         target_metadata = self._metadata_retriever.get_metadata(target)
         source_column_names = {column.name for column in source_metadata.columns}
@@ -35,7 +35,7 @@ def _build_comparison_result_entry(
     source_col: ColumnMetadata | None, target_col: ColumnMetadata | None
 ) -> SchemaComparisonEntry:
     if source_col and target_col:
-        is_matching = _compare_col_metadata(source_col, target_col)
+        is_matching = source_col == target_col
         notes = None
     else:
         is_matching = False
@@ -49,11 +49,3 @@ def _build_comparison_result_entry(
         is_matching=is_matching,
         notes=notes,
     )
-
-
-def _compare_col_metadata(source_col: ColumnMetadata, target_col: ColumnMetadata) -> bool:
-    if source_col is None and target_col is None:
-        return True
-    if source_col is None or target_col is None:
-        return False
-    return source_col.name == target_col.name and source_col.data_type == target_col.data_type

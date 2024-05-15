@@ -3,13 +3,17 @@ from dataclasses import dataclass
 
 
 @dataclass
-class TableDescriptor:
+class TableIdentifier:
     catalog: str
     schema: str
     table: str
 
+    @property
+    def fqn(self):
+        return f"{self.catalog}.{self.schema}.{self.table}"
 
-@dataclass
+
+@dataclass(frozen=True)
 class ColumnMetadata:
     name: str
     data_type: str
@@ -17,7 +21,7 @@ class ColumnMetadata:
 
 @dataclass
 class TableMetadata:
-    descriptor: TableDescriptor
+    identifier: TableIdentifier
     columns: list[ColumnMetadata]
 
     def get_column_metadata(self, column_name: str) -> ColumnMetadata | None:
@@ -51,28 +55,31 @@ class SchemaComparisonResult:
 
 @dataclass
 class DataComparisonResult:
-    pass
+    source_row_count: int
+    target_row_count: int
+    source_to_target_mismatch_count: int
+    target_to_source_mismatch_count: int
 
 
 class TableMetadataRetriever(ABC):
     @abstractmethod
-    def get_metadata(self, source: TableDescriptor) -> TableMetadata:
+    def get_metadata(self, entity: TableIdentifier) -> TableMetadata:
         pass
 
 
 class DataProfiler(ABC):
     @abstractmethod
-    def profile_data(self, source: TableDescriptor) -> DataProfilingResult:
+    def profile_data(self, entity: TableIdentifier) -> DataProfilingResult:
         pass
 
 
 class SchemaComparator(ABC):
     @abstractmethod
-    def compare_schema(self, source: TableDescriptor, target: TableDescriptor) -> SchemaComparisonResult:
+    def compare_schema(self, source: TableIdentifier, target: TableIdentifier) -> SchemaComparisonResult:
         pass
 
 
 class DataComparator(ABC):
     @abstractmethod
-    def compare_data(self, source: TableDescriptor, target: TableDescriptor) -> DataComparisonResult:
+    def compare_data(self, source: TableIdentifier, target: TableIdentifier) -> DataComparisonResult:
         pass

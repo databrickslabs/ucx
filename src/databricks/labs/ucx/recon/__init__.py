@@ -1,5 +1,5 @@
 from ._base import (
-    TableDescriptor,
+    TableIdentifier,
     ColumnMetadata,
     TableMetadata,
     DataProfilingResult,
@@ -17,7 +17,7 @@ from ._metadata_retriever import DatabricksTableMetadataRetriever
 from ._schema_comparator import StandardSchemaComparator
 
 __all__ = [
-    "TableDescriptor",
+    "TableIdentifier",
     "ColumnMetadata",
     "TableMetadata",
     "TableMetadataRetriever",
