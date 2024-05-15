@@ -24,11 +24,13 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
+        installer: BaseLibraryInstaller | None,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
     ):
         self._dependency = dependency
         self._parent = parent
+        self._installer = installer
         self._resolver = resolver
         self._path_lookup = path_lookup.change_directory(dependency.path.parent)
         self._dependencies: dict[Dependency, DependencyGraph] = {}
@@ -44,6 +46,11 @@ class DependencyGraph:
     @property
     def path(self):
         return self._dependency.path
+
+    def install_library(self, library: str) -> list[DependencyProblem]:
+        """Install a library and augment path look-up so that it is able to resolve the library."""
+        assert self._installer is not None
+        return self._installer.install_library(self._path_lookup, library)
 
     def register_library(self, name: str) -> MaybeGraph:
         # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
@@ -77,7 +84,7 @@ class DependencyGraph:
             self._dependencies[dependency] = maybe.graph
             return maybe
         # nay, create the child graph and populate it
-        child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup)
+        child_graph = DependencyGraph(dependency, self, self._installer, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
         container = dependency.load(self.path_lookup)
         if not container:
@@ -362,7 +369,7 @@ class DependencyResolver:
         maybe = resolver.resolve_local_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
+        graph = DependencyGraph(maybe.dependency, None, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
             problem = DependencyProblem('cannot-load-file', f"Could not load file {path}")
@@ -387,7 +394,7 @@ class DependencyResolver:
         maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
+        graph = DependencyGraph(maybe.dependency, None, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
             problem = DependencyProblem('cannot-load-notebook', f"Could not load notebook {path}")
