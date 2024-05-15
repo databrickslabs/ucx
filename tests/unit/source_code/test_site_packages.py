@@ -26,5 +26,5 @@ def test_pip_installer_install_library_unknown_library(mock_path_lookup):
 
 def test_reads_site_packages():
     site_packages_path = locate_site_packages()
-    site_packages = SitePackages.parse(str(site_packages_path))
+    site_packages = SitePackages.parse(site_packages_path)
     assert site_packages["astroid"] is not None
