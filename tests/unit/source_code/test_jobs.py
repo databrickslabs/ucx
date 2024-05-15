@@ -8,13 +8,17 @@ from databricks.sdk.service import compute, jobs
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowTaskContainer
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.site_packages import PipResolver
 
 
 @pytest.fixture
 def graph(mock_path_lookup) -> DependencyGraph:
     dependency = Dependency(FileLoader(), Path("test"))
-    dependency_resolver = DependencyResolver([PipResolver()], mock_path_lookup)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolver = PipResolver()
+    dependency_resolver = DependencyResolver(notebook_resolver, [import_resolver], mock_path_lookup)
     dependency_graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
     return dependency_graph
 

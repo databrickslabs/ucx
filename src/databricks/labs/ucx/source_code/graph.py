@@ -359,7 +359,7 @@ class DependencyResolver:
         if library.endswith(".txt"):
             problem = DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")
             return MaybeDependency(None, [problem])
-        return self._resolver.resolve_library_pip(path_lookup, library)
+        return self._import_resolver.resolve_library_pip(path_lookup, library)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
