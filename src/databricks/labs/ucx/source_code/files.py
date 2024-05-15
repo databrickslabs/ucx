@@ -1,24 +1,22 @@
 from __future__ import annotations  # for type hints
 
-import ast
 import logging
 from pathlib import Path
-from collections.abc import Callable
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.python_linter import PythonLinter, ASTLinter
 from databricks.labs.ucx.source_code.graph import (
-    DependencyGraph,
-    SourceContainer,
-    DependencyProblem,
-    DependencyLoader,
+    BaseImportResolver,
+    BaseFileResolver,
     Dependency,
-    BaseDependencyResolver,
+    DependencyGraph,
+    DependencyLoader,
+    DependencyProblem,
+    MaybeDependency,
+    SourceContainer,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,68 +30,18 @@ class LocalFile(SourceContainer):
         # using CellLanguage so we can reuse the facilities it provides
         self._language = CellLanguage.of_language(language)
 
-    @property
-    def path(self):
-        return self._path
-
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is not CellLanguage.PYTHON:
             logger.warning(f"Unsupported language: {self._language.language}")
-            return
-        path_lookup.push_cwd(self.path.parent)
-        self._build_dependency_graph(parent)
-        path_lookup.pop_cwd()
+            return []
+        return parent.build_graph_from_python_source(self._original_code)
 
-    def _build_dependency_graph(self, parent: DependencyGraph) -> None:
-        # TODO replace the below with parent.build_graph_from_python_source
-        # can only be done after https://github.com/databrickslabs/ucx/issues/1287
-        linter = ASTLinter.parse(self._original_code)
-        run_notebook_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        for call in run_notebook_calls:
-            call_problems: list[DependencyProblem] = []
-            notebook_path_arg = PythonLinter.get_dbutils_notebook_run_path_arg(call)
-            if isinstance(notebook_path_arg, ast.Constant):
-                notebook_path = notebook_path_arg.value
-                parent.register_notebook(Path(notebook_path), call_problems.append)
-                call_problems = [
-                    problem.replace(
-                        source_path=self._path,
-                        start_line=call.lineno,
-                        start_col=call.col_offset,
-                        end_line=call.end_lineno or 0,
-                        end_col=call.end_col_offset or 0,
-                    )
-                    for problem in call_problems
-                ]
-                parent.add_problems(call_problems)
-                continue
-            problem = DependencyProblem(
-                code='dependency-not-constant',
-                message="Can't check dependency not provided as a constant",
-                source_path=self._path,
-                start_line=call.lineno,
-                start_col=call.col_offset,
-                end_line=call.end_lineno or 0,
-                end_col=call.end_col_offset or 0,
-            )
-            parent.add_problems([problem])
-        # TODO https://github.com/databrickslabs/ucx/issues/1287
-        for pair in PythonLinter.list_import_sources(linter):
-            import_name = pair[0]
-            import_problems: list[DependencyProblem] = []
-            parent.register_import(import_name, import_problems.append)
-            node = pair[1]
-            import_problems = [
-                problem.replace(
-                    source_path=self._path,
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno or 0,
-                    end_col=node.end_col_offset or 0,
-                )
-                for problem in import_problems
-            ]
-            parent.add_problems(import_problems)
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def __repr__(self):
+        return f"<LocalFile {self._path}>"
 
 
 class LocalFileMigrator:
@@ -148,55 +96,59 @@ class LocalFileMigrator:
 
 
 class FileLoader(DependencyLoader):
-
-    def __init__(self, path_lookup: PathLookup):
-        self._path_lookup = path_lookup
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        fullpath = self.full_path(dependency.path)
-        assert fullpath is not None
-        return LocalFile(fullpath, fullpath.read_text("utf-8"), Language.PYTHON)
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        absolute_path = path_lookup.resolve(dependency.path)
+        if not absolute_path:
+            return None
+        return LocalFile(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
 
     def exists(self, path: Path) -> bool:
-        return self.full_path(path) is not None
+        return path.exists()
 
-    def full_path(self, path: Path) -> Path | None:
-        if path.is_file():
-            return path
-        for parent in self._path_lookup.paths:
-            child = Path(parent, path)
-            if child.is_file():
-                return child
-        return None
-
-    def is_notebook(self, path: Path) -> bool:
-        fullpath = self.full_path(path)
-        if fullpath is None:
-            return False
-        with fullpath.open(mode="r", encoding="utf-8") as stream:
-            line = stream.readline()
-            return NOTEBOOK_HEADER in line
+    def __repr__(self):
+        return "FileLoader()"
 
 
-class LocalFileResolver(BaseDependencyResolver):
+class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, next_resolver: BaseDependencyResolver | None = None):
+    def __init__(self, file_loader: FileLoader, next_resolver: BaseImportResolver | None = None):
         super().__init__(next_resolver)
         self._file_loader = file_loader
 
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
         return LocalFileResolver(self._file_loader, resolver)
 
-    # TODO problem_collector is tactical, pending https://github.com/databrickslabs/ucx/issues/1559
-    def resolve_local_file(
-        self, path: Path, problem_collector: Callable[[DependencyProblem], None]
-    ) -> Dependency | None:
-        if self._file_loader.exists(path) and not self._file_loader.is_notebook(path):
-            return Dependency(self._file_loader, path)
-        return super().resolve_local_file(path, problem_collector)
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+        absolute_path = path_lookup.resolve(path)
+        if absolute_path:
+            return MaybeDependency(Dependency(self._file_loader, absolute_path), [])
+        problem = DependencyProblem("file-not-found", f"File not found: {path.as_posix()}")
+        return MaybeDependency(None, [problem])
 
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        fullpath = self._file_loader.full_path(Path(f"{name}.py"))
-        if fullpath is not None:
-            return Dependency(self._file_loader, fullpath)
-        return super().resolve_import(name, problem_collector)
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        if not name:
+            return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
+        parts = []
+        # Relative imports use leading dots. A single leading dot indicates a relative import, starting with
+        # the current package. Two or more leading dots indicate a relative import to the parent(s) of the current
+        # package, one level per dot after the first.
+        # see https://docs.python.org/3/reference/import.html#package-relative-imports
+        for i, rune in enumerate(name):
+            if not i and rune == '.':  # leading single dot
+                parts.append(path_lookup.cwd.as_posix())
+                continue
+            if rune != '.':
+                parts.append(name[i:].replace('.', '/'))
+                break
+            parts.append("..")
+        for candidate in (f'{"/".join(parts)}.py', f'{"/".join(parts)}/__init__.py'):
+            relative_path = Path(candidate)
+            absolute_path = path_lookup.resolve(relative_path)
+            if not absolute_path:
+                continue
+            dependency = Dependency(self._file_loader, absolute_path)
+            return MaybeDependency(dependency, [])
+        return super().resolve_import(path_lookup, name)
+
+    def __repr__(self):
+        return "LocalFileResolver()"

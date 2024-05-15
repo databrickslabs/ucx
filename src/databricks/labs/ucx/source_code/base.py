@@ -86,6 +86,7 @@ class Fixer:
 
 # The default schema to use when the schema is not specified in a table reference
 # See: https://spark.apache.org/docs/3.0.0-preview/sql-ref-syntax-qry-select-usedb.html
+DEFAULT_CATALOG = 'hive_metastore'
 DEFAULT_SCHEMA = 'default'
 
 
@@ -97,10 +98,12 @@ class CurrentSessionState:
     This class can be used to track various aspects of a session, such as the current schema.
 
     Attributes:
+        catalog (str): The current schema of the session. If not provided, it defaults to 'DEFAULT_CATALOG'.
         schema (str): The current schema of the session. If not provided, it defaults to 'DEFAULT_SCHEMA'.
     """
 
     schema: str = DEFAULT_SCHEMA
+    catalog: str = DEFAULT_CATALOG
 
 
 class SequentialLinter(Linter):

@@ -27,14 +27,30 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow(workflow)
 
+    # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
+    migration_status_query = f"SELECT * FROM {ctx.config.inventory_database}.migration_status"
+    migration_statuses = list(ctx.sql_backend.fetch(migration_status_query))
+
+    assert len(migration_statuses) > 0, "No migration statuses found"
+
+    asserts = []
     for table in tables.values():
-        # Avoiding MigrationStatusRefresh as it will refresh the status before fetching
-        query_migration_status = (
-            f"SELECT * FROM {ctx.config.inventory_database}.migration_status "
-            f"WHERE src_schema = '{table.schema_name}' AND src_table = '{table.name}'"
-        )
-        migration_status = list(ctx.sql_backend.fetch(query_migration_status))
+        migration_status = []
+        for status in migration_statuses:
+            if status.src_schema == table.schema_name and status.src_table == table.name:
+                migration_status.append(status)
+
         assert_message_postfix = f" found for {table.table_type} {table.full_name}"
-        assert len(migration_status) == 1, "No migration status" + assert_message_postfix
-        assert migration_status[0].dst_schema is not None, "No destination schema" + assert_message_postfix
-        assert migration_status[0].dst_table is not None, "No destination table" + assert_message_postfix
+        if len(migration_status) == 0:
+            asserts.append("No migration status" + assert_message_postfix)
+        elif len(migration_status) > 1:
+            asserts.append("Multiple migration statuses" + assert_message_postfix)
+        elif migration_status[0].dst_schema is None:
+            asserts.append("No destination schema" + assert_message_postfix)
+        elif migration_status[0].dst_table is None:
+            asserts.append("No destination table" + assert_message_postfix)
+
+    assert_message = (
+        "\n".join(asserts) + " given migration statuses " + "\n".join([str(status) for status in migration_statuses])
+    )
+    assert len(asserts) == 0, assert_message

@@ -43,7 +43,9 @@ from databricks.sdk.service.sql import (
     GetResponse,
     ObjectTypePlural,
     Query,
-    QueryInfo,
+    Dashboard,
+    WidgetOptions,
+    WidgetPosition,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -558,7 +560,7 @@ def make_secret_scope_acl(ws):
 def make_notebook(ws, make_random):
     def create(
         *,
-        path: str | None = None,
+        path: str | Path | None = None,
         content: BinaryIO | None = None,
         language: Language = Language.PYTHON,
         format: ImportFormat = ImportFormat.SOURCE,  # pylint:  disable=redefined-builtin
@@ -566,6 +568,8 @@ def make_notebook(ws, make_random):
     ) -> str:
         if path is None:
             path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+        elif isinstance(path, pathlib.Path):
+            path = str(path)
         if content is None:
             content = io.BytesIO(b"print(1)")
         path = str(path)
@@ -621,6 +625,7 @@ def _make_group(name, cfg, interface, make_random):
         roles: list[str] | None = None,
         entitlements: list[str] | None = None,
         display_name: str | None = None,
+        wait_for_provisioning: bool = False,
         **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
@@ -636,6 +641,14 @@ def _make_group(name, cfg, interface, make_random):
             logger.info(f"Account group {group.display_name}: {cfg.host}/users/groups/{group.id}/members")
         else:
             logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
+
+        @retried(on=[NotFound], timeout=timedelta(minutes=2))
+        def _wait_for_provisioning() -> None:
+            interface.get(group.id)
+
+        if wait_for_provisioning:
+            _wait_for_provisioning()
+
         return group
 
     yield from factory(name, create, lambda item: interface.delete(item.id))
@@ -754,43 +767,33 @@ def make_instance_pool(ws, make_random):
 
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
-    def create(**kwargs):
+    def create(notebook_path: str | Path | None = None, **kwargs):
         task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
+        if isinstance(notebook_path, pathlib.Path):
+            notebook_path = str(notebook_path)
+        if not notebook_path:
+            notebook_path = make_notebook()
+        assert notebook_path is not None
         if "tasks" not in kwargs:
-            if task_spark_conf:
-                kwargs["tasks"] = [
-                    jobs.Task(
-                        task_key=make_random(4),
-                        description=make_random(4),
-                        new_cluster=compute.ClusterSpec(
-                            num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                            spark_version=ws.clusters.select_spark_version(latest=True),
-                            spark_conf=task_spark_conf,
-                        ),
-                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                        timeout_seconds=0,
-                    )
-                ]
-            else:
-                kwargs["tasks"] = [
-                    jobs.Task(
-                        task_key=make_random(4),
-                        description=make_random(4),
-                        new_cluster=compute.ClusterSpec(
-                            num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
-                            spark_version=ws.clusters.select_spark_version(latest=True),
-                        ),
-                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                        timeout_seconds=0,
-                    )
-                ]
+            kwargs["tasks"] = [
+                jobs.Task(
+                    task_key=make_random(4),
+                    description=make_random(4),
+                    new_cluster=compute.ClusterSpec(
+                        num_workers=1,
+                        node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                        spark_version=ws.clusters.select_spark_version(latest=True),
+                        spark_conf=task_spark_conf,
+                    ),
+                    notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
+                    timeout_seconds=0,
+                )
+            ]
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
         return job
@@ -1130,13 +1133,14 @@ def make_udf(
 
 @pytest.fixture
 def make_query(ws, make_table, make_random):
-    def create() -> QueryInfo:
+    def create() -> Query:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
         query = ws.queries.create(
-            name=f"{query_name}",
+            name=query_name,
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
+            tags=["original_query_tag"],
         )
         logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
@@ -1272,3 +1276,49 @@ def make_storage_dir(ws, env_or_skip):
             ws.dbfs.delete(path, recursive=True)
 
     yield from factory("make_storage_dir", create, remove)
+
+
+@pytest.fixture
+def make_dashboard(ws, make_random, make_query):
+    def create() -> Dashboard:
+        query = make_query()
+        viz = ws.query_visualizations.create(
+            type="table",
+            query_id=query.id,
+            options={
+                "itemsPerPage": 1,
+                "condensed": True,
+                "withRowNumber": False,
+                "version": 2,
+                "columns": [
+                    {"name": "id", "title": "id", "allowSearch": True},
+                ],
+            },
+        )
+
+        dashboard_name = f"ucx_D{make_random(4)}"
+        dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
+        ws.dashboard_widgets.create(
+            dashboard_id=dashboard.id,
+            visualization_id=viz.id,
+            width=1,
+            options=WidgetOptions(
+                title="",
+                position=WidgetPosition(
+                    col=0,
+                    row=0,
+                    size_x=3,
+                    size_y=3,
+                ),
+            ),
+        )
+        logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
+        return dashboard
+
+    def remove(dashboard: Dashboard):
+        try:
+            ws.dashboards.delete(dashboard_id=dashboard.id)
+        except RuntimeError as e:
+            logger.info(f"Can't delete dashboard {e}")
+
+    yield from factory("dashboard", create, remove)

@@ -1,55 +1,30 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable
-from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.graph import (
-    Dependency,
-    WrappingLoader,
-    SourceContainer,
-    DependencyGraph,
-    BaseDependencyResolver,
-    DependencyProblem,
-)
 
-
-class SitePackagesResolver(BaseDependencyResolver):
-
-    def __init__(
-        self,
-        site_packages: SitePackages,
-        file_loader: FileLoader,
-        path_lookup: PathLookup,
-        next_resolver: BaseDependencyResolver | None = None,
-    ):
-        super().__init__(next_resolver)
-        self._site_packages = site_packages
-        self._file_loader = file_loader
-        self._path_lookup = path_lookup
-
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return SitePackagesResolver(self._site_packages, self._file_loader, self._path_lookup, resolver)
-
-    def resolve_import(self, name: str, problem_collector: Callable[[DependencyProblem], None]) -> Dependency | None:
-        site_package = self._site_packages[name]
-        if site_package is not None:
-            container = SitePackageContainer(self._file_loader, site_package)
-            return Dependency(WrappingLoader(container), Path(name))
-        return super().resolve_import(name, problem_collector)
-
-
+COMMENTED_OUT_FOR_PR_1685 = """
 class SitePackageContainer(SourceContainer):
 
     def __init__(self, file_loader: FileLoader, site_package: SitePackage):
         self._file_loader = file_loader
         self._site_package = site_package
 
-    def build_dependency_graph(self, parent: DependencyGraph, path_lookup: PathLookup) -> None:
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        problems: list[DependencyProblem] = []
         for module_path in self._site_package.module_paths:
-            parent.register_dependency(Dependency(self._file_loader, module_path))
+            maybe = parent.register_dependency(Dependency(self._file_loader, module_path))
+            if maybe.problems:
+                problems.extend(maybe.problems)
+        return problems
+
+    @property
+    def paths(self):
+        return self._site_package.module_paths
+
+    def __repr__(self):
+        return f"<SitePackageContainer {self._site_package}>"
+"""
 
 
 class SitePackages:
@@ -70,7 +45,6 @@ class SitePackages:
         return self._packages.get(item, None)
 
 
-@dataclass
 class SitePackage:
 
     @staticmethod
@@ -104,3 +78,6 @@ class SitePackage:
     @property
     def module_paths(self) -> list[Path]:
         return [Path(self._dist_info_path.parent, path) for path in self._module_paths]
+
+    def __repr__(self):
+        return f"<SitePackage {self._dist_info_path}>"

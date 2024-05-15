@@ -62,6 +62,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 from databricks.labs.ucx.runtime import Workflows
+from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.generic import WorkspaceObjectInfo
 from databricks.labs.ucx.workspace_access.groups import ConfigureGroups, MigratedGroup
@@ -101,6 +102,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "submit_runs", SubmitRunInfo),
             functools.partial(table, "policies", PolicyInfo),
             functools.partial(table, "migration_status", MigrationStatus),
+            functools.partial(table, "workflow_problems", JobProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
         ],
@@ -210,8 +212,6 @@ class WorkspaceInstaller(WorkspaceContext):
         num_threads = int(self.prompts.question("Number of threads", default="8", valid_number=True))
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
-        # Check if terraform is being used
-        is_terraform_used = self.prompts.confirm("Do you use Terraform to deploy your infrastructure?")
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         return WorkspaceConfig(
@@ -224,7 +224,6 @@ class WorkspaceInstaller(WorkspaceContext):
             renamed_group_prefix=configure_groups.renamed_group_prefix,
             log_level=log_level,
             num_threads=num_threads,
-            is_terraform_used=is_terraform_used,
             include_databases=include_databases,
             trigger_job=trigger_job,
         )
@@ -611,36 +610,6 @@ class AccountInstaller(AccountContext):
         account_id = self.prompts.question("Please provide the Databricks account id")
         return AccountClient(host=host, account_id=account_id, product="ucx", product_version=__version__)
 
-    def _can_administer(self, workspace: Workspace):
-        # TODO: move to AccountWorkspaces
-        try:
-            # check if user is a workspace admin
-            ws = self.account_client.get_workspace_client(workspace)
-            current_user = ws.current_user.me()
-            if current_user.groups is None:
-                return False
-            if "admins" not in [g.display for g in current_user.groups]:
-                logger.warning(
-                    f"{workspace.deployment_name}: User {current_user.user_name} is not a workspace admin. Skipping..."
-                )
-                return False
-            # check if user has access to workspace
-        except (PermissionDenied, NotFound, ValueError) as err:
-            logger.warning(f"{workspace.deployment_name}: Encounter error {err}. Skipping...")
-            return False
-        return True
-
-    def _get_accessible_workspaces(self):
-        """
-        Get all workspaces that the user has access to
-        """
-        # TODO: move to AccountWorkspaces
-        accessible_workspaces = []
-        for workspace in self.account_client.workspaces.list():
-            if self._can_administer(workspace):
-                accessible_workspaces.append(workspace)
-        return accessible_workspaces
-
     def _get_installer(self, workspace: Workspace) -> WorkspaceInstaller:
         workspace_client = self.account_client.get_workspace_client(workspace)
         logger.info(f"Installing UCX on workspace {workspace.deployment_name}")
@@ -650,7 +619,7 @@ class AccountInstaller(AccountContext):
         ctx = AccountContext(self._get_safe_account_client())
         default_config = None
         confirmed = False
-        accessible_workspaces = self._get_accessible_workspaces()
+        accessible_workspaces = self.account_workspaces.get_accessible_workspaces()
         msg = "\n".join([w.deployment_name for w in accessible_workspaces])
         installed_workspaces = []
         if not self.prompts.confirm(
@@ -683,6 +652,80 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
+    def join_collection(
+        self,
+        current_workspace_id: int,
+    ):
+        if not self.is_account_install and self.prompts.confirm(
+            "Do you want to join the current installation to an existing collection?"
+        ):
+
+            installed_workspaces: list[Workspace] | None = []
+            accessible_workspaces: list[Workspace] = []
+            account_client = self._get_safe_account_client()
+            ctx = AccountContext(account_client)
+            try:
+                accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
+            except PermissionDenied:
+                logger.warning("User doesnt have account admin permission, cant join a collection, skipping...")
+            collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
+            if collection_workspace is not None:
+                installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id, account_client)
+            if installed_workspaces is not None:
+                ctx.account_workspaces.sync_workspace_info(installed_workspaces)
+
+    def _sync_collection(
+        self,
+        collection_workspace: Workspace,
+        current_workspace_id: int,
+        account_client: AccountClient,
+    ) -> list[Workspace] | None:
+        installer = self._get_installer(collection_workspace)
+        installed_workspace_ids = installer.config.installed_workspace_ids
+        if installed_workspace_ids is None:
+            installed_workspace_ids = []
+            logger.warning(
+                f"Workspace {collection_workspace.deployment_name} does not belong to any existing "
+                f"collection, creating a new collection"
+            )
+        installed_workspace_ids.append(current_workspace_id)
+        installed_workspaces = []
+        for account_workspace in account_client.workspaces.list():
+            if account_workspace.workspace_id in installed_workspace_ids:
+                installed_workspaces.append(account_workspace)
+
+        for installed_workspace in installed_workspaces:
+            installer = self._get_installer(installed_workspace)
+            installer.replace_config(installed_workspace_ids=installed_workspace_ids)
+        return installed_workspaces
+
+    def _get_collection_workspace(
+        self,
+        accessible_workspaces: list[Workspace],
+        account_client: AccountClient,
+    ) -> Workspace | None:
+        installed_workspaces = []
+        for workspace in accessible_workspaces:
+            workspace_client = account_client.get_workspace_client(workspace)
+            workspace_installation = Installation.existing(workspace_client, self.product_info.product_name())
+            if len(workspace_installation) > 0:
+                installed_workspaces.append(workspace)
+
+        if len(installed_workspaces) == 0:
+            logger.warning("No existing installation found , setting up new installation without")
+            return None
+        workspaces = {
+            workspace.deployment_name: workspace
+            for workspace in installed_workspaces
+            if workspace.deployment_name is not None
+        }
+        workspace = self.prompts.choice_from_dict(
+            "Please select a workspace, the current installation of ucx will be grouped as a "
+            "collection with the selected workspace",
+            workspaces,
+        )
+        return workspace
+
 
 if __name__ == "__main__":
     logger = get_logger(__file__)
@@ -690,9 +733,10 @@ if __name__ == "__main__":
         logging.getLogger('databricks').setLevel(logging.DEBUG)
     env = dict(os.environ.items())
     force_install = env.get("UCX_FORCE_INSTALL")
+    account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
     if force_install == "account":
-        account_installer = AccountInstaller(AccountClient(product="ucx", product_version=__version__))
         account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
         workspace_installer.run()
+        account_installer.join_collection(workspace_installer.workspace_client.get_workspace_id())

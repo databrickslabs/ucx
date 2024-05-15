@@ -5,17 +5,15 @@ from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
 from pathlib import Path
-from collections.abc import Callable
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
-
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
 
+NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
 MAGIC_PREFIX = 'MAGIC'
 LANGUAGE_PREFIX = '%'
@@ -49,15 +47,17 @@ class Cell(ABC):
     @property
     @abstractmethod
     def language(self) -> CellLanguage:
-        raise NotImplementedError()
+        """returns the language of this cell"""
 
     @abstractmethod
     def is_runnable(self) -> bool:
-        raise NotImplementedError()
+        """whether of not this cell can be run"""
 
-    @abstractmethod
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        raise NotImplementedError()
+    def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
+        return []
+
+    def __repr__(self):
+        return f"{self.language.name}: {self._original_code[:20]}"
 
 
 class PythonCell(Cell):
@@ -73,8 +73,8 @@ class PythonCell(Cell):
         except SyntaxError:
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        parent.build_graph_from_python_source(self._original_code, problem_collector)
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return parent.build_graph_from_python_source(self._original_code)
 
 
 class RCell(Cell):
@@ -86,9 +86,6 @@ class RCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        pass  # not in scope
-
 
 class ScalaCell(Cell):
 
@@ -98,9 +95,6 @@ class ScalaCell(Cell):
 
     def is_runnable(self) -> bool:
         return True  # TODO
-
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        pass  # TODO
 
 
 class SQLCell(Cell):
@@ -117,9 +111,6 @@ class SQLCell(Cell):
             sqlglot_logger.warning(f"Failed to parse SQL using 'sqlglot': {self._original_code}", exc_info=e)
             return True
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        pass  # not in scope
-
 
 class MarkdownCell(Cell):
 
@@ -129,9 +120,6 @@ class MarkdownCell(Cell):
 
     def is_runnable(self) -> bool:
         return True  # TODO
-
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        pass  # not in scope
 
 
 class RunCell(Cell):
@@ -143,7 +131,7 @@ class RunCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for idx, line in enumerate(lines):
@@ -153,15 +141,13 @@ class RunCell(Cell):
                 path = path.strip().strip("'").strip('"')
                 if len(path) == 0:
                     continue
-                problems: list[DependencyProblem] = []
-                parent.register_notebook(Path(path), problems.append)
+                notebook_path = Path(path)
                 start_line = self._original_offset + idx + 1
-                for problem in problems:
-                    problem = problem.replace(
-                        start_line=start_line, start_col=0, end_line=start_line, end_col=len(line)
-                    )
-                    problem_collector(problem)
-                return
+                problems = parent.register_notebook(notebook_path)
+                return [
+                    problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
+                    for problem in problems
+                ]
         start_line = self._original_offset + 1
         problem = DependencyProblem(
             'invalid-run-cell',
@@ -171,7 +157,7 @@ class RunCell(Cell):
             end_line=start_line,
             end_col=len(self._original_code),
         )
-        problem_collector(problem)
+        return [problem]
 
     def migrate_notebook_path(self):
         pass
@@ -186,12 +172,6 @@ class ShellCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        pass  # nothing to do
-
-    def migrate_notebook_path(self):
-        pass  # nothing to do
-
 
 class PipCell(Cell):
 
@@ -202,11 +182,9 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, parent: DependencyGraph, problem_collector: Callable[[DependencyProblem], None]):
-        pass  # nothing to do
-
-    def migrate_notebook_path(self):
-        pass
+    def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
+        # TODO: https://github.com/databrickslabs/ucx/issues/1642
+        return []
 
 
 class CellLanguage(Enum):
@@ -229,6 +207,10 @@ class CellLanguage(Enum):
         # PI stands for Processing Instruction
         self._requires_isolated_pi = args[3]
         self._new_cell = args[4]
+
+    @property
+    def file_magic_header(self):
+        return f"{self._comment_prefix} {NOTEBOOK_HEADER}"
 
     @property
     def language(self) -> Language:
@@ -277,8 +259,7 @@ class CellLanguage(Enum):
 
     def extract_cells(self, source: str) -> list[Cell] | None:
         lines = source.split('\n')
-        header = f"{self.comment_prefix} {NOTEBOOK_HEADER}"
-        if not lines[0].startswith(header):
+        if not lines[0].startswith(self.file_magic_header):
             raise ValueError("Not a Databricks notebook source!")
 
         def make_cell(cell_lines: list[str], start: int):

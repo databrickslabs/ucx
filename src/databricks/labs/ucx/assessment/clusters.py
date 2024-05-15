@@ -100,9 +100,9 @@ class CheckClusterMixin(CheckInitScriptMixin):
 
     def _check_spark_conf(self, conf: dict[str, str], source: str) -> list[str]:
         failures: list[str] = []
-        for k in INCOMPATIBLE_SPARK_CONFIG_KEYS:
-            if k in conf:
-                failures.append(f"unsupported config: {k}")
+        for key, error in INCOMPATIBLE_SPARK_CONFIG_KEYS.items():
+            if key in conf:
+                failures.append(f"{error}: {key} in {source}.")
         for value in conf.values():
             if "dbfs:/mnt" in value or "/dbfs/mnt" in value:
                 failures.append(f"using DBFS mount in configuration: {value}")

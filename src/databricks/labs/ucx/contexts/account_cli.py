@@ -1,4 +1,5 @@
 from functools import cached_property
+from os import environ
 
 from databricks.sdk import AccountClient
 
@@ -29,6 +30,10 @@ class AccountContext(CliContext):
     @cached_property
     def account_aggregate(self):
         return AccountAggregate(self.account_workspaces)
+
+    @cached_property
+    def is_account_install(self):
+        return environ.get("UCX_FORCE_INSTALL") == "account"
 
     @cached_property
     def account_metastores(self):

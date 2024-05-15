@@ -33,11 +33,11 @@ class Matcher(ABC):
 
     @abstractmethod
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
-        raise NotImplementedError()
+        """raises Advices by linting the code"""
 
     @abstractmethod
     def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
-        raise NotImplementedError()
+        """applies recommendations"""
 
     def _get_table_arg(self, node: ast.Call):
         if len(node.args) > 0:
@@ -230,6 +230,7 @@ class SparkMatchers:
             TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("getTable", 1, 1, 0),
+            TableNameMatcher("table", 1, 1, 0),
             TableNameMatcher("isCached", 1, 1, 0),
             TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
             TableNameMatcher("tableExists", 1, 2, 0, "tableName"),

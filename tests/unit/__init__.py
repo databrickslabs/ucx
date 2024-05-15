@@ -1,30 +1,25 @@
 import base64
 import dataclasses
+import io
 import json
 import logging
 import os
-import pathlib
+from pathlib import Path
 from unittest.mock import create_autospec
-from typing import BinaryIO
 
+import yaml
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.lsql.backends import MockBackend
-from databricks.labs.ucx.source_code.notebooks.loaders import LocalNotebookLoader
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service.compute import ClusterDetails, Policy
 from databricks.sdk.service.jobs import BaseJob, BaseRun
 from databricks.sdk.service.pipelines import GetPipelineResponse, PipelineStateInfo
 from databricks.sdk.service.sql import EndpointConfPair
-from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, Language
-
+from databricks.sdk.service.workspace import ExportResponse, GetSecretResponse, ObjectInfo
+from databricks.sdk.service import iam
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping, TableToMigrate
-from databricks.labs.ucx.source_code.graph import SourceContainer, Dependency
-from databricks.labs.ucx.source_code.files import LocalFile, FileLoader
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook
-from databricks.labs.ucx.source_code.notebooks.base import NOTEBOOK_HEADER
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.graph import SourceContainer
 
 logging.getLogger("tests").setLevel("DEBUG")
 
@@ -57,7 +52,7 @@ PERMISSIONS = MockBackend.rows(
     "raw",
 )
 
-__dir = pathlib.Path(__file__).parent
+__dir = Path(__file__).parent
 
 
 def _base64(filename: str):
@@ -127,6 +122,7 @@ def _id_list(cls: type, ids=None):
 
 
 def _load_sources(cls: type, *filenames: str):
+    # TODO: remove the usage of it in favor of MockPathLookup
     if not filenames:
         return []
     installation = MockInstallation(DEFAULT_CONFIG | {_: _load_source(f'{_FOLDERS[cls]}/{_}') for _ in filenames})
@@ -156,147 +152,7 @@ def _secret_not_found(secret_scope, _):
     raise NotFound(msg)
 
 
-# can't remove **kwargs because it receives format=xxx
-# pylint: disable=unused-argument
-def _download_side_effect(sources: dict[str, str], visited: dict[str, bool], *args, **kwargs):
-    filename = args[0]
-    if filename.startswith('./'):
-        filename = filename[2:]
-    visited[filename] = True
-    source = sources.get(filename, None)
-    if filename.find(".py") < 0:
-        filename = filename + ".py"
-    if filename.find(".txt") < 0:
-        filename = filename + ".txt"
-    result = create_autospec(BinaryIO)
-    if source is None:
-        source = sources.get(filename)
-    assert source is not None
-    result.__enter__.return_value.read.return_value = source.encode("utf-8")
-    return result
-
-
-def _load_dependency_side_effect(sources: dict[str, str], visited: dict[str, bool], *args):
-    dependency = args[0]
-    filename = str(dependency.path)
-    is_package_file = os.path.isfile(dependency.path)
-    if is_package_file:
-        with dependency.path.open("r") as f:
-            source = f.read()
-    else:
-        if filename.startswith('./'):
-            filename = filename[2:]
-        visited[filename] = True
-        source = sources.get(filename, None)
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        if source is None:
-            source = sources.get(filename)
-    assert source is not None
-    if NOTEBOOK_HEADER in source:
-        return Notebook.parse(pathlib.Path(filename), source, Language.PYTHON)
-    return LocalFile(pathlib.Path(filename), source, Language.PYTHON)
-
-
-def _is_notebook_side_effect(sources: dict[str, str], *args):
-    dependency = args[0]
-    filename = dependency.path.as_posix()
-    if filename.startswith('./'):
-        filename = filename[2:]
-    source = sources.get(filename, None)
-    if filename.find(".py") < 0:
-        filename = filename + ".py"
-    if filename.find(".txt") < 0:
-        filename = filename + ".txt"
-    if source is None:
-        source = sources.get(filename)
-    assert source is not None
-    return NOTEBOOK_HEADER in source
-
-
-def _full_path_side_effect(sources: dict[str, str], *args):
-    path = args[0]
-    filename = path.as_posix()
-    if filename.startswith('./'):
-        filename = filename[2:]
-    if filename in sources:
-        return pathlib.Path(filename)
-    if filename.find(".py") < 0:
-        filename = filename + ".py"
-    if filename.find(".txt") < 0:
-        filename = filename + ".txt"
-    if filename in sources:
-        return pathlib.Path(filename)
-    return None
-
-
-def _is_file_side_effect(sources: dict[str, str], *args):
-    return _full_path_side_effect(sources, *args) is not None
-
-
-def _local_loader_with_side_effects(cls: type, sources: dict[str, str], visited: dict[str, bool]):
-    file_loader = create_autospec(cls)
-    file_loader.exists.side_effect = lambda *args, **kwargs: _is_file_side_effect(sources, *args)
-    file_loader.is_notebook.return_value = False
-    file_loader.full_path.side_effect = lambda *args: _full_path_side_effect(sources, *args)
-    file_loader.load_dependency.side_effect = lambda *args, **kwargs: _load_dependency_side_effect(
-        sources, visited, *args
-    )
-    return file_loader
-
-
-class TestFileLoader(FileLoader):
-    __test__ = False
-
-    def __init__(self, path_lookup: PathLookup, sources: dict[str, str]):
-        super().__init__(path_lookup)
-        self._sources = sources
-
-    def exists(self, path: pathlib.Path):
-        if super().exists(path):
-            return True
-        filename = path.as_posix()
-        if filename.startswith('./'):
-            filename = filename[2:]
-        if filename in self._sources:
-            return True
-        if filename.find(".py") < 0:
-            filename = filename + ".py"
-        if filename.find(".txt") < 0:
-            filename = filename + ".txt"
-        return filename in self._sources
-
-
-class VisitingFileLoader(FileLoader):
-    __test__ = False
-
-    def __init__(self, path_lookup: PathLookup, visited: dict[str, bool]):
-        super().__init__(path_lookup)
-        self._visited = visited
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        container = super().load_dependency(dependency)
-        if isinstance(container, LocalFile):
-            self._visited[container.path.as_posix()] = True
-        return container
-
-
-class VisitingNotebookLoader(LocalNotebookLoader):
-
-    def __init__(self, path_lookup: PathLookup, visited: dict[str, bool]):
-        super().__init__(path_lookup)
-        self._visited = visited
-
-    def load_dependency(self, dependency: Dependency) -> SourceContainer | None:
-        container = super().load_dependency(dependency)
-        if isinstance(container, Notebook):
-            self._visited[container.path.as_posix()] = True
-        return container
-
-
-def workspace_client_mock(
+def mock_workspace_client(
     cluster_ids: list[str] | None = None,
     pipeline_ids: list[str] | None = None,
     job_ids: list[str] | None = None,
@@ -306,11 +162,13 @@ def workspace_client_mock(
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.list.return_value = _id_list(Policy, policy_ids)
     ws.cluster_policies.get = _cluster_policy
     ws.pipelines.list_pipelines.return_value = _id_list(PipelineStateInfo, pipeline_ids)
     ws.pipelines.get = _pipeline
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
     ws.jobs.list.return_value = _id_list(BaseJob, job_ids)
     ws.jobs.list_runs.return_value = _id_list(BaseRun, jobruns_ids)
     ws.warehouses.get_workspace_warehouse_config().data_access_config = _load_list(EndpointConfPair, warehouse_config)
@@ -319,23 +177,29 @@ def workspace_client_mock(
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
     else:
         ws.secrets.get_secret = _secret_not_found
+    download_yaml = yaml.dump(
+        {
+            'version': 1,
+            'inventory_database': 'ucx_exists',
+            'connect': {
+                'host': '...',
+                'token': '...',
+            },
+            'installed_workspace_ids': [123, 456],
+        }
+    )
+    ws.workspace.download.return_value = io.StringIO(download_yaml)
     return ws
 
 
-def table_mapping_mock(tables: list[str] | None = None):
+def mock_table_mapping(tables: list[str] | None = None):
     table_mapping = create_autospec(TableMapping)
     table_mapping.get_tables_to_migrate.return_value = _id_list(TableToMigrate, tables)
     return table_mapping
 
 
-def whitelist_mock():
-    wls = create_autospec(Whitelist)
-    wls.compatibility.return_value = None
-    return wls
-
-
-def locate_site_packages() -> pathlib.Path:
-    project_path = pathlib.Path(os.path.dirname(__file__)).parent.parent
-    python_lib_path = pathlib.Path(project_path, ".venv", "lib")
+def locate_site_packages() -> Path:
+    project_path = Path(os.path.dirname(__file__)).parent.parent
+    python_lib_path = Path(project_path, ".venv", "lib")
     actual_python = next(file for file in os.listdir(str(python_lib_path)) if file.startswith("python3."))
-    return pathlib.Path(python_lib_path, actual_python, "site-packages")
+    return Path(python_lib_path, actual_python, "site-packages")

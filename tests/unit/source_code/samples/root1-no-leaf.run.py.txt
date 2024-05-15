@@ -1,0 +1,20 @@
+# Databricks notebook source
+# time horizon
+days = 300
+
+# volatility
+sigma = 0.04
+
+# drift (average growth rate)
+mu = 0.05
+
+# initial starting price
+start_price = 10
+
+# COMMAND ----------
+
+# MAGIC %run "./leaf1.py.txt"
+
+# COMMAND ----------
+
+# MAGIC %run "./__NOT_FOUND__"

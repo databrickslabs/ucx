@@ -50,7 +50,7 @@ Migration Assessment Report
     * [AF300.4 - ML Runtime cpu](#af3004---ml-runtime-cpu)
     * [AF300.5 - ML Runtime gpu](#af3005---ml-runtime-gpu)
     * [AF301.1 - spark.catalog.x](#af3011---sparkcatalogx)
-    * [AF301.2 - spark.catalog.x (spark.\_jsparkSession.catalog)](#af3012---sparkcatalogx-spark_jsparksessioncatalog)
+    * [AF301.2 - spark.catalog.x (spark._jsparkSession.catalog)](#af3012---sparkcatalogx-spark_jsparksessioncatalog)
   * [AF302.x - Arbitrary Java](#af302x---arbitrary-java)
     * [AF302.1 - Arbitrary Java (`spark._jspark`)](#af3021---arbitrary-java-spark_jspark)
     * [AF302.2 - Arbitrary Java (`spark._jvm`)](#af3022---arbitrary-java-spark_jvm)
@@ -105,9 +105,9 @@ Migration Assessment Report
     * [AF314.3 - Distributed ML (`catboost_spark`)](#af3143---distributed-ml-catboost_spark)
     * [AF314.4 - Distributed ML (`ai.catboost:catboost-spark`)](#af3144---distributed-ml-aicatboostcatboost-spark)
     * [AF314.5 - Distributed ML (`hyperopt`)](#af3145---distributed-ml-hyperopt)
-    * [AF314.6 - Distributed ML](#af3146---distributed-ml)
-    * [AF314.7 - Distributed ML](#af3147---distributed-ml)
-    * [AF314.8 - Distributed ML](#af3148---distributed-ml)
+    * [AF314.6 - Distributed ML (`SparkTrials`)](#af3146---distributed-ml-sparktrials)
+    * [AF314.7 - Distributed ML (`horovod.spark`)](#af3147---distributed-ml-horovodspark)
+    * [AF314.8 - Distributed ML (`ray.util.spark`)](#af3148---distributed-ml-rayutilspark)
     * [AF314.9 - Distributed ML (`databricks.automl`)](#af3149---distributed-ml-databricksautoml)
     * [AF308.1 - Graphframes (`from graphframes`)](#af3081---graphframes-from-graphframes)
     * [AF309.1 - Spark ML (`pyspark.ml.`)](#af3091---spark-ml-pysparkml)
@@ -336,14 +336,17 @@ Create a storage CREDENTIAL, then an EXTERNAL LOCATION and possibly external tab
 
 [[back to top](#migration-assessment-report)]
 
-### AF114 - unsupported config
+### AF114 - Uses external Hive metastore config: spark.hadoop.javax.jdo.option.ConnectionURL
 
-A spark config option was found in a cluster compute definition that is incompatible with Unity Catalog based compute. The recommendation is to remove or alter the config. Additionally, Unity Catalog enabled clusters may require a different approach to the same capability. As a transition strategy, "Unassigned" clusters or "Assigned" (including job clusters but not shared clusters) may work.
+Spark configurations for External Hive metastore was found in a cluster definition. Unity Catalog is the recommended approach
+for sharing data across workspaces. The recommendation is to remove the config after migrating the existing tables & views
+using UCX. As a transition strategy, "No Isolation Shared" clusters or "Assigned" clusters will work.
 - `spark.hadoop.javax.jdo.option.ConnectionURL` an external Hive Metastore is in use. Recommend migrating the these tables and schemas to Unity Catalog external tables where they can be shared across workspaces.
+- `spark.databricks.hive.metastore.glueCatalog.enabled` Glue is used as external Hive Metastore. Recommend migrating the these tables and schemas to Unity Catalog external tables where they can be shared across workspaces.
 
 [[back to top](#migration-assessment-report)]
 
-### AF115 - unsupported config: spark.databricks.passthrough.enabled
+### AF115 - Uses passthrough config: spark.databricks.passthrough.enabled.
 
 Passthrough security model is not supported by Unity Catalog. Passthrough mode relied upon file based authorization which is incompatible with Fine Grained Access Controls supported by Unity Catalog.
 Recommend mapping your Passthrough security model to a External Location/Volume/Table/View based security model compatible with Unity Catalog.

@@ -46,9 +46,9 @@ classifiers = [
 
 dependencies = ["databricks-sdk~=0.27.0",
                 "databricks-labs-lsql~=0.4.0",
-                "databricks-labs-blueprint~=0.4.3",
+                "databricks-labs-blueprint>=0.4.3,<0.6.0",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=23.9,<23.14"]
+                "sqlglot>=23.9,<23.16"]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
@@ -111,6 +111,7 @@ skip-string-normalization = true
 cache-dir = ".venv/ruff-cache"
 target-version = "py310"
 line-length = 120
+exclude = ["tests/unit/source_code/samples/*"]
 
 [tool.ruff.lint]
 ignore = [
