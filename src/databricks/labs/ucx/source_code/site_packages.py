@@ -17,7 +17,13 @@ class PipInstaller(BaseLibraryInstaller):
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+    def __init__(self, next_installer: BaseLibraryInstaller | None = None) -> None:
+        super().__init__(next_installer)
+
+    def with_next_installer(self, installer: BaseLibraryInstaller) -> PipInstaller:
+        return PipInstaller(self._next_installer)
+
+    def install_library_pip(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
         """Pip install library and augment path look-up so that is able to resolve the library"""
         # invoke pip install via subprocess to install this library into lib_install_folder
         pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]

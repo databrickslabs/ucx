@@ -24,7 +24,7 @@ class DependencyGraph:
         self,
         dependency: Dependency,
         parent: DependencyGraph | None,
-        installer: BaseLibraryInstaller | None,
+        installer: LibraryInstaller | None,
         resolver: DependencyResolver,
         path_lookup: PathLookup,
     ):
@@ -214,9 +214,47 @@ class BaseLibraryInstaller(abc.ABC):
     they can be registered during dependency graph building.
     """
 
+    def __init__(self, next_installer: BaseLibraryInstaller | None) -> None:
+        self._next_installer = next_installer
+
     @abc.abstractmethod
+    def with_next_installer(self, installer: BaseLibraryInstaller) -> BaseLibraryInstaller:
+        """Chain next installer."""
+
+    @property
+    def next_installer(self):
+        return self._next_installer
+
+    def install_library_pip(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+        """Install a library with pip and augment path look-up so that it is able to resolve the library."""
+        assert self._next_installer is not None
+        return self._next_installer.install_library_pip(path_lookup, library)
+
+
+class StubInstaller(BaseLibraryInstaller):
+    """Last installer in the chain"""
+
+    def __init__(self):
+        super().__init__(None)
+
+    def with_next_installer(self, installer: BaseLibraryInstaller) -> BaseLibraryInstaller:
+        raise NotImplementedError("Should never happen!")
+
+
+class LibraryInstaller:
+    def __init__(self, installers: list[BaseLibraryInstaller]):
+        previous: BaseLibraryInstaller = StubInstaller()
+        for installer in installers:
+            installer = installer.with_next_installer(previous)
+            previous = installer
+        self._installer: BaseLibraryInstaller = previous
+
     def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
         """Install a library and augment path look-up so that it is able to resolve the library."""
+        return self._installer.install_library_pip(path_lookup, library)
+
+    def __repr__(self):
+        return f"<LibraryInstaller {self._installer}>"
 
 
 class Dependency(abc.ABC):

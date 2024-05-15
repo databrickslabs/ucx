@@ -7,7 +7,7 @@ from tests.unit import locate_site_packages
 def test_pip_installer_install_library(mock_path_lookup):
     """Install and resolve pytest"""
     pip_installer = PipInstaller()
-    problems = pip_installer.install_library(mock_path_lookup, "pytest")
+    problems = pip_installer.install_library_pip(mock_path_lookup, "pytest")
 
     assert len(problems) == 0
     assert mock_path_lookup.resolve(Path("pytest")).exists()
@@ -16,7 +16,7 @@ def test_pip_installer_install_library(mock_path_lookup):
 def test_pip_installer_install_library_unknown_library(mock_path_lookup):
     """Installing unknown library returns problem"""
     pip_installer = PipInstaller()
-    problems = pip_installer.install_library(mock_path_lookup, "unknown-library-name")
+    problems = pip_installer.install_library_pip(mock_path_lookup, "unknown-library-name")
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
