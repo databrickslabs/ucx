@@ -64,12 +64,12 @@ class WorkflowTaskContainer(SourceContainer):
         self._ws = ws
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        installation_problems = list(self._install_libraries(parent))
+        installation_problems = list(self._install_task_libraries(parent))
         if len(installation_problems) > 0:
             return installation_problems
         return list(self._register_task_dependencies(parent))
 
-    def _install_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+    def _install_task_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._install_libraries(graph)
         yield from self._install_cluster_libraries(graph)
 
