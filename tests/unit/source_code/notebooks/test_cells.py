@@ -1,17 +1,21 @@
 from pathlib import Path
 from unittest.mock import create_autospec
 
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, LibraryInstaller
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
-from databricks.labs.ucx.source_code.site_packages import PipInstaller
+from databricks.labs.ucx.source_code.notebooks.loaders import (
+    NotebookResolver,
+    NotebookLoader,
+)
+from databricks.labs.ucx.source_code.site_packages import PipResolver
 
 
 def test_pip_cell_language_is_pip():
     assert PipCell("code").language == CellLanguage.PIP
 
 
-def test_pip_cell_build_dependency_graph_invokes_install_library():
+def test_pip_cell_build_dependency_graph_invokes_register_library():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install databricks"
@@ -20,10 +24,10 @@ def test_pip_cell_build_dependency_graph_invokes_install_library():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.install_library.assert_called_once_with("databricks")
+    graph.register_library.assert_called_once_with("databricks")
 
 
-def test_pip_cell_build_dependency_graph_pip_installs_missing_library():
+def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install"
@@ -34,7 +38,7 @@ def test_pip_cell_build_dependency_graph_pip_installs_missing_library():
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
     assert problems[0].message == "Missing arguments in '%pip install'"
-    graph.install_library.assert_not_called()
+    graph.register_library.assert_not_called()
 
 
 def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
@@ -48,14 +52,15 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
     assert problems[0].message == "Unsupported %pip command: installl"
-    graph.install_library.assert_not_called()
+    graph.register_library.assert_not_called()
 
 
 def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_lookup):
     dependency = Dependency(FileLoader(), Path("test"))
-    installer = LibraryInstaller([PipInstaller()])
-    dependency_resolver = DependencyResolver([], mock_path_lookup)
-    graph = DependencyGraph(dependency, None, installer, dependency_resolver, mock_path_lookup)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [PipResolver()], mock_path_lookup)
+    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install unknown-library-name"
     cell = PipCell(code)
@@ -69,9 +74,10 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
 
 def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lookup):
     dependency = Dependency(FileLoader(), Path("test"))
-    installer = LibraryInstaller([PipInstaller()])
-    dependency_resolver = DependencyResolver([], mock_path_lookup)
-    graph = DependencyGraph(dependency, None, installer, dependency_resolver, mock_path_lookup)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver(notebook_resolver, [PipResolver()], mock_path_lookup)
+    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install pytest"
     cell = PipCell(code)
