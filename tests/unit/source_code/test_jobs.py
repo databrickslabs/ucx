@@ -26,9 +26,9 @@ def test_workflow_task_container_build_dependency_graph_empty_task(mock_path_loo
     task = jobs.Task(task_key="test")
 
     workflow_task_container = WorkflowTaskContainer(ws, task)
-    dependency_problems = workflow_task_container.build_dependency_graph(graph)
+    problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(dependency_problems) == 0
+    assert len(problems) == 0
     ws.assert_not_called()
 
 
@@ -39,8 +39,24 @@ def test_workflow_task_container_build_dependency_graph_pytest_pypi_library(mock
     task = jobs.Task(task_key="test", libraries=libraries)
 
     workflow_task_container = WorkflowTaskContainer(ws, task)
-    dependency_problems = workflow_task_container.build_dependency_graph(graph)
+    problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(dependency_problems) == 0
+    assert len(problems) == 0
     assert graph.path_lookup.resolve(Path("pytest")).exists()
+    ws.assert_not_called()
+
+
+def test_workflow_task_container_build_dependency_graph_unknown_pypi_library(mock_path_lookup, graph):
+    """Install unknown PyPi library"""
+    ws = create_autospec(WorkspaceClient)
+    libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install unknown-library-name")
+    assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
     ws.assert_not_called()
