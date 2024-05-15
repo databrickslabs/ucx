@@ -3,7 +3,13 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, LibraryInstaller, StubInstaller
+from databricks.labs.ucx.source_code.graph import (
+    Dependency,
+    DependencyGraph,
+    DependencyResolver,
+    LibraryInstaller,
+    StubInstaller,
+)
 from databricks.labs.ucx.source_code.site_packages import PipInstaller
 
 
