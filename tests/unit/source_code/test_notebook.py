@@ -125,16 +125,16 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
         assert cell.is_runnable()
 
 
-def test_notebook_builds_leaf_dependency_graph(path_lookup):
+def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
-    maybe = dependency_resolver.resolve_notebook(path_lookup, Path("leaf1.py.txt"))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup)
-    container = maybe.dependency.load(path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py.txt"))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    assert graph.all_paths == {path_lookup.cwd / "leaf1.py.txt"}
+    assert graph.all_paths == {mock_path_lookup.cwd / "leaf1.py.txt"}
 
 
 def get_status_side_effect(*args):
@@ -142,70 +142,70 @@ def get_status_side_effect(*args):
     return ObjectInfo(path=path, object_type=ObjectType.NOTEBOOK, language=Language.PYTHON)
 
 
-def test_notebook_builds_depth1_dependency_graph(path_lookup):
+def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
-    maybe = dependency_resolver.resolve_notebook(path_lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup)
-    container = maybe.dependency.load(path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    assert graph.all_paths == {path_lookup.cwd / path for path in paths}
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_depth2_dependency_graph(path_lookup):
+def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
-    maybe = dependency_resolver.resolve_notebook(path_lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup)
-    container = maybe.dependency.load(path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    assert graph.all_paths == {path_lookup.cwd / path for path in paths}
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_dependency_graph_avoiding_duplicates(path_lookup):
+def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
-    maybe = dependency_resolver.resolve_notebook(path_lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup)
-    container = maybe.dependency.load(path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
     # if visited once only, set and list will have same len
-    assert graph.all_paths == {path_lookup.cwd / path for path in paths}
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_cyclical_dependency_graph(path_lookup):
+def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
-    maybe = dependency_resolver.resolve_notebook(path_lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup)
-    container = maybe.dependency.load(path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    assert graph.all_paths == {path_lookup.cwd / path for path in paths}
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_python_dependency_graph(path_lookup):
+def test_notebook_builds_python_dependency_graph(mock_path_lookup):
     paths = ["root4.py.txt", "leaf3.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], path_lookup)
-    maybe = dependency_resolver.resolve_notebook(path_lookup, Path(paths[0]))
-    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, path_lookup)
-    container = maybe.dependency.load(path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    assert graph.all_paths == {path_lookup.cwd / path for path in paths}
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():

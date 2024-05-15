@@ -47,11 +47,11 @@ class Cell(ABC):
     @property
     @abstractmethod
     def language(self) -> CellLanguage:
-        """abstract method"""
+        """returns the language of this cell"""
 
     @abstractmethod
     def is_runnable(self) -> bool:
-        """abstract method"""
+        """whether of not this cell can be run"""
 
     def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
         return []

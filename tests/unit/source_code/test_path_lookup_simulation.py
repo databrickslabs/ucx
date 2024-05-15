@@ -34,7 +34,7 @@ from tests.unit import (
         (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
     ],
 )
-def test_locates_notebooks(source: list[str], expected: int, path_lookup):
+def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
@@ -45,7 +45,7 @@ def test_locates_notebooks(source: list[str], expected: int, path_lookup):
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
-    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
     assert maybe.graph is not None

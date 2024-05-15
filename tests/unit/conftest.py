@@ -108,12 +108,12 @@ class MockPathLookup(PathLookup):
 
 
 @pytest.fixture
-def path_lookup():
+def mock_path_lookup():
     return MockPathLookup()
 
 
 @pytest.fixture
-def notebook_resolver():
+def mock_notebook_resolver():
     resolver = create_autospec(BaseNotebookResolver)
     resolver.resolve_notebook.return_value = None
     return resolver

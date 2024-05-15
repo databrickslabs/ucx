@@ -107,17 +107,17 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         ("", []),
     ],
 )
-def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyProblem], tmp_path, path_lookup):
+def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyProblem], tmp_path, mock_path_lookup):
     sample = tmp_path / "test_detect_s3fs_import.py"
     sample.write_text(source)
-    path_lookup.append_path(tmp_path)
-    yml = path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
+    mock_path_lookup.append_path(tmp_path)
+    yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     whitelist = Whitelist.parse(yml.read_text())
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
-    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, path_lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
 
@@ -139,13 +139,13 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     ),
 )
 def test_detect_s3fs_import_in_dependencies(
-    empty_index, expected: list[DependencyProblem], path_lookup, notebook_resolver
+    empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
 ):
-    yml = path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
+    yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     file_loader = FileLoader()
     whitelist = Whitelist.parse(yml.read_text())
     import_resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
-    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, path_lookup)
-    sample = path_lookup.cwd / "root9.py.txt"
+    dependency_resolver = DependencyResolver(mock_notebook_resolver, import_resolvers, mock_path_lookup)
+    sample = mock_path_lookup.cwd / "root9.py.txt"
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == expected
