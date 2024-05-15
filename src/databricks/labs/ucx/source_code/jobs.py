@@ -159,6 +159,17 @@ class WorkflowTaskContainer(SourceContainer):
             return
         # TODO: https://github.com/databrickslabs/ucx/issues/1637
         # load libraries installed on the referred cluster
+        body = {'cluster_id': self._task.existing_cluster_id}
+        headers = {'Accept': 'application/json', 'Content-Type': 'application/json', }
+        response = self._ws.api_client.do('GET', '/api/2.0/libraries/cluster-status', body=body, headers=headers)
+
+        libraries_from_cluster = []
+        # TODO: Lint the libraries obtained from the cluster
+        # adding library to task is not showing up in cluster libs
+        for library in response['library_statuses']:
+            if 'pypi' in library['library']:
+                libraries_from_cluster.append(library['library']['pypi']['package'])
+
         yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
