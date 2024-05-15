@@ -144,8 +144,10 @@ class CatalogSchema:
         for external_location in self._external_locations:
             if location == external_location.url:
                 return True
-            if location_path.match(f"{external_location.url}/*"):
-                return True
+            if external_location.url is not None:
+                external_location_path = PurePath(external_location.url)
+                if location_path.parts[: len(external_location_path.parts)] == external_location_path.parts:
+                    return True
         return False
 
     def _create_catalog(self, catalog, catalog_storage):
