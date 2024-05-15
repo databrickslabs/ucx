@@ -84,31 +84,17 @@ class WorkflowTaskContainer(SourceContainer):
 
     @staticmethod
     def _register_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
-        if library.pypi:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            problems = graph.register_library(library.pypi.package)
-            if len(problems) > 0:
-                yield from problems
-        if library.jar:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1641
-            problems = graph.register_library(library.jar)
-            if len(problems) > 0:
-                yield from problems
-        if library.egg:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            problems = graph.register_library(library.egg)
-            if len(problems) > 0:
-                yield from problems
-        if library.whl:
-            # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
-            # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            problems = graph.register_library(library.whl)
-            if len(problems) > 0:
-                yield from problems
-        if library.requirements:
-            # TODO: download and add every entry via graph.register_library
-            # TODO: https://github.com/databrickslabs/ucx/issues/1644
-            problems = graph.register_library(library.requirements)
+        libraries = (
+            library.pypi.package if library.pypi else None,  # TODO: https://github.com/databrickslabs/ucx/issues/1642
+            library.jar,  # TODO: https://github.com/databrickslabs/ucx/issues/1641
+            library.egg,  # TODO: https://github.com/databrickslabs/ucx/issues/1643
+            library.whl,  # TODO: https://github.com/databrickslabs/ucx/issues/1640
+            library.requirements,  # TODO: https://github.com/databrickslabs/ucx/issues/1644
+        )
+        for lib in libraries:
+            if lib is None:
+                continue
+            problems = graph.register_library(lib)
             if len(problems) > 0:
                 yield from problems
 
