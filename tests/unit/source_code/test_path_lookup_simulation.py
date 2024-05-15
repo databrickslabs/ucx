@@ -2,15 +2,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader, SitePackageResolver
+from databricks.labs.ucx.source_code.files import LocalFileResolver, FileLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
 from tests.unit import (
     _samples_path,
-    MockPathLookup,
-    locate_site_packages,
 )
 
 
@@ -36,21 +34,18 @@ from tests.unit import (
         (["simulate-sys-path", "via-sys-path", "run_notebook_4.py"], 2),
     ],
 )
-def test_locates_notebooks(source: list[str], expected: int):
+def test_locates_notebooks(source: list[str], expected: int, path_lookup):
     elems = [_samples_path(SourceContainer)]
     elems.extend(source)
     notebook_path = Path(*elems)
-    lookup = MockPathLookup()
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
-    site_packages_path = locate_site_packages()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [
-        SitePackageResolver(file_loader, site_packages_path),
         WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
     ]
-    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, lookup)
+    dependency_resolver = DependencyResolver(notebook_resolver, import_resolvers, path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
     assert maybe.graph is not None
@@ -73,10 +68,8 @@ def test_locates_files(source: list[str], expected: int):
     lookup = PathLookup.from_sys_path(Path.cwd())
     file_loader = FileLoader()
     notebook_loader = NotebookLoader()
-    site_packages_path = locate_site_packages()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [
-        SitePackageResolver(file_loader, site_packages_path),
         WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
     ]
@@ -117,9 +110,7 @@ sys.path.append('{child_dir_path.as_posix()}')
         file_loader = FileLoader()
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
-        site_packages_path = locate_site_packages()
         import_resolvers = [
-            SitePackageResolver(file_loader, site_packages_path, lookup),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]
@@ -160,9 +151,7 @@ def func():
         file_loader = FileLoader()
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
-        site_packages_path = locate_site_packages()
         import_resolvers = [
-            SitePackageResolver(file_loader, site_packages_path, lookup),
             WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
         ]

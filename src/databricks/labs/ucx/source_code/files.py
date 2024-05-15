@@ -152,4 +152,3 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
     def __repr__(self):
         return "LocalFileResolver()"
-
