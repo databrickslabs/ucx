@@ -340,7 +340,7 @@ class DependencyResolver:
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        resolver = self._local_file_resolver()
+        resolver = self._local_file_resolver
         if not resolver:
             problem = DependencyProblem("missing-file-resolver", "Missing resolver for local files")
             return MaybeGraph(None, [problem])
@@ -357,6 +357,7 @@ class DependencyResolver:
             problems = self._make_relative_paths(problems, path)
         return MaybeGraph(graph, problems)
 
+    @property
     def _local_file_resolver(self) -> BaseFileResolver | None:
         resolver = self._import_resolver
         while resolver is not None:
