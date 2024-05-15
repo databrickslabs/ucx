@@ -533,14 +533,14 @@ class WorkflowsDeployment(InstallationMixin):
         wheel_paths = []
         with self._wheels:
             if self._config.upload_dependencies:
-                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot"])
-                wheel_paths = [f"/Workspace{wheel_path}" for wheel_path in wheel_paths]
-            wheel_paths.append(f"/Workspace{self._wheels.upload_to_wsfs()}")
+                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks_sdk", "sqlglot"])
+            wheel_paths.append(self._wheels.upload_to_wsfs())
+            wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]
             return wheel_paths
 
     def _upload_wheel_runner(self, remote_wheels: list[str]):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        remote_wheels_str = " ".join(list(remote_wheels))
+        remote_wheels_str = " ".join(remote_wheels)
         code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
         return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
@@ -644,12 +644,7 @@ class WorkflowsDeployment(InstallationMixin):
             ),
         )
 
-    def _job_wheel_task(
-        self,
-        jobs_task: jobs.Task,
-        workflow: str,
-        remote_wheels: list[str],
-    ) -> jobs.Task:
+    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheels: list[str]) -> jobs.Task:
         libraries = []
         for wheel in remote_wheels:
             libraries.append(compute.Library(whl=wheel))
@@ -713,12 +708,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_parse_logs_task(
-        self,
-        job_tasks: list[jobs.Task],
-        workflow: str,
-        remote_wheels: list[str],
-    ) -> jobs.Task:
+    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheels: list[str]) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key="parse_logs",
             job_cluster_key=Task.job_cluster,
