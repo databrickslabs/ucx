@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
-from datetime import timedelta
+from datetime import timedelta, datetime
 from pathlib import Path
 from typing import BinaryIO
 
@@ -55,6 +55,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
 logger = logging.getLogger(__name__)
+JOBS_PURGE_TIMEOUT = timedelta(days=1)
 
 
 def factory(name, create, remove):
@@ -798,6 +799,16 @@ def make_job(ws, make_random, make_notebook):
                     timeout_seconds=0,
                 )
             ]
+
+        # add RemoveAfter tag for test job cleanup
+        date_to_remove = (datetime.now() + JOBS_PURGE_TIMEOUT).strftime("%Y-%m-%d")
+        remove_after_tag = {"key": "RemoveAfter", "value": date_to_remove}
+
+        if 'tags' not in kwargs:
+            kwargs["tags"] = [remove_after_tag]
+        else:
+            kwargs["tags"].append(remove_after_tag)
+
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
         return job
