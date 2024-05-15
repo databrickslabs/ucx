@@ -1,8 +1,7 @@
-from pyspark.sql import DataFrame
-
-from databricks.labs.ucx.recon import DataComparator, DataComparisonResult
+from databricks.labs.ucx.recon import DataComparator, DataComparisonResult, TableDescriptor
 
 
 class StandardDataComparator(DataComparator):
-    def compare_data(self, source: DataFrame, target: DataFrame) -> DataComparisonResult:
+
+    def compare_data(self, source: TableDescriptor, target: TableDescriptor) -> DataComparisonResult:
         return DataComparisonResult()
