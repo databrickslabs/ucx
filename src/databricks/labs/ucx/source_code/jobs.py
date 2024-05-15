@@ -103,7 +103,9 @@ class WorkflowTaskContainer(SourceContainer):
         if library.requirements:
             # TODO: download and add every entry via graph.register_library
             # TODO: https://github.com/databrickslabs/ucx/issues/1644
-            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+            problems = graph.install_library(library.requirements)
+            if len(problems) > 0:
+                yield from problems
 
     def _install_cluster_libraries(self, graph: DependencyGraph):
         _ = graph

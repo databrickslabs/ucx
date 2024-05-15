@@ -20,6 +20,21 @@ def graph(mock_path_lookup) -> DependencyGraph:
     return dependency_graph
 
 
+def test_workflow_task_container_build_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
+    """Receive not yet implemented problems"""
+    # Goal of test is to raise test coverage, remove after implementing
+    ws = create_autospec(WorkspaceClient)
+    library = compute.Library(jar="library.jar", egg="library.egg", whl="libary.whl", requirements="requirements.txt")
+    task = jobs.Task(task_key="test", libraries=[library], existing_cluster_id="id")
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 5
+    assert all(problem.code == "not-yet-implemented" for problem in problems)
+    ws.assert_not_called()
+
+
 def test_workflow_task_container_build_dependency_graph_empty_task(mock_path_lookup, graph):
     """No dependency problems with empty task"""
     ws = create_autospec(WorkspaceClient)

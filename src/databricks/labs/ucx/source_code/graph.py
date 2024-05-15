@@ -251,6 +251,14 @@ class LibraryInstaller:
 
     def install_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
         """Install a library and augment path look-up so that it is able to resolve the library."""
+        if library.endswith(".jar"):
+            return [DependencyProblem("not-yet-implemented", "Jar library is not yet implemented")]
+        if library.endswith(".egg"):
+            return [DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")]
+        if library.endswith(".whl"):
+            return [DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")]
+        if library.endswith(".txt"):
+            return [DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")]
         return self._installer.install_library_pip(path_lookup, library)
 
     def __repr__(self):
