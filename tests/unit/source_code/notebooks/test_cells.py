@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCel
 from databricks.labs.ucx.source_code.site_packages import PipInstaller
 
 
-def test_pip_cell_langauge_is_pip():
+def test_pip_cell_language_is_pip():
     assert PipCell("code").language == CellLanguage.PIP
 
 
@@ -23,7 +23,7 @@ def test_pip_cell_build_dependency_graph_invokes_install_library():
     graph.install_library.assert_called_once_with("databricks")
 
 
-def test_pip_cell_build_dependency_graph_pip_install_missing_library():
+def test_pip_cell_build_dependency_graph_pip_installs_missing_library():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install"
@@ -67,7 +67,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     assert problems[0].message.startswith("Failed to install unknown-library-name")
 
 
-def test_pip_cell_build_dependency_graph_resolve_installed_library(mock_path_lookup):
+def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lookup):
     dependency = Dependency(FileLoader(), Path("test"))
     installer = LibraryInstaller([PipInstaller()])
     dependency_resolver = DependencyResolver([], mock_path_lookup)
