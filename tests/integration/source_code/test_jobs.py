@@ -239,3 +239,34 @@ def test_workflow_linter_lints_job_with_egg_dependency(
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+
+
+def test_workflow_linter_lints_job_with_import_pypi_library(
+        simple_ctx,
+        ws,
+        make_job,
+        make_notebook,
+        make_random,
+):
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
+    entrypoint.mkdir()
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=Whitelist([]),  # pytest is in default list
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
+    )
+
+    notebook = entrypoint / "notebook.ipynb"
+    make_notebook(path=notebook, content=b"import pytest")
+
+    job_with_import_pytest_problem = make_job(notebook_path=notebook)
+    problems = simple_ctx.workflow_linter.lint_job(job_with_import_pytest_problem.job_id)
+
+    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) > 0
+
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))
+    job_without_import_pytest_problem = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_without_import_pytest_problem.job_id)
+
+    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
