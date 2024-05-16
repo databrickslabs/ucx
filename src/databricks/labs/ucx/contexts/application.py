@@ -9,6 +9,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -350,6 +351,10 @@ class GlobalContext(abc.ABC):
         return VerifyHasMetastore(self.workspace_client)
 
     @cached_property
+    def pip_resolver(self):
+        return PipResolver()
+
+    @cached_property
     def notebook_loader(self) -> NotebookLoader:
         return NotebookLoader()
 
@@ -387,7 +392,8 @@ class GlobalContext(abc.ABC):
     @cached_property
     def dependency_resolver(self):
         import_resolvers = [self.file_resolver, self.whitelist_resolver]
-        return DependencyResolver(self.notebook_resolver, import_resolvers, self.path_lookup)
+        library_resolvers = [self.pip_resolver]
+        return DependencyResolver(library_resolvers, self.notebook_resolver, import_resolvers, self.path_lookup)
 
     @cached_property
     def workflow_linter(self):
