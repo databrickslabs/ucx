@@ -70,4 +70,3 @@ def test_removeafter_tag(ws, env_or_skip, make_job):
 
     created_job = ws.jobs.get(new_job.job_id)
     assert "RemoveAfter" in created_job.settings.tags
-
