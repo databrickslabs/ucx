@@ -447,7 +447,7 @@ class DependencyResolver:
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
-            problem = DependencyProblem('cannot-load-notebook', f"Could not load notebook {path}")
+            problem = DependencyProblem('cannot-load-library', f"Could not load library {path}")
             return MaybeGraph(None, [problem])
         problems = container.build_dependency_graph(graph)
         if problems:

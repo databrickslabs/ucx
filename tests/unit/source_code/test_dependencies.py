@@ -323,3 +323,12 @@ def test_dependency_resolver_resolves_newly_installed_library_dependency(mock_no
     assert library_graph is not None
     maybe = library_graph.locate_dependency(path_lookup.resolve(Path("pkgdir", "__init__.py")))
     assert maybe.graph is not None
+
+
+def test_dependency_resolver_fails_to_load_unknown_library(mock_notebook_resolver):
+    path_lookup = PathLookup.from_sys_path(Path.cwd())
+    dependency_resolver = DependencyResolver(
+        [PipResolver(FileLoader(), Whitelist())], mock_notebook_resolver, [], path_lookup
+    )
+    maybe = dependency_resolver.build_library_dependency_graph(Path("some-unknown-library"))
+    assert maybe.graph is None
