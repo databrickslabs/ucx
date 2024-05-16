@@ -131,7 +131,7 @@ class PipPackage(KnownPackage):
 
 class Whitelist:
     @classmethod
-    def parse(cls, data: str):
+    def parse(cls, data: str, use_defaults=True):
         yamls = load_yaml(data, Loader=Loader)
         # @dataclass(kw_only=True) fails to convert inner structs, so deserialize manually
         pips: list[PipPackage] = []
@@ -140,15 +140,15 @@ class Whitelist:
             top_level = yaml['top_level']
             packages = {p.name: p for p in [PythonPackage(**package) for package in yaml['packages']]}
             pips.append(PipPackage(identifier, top_level, packages))
-        return Whitelist(pips)
+        return Whitelist(use_defaults, pips)
 
-    def __init__(self, pips: Iterable[PipPackage] | None = None):
+    def __init__(self, use_defaults=True, pips: Iterable[PipPackage] | None = None):
         python_version = sys.version
         known_packages: list[KnownPackage] = [
             PythonBuiltinPackage(Identifier(**{"name": name, "version": python_version}), name)
             for name in sys.stdlib_module_names
         ]
-        if pips is None:
+        if use_defaults:
             # default white list
             known_packages.extend(
                 [
@@ -163,7 +163,7 @@ class Whitelist:
                     PipPackage.compatible("yaml"),
                 ]
             )
-        else:
+        if pips is not None:
             known_packages.extend(pips)
 
         self._known_packages: dict[str, list[KnownPackage]] = {}

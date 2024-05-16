@@ -352,7 +352,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pip_resolver(self):
-        return PipResolver()
+        return PipResolver(self.file_loader, self.whitelist)
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:

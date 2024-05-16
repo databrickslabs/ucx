@@ -1,72 +1,152 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
-from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
-from databricks.labs.ucx.source_code.graph import BaseLibraryResolver, DependencyProblem, MaybeDependency
+from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.graph import (
+    BaseLibraryResolver,
+    DependencyProblem,
+    MaybeDependency,
+    SourceContainer,
+    DependencyGraph,
+    Dependency,
+    WrappingLoader,
+)
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
 class PipResolver(BaseLibraryResolver):
-    # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
-    # TODO: https://github.com/databrickslabs/ucx/issues/1642
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(self, next_resolver: BaseLibraryResolver | None = None) -> None:
+    def __init__(
+        self, file_loader: FileLoader, white_list: Whitelist, next_resolver: BaseLibraryResolver | None = None
+    ) -> None:
         super().__init__(next_resolver)
+        self._file_loader = file_loader
+        self._white_list = white_list
+        self._lib_install_folder = ""
 
     def with_next_resolver(self, resolver: BaseLibraryResolver) -> PipResolver:
-        return PipResolver(resolver)
+        return PipResolver(self._file_loader, self._white_list, resolver)
 
-    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+    def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
+        dist_info_path = self._locate_dist_info(path_lookup, library)
+        if dist_info_path is None:  # not installed yet
+            return self._install_library(path_lookup, library)
+        return self._create_dependency(library, dist_info_path)
+
+    def _locate_dist_info(self, path_lookup: PathLookup, library: Path) -> Path | None:
+        # start the quick way
+        full_path = path_lookup.resolve(library)
+        if full_path is not None:
+            packages = os.listdir(full_path.parent.as_posix())
+            dist_info_dir = next(
+                (
+                    package
+                    for package in packages
+                    if package.startswith(library.name) and package.endswith(".dist-info")
+                ),
+                None,
+            )
+            return None if dist_info_dir is None else path_lookup.resolve(Path(dist_info_dir))
+        # some packages require more work, for example 'typing-extensions'
+        for path in path_lookup.paths:
+            if not path.is_dir():
+                continue
+            packages = os.listdir(path.as_posix())
+            dist_info_dir = next(
+                (
+                    package
+                    for package in packages
+                    if package.startswith(library.name) and package.endswith(".dist-info")
+                ),
+                None,
+            )
+            if dist_info_dir is not None:
+                return path_lookup.resolve(Path(dist_info_dir))
+        # maybe the name needs tweaking
+        if "-" in library.name:
+            name = library.name.replace("-", "_")
+            return self._locate_dist_info(path_lookup, Path(name))
+        return None
+
+    def _install_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
         """Pip install library and augment path look-up to resolve the library at import"""
-        # invoke pip install via subprocess to install this library into lib_install_folder
-        pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]
+        # invoke pip install via subprocess to install this library into self._lib_install_folder
+        venv = self._temporary_virtual_environment(path_lookup).as_posix()
+        existing_packages = os.listdir(venv)
+        pip_install_arguments = ["pip", "install", library.name, "-t", venv]
         try:
             subprocess.run(pip_install_arguments, check=True)
         except CalledProcessError as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return MaybeDependency(None, [problem])
+        added_packages = set(os.listdir(venv)).difference(existing_packages)
+        dist_info_dirs = list(filter(lambda package: package.endswith(".dist-info"), added_packages))
+        dist_info_dir = next((dir for dir in dist_info_dirs if dir.startswith(library.name)), None)
+        if dist_info_dir is None and "-" in library.name:
+            name = library.name.replace("-", "_")
+            dist_info_dir = next((dir for dir in dist_info_dirs if dir.startswith(name)), None)
+        if dist_info_dir is None:
+            # TODO handle other distribution types
+            problem = DependencyProblem('no-dist-info', f"No dist-info found for {library.name}")
+            return MaybeDependency(None, [problem])
+        dist_info_path = path_lookup.resolve(Path(dist_info_dir))
+        assert dist_info_path is not None
+        return self._create_dependency(library, dist_info_path)
 
-        path_lookup.append_path(self._temporary_virtual_environment)
-        return MaybeDependency(None, [])
+    def _create_dependency(self, library: Path, dist_info_path: Path):
+        package = DistInfoPackage.parse(dist_info_path)
+        container = DistInfoContainer(self._file_loader, self._white_list, package)
+        dependency = Dependency(WrappingLoader(container), library)
+        return MaybeDependency(dependency, [])
 
-    @cached_property
-    def _temporary_virtual_environment(self) -> Path:
+    def _temporary_virtual_environment(self, path_lookup: PathLookup) -> Path:
         # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
         # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
         # environment. If we don't have a virtual environment, create a temporary one.
         # simulate notebook-scoped virtual environment
-        lib_install_folder = tempfile.mkdtemp(prefix="ucx-")
-        return Path(lib_install_folder)
+        if len(self._lib_install_folder) == 0:
+            self._lib_install_folder = tempfile.mkdtemp(prefix="ucx-python-libs-")
+            path_lookup.append_path(Path(self._lib_install_folder))
+        return Path(self._lib_install_folder)
 
 
-COMMENTED_OUT_FOR_PR_1685 = """
-class SitePackageContainer(SourceContainer):
+class DistInfoContainer(SourceContainer):
 
-    def __init__(self, file_loader: FileLoader, site_package: SitePackage):
+    def __init__(self, file_loader: FileLoader, white_list: Whitelist, package: DistInfoPackage):
         self._file_loader = file_loader
-        self._site_package = site_package
+        self._white_list = white_list
+        self._package = package
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
-        for module_path in self._site_package.module_paths:
+        for module_path in self._package.module_paths:
             maybe = parent.register_dependency(Dependency(self._file_loader, module_path))
             if maybe.problems:
                 problems.extend(maybe.problems)
+        for library_name in self._package.library_names:
+            compatibility = self._white_list.compatibility(library_name)
+            if compatibility is not None:
+                # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+                continue
+            more_problems = parent.register_library(library_name)
+            problems.extend(more_problems)
         return problems
 
     @property
     def paths(self):
-        return self._site_package.module_paths
+        return self._package.module_paths
 
     def __repr__(self):
-        return f"<SitePackageContainer {self._site_package}>"
-"""
+        return f"<DistInfoContainer {self._package}>"
+
 
 REQUIRES_DIST_PREFIX = "Requires-Dist: "
 
