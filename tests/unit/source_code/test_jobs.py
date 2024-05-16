@@ -27,6 +27,7 @@ def test_job_problem_as_message():
     assert problem.as_message() == expected_message
 
 
+
 @pytest.fixture
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
@@ -177,17 +178,29 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
 
 
 def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_pytest_pypi_library(
-    mock_path_lookup, graph):
+    mock_path_lookup, graph
+):
     ws = create_autospec(WorkspaceClient)
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))]
     existing_cluster_id = "TEST_CLUSTER_ID"
     task = jobs.Task(task_key="test", libraries=libraries, existing_cluster_id=existing_cluster_id)
     libraries_api = create_autospec(compute.LibrariesAPI)
-    libraries_api.cluster_status.return_value = [compute.LibraryFullStatus(
-        is_library_for_all_clusters=False,
-        library=compute.Library(
-            cran=None, egg=None, jar=None, maven=None, pypi=compute.PythonPyPiLibrary(package='pandas', repo=None),
-            requirements=None, whl=None), messages=None, status="<LibraryInstallStatus.PENDING: 'PENDING'>")]
+    libraries_api.cluster_status.return_value = [
+        compute.LibraryFullStatus(
+            is_library_for_all_clusters=False,
+            library=compute.Library(
+                cran=None,
+                egg=None,
+                jar=None,
+                maven=None,
+                pypi=compute.PythonPyPiLibrary(package='pandas', repo=None),
+                requirements=None,
+                whl=None,
+            ),
+            messages=None,
+            status="<LibraryInstallStatus.PENDING: 'PENDING'>",
+        )
+    ]
 
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
