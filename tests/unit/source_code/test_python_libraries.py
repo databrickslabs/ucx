@@ -34,7 +34,7 @@ def test_dist_info_package_parses_installed_package():
     assert "typing-extensions" in package.library_names
 
 
-def test_pip_resolver_does_not_resolve_library_without_dist_info():
+def test_pip_resolver_does_not_resolve_already_installed_library_without_dist_info():
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     pip_resolver = PipResolver(FileLoader(), Whitelist())
     maybe = pip_resolver.resolve_library(path_lookup, Path("xdist"))
