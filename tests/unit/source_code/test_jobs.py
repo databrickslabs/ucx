@@ -18,7 +18,7 @@ def graph(mock_path_lookup) -> DependencyGraph:
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolver = PipResolver()
-    dependency_resolver = DependencyResolver(notebook_resolver, [import_resolver], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [import_resolver], mock_path_lookup)
     dependency_graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
     return dependency_graph
 

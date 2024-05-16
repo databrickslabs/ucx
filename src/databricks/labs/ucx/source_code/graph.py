@@ -325,10 +325,12 @@ class DependencyResolver:
 
     def __init__(
         self,
+        library_resolvers,
         notebook_resolver: BaseNotebookResolver,
         import_resolvers: list[BaseImportResolver],
         path_lookup: PathLookup,
     ):
+        self._library_resolvers = library_resolvers
         self._notebook_resolver = notebook_resolver
         self._import_resolver = self._chain_import_resolvers(import_resolvers)
         self._path_lookup = path_lookup

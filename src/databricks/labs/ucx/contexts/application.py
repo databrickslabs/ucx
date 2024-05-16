@@ -396,7 +396,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def dependency_resolver(self):
         import_resolvers = [self.pip_resolver, self.file_resolver, self.whitelist_resolver]
-        return DependencyResolver(self.notebook_resolver, import_resolvers, self.path_lookup)
+        return DependencyResolver([], self.notebook_resolver, import_resolvers, self.path_lookup)
 
     @cached_property
     def workflow_linter(self):
