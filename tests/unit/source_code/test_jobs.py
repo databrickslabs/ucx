@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
 
@@ -9,7 +10,6 @@ from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.site_packages import PipResolver
 
 
 @pytest.fixture

@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.site_packages import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 
 
 def test_pip_cell_language_is_pip():

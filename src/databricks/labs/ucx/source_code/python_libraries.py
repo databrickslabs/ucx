@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 import tempfile
 from functools import cached_property
@@ -77,14 +76,18 @@ class DistInfoPackage:
     represents a wheel package installable via pip
     see https://packaging.python.org/en/latest/specifications/binary-distribution-format/
     """
+
     @classmethod
     def parse(cls, path: Path):
         # not using importlib.metadata because it only works on accessible packages
         # which we can't guarantee since we have our own emulated sys.paths
         with open(Path(path, "METADATA"), encoding="utf-8") as metadata_file:
             lines = metadata_file.readlines()
-            lines = filter(lambda line: line.startswith(REQUIRES_DIST_PREFIX), lines)
-            library_names = [cls._extract_library_name_from_requires_dist(line[len(REQUIRES_DIST_PREFIX):]) for line in lines]
+            requirements = filter(lambda line: line.startswith(REQUIRES_DIST_PREFIX), lines)
+            library_names = [
+                cls._extract_library_name_from_requires_dist(requirement[len(REQUIRES_DIST_PREFIX) :])
+                for requirement in requirements
+            ]
         with open(Path(path, "RECORD"), encoding="utf-8") as record_file:
             lines = record_file.readlines()
             files = [line.split(',')[0] for line in lines]
@@ -100,15 +103,15 @@ class DistInfoPackage:
             # strip version
             dir_name = dir_name[: dir_name.rindex('-')]
             top_levels = [dir_name]
-        return DistInfoPackage(path, top_levels, [Path(module) for module in modules], library_names)
+        return DistInfoPackage(path, top_levels, [Path(module) for module in modules], list(library_names))
 
     @classmethod
-    def _extract_library_name_from_requires_dist(cls, spec: str) -> str:
-        delimiters = { ' ', '@', '<', '>', ';' }
-        for i, c in enumerate(spec):
-            if c in delimiters:
-                return spec[:i]
-        return spec
+    def _extract_library_name_from_requires_dist(cls, requirement: str) -> str:
+        delimiters = {' ', '@', '<', '>', ';'}
+        for i, char in enumerate(requirement):
+            if char in delimiters:
+                return requirement[:i]
+        return requirement
 
     def __init__(self, dist_info_path: Path, top_levels: list[str], module_paths: list[Path], library_names: list[str]):
         self._dist_info_path = dist_info_path

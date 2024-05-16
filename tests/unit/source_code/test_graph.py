@@ -3,7 +3,7 @@ from pathlib import Path
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, StubLibraryResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.site_packages import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 
 
 def test_dependency_graph_registers_library(mock_path_lookup):
