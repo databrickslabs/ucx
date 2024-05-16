@@ -14,13 +14,11 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary, LibrariesAPI
 from databricks.labs.ucx.assessment import jobs
-
-from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.sdk.service import jobs, compute
+from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

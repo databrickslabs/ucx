@@ -157,20 +157,14 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_existing_cluster_id(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.existing_cluster_id:
             return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1637
-        # load libraries installed on the referred cluster
 
+        # load libraries installed on the referred cluster
         libraries_api = compute.LibrariesAPI(self._ws.api_client)
         library_full_status_list = libraries_api.cluster_status(self._task.existing_cluster_id)
 
-        libraries_from_cluster = []
-        # TODO: Lint the libraries obtained from the cluster
         for library_full_status in library_full_status_list:
             if library_full_status.library:
-                if library_full_status.library.pypi:
-                    libraries_from_cluster.append(library_full_status.library.pypi.package)
-
-        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
+                yield self._register_library(graph, library_full_status.library)
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
