@@ -36,44 +36,38 @@ class PipResolver(BaseLibraryResolver):
         return PipResolver(self._file_loader, self._white_list, resolver)
 
     def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
-        dist_info_path = self._locate_dist_info(path_lookup, library)
-        if dist_info_path is None:  # not installed yet
+        library_path = self._locate_library(path_lookup, library)
+        if library_path is None:  # not installed yet
             return self._install_library(path_lookup, library)
+        dist_info_path = self._locate_dist_info(library_path, library)
+        if dist_info_path is None:  # old package style
+            problem = DependencyProblem('no-dist-info', f"No dist-info found for {library.name}")
+            return MaybeDependency(None, [problem])
         return self._create_dependency(library, dist_info_path)
 
-    def _locate_dist_info(self, path_lookup: PathLookup, library: Path) -> Path | None:
+    def _locate_library(self, path_lookup: PathLookup, library: Path) -> Path | None:
         # start the quick way
         full_path = path_lookup.resolve(library)
         if full_path is not None:
-            packages = os.listdir(full_path.parent.as_posix())
-            dist_info_dir = next(
-                (
-                    package
-                    for package in packages
-                    if package.startswith(library.name) and package.endswith(".dist-info")
-                ),
-                None,
-            )
-            return None if dist_info_dir is None else path_lookup.resolve(Path(dist_info_dir))
-        # some packages require more work, for example 'typing-extensions'
-        for path in path_lookup.paths:
-            if not path.is_dir():
-                continue
-            packages = os.listdir(path.as_posix())
-            dist_info_dir = next(
-                (
-                    package
-                    for package in packages
-                    if package.startswith(library.name) and package.endswith(".dist-info")
-                ),
-                None,
-            )
-            if dist_info_dir is not None:
-                return path_lookup.resolve(Path(dist_info_dir))
+            return full_path
         # maybe the name needs tweaking
         if "-" in library.name:
             name = library.name.replace("-", "_")
-            return self._locate_dist_info(path_lookup, Path(name))
+            return self._locate_library(path_lookup, Path(name))
+        return None
+
+    def _locate_dist_info(self, library_path: Path, library: Path) -> Path | None:
+        packages = os.listdir(library_path.parent.as_posix())
+        dist_info_dir = next(
+            (package for package in packages if package.startswith(library.name) and package.endswith(".dist-info")),
+            None,
+        )
+        if dist_info_dir is not None:
+            return Path(library_path.parent, Path(dist_info_dir))
+        # maybe the name needs tweaking
+        if "-" in library.name:
+            name = library.name.replace("-", "_")
+            return self._locate_dist_info(library_path, Path(name))
         return None
 
     def _install_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
