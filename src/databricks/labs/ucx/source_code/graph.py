@@ -45,12 +45,16 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_library(self, name: str) -> MaybeGraph:
+    def register_library(self, library: str) -> list[DependencyProblem]:
         # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
         # TODO: https://github.com/databrickslabs/ucx/issues/1642
         # TODO: https://github.com/databrickslabs/ucx/issues/1643
         # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
+        maybe = self._resolver.resolve_library(self.path_lookup, library)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -80,6 +84,7 @@ class DependencyGraph:
         child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
         container = dependency.load(self.path_lookup)
+        # TODO: Return either (child) graph OR problems
         if not container:
             problem = DependencyProblem('dependency-register-failed', 'Failed to register dependency', dependency.path)
             return MaybeGraph(child_graph, [problem])
@@ -247,6 +252,20 @@ class WrappingLoader(DependencyLoader):
         return f"<WrappingLoader source_container={self._source_container}>"
 
 
+class BaseLibraryResolver(abc.ABC):
+
+    def __init__(self, next_resolver: BaseLibraryResolver | None):
+        self._next_resolver = next_resolver
+
+    @abc.abstractmethod
+    def with_next_resolver(self, resolver: BaseLibraryResolver) -> BaseLibraryResolver:
+        """required to create a linked list of resolvers"""
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_library(path_lookup, library)
+
+
 class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
@@ -284,6 +303,22 @@ class BaseFileResolver(abc.ABC):
         """locates a file"""
 
 
+class StubLibraryResolver(BaseLibraryResolver):
+
+    def __init__(self):
+        super().__init__(None)
+
+    def with_next_resolver(self, resolver: BaseLibraryResolver) -> BaseLibraryResolver:
+        raise NotImplementedError("Should never happen!")
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        return self._fail('library-not-found', f"Could not resolve library: {library}")
+
+    @staticmethod
+    def _fail(code: str, message: str):
+        return MaybeDependency(None, [DependencyProblem(code, message)])
+
+
 class StubImportResolver(BaseImportResolver):
 
     def __init__(self):
@@ -316,13 +351,23 @@ class DependencyResolver:
 
     def __init__(
         self,
+        library_resolvers: list[BaseLibraryResolver],
         notebook_resolver: BaseNotebookResolver,
         import_resolvers: list[BaseImportResolver],
         path_lookup: PathLookup,
     ):
+        self._library_resolver = self._chain_library_resolvers(library_resolvers)
         self._notebook_resolver = notebook_resolver
         self._import_resolver = self._chain_import_resolvers(import_resolvers)
         self._path_lookup = path_lookup
+
+    @staticmethod
+    def _chain_library_resolvers(library_resolvers: list[BaseLibraryResolver]) -> BaseLibraryResolver:
+        previous: BaseLibraryResolver = StubLibraryResolver()
+        for resolver in library_resolvers:
+            resolver = resolver.with_next_resolver(previous)
+            previous = resolver
+        return previous
 
     @staticmethod
     def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]) -> BaseImportResolver:
@@ -337,6 +382,9 @@ class DependencyResolver:
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        return self._library_resolver.resolve_library(path_lookup, library)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.

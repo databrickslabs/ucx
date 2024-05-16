@@ -1,7 +1,50 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import tempfile
+from functools import cached_property
 from pathlib import Path
+from subprocess import CalledProcessError
+
+from databricks.labs.ucx.source_code.graph import BaseLibraryResolver, DependencyProblem, MaybeDependency
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+
+class PipResolver(BaseLibraryResolver):
+    # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
+    # TODO: https://github.com/databrickslabs/ucx/issues/1642
+    # TODO: https://github.com/databrickslabs/ucx/issues/1643
+    # TODO: https://github.com/databrickslabs/ucx/issues/1640
+
+    def __init__(self, next_resolver: BaseLibraryResolver | None = None) -> None:
+        super().__init__(next_resolver)
+
+    def with_next_resolver(self, resolver: BaseLibraryResolver) -> PipResolver:
+        return PipResolver(resolver)
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        """Pip install library and augment path look-up to resolve the library at import"""
+        # invoke pip install via subprocess to install this library into lib_install_folder
+        pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]
+        try:
+            subprocess.run(pip_install_arguments, check=True)
+        except CalledProcessError as e:
+            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+            return MaybeDependency(None, [problem])
+
+        path_lookup.append_path(self._temporary_virtual_environment)
+        return MaybeDependency(None, [])
+
+    @cached_property
+    def _temporary_virtual_environment(self) -> Path:
+        # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
+        # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
+        # environment. If we don't have a virtual environment, create a temporary one.
+        # simulate notebook-scoped virtual environment
+        lib_install_folder = tempfile.mkdtemp(prefix="ucx-")
+        return Path(lib_install_folder)
+
 
 COMMENTED_OUT_FOR_PR_1685 = """
 class SitePackageContainer(SourceContainer):
@@ -42,6 +85,8 @@ class SitePackages:
                 self._packages[top_level] = package
 
     def __getitem__(self, item: str) -> SitePackage | None:
+        # TODO: Replace hyphen with underscores
+        # TODO: Don't use get, raise KeyError
         return self._packages.get(item, None)
 
 
