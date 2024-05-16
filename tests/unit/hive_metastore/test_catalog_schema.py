@@ -75,7 +75,7 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
                     'dst_schema': 'schema4',
                     'dst_table': 'table1',
                     'src_schema': 'schema1',
-                    'src_table': 'abfss://container@msft/path/dest3',
+                    'src_table': 'abfss://container@msft/path/dest4',
                     'workspace_name': 'workspace',
                 },
             ]
@@ -94,9 +94,9 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     return CatalogSchema(ws, table_mapping, principal_acl, backend)
 
 
-@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/1"])
+@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
 def test_create_all_catalogs_schemas_creates_catalogs(location: str):
-    """Catalog 2 and 3 should be created; catalog 1 already exists."""
+    """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": location})
 
