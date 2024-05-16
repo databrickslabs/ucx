@@ -15,12 +15,12 @@ from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import (
-    DependencyGraph,
-    SourceContainer,
-    DependencyProblem,
     Dependency,
-    WrappingLoader,
+    DependencyGraph,
+    DependencyProblem,
     DependencyResolver,
+    SourceContainer,
+    WrappingLoader,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
@@ -76,32 +76,29 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
-    def _register_libraries(self, graph: DependencyGraph):
+    def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
             return
         for library in self._task.libraries:
-            yield from self._lint_library(library, graph)
+            yield from self._register_library(graph, library)
 
-    def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+    @staticmethod
+    def _register_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
             # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            maybe = graph.register_library(library.pypi.package)
-            if maybe.problems:
-                yield from maybe.problems
+            problems = graph.register_library(library.pypi.package)
+            if problems:
+                yield from problems
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
         if library.egg:
             # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            maybe = graph.register_library(library.egg)
-            if maybe.problems:
-                yield from maybe.problems
+            yield DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
         if library.whl:
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            maybe = graph.register_library(library.whl)
-            if maybe.problems:
-                yield from maybe.problems
+            yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
         if library.requirements:
             # TODO: download and add every entry via graph.register_library
             # TODO: https://github.com/databrickslabs/ucx/issues/1644

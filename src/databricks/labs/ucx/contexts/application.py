@@ -43,7 +43,7 @@ from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackages
+from databricks.labs.ucx.source_code.site_packages import PipResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -351,6 +351,10 @@ class GlobalContext(abc.ABC):
         return VerifyHasMetastore(self.workspace_client)
 
     @cached_property
+    def pip_resolver(self):
+        return PipResolver()
+
+    @cached_property
     def notebook_loader(self) -> NotebookLoader:
         return NotebookLoader()
 
@@ -392,7 +396,8 @@ class GlobalContext(abc.ABC):
     @cached_property
     def dependency_resolver(self):
         import_resolvers = [self.file_resolver, self.whitelist_resolver]
-        return DependencyResolver(self.notebook_resolver, import_resolvers, self.path_lookup)
+        library_resolvers = [self.pip_resolver]
+        return DependencyResolver(library_resolvers, self.notebook_resolver, import_resolvers, self.path_lookup)
 
     @cached_property
     def workflow_linter(self):
