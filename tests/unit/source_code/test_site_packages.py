@@ -4,7 +4,7 @@ from databricks.labs.ucx.source_code.site_packages import PipResolver, SitePacka
 from tests.unit import locate_site_packages
 
 
-def test_pip_resolver_library(mock_path_lookup):
+def test_pip_resolver_resolves_library(mock_path_lookup):
     pip_installer = PipResolver()
     maybe = pip_installer.resolve_library(mock_path_lookup, "pytest")
 
@@ -12,7 +12,7 @@ def test_pip_resolver_library(mock_path_lookup):
     assert mock_path_lookup.resolve(Path("pytest")).exists()
 
 
-def test_pip_resolver_unknown_library(mock_path_lookup):
+def test_pip_resolver_does_not_resolve_unknown_library(mock_path_lookup):
     pip_installer = PipResolver()
     maybe = pip_installer.resolve_library(mock_path_lookup, "unknown-library-name")
 
