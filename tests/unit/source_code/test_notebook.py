@@ -128,7 +128,7 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py.txt"))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -146,7 +146,7 @@ def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -159,7 +159,7 @@ def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -172,7 +172,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -186,7 +186,7 @@ def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -199,7 +199,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup):
     paths = ["root4.py.txt", "leaf3.py.txt"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
