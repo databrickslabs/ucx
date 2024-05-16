@@ -7,20 +7,20 @@ from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
-from databricks.labs.ucx.source_code.graph import BaseImportResolver, DependencyProblem, MaybeDependency
+from databricks.labs.ucx.source_code.graph import BaseLibraryResolver, DependencyProblem, MaybeDependency
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
-class PipResolver(BaseImportResolver):
+class PipResolver(BaseLibraryResolver):
     # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
     # TODO: https://github.com/databrickslabs/ucx/issues/1642
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(self, next_resolver: BaseImportResolver | None = None) -> None:
+    def __init__(self, next_resolver: BaseLibraryResolver | None = None) -> None:
         super().__init__(next_resolver)
 
-    def with_next_resolver(self, resolver: BaseImportResolver) -> PipResolver:
+    def with_next_resolver(self, resolver: BaseLibraryResolver) -> PipResolver:
         return PipResolver(resolver)
 
     def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
