@@ -299,6 +299,22 @@ class BaseFileResolver(abc.ABC):
         """locates a file"""
 
 
+class StubLibraryResolver(BaseLibraryResolver):
+
+    def __init__(self):
+        super().__init__(None)
+
+    def with_next_resolver(self, resolver: BaseLibraryResolver) -> BaseLibraryResolver:
+        raise NotImplementedError("Should never happen!")
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        return self._fail('library-not-found', f"Could not resolve library: {library}")
+
+    @staticmethod
+    def _fail(code: str, message: str):
+        return MaybeDependency(None, [DependencyProblem(code, message)])
+
+
 class StubImportResolver(BaseImportResolver):
 
     def __init__(self):
@@ -309,9 +325,6 @@ class StubImportResolver(BaseImportResolver):
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._fail('import-not-found', f"Could not locate import: {name}")
-
-    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        return self._fail('library-not-found', f"Could not resolve library: {name}")
 
     @staticmethod
     def _fail(code: str, message: str):
@@ -339,10 +352,18 @@ class DependencyResolver:
         import_resolvers: list[BaseImportResolver],
         path_lookup: PathLookup,
     ):
-        self._library_resolvers = library_resolvers
+        self._library_resolver = self._chain_library_resolvers(library_resolvers)
         self._notebook_resolver = notebook_resolver
         self._import_resolver = self._chain_import_resolvers(import_resolvers)
         self._path_lookup = path_lookup
+
+    @staticmethod
+    def _chain_library_resolvers(library_resolvers: list[BaseLibraryResolver]) -> BaseLibraryResolver:
+        previous: BaseLibraryResolver = StubLibraryResolver()
+        for resolver in library_resolvers:
+            resolver = resolver.with_next_resolver(previous)
+            previous = resolver
+        return previous
 
     @staticmethod
     def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]) -> BaseImportResolver:
@@ -371,7 +392,7 @@ class DependencyResolver:
         if library.endswith(".txt"):
             problem = DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")
             return MaybeDependency(None, [problem])
-        return self._import_resolver.resolve_library(path_lookup, library)
+        return self._library_resolver.resolve_library(path_lookup, library)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
