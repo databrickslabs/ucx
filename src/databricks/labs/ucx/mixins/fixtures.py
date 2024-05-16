@@ -774,6 +774,9 @@ def make_job(ws, make_random, make_notebook):
         if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
+        libraries = None
+        if "libraries" in kwargs:
+            libraries = kwargs.pop("libraries")
         if isinstance(notebook_path, pathlib.Path):
             notebook_path = str(notebook_path)
         if not notebook_path:
@@ -791,6 +794,7 @@ def make_job(ws, make_random, make_notebook):
                         spark_conf=task_spark_conf,
                     ),
                     notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
+                    libraries=libraries,
                     timeout_seconds=0,
                 )
             ]
