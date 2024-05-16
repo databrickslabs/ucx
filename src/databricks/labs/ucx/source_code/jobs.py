@@ -84,19 +84,25 @@ class WorkflowTaskContainer(SourceContainer):
 
     @staticmethod
     def _register_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
-        libraries = (
-            library.pypi.package if library.pypi else None,  # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            library.jar,  # TODO: https://github.com/databrickslabs/ucx/issues/1641
-            library.egg,  # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            library.whl,  # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            library.requirements,  # TODO: https://github.com/databrickslabs/ucx/issues/1644
-        )
-        for lib in libraries:
-            if lib is None:
-                continue
-            problems = graph.register_library(lib)
-            if len(problems) > 0:
+        if library.pypi:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1642
+            problems = graph.register_library(library.pypi.package)
+            if problems:
                 yield from problems
+        if library.jar:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1641
+            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
+        if library.egg:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1643
+            yield DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
+        if library.whl:
+            # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
+            # TODO: https://github.com/databrickslabs/ucx/issues/1640
+            yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
+        if library.requirements:
+            # TODO: download and add every entry via graph.register_library
+            # TODO: https://github.com/databrickslabs/ucx/issues/1644
+            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:

@@ -380,18 +380,6 @@ class DependencyResolver:
         return self._import_resolver.resolve_import(path_lookup, name)
 
     def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
-        if library.endswith(".jar"):
-            problem = DependencyProblem("not-yet-implemented", "Jar library is not yet implemented")
-            return MaybeDependency(None, [problem])
-        if library.endswith(".egg"):
-            problem = DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
-            return MaybeDependency(None, [problem])
-        if library.endswith(".whl"):
-            problem = DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
-            return MaybeDependency(None, [problem])
-        if library.endswith(".txt"):
-            problem = DependencyProblem("not-yet-implemented", "Requirements library is not yet implemented")
-            return MaybeDependency(None, [problem])
         return self._library_resolver.resolve_library(path_lookup, library)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
