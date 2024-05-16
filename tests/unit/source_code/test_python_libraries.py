@@ -39,3 +39,10 @@ def test_pip_resolver_does_not_resolve_library_without_dist_info():
     pip_resolver = PipResolver(FileLoader(), Whitelist())
     maybe = pip_resolver.resolve_library(path_lookup, Path("xdist"))
     assert maybe.dependency is None
+
+
+def test_pip_resolver_resolves_library_with_hyphen():
+    path_lookup = PathLookup.from_sys_path(Path.cwd())
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    maybe = pip_resolver.resolve_library(path_lookup, Path("pyasn1-modules"))
+    assert maybe.dependency is not None
