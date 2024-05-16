@@ -270,3 +270,39 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     problems = simple_ctx.workflow_linter.lint_job(job_without_import_pytest_problem.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
+
+
+def test_workflow_linter_lints_job_with_import_whl_library(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_random,
+):
+    # TODO: Clean this directory
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
+    entrypoint.mkdir()
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=Whitelist([]),  # databricks is in default list
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
+    )
+
+    notebook = entrypoint / "notebook.ipynb"
+    make_notebook(path=notebook, content=b"import databricks.labs.ucx")
+    problem_message = "Could not locate import: databricks.labs.ucx"
+
+    job_without_ucx_library = make_job(notebook_path=notebook)
+    problems = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == problem_message]) > 0
+
+    simple_ctx.workspace_installation.run()  # Creates ucx wheel
+
+    wheels = [file for file in simple_ctx.installation.files() if file.path.endswith(".whl")]
+    library = compute.Library(whl=wheels[0].path)
+    job_with_ucx_library = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == problem_message]) == 0
