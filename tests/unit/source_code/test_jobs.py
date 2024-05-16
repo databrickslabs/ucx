@@ -14,6 +14,7 @@ from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.site_packages import PipResolver
 
 
 def test_job_problem_as_message():
@@ -173,3 +174,23 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
 
     assert expected_message in caplog.messages
     ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_pytest_pypi_library(
+    mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))]
+    existing_cluster_id = "TEST_CLUSTER_ID"
+    task = jobs.Task(task_key="test", libraries=libraries, existing_cluster_id=existing_cluster_id)
+    libraries_api = create_autospec(compute.LibrariesAPI)
+    libraries_api.cluster_status.return_value = [compute.LibraryFullStatus(
+        is_library_for_all_clusters=False,
+        library=compute.Library(
+            cran=None, egg=None, jar=None, maven=None, pypi=compute.PythonPyPiLibrary(package='pandas', repo=None),
+            requirements=None, whl=None), messages=None, status="<LibraryInstallStatus.PENDING: 'PENDING'>")]
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 0
+    assert graph.path_lookup.resolve(Path("pytest")).exists()
+    ws.assert_not_called()
