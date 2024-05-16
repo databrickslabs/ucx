@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.lsql.core import Row
 
-from ._base import DataProfiler, DataProfilingResult, TableIdentifier, TableMetadataRetriever
+from .base import DataProfiler, DataProfilingResult, TableIdentifier, TableMetadataRetriever
 
 
 class StandardDataProfiler(DataProfiler):
@@ -20,7 +20,7 @@ class StandardDataProfiler(DataProfiler):
 
     def _get_table_row_count(self, entity: TableIdentifier) -> int:
         query_result: Iterator[Row] = self._sql_backend.fetch(
-            f"SELECT COUNT(*) FROM {entity.table}",
+            f"SELECT COUNT(*) as row_count FROM {entity.table}",
             catalog=entity.catalog,
             schema=entity.schema,
         )

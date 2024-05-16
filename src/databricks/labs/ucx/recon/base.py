@@ -57,29 +57,37 @@ class SchemaComparisonResult:
 class DataComparisonResult:
     source_row_count: int
     target_row_count: int
-    source_to_target_mismatch_count: int
-    target_to_source_mismatch_count: int
+    num_missing_records_in_target: int
+    num_missing_records_in_source: int
 
 
 class TableMetadataRetriever(ABC):
     @abstractmethod
     def get_metadata(self, entity: TableIdentifier) -> TableMetadata:
-        pass
+        """
+        Get metadata for a given table
+        """
 
 
 class DataProfiler(ABC):
     @abstractmethod
     def profile_data(self, entity: TableIdentifier) -> DataProfilingResult:
-        pass
+        """
+        Profile data for a given table
+        """
 
 
 class SchemaComparator(ABC):
     @abstractmethod
     def compare_schema(self, source: TableIdentifier, target: TableIdentifier) -> SchemaComparisonResult:
-        pass
+        """
+        Compare schema for two tables
+        """
 
 
 class DataComparator(ABC):
     @abstractmethod
     def compare_data(self, source: TableIdentifier, target: TableIdentifier) -> DataComparisonResult:
-        pass
+        """
+        Compare data for two tables
+        """

@@ -1,4 +1,4 @@
-from ._base import (
+from .base import (
     SchemaComparator,
     SchemaComparisonEntry,
     SchemaComparisonResult,
@@ -24,7 +24,7 @@ class StandardSchemaComparator(SchemaComparator):
         target_column_names = {column.name for column in target_metadata.columns}
         all_column_names = source_column_names.union(target_column_names)
         comparison_result = []
-        for field_name in all_column_names:
+        for field_name in sorted(all_column_names):
             source_col = source_metadata.get_column_metadata(field_name)
             target_col = target_metadata.get_column_metadata(field_name)
             comparison_result.append(_build_comparison_result_entry(source_col, target_col))
