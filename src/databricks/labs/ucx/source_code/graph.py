@@ -46,6 +46,9 @@ class DependencyGraph:
         return self._dependency.path
 
     def register_library(self, library: str) -> list[DependencyProblem]:
+        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
+        # TODO: https://github.com/databrickslabs/ucx/issues/1643
+        # TODO: https://github.com/databrickslabs/ucx/issues/1640
         maybe = self._resolver.resolve_library(self.path_lookup, library)
         if not maybe.dependency:
             return maybe.problems
