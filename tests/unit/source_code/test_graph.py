@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from databricks.labs.ucx.source_code.files import FileLoader
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, StubImportResolver
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, StubLibraryResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.site_packages import PipResolver
 
@@ -19,7 +19,7 @@ def test_dependency_graph_register_library(mock_path_lookup):
 
 
 def test_stub_import_resolver_fails_with_library_not_found_dependency_problem(mock_path_lookup):
-    resolver = StubImportResolver()
+    resolver = StubLibraryResolver()
     maybe = resolver.resolve_library(mock_path_lookup, "test")
 
     assert len(maybe.problems) == 1
