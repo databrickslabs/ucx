@@ -23,14 +23,14 @@ class PipResolver(BaseLibraryResolver):
     def with_next_resolver(self, resolver: BaseLibraryResolver) -> PipResolver:
         return PipResolver(resolver)
 
-    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
         """Pip install library and augment path look-up to resolve the library at import"""
         # invoke pip install via subprocess to install this library into lib_install_folder
-        pip_install_arguments = ["pip", "install", name, "-t", self._temporary_virtual_environment.as_posix()]
+        pip_install_arguments = ["pip", "install", library, "-t", self._temporary_virtual_environment.as_posix()]
         try:
             subprocess.run(pip_install_arguments, check=True)
         except CalledProcessError as e:
-            problem = DependencyProblem("library-install-failed", f"Failed to install {name}: {e}")
+            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return MaybeDependency(None, [problem])
 
         path_lookup.append_path(self._temporary_virtual_environment)

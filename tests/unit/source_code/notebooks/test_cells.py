@@ -59,7 +59,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [PipResolver()], mock_path_lookup)
+    dependency_resolver = DependencyResolver([PipResolver()], notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install unknown-library-name"
@@ -76,7 +76,7 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [PipResolver()], mock_path_lookup)
+    dependency_resolver = DependencyResolver([PipResolver()], notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install pytest"

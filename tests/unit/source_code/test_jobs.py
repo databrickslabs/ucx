@@ -15,10 +15,7 @@ from databricks.labs.ucx.source_code.site_packages import PipResolver
 @pytest.fixture
 def graph(mock_path_lookup) -> DependencyGraph:
     dependency = Dependency(FileLoader(), Path("test"))
-    notebook_loader = NotebookLoader()
-    notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = PipResolver()
-    dependency_resolver = DependencyResolver([], notebook_resolver, [import_resolver], mock_path_lookup)
+    dependency_resolver = DependencyResolver([PipResolver()], NotebookResolver(NotebookLoader()), [], mock_path_lookup)
     dependency_graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
     return dependency_graph
 
