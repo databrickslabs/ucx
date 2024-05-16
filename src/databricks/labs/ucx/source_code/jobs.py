@@ -102,8 +102,9 @@ class WorkflowTaskContainer(SourceContainer):
                     yield from graph.register_library(local_file.as_posix())
         if library.whl:
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
-            # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
+            problems = graph.register_library(library.whl)
+            if problems:
+                yield from problems
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
             logger.info(f"Registering libraries from {library.requirements}")
             with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
