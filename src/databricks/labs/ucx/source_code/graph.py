@@ -248,6 +248,20 @@ class WrappingLoader(DependencyLoader):
         return f"<WrappingLoader source_container={self._source_container}>"
 
 
+class BaseLibraryResolver(abc.ABC):
+
+    def __init__(self, next_resolver: BaseLibraryResolver | None):
+        self._next_resolver = next_resolver
+
+    @abc.abstractmethod
+    def with_next_resolver(self, resolver: BaseLibraryResolver) -> BaseLibraryResolver:
+        """required to create a linked list of resolvers"""
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        assert self._next_resolver is not None
+        return self._next_resolver.resolve_library(path_lookup, library)
+
+
 class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
@@ -276,11 +290,6 @@ class BaseImportResolver(abc.ABC):
         # TODO: remove StubResolver and return MaybeDependency(None, [...])
         assert self._next_resolver is not None
         return self._next_resolver.resolve_import(path_lookup, name)
-
-    def resolve_library(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        # TODO: remove StubResolver and return MaybeDependency(None, [...])
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_library(path_lookup, name)
 
 
 class BaseFileResolver(abc.ABC):
@@ -325,7 +334,7 @@ class DependencyResolver:
 
     def __init__(
         self,
-        library_resolvers,
+        library_resolvers: list[BaseLibraryResolver],
         notebook_resolver: BaseNotebookResolver,
         import_resolvers: list[BaseImportResolver],
         path_lookup: PathLookup,
