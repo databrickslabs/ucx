@@ -20,8 +20,7 @@ def graph(mock_path_lookup) -> DependencyGraph:
     return dependency_graph
 
 
-def test_workflow_task_container_build_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
-    """Receive not yet implemented problems"""
+def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
     # Goal of test is to raise test coverage, remove after implementing
     ws = create_autospec(WorkspaceClient)
     library = compute.Library(jar="library.jar", egg="library.egg", whl="libary.whl", requirements="requirements.txt")
@@ -35,8 +34,7 @@ def test_workflow_task_container_build_dependency_graph_not_yet_implemented(mock
     ws.assert_not_called()
 
 
-def test_workflow_task_container_build_dependency_graph_empty_task(mock_path_lookup, graph):
-    """No dependency problems with empty task"""
+def test_workflow_task_container_builds_dependency_graph_empty_task(mock_path_lookup, graph):
     ws = create_autospec(WorkspaceClient)
     task = jobs.Task(task_key="test")
 
@@ -47,8 +45,7 @@ def test_workflow_task_container_build_dependency_graph_empty_task(mock_path_loo
     ws.assert_not_called()
 
 
-def test_workflow_task_container_build_dependency_graph_pytest_pypi_library(mock_path_lookup, graph):
-    """Install pytest PyPi library"""
+def test_workflow_task_container_builds_dependency_graph_pytest_pypi_library(mock_path_lookup, graph):
     ws = create_autospec(WorkspaceClient)
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))]
     task = jobs.Task(task_key="test", libraries=libraries)
@@ -61,8 +58,7 @@ def test_workflow_task_container_build_dependency_graph_pytest_pypi_library(mock
     ws.assert_not_called()
 
 
-def test_workflow_task_container_build_dependency_graph_unknown_pypi_library(mock_path_lookup, graph):
-    """Install unknown PyPi library"""
+def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mock_path_lookup, graph):
     ws = create_autospec(WorkspaceClient)
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test", libraries=libraries)
