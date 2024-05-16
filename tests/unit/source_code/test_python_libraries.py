@@ -25,13 +25,21 @@ def test_pip_resolver_does_not_resolve_unknown_library(mock_path_lookup):
     assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
 
 
-def test_dist_info_package_parses_installed_package():
+def test_dist_info_package_parses_installed_package_with_toplevel():
     site_packages_path = locate_site_packages()
     astroid_path = Path(site_packages_path, "astroid-3.1.0.dist-info")
     package = DistInfoPackage.parse(astroid_path)
     assert "astroid" in package.top_levels
     assert Path(site_packages_path, "astroid", "constraint.py") in package.module_paths
     assert "typing-extensions" in package.library_names
+
+
+def test_dist_info_package_parses_installed_package_without_toplevel():
+    site_packages_path = locate_site_packages()
+    astroid_path = Path(site_packages_path, "ruff-0.3.7.dist-info")
+    package = DistInfoPackage.parse(astroid_path)
+    assert "ruff" in package.top_levels
+    assert Path(site_packages_path, "ruff", "__init__.py") in package.module_paths
 
 
 def test_pip_resolver_does_not_resolve_already_installed_library_without_dist_info():

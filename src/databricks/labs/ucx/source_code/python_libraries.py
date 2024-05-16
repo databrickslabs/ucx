@@ -134,10 +134,6 @@ class DistInfoContainer(SourceContainer):
             problems.extend(more_problems)
         return problems
 
-    @property
-    def paths(self):
-        return self._package.module_paths
-
     def __repr__(self):
         return f"<DistInfoContainer {self._package}>"
 
