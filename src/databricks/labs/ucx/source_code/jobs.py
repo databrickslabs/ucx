@@ -85,13 +85,9 @@ class WorkflowTaskContainer(SourceContainer):
     @staticmethod
     def _register_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1642
             problems = graph.register_library(library.pypi.package)
             if problems:
                 yield from problems
-        if library.jar:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1641
-            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
         if library.egg:
             # TODO: https://github.com/databrickslabs/ucx/issues/1643
             yield DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
@@ -103,6 +99,9 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: download and add every entry via graph.register_library
             # TODO: https://github.com/databrickslabs/ucx/issues/1644
             yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+        if library.jar:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1641
+            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
