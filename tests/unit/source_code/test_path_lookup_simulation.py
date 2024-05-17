@@ -42,8 +42,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [
-        WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
+        WhitelistResolver(Whitelist()),
     ]
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
@@ -70,8 +70,8 @@ def test_locates_files(source: list[str], expected: int):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [
-        WhitelistResolver(whitelist),
         LocalFileResolver(file_loader),
+        WhitelistResolver(whitelist),
     ]
     resolver = DependencyResolver([], notebook_resolver, import_resolvers, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path)
@@ -111,8 +111,8 @@ sys.path.append('{child_dir_path.as_posix()}')
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
         import_resolvers = [
-            WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
+            WhitelistResolver(whitelist),
         ]
         resolver = DependencyResolver([], notebook_resolver, import_resolvers, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
@@ -152,8 +152,8 @@ def func():
         notebook_loader = NotebookLoader()
         notebook_resolver = NotebookResolver(notebook_loader)
         import_resolvers = [
-            WhitelistResolver(whitelist),
             LocalFileResolver(file_loader),
+            WhitelistResolver(whitelist),
         ]
         resolver = DependencyResolver([], notebook_resolver, import_resolvers, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)

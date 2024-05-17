@@ -369,10 +369,17 @@ class DependencyResolver:
 
     @staticmethod
     def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]) -> BaseImportResolver:
+        # check that WhiteListResolver comes first when resolving import
+        has_whitelist_resolver = False
+        is_white_list_resolver = False
         previous: BaseImportResolver = StubImportResolver()
         for resolver in import_resolvers:
             resolver = resolver.with_next_resolver(previous)
             previous = resolver
+            # we don't allow local imports, so we check against the type name
+            is_white_list_resolver = type(resolver).__name__ == "WhitelistResolver"
+            has_whitelist_resolver |= is_white_list_resolver
+        assert is_white_list_resolver or not has_whitelist_resolver
         return previous
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:

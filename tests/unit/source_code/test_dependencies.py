@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
@@ -51,8 +53,8 @@ def test_dependency_resolver_visits_workspace_file_dependencies(mock_path_lookup
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [
-        WhitelistResolver(whi),
         LocalFileResolver(file_loader),
+        WhitelistResolver(whi),
     ]
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path('./root8.py'))
@@ -66,8 +68,8 @@ def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_depe
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolvers = [
-        WhitelistResolver(whi),
         LocalFileResolver(file_loader),
+        WhitelistResolver(whi),
     ]
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root1-no-leaf.run.py"))
@@ -150,7 +152,7 @@ def test_dependency_resolver_raises_problem_with_unresolved_import(mock_path_loo
 def test_dependency_resolver_raises_problem_with_non_constant_notebook_argument(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+    import_resolvers = [LocalFileResolver(FileLoader()), WhitelistResolver(Whitelist())]
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("run_notebooks.py.txt"))
     assert list(maybe.problems) == [
@@ -179,7 +181,7 @@ def test_dependency_resolver_visits_file_dependencies(mock_path_lookup):
 def test_dependency_resolver_skips_builtin_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+    import_resolvers = [LocalFileResolver(FileLoader()), WhitelistResolver(Whitelist())]
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert not maybe.failed
@@ -193,7 +195,7 @@ def test_dependency_resolver_skips_builtin_dependencies(mock_path_lookup):
 def test_dependency_resolver_ignores_known_dependencies(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+    import_resolvers = [LocalFileResolver(FileLoader()), WhitelistResolver(Whitelist())]
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py.txt"))
     assert maybe.graph
@@ -208,8 +210,8 @@ def test_dependency_resolver_visits_site_packages(empty_index, mock_notebook_res
     lookup.append_path(site_packages_path)
     file_loader = FileLoader()
     import_resolvers = [
-        WhitelistResolver(Whitelist()),
         LocalFileResolver(file_loader),
+        WhitelistResolver(Whitelist()),
     ]
     dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolvers, lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-site-package.py.txt"))
@@ -332,3 +334,19 @@ def test_dependency_resolver_fails_to_load_unknown_library(mock_notebook_resolve
     )
     maybe = dependency_resolver.build_library_dependency_graph(Path("some-unknown-library"))
     assert maybe.graph is None
+
+
+def test_dependency_resolver_imports_typing_extensions(mock_notebook_resolver, mock_path_lookup):
+    path_lookup = PathLookup.from_sys_path(mock_path_lookup.cwd)
+    dependency_resolver = DependencyResolver(
+        [], mock_notebook_resolver, [LocalFileResolver(FileLoader()), WhitelistResolver(Whitelist())], path_lookup
+    )
+    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import_typing_extensions.py.txt"))
+    assert maybe.graph is not None
+    assert len(maybe.problems) == 0
+
+
+def test_dependency_resolver_yells_with_misplaced_whitelist_resolver(mock_notebook_resolver, mock_path_lookup):
+    with pytest.raises(Exception):
+        import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
+        dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolvers, mock_path_lookup)
