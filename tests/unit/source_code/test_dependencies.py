@@ -350,3 +350,4 @@ def test_dependency_resolver_yells_with_misplaced_whitelist_resolver(mock_notebo
     with pytest.raises(Exception):
         import_resolvers = [WhitelistResolver(Whitelist()), LocalFileResolver(FileLoader())]
         dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolvers, mock_path_lookup)
+        assert dependency_resolver is not None
