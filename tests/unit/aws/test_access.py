@@ -684,3 +684,51 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
             },
         ],
     )
+
+
+def test_instance_profile_lookup():
+    def instance_lookup(_):
+        ip_doc = """
+{
+    "InstanceProfile": {
+        "Path": "/",
+        "InstanceProfileName": "instance_profile_1",
+        "InstanceProfileId": "778899",
+        "Arn": "arn:aws:iam::12345678:instance-profile/instance_profile_1",
+        "CreateDate": "2024-01-01T12:00:00+00:00",
+        "Roles": [
+            {
+                "Path": "/",
+                "RoleName": "arn:aws:iam::12345678:role/role_1",
+                "RoleId": "445566",
+                "Arn": "arn:aws:iam::12345678:role/role_1",
+                "CreateDate": "2024-01-01T12:00:00+00:00"
+            }
+        ]
+    }
+}
+
+        """
+        return 0, ip_doc, ""
+
+    aws = AWSResources("profile", instance_lookup)
+    assert aws.get_instance_profile_role_arn("instance_profile_1") == "arn:aws:iam::12345678:role/role_1"
+
+
+def test_instance_profile_failed_lookup():
+    def instance_lookup(_):
+        ip_doc = """
+{
+    "InstanceProfile": {
+        "Path": "/",
+        "InstanceProfileName": "instance_profile_1",
+        "InstanceProfileId": "778899",
+        "Arn": "arn:aws:iam::12345678:instance-profile/instance_profile_1"
+    }
+}
+
+        """
+        return 0, ip_doc, ""
+
+    aws = AWSResources("profile", instance_lookup)
+    assert aws.get_instance_profile_role_arn("instance_profile_1") is None
