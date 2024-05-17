@@ -388,7 +388,23 @@ def test_migrate_locations_azure(ws):
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+    successful_return = """
+    {
+        "UserId": "uu@mail.com",
+        "Account": "1234",
+        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
+    }
+    """
+
+    def successful_call(_):
+        return 0, successful_return, ""
+
+    ctx = WorkspaceContext(ws).replace(
+        is_aws=True,
+        is_azure=False,
+        aws_profile="profile",
+        aws_cli_run_command=successful_call,
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 

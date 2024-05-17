@@ -199,6 +199,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
     aws.get_instance_profile.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
@@ -310,6 +311,7 @@ def test_create_uber_principal_no_storage(mock_ws, mock_installation, locations)
 
 def test_create_uc_role_single(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
@@ -323,6 +325,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
 
 def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, locations):
     aws = create_autospec(AWSResources)
+    aws.validate_connection.return_value = {}
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
