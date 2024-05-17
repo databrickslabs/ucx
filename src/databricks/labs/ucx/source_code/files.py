@@ -1,8 +1,12 @@
 from __future__ import annotations  # for type hints
 
 import logging
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
+from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
@@ -17,6 +21,8 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     MaybeDependency,
     SourceContainer,
+    DependencyResolver,
+    MISSING_SOURCE_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +50,114 @@ class LocalFile(SourceContainer):
         return f"<LocalFile {self._path}>"
 
 
-class LocalFileMigrator:
+class LocalDirectory(SourceContainer):
+    def __init__(self, path: Path, file_loader: FileLoader, dir_loader: DirectoryLoader):
+        self._path = path
+        self._file_loader = file_loader
+        self._dir_loader = dir_loader
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return list(self._build_dependency_graph(parent))
+
+    def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
+        for child_path in self._path.iterdir():
+            if child_path.is_dir():
+                dependency = Dependency(self._dir_loader, child_path)
+                yield from parent.register_dependency(dependency).problems
+                continue
+            dependency = Dependency(self._file_loader, child_path)
+            yield from parent.register_dependency(dependency).problems
+
+    def __repr__(self):
+        return f"<LocalDirectory {self._path}>"
+
+
+# TODO remove duplicate code by inheriting from LocatedAdvice once https://github.com/databrickslabs/lsql/issues/103 is fixed
+# pylint: disable=duplicate-code
+@dataclass
+class FileProblem:
+    path: str
+    code: str
+    message: str
+    start_line: int
+    start_col: int
+    end_line: int
+    end_col: int
+
+
+class LocalFilesLinter:
+
+    def __init__(
+        self,
+        languages: Languages,
+        file_loader: FileLoader,
+        dir_loader: DirectoryLoader,
+        path_lookup: PathLookup,
+        dependency_resolver: DependencyResolver,
+    ) -> None:
+        self._languages = languages
+        self._file_loader = file_loader
+        self._dir_loader = dir_loader
+        self._path_lookup = path_lookup
+        self._dependency_resolver = dependency_resolver
+        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+
+    def lint(self, path: Path) -> list[FileProblem]:
+        return list(self._lint(path))
+
+    def _lint(self, path: Path) -> Iterable[FileProblem]:
+        loader = self._dir_loader if path.is_dir() else self._file_loader
+        dependency = Dependency(loader, path)
+        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)
+        container = dependency.load(self._path_lookup)
+        assert container is not None  # because we just created it
+        dependency_problems = container.build_dependency_graph(graph)
+        if dependency_problems:
+            problems = [
+                self._file_problem_from_dependency_problem(dependency_problem)
+                for dependency_problem in dependency_problems
+            ]
+            yield from problems
+        for child_path in graph.all_paths:
+            yield from self._lint_one(child_path)
+
+    @staticmethod
+    def _file_problem_from_dependency_problem(problem: DependencyProblem):
+        return FileProblem(
+            path=problem.source_path.as_posix() if problem.source_path.name != MISSING_SOURCE_PATH else 'UNKNOWN',
+            code=problem.code,
+            message=problem.message,
+            start_line=problem.start_line,
+            start_col=problem.start_col,
+            end_line=problem.end_line,
+            end_col=problem.end_col,
+        )
+
+    def _lint_one(self, path: Path) -> Iterable[FileProblem]:
+        if path.is_dir():
+            return []
+        linter = FileLinter(self._languages, path)
+        advices = linter.lint()
+        return [self._file_problem_from_advice(path, advice) for advice in advices]
+
+    @staticmethod
+    def _file_problem_from_advice(path: Path, advice: Advice):
+        return FileProblem(
+            path=path.absolute().as_posix(),
+            code=advice.code,
+            message=advice.message,
+            start_line=advice.start_line,
+            start_col=advice.start_col,
+            end_line=advice.end_line,
+            end_col=advice.end_col,
+        )
+
+
+class LocalFilesMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
     def __init__(self, languages: Languages):
@@ -100,13 +213,34 @@ class FileLoader(DependencyLoader):
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        return LocalFile(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
+        # for now we only support python
+        if not absolute_path.as_posix().endswith(".py"):
+            return None
+        for encoding in ("utf-8", "ascii"):
+            try:
+                code = absolute_path.read_text(encoding)
+                return LocalFile(absolute_path, code, Language.PYTHON)
+            except UnicodeDecodeError:
+                pass
+        return None
 
     def exists(self, path: Path) -> bool:
         return path.exists()
 
     def __repr__(self):
         return "FileLoader()"
+
+
+class DirectoryLoader(FileLoader):
+
+    def __init__(self, file_loader: FileLoader):
+        self._file_loader = file_loader
+
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        absolute_path = path_lookup.resolve(dependency.path)
+        if not absolute_path:
+            return None
+        return LocalDirectory(absolute_path, self._file_loader, self)
 
 
 class LocalFileResolver(BaseImportResolver, BaseFileResolver):

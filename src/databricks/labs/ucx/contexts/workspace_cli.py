@@ -3,7 +3,6 @@ import shutil
 from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
@@ -16,7 +15,7 @@ from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.files import LocalFilesMigrator, LocalFilesLinter
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
@@ -179,9 +178,11 @@ class LocalContext(WorkspaceContext):
     for running local operations."""
 
     @cached_property
-    def local_file_migrator(self):
-        return LocalFileMigrator(self.languages)
+    def local_files_migrator(self):
+        return LocalFilesMigrator(self.languages)
 
     @cached_property
-    def local_file_linter(self):
-        return FileLinter(self.tables_migrator.index(), self.dependency_resolver)
+    def local_files_linter(self):
+        return LocalFilesLinter(
+            self.languages, self.file_loader, self.directory_loader, self.path_lookup, self.dependency_resolver
+        )

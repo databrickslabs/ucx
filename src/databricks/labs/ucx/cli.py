@@ -400,7 +400,7 @@ def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     working_directory = Path.cwd()
     if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
         return
-    ctx.local_file_migrator.apply(working_directory)
+    ctx.local_files_migrator.apply(working_directory)
 
 
 @ucx.command(is_account=True)
@@ -470,15 +470,13 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 
 
 @ucx.command
-def lint_local_code(w: WorkspaceClient, ctx: LocalContext | None = None):
+def lint_local_code(w: WorkspaceClient, path: Path | None = None, ctx: LocalContext | None = None):
     """Lint local code files looking for problems in notebooks and python files."""
+    if path is None:
+        path = Path.cwd()
     if ctx is None:
-        # TODO Add a local dependency builder to localcontext rather than Workspace, once Eric's PR hits
-        # Right now it is using the workspace loader to prove it all works but obviously will not find notebooks
-        # in the workspace
         ctx = LocalContext(w)
-    working_directory = Path.cwd()
-    ctx.local_file_linter.lint(working_directory)
+    ctx.local_files_linter.lint(path)
 
 
 if __name__ == "__main__":

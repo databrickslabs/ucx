@@ -42,8 +42,7 @@ class Matcher(ABC):
     def _get_table_arg(self, node: ast.Call):
         if len(node.args) > 0:
             return node.args[self.table_arg_index] if self.min_args <= len(node.args) <= self.max_args else None
-        assert self.table_arg_name is not None
-        if not node.keywords:
+        if not self.table_arg_name or not node.keywords:
             return None
         arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
         return arg.value if arg is not None else None
