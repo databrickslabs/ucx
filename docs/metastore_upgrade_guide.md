@@ -87,6 +87,10 @@ We will use the following command:
 databricks labs ucx principal-prefix-access
 ```
 
+This command produces a file named `aws_instance_profile_info.csv`.
+It has the following format:
+
+
 #### Step 2.2: Create/Modify Cloud Principals and Credentials
 In this step we will create the necessary cloud principals for the UC credentials.
 The manual process is documented in the following links:
