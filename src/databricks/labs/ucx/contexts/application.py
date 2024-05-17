@@ -9,6 +9,7 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.service import sql
 
@@ -43,7 +44,6 @@ from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import PipResolver, SitePackages
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -352,7 +352,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pip_resolver(self):
-        return PipResolver()
+        return PipResolver(self.file_loader, self.whitelist)
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:
@@ -366,10 +366,6 @@ class GlobalContext(abc.ABC):
     def site_packages_path(self):
         lookup = self.path_lookup
         return next(path for path in lookup.paths if "site-packages" in path.as_posix())
-
-    @cached_property
-    def site_packages(self):
-        return SitePackages.parse(self.site_packages_path)
 
     @cached_property
     def path_lookup(self):

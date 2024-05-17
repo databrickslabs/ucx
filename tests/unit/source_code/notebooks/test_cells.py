@@ -8,7 +8,8 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.site_packages import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
 def test_pip_cell_language_is_pip():
@@ -59,7 +60,9 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([PipResolver()], notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver(
+        [PipResolver(FileLoader(), Whitelist())], notebook_resolver, [], mock_path_lookup
+    )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install unknown-library-name"
@@ -76,13 +79,15 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([PipResolver()], notebook_resolver, [], mock_path_lookup)
+    dependency_resolver = DependencyResolver(
+        [PipResolver(FileLoader(), Whitelist())], notebook_resolver, [], mock_path_lookup
+    )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
-    code = "%pip install pytest"
+    code = "%pip install demo-egg"  # installs pkgdir
     cell = PipCell(code)
 
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("pytest")).exists()
+    assert graph.path_lookup.resolve(Path("pkgdir")).exists()
