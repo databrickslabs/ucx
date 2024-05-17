@@ -82,6 +82,10 @@ You can read about it here:
 
 #### Step 2.1: Map the cloud principals to the cloud "prefixes"
 In this step we are going to map all the cloud principals to the paths they have access to.
+We will use the following command:
+```bash
+databricks labs ucx principal-prefix-access
+```
 
 #### Step 2.2: Create/Modify Cloud Principals and Credentials
 In this step we will create the necessary cloud principals for the UC credentials.
