@@ -9,8 +9,20 @@ class TableIdentifier:
     table: str
 
     @property
-    def fqn(self):
-        return f"{self.catalog}.{self.schema}.{self.table}"
+    def catalog_escaped(self):
+        return f"`{self.catalog}`"
+
+    @property
+    def schema_escaped(self):
+        return f"`{self.schema}`"
+
+    @property
+    def table_escaped(self):
+        return f"`{self.table}`"
+
+    @property
+    def fqn_escaped(self):
+        return f"{self.catalog_escaped}.{self.schema_escaped}.{self.table_escaped}"
 
 
 @dataclass(frozen=True)

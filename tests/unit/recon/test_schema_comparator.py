@@ -14,7 +14,7 @@ def test_schema_comparison_success(metadata_row_factory):
                 ("col1", "int"),
                 ("col2", "string"),
             ],
-            f"{target.catalog}\\.information_schema\\.columns": metadata_row_factory[
+            f"{target.catalog_escaped}\\.information_schema\\.columns": metadata_row_factory[
                 ("col1", "int"),
                 ("col2", "string"),
             ],
@@ -59,7 +59,7 @@ def test_schema_comparison_failure(metadata_row_factory):
                 ("col3", "array<string>"),
                 ("# col_name", "data_type"),
             ],
-            f"{target.catalog}\\.information_schema\\.columns": metadata_row_factory[
+            f"{target.catalog_escaped}\\.information_schema\\.columns": metadata_row_factory[
                 ("col1", "int"),
                 ("col2", "string"),
             ],

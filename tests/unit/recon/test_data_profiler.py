@@ -9,7 +9,7 @@ def test_data_profiling(metadata_row_factory, row_count_row_factory):
     table_identifier = TableIdentifier("catalog1", "db1", "table1")
     sql_backend = MockBackend(
         rows={
-            f"{table_identifier.catalog}\\.information_schema\\.columns": metadata_row_factory[
+            f"{table_identifier.catalog_escaped}\\.information_schema\\.columns": metadata_row_factory[
                 ("col2", "string"),
                 ("col1", "int"),
                 ("col3", "array<string>"),
