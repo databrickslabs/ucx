@@ -6,8 +6,10 @@ from pathlib import Path
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
@@ -17,6 +19,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     MaybeDependency,
     SourceContainer,
+    DependencyResolver,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,3 +155,60 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
     def __repr__(self):
         return "LocalFileResolver()"
+
+
+class LocalFileLinter:
+
+    def __init__(self, migration_index: MigrationIndex, dependency_resolver: DependencyResolver) -> None:
+        self._migration_index = migration_index
+        self._dependency_resolver = dependency_resolver
+        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+
+    # TODO: Build dependency graph, use ws tools for directory walk
+    def lint(self, path: Path) -> bool:
+
+        if path.is_dir():
+            for child_path in path.iterdir():
+                self.lint(child_path)
+            return True
+        return self._lint_file(path)
+
+    def _lint_file(self, path: Path) -> bool:
+        if path.suffix not in self._extensions:
+            return False
+        language = self._extensions[path.suffix]
+        if not language:
+            return False
+        advised = False
+        logger.info(f"Analysing {path}")
+
+        # Recreate Language every time to reset the state
+        languages = Languages(self._migration_index)
+        # TODO: Change to use tools rather than with
+        with path.open("r") as f:
+
+            # Check dependencies
+            # TODO: Need a local version of this, pending Eric's PR
+            maybe = self._dependency_resolver.build_notebook_dependency_graph(path)
+            for problem in maybe.problems:
+                logger.info(f"Found: {problem}")
+                advised = True
+
+            code = f.read()
+            # Check to see if this is actually a notebook
+            if self.is_notebook(code):
+                notebook_linter = NotebookLinter.from_source(self._migration_index, code, language)
+                for advice in notebook_linter.lint():
+                    logger.info(f"Found: {advice}")
+                    advised = True
+                return advised
+
+            linter = languages.linter(language)
+            for advice in linter.lint(code):
+                logger.info(f"Found: {advice}")
+                advised = True
+            return advised
+
+    @staticmethod
+    def is_notebook(src: str) -> bool:
+        return NOTEBOOK_HEADER in src.split('\n', 1)[0]
