@@ -717,6 +717,15 @@ def test_instance_profile_lookup():
 
 def test_instance_profile_failed_lookup():
     def instance_lookup(_):
+        ip_doc = ""
+        return 0, ip_doc, ""
+
+    aws = AWSResources("profile", instance_lookup)
+    assert aws.get_instance_profile_role_arn("instance_profile_1") is None
+
+
+def test_instance_profile_malformed_lookup():
+    def instance_lookup(_):
         ip_doc = """
 {
     "InstanceProfile": {
