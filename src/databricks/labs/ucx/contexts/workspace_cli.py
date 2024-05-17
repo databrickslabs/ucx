@@ -3,9 +3,8 @@ import shutil
 from functools import cached_property
 
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
-from databricks.labs.ucx.account.metastores import AccountMetastores
-from databricks.labs.ucx.account.workspaces import AccountWorkspaces
-from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
@@ -17,7 +16,7 @@ from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileLinter
+from databricks.labs.ucx.source_code.files import LocalFileMigrator
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
@@ -175,28 +174,6 @@ class WorkspaceContext(CliContext):
         return NotebookLoader()
 
 
-class AccountContext(CliContext):
-    def __init__(self, ac: AccountClient, named_parameters: dict[str, str] | None = None):
-        super().__init__(named_parameters)
-        self._ac = ac
-
-    @cached_property
-    def account_client(self) -> AccountClient:
-        return self._ac
-
-    @cached_property
-    def workspace_ids(self):
-        return [int(_.strip()) for _ in self.named_parameters.get("workspace_ids", "").split(",") if _]
-
-    @cached_property
-    def account_workspaces(self):
-        return AccountWorkspaces(self.account_client, self.workspace_ids)
-
-    @cached_property
-    def account_metastores(self):
-        return AccountMetastores(self.account_client)
-
-
 class LocalContext(WorkspaceContext):
     """Local context extends Workspace context to provide extra properties
     for running local operations."""
@@ -207,4 +184,4 @@ class LocalContext(WorkspaceContext):
 
     @cached_property
     def local_file_linter(self):
-        return LocalFileLinter(self.tables_migrator.index(), self.dependency_resolver)
+        return FileLinter(self.tables_migrator.index(), self.dependency_resolver)
