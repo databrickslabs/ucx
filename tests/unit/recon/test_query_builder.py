@@ -8,7 +8,7 @@ def test_hms_metadata_query():
     table_identifier = TableIdentifier("hive_metastore", "db1", "table1")
     actual_query = build_metadata_query(table_identifier)
     expected_query = "DESCRIBE TABLE hive_metastore.db1.table1"
-    assert re.sub(r'\s+', ' ', actual_query.strip().lower()) == re.sub(r'\s+', ' ', expected_query.strip().lower())
+    assert _normalize_string(actual_query) == _normalize_string(expected_query)
 
 
 def test_unity_metadata_query():
@@ -26,7 +26,7 @@ def test_unity_metadata_query():
             LOWER(table_name) ='table1'
         ORDER BY col_name
     """
-    assert re.sub(r'\s+', ' ', actual_query.strip().lower()) == re.sub(r'\s+', ' ', expected_query.strip().lower())
+    assert _normalize_string(actual_query) == _normalize_string(expected_query)
 
 
 def test_prepare_data_comparison_query():
@@ -66,14 +66,8 @@ def test_prepare_data_comparison_query():
                     WHEN source.hash_value = target.hash_value THEN TRUE
                     ELSE FALSE
                 END AS is_match,
-                CASE 
-                    WHEN target.hash_value IS NULL THEN 1
-                    ELSE 0
-                END AS num_missing_records_in_target,
-                CASE 
-                    WHEN source.hash_value IS NULL THEN 1
-                    ELSE 0
-                END AS num_missing_records_in_source
+                CASE WHEN target.hash_value IS NULL THEN 1 ELSE 0 END AS num_missing_records_in_target,
+                CASE WHEN source.hash_value IS NULL THEN 1 ELSE 0 END AS num_missing_records_in_source
             FROM (
                 SELECT SHA2(CONCAT_WS('|', 
                         COALESCE(TRIM(col1), ''), 
@@ -87,15 +81,18 @@ def test_prepare_data_comparison_query():
                     COALESCE(TRIM(TO_JSON(SORT_ARRAY(col2))), ''), 
                     COALESCE(TRIM(TO_JSON(col3)), '')), 256) AS hash_value
                 FROM catalog1.schema1.table2
-            ) AS target
-            ON source.hash_value = target.hash_value
+            ) AS target ON source.hash_value = target.hash_value
         )
-        SELECT 
-            COUNT(*) AS total_mismatches,
-            COALESCE(SUM(num_missing_records_in_target), 0) AS num_missing_records_in_target,
-            COALESCE(SUM(num_missing_records_in_source), 0) AS num_missing_records_in_source
-        FROM compare_results
-        WHERE is_match IS FALSE;
+        SELECT COUNT(*) AS total_mismatches,
+            COALESCE(SUM(num_missing_records_in_target), 0) 
+            AS num_missing_records_in_target,
+            COALESCE(SUM(num_missing_records_in_source), 0) 
+            AS num_missing_records_in_source
+        FROM compare_results WHERE is_match IS FALSE;
     """
 
-    assert re.sub(r'\s+', ' ', actual_query.strip().lower()) == re.sub(r'\s+', ' ', expected_query.strip().lower())
+    assert _normalize_string(actual_query) == _normalize_string(expected_query)
+
+
+def _normalize_string(value):
+    return re.sub(r'\s+', ' ', value.strip().lower())
