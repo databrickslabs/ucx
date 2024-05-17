@@ -558,3 +558,10 @@ def test_migrate_dbsql_dashboards(ws, caplog):
 def test_revert_dbsql_dashboards(ws, caplog):
     revert_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
+
+
+def test_cli_missing_awscli(ws, mocker, caplog):
+    mocker.patch("shutil.which", side_effect=ValueError("Couldn't find AWS CLI in path"))
+    with pytest.raises(ValueError):
+        ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+        migrate_locations(ws, ctx)
