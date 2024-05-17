@@ -1,7 +1,11 @@
 import re
 
 from databricks.labs.ucx.recon.base import TableIdentifier, DataProfilingResult, TableMetadata, ColumnMetadata
-from databricks.labs.ucx.recon.query_builder import build_metadata_query, build_data_comparison_query
+from databricks.labs.ucx.recon.query_builder import (
+    build_metadata_query,
+    build_data_comparison_query,
+    DATA_COMPARISON_QUERY_TEMPLATE,
+)
 
 
 def test_hms_metadata_query():
@@ -57,43 +61,22 @@ def test_prepare_data_comparison_query():
     )
 
     actual_query = build_data_comparison_query(source_data_profile, target_data_profile)
-    expected_query = """
-        WITH compare_results AS (
-            SELECT 
-                CASE 
-                    WHEN 
-                    source.hash_value IS NULL AND target.hash_value IS NULL THEN TRUE
-                    WHEN 
-                    source.hash_value IS NULL OR target.hash_value IS NULL THEN FALSE
-                    WHEN 
-                    source.hash_value = target.hash_value THEN TRUE
-                    ELSE FALSE
-                END AS is_match,
-                CASE WHEN target.hash_value IS NULL THEN 1 ELSE 0 END AS num_missing_records_in_target,
-                CASE WHEN source.hash_value IS NULL THEN 1 ELSE 0 END AS num_missing_records_in_source
-            FROM (
-                SELECT SHA2(CONCAT_WS('|', 
-                        COALESCE(TRIM(col1), ''), 
-                        COALESCE(TRIM(TO_JSON(SORT_ARRAY(col2))), ''), 
-                        COALESCE(TRIM(TO_JSON(col3)), '')), 256) AS hash_value
-                FROM hive_metastore.db1.table1
-            ) AS source
-            FULL OUTER JOIN (
-                SELECT SHA2(CONCAT_WS('|', 
-                    COALESCE(TRIM(col1), ''), 
-                    COALESCE(TRIM(TO_JSON(SORT_ARRAY(col2))), ''), 
-                    COALESCE(TRIM(TO_JSON(col3)), '')), 256) AS hash_value
-                FROM catalog1.schema1.table2
-            ) AS target ON source.hash_value = target.hash_value
-        )
-        SELECT COUNT(*) AS total_mismatches,
-            COALESCE(SUM(num_missing_records_in_target), 0) 
-            AS num_missing_records_in_target,
-            COALESCE(SUM(num_missing_records_in_source), 0) 
-            AS num_missing_records_in_source
-        FROM compare_results WHERE is_match IS FALSE;
-    """
-
+    source_hash_columns = [
+        "COALESCE(TRIM(col1), '')",
+        "COALESCE(TRIM(TO_JSON(SORT_ARRAY(col2))), '')",
+        "COALESCE(TRIM(TO_JSON(col3)), '')",
+    ]
+    target_hash_columns = [
+        "COALESCE(TRIM(col1), '')",
+        "COALESCE(TRIM(TO_JSON(SORT_ARRAY(col2))), '')",
+        "COALESCE(TRIM(TO_JSON(col3)), '')",
+    ]
+    expected_query = DATA_COMPARISON_QUERY_TEMPLATE.format(
+        source_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(source_hash_columns)}), 256)",
+        target_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(target_hash_columns)}), 256)",
+        source_table_fqn="hive_metastore.db1.table1",
+        target_table_fqn="catalog1.schema1.table2",
+    )
     assert _normalize_string(actual_query) == _normalize_string(expected_query)
 
 

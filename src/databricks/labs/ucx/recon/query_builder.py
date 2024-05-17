@@ -1,6 +1,42 @@
 from databricks.labs.ucx.recon.base import TableIdentifier, DataProfilingResult
 
 
+DATA_COMPARISON_QUERY_TEMPLATE = """
+WITH compare_results AS (
+    SELECT 
+        CASE 
+            WHEN source.hash_value IS NULL AND target.hash_value IS NULL THEN TRUE
+            WHEN source.hash_value IS NULL OR target.hash_value IS NULL THEN FALSE
+            WHEN source.hash_value = target.hash_value THEN TRUE
+            ELSE FALSE
+        END AS is_match,
+        CASE 
+            WHEN target.hash_value IS NULL THEN 1
+            ELSE 0
+        END AS num_missing_records_in_target,
+        CASE 
+            WHEN source.hash_value IS NULL THEN 1
+            ELSE 0
+        END AS num_missing_records_in_source
+    FROM (
+        SELECT {source_hash_expr} AS hash_value
+        FROM {source_table_fqn}
+    ) AS source
+    FULL OUTER JOIN (
+        SELECT {target_hash_expr} AS hash_value
+        FROM {target_table_fqn}
+    ) AS target
+    ON source.hash_value = target.hash_value
+)
+SELECT 
+    COUNT(*) AS total_mismatches,
+    COALESCE(SUM(num_missing_records_in_target), 0) AS num_missing_records_in_target,
+    COALESCE(SUM(num_missing_records_in_source), 0) AS num_missing_records_in_source
+FROM compare_results
+WHERE is_match IS FALSE;
+"""
+
+
 def build_metadata_query(entity: TableIdentifier) -> str:
     if entity.catalog == "hive_metastore":
         return f"DESCRIBE TABLE {entity.fqn}"
@@ -28,40 +64,12 @@ def build_data_comparison_query(
     target_table = target_data_profile.table_metadata.identifier
     source_hash_inputs = _build_data_comparison_hash_inputs(source_data_profile)
     target_hash_inputs = _build_data_comparison_hash_inputs(target_data_profile)
-    comparison_query = f"""
-        WITH compare_results AS (
-            SELECT 
-                CASE 
-                    WHEN source.hash_value IS NULL AND target.hash_value IS NULL THEN TRUE
-                    WHEN source.hash_value IS NULL OR target.hash_value IS NULL THEN FALSE
-                    WHEN source.hash_value = target.hash_value THEN TRUE
-                    ELSE FALSE
-                END AS is_match,
-                CASE 
-                    WHEN target.hash_value IS NULL THEN 1
-                    ELSE 0
-                END AS num_missing_records_in_target,
-                CASE 
-                    WHEN source.hash_value IS NULL THEN 1
-                    ELSE 0
-                END AS num_missing_records_in_source
-            FROM (
-                SELECT SHA2(CONCAT_WS('|', {", ".join(source_hash_inputs)}), 256) AS hash_value
-                FROM {source_table.fqn}
-            ) AS source
-            FULL OUTER JOIN (
-                SELECT SHA2(CONCAT_WS('|', {", ".join(target_hash_inputs)}), 256) AS hash_value
-                FROM {target_table.fqn}
-            ) AS target
-            ON source.hash_value = target.hash_value
-        )
-        SELECT 
-            COUNT(*) AS total_mismatches,
-            COALESCE(SUM(num_missing_records_in_target), 0) AS num_missing_records_in_target,
-            COALESCE(SUM(num_missing_records_in_source), 0) AS num_missing_records_in_source
-        FROM compare_results
-        WHERE is_match IS FALSE;
-        """
+    comparison_query = DATA_COMPARISON_QUERY_TEMPLATE.format(
+        source_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(source_hash_inputs)}), 256)",
+        target_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(target_hash_inputs)}), 256)",
+        source_table_fqn=source_table.fqn,
+        target_table_fqn=target_table.fqn,
+    )
 
     return comparison_query
 
