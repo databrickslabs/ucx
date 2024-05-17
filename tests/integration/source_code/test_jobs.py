@@ -1,8 +1,11 @@
 from pathlib import Path
 
 import pytest
+from databricks.sdk.service import compute
 
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
 def test_running_real_workflow_linter_job(installation_ctx):
@@ -72,3 +75,34 @@ display(spark.read.parquet("/mnt/something"))
         'some_file.py:1 [dbfs-usage] Deprecated file system path in call to: /mnt/foo/bar',
         'second_notebook:4 [dbfs-usage] Deprecated file system path in call to: /mnt/something',
     }
+
+
+def test_workflow_linter_lints_job_with_import_pypi_library(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_random,
+):
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
+    entrypoint.mkdir()
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=Whitelist([]),  # pytest is in default list
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
+    )
+
+    notebook = entrypoint / "notebook.ipynb"
+    make_notebook(path=notebook, content=b"import pytest")
+
+    job_without_pytest_library = make_job(notebook_path=notebook)
+    problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) > 0
+
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))
+    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
