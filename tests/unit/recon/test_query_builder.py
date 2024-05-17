@@ -61,9 +61,12 @@ def test_prepare_data_comparison_query():
         WITH compare_results AS (
             SELECT 
                 CASE 
-                    WHEN source.hash_value IS NULL AND target.hash_value IS NULL THEN TRUE
-                    WHEN source.hash_value IS NULL OR target.hash_value IS NULL THEN FALSE
-                    WHEN source.hash_value = target.hash_value THEN TRUE
+                    WHEN 
+                    source.hash_value IS NULL AND target.hash_value IS NULL THEN TRUE
+                    WHEN 
+                    source.hash_value IS NULL OR target.hash_value IS NULL THEN FALSE
+                    WHEN 
+                    source.hash_value = target.hash_value THEN TRUE
                     ELSE FALSE
                 END AS is_match,
                 CASE WHEN target.hash_value IS NULL THEN 1 ELSE 0 END AS num_missing_records_in_target,
