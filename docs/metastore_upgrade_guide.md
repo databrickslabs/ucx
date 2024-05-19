@@ -90,6 +90,10 @@ databricks labs ucx principal-prefix-access
 This command produces a file named `aws_instance_profile_info.csv`.
 It has the following format:
 
+| **role_arn**                                         | **resource_type** | **privilege** | **resource_path**     |
+|------------------------------------------------------|-------------------|---------------|-----------------------|
+| arn:aws:iam::1234:instance-profile/instance-profile1 | s3                | WRITE_FILES   | s3://s3_bucket1/path1 |
+
 
 #### Step 2.2: Create/Modify Cloud Principals and Credentials
 In this step we will create the necessary cloud principals for the UC credentials.
@@ -105,6 +109,10 @@ This command identifies all the S3 locations that are missing a UC compatible ro
 It takes single-role optional parameter. 
 If set to True, it will create a single role for all the S3 locations.
 Otherwise, it will create a role for each S3 location.
+
+Two optional parameter are available for this command:
+`--role-name` - This parameter is used to set the prefix for the role name. The default value is `UCX-ROLE`.
+`--role-policy` - This parameter is used to set the prefix for the role policy name. The default value is `UCX-POLICY`.
 
 
 For both AWS and Azure we can use the following CLI command to upgrade the necessary cloud principals:
