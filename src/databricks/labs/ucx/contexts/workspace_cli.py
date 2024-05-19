@@ -146,12 +146,15 @@ class WorkspaceContext(CliContext):
 
     @cached_property
     def aws_resource_permissions(self):
+        aws_account_id = self.named_parameters.get("aws_account_id")
+        if not aws_account_id:
+            aws_account_id = self.aws_resources.validate_connection().get("Account")
         return AWSResourcePermissions(
             self.installation,
             self.workspace_client,
             self.aws_resources,
             self.external_locations,
-            self.named_parameters.get("aws_account_id"),
+            aws_account_id,
             self.named_parameters.get("kms_key"),
         )
 
