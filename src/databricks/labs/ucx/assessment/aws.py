@@ -46,7 +46,7 @@ class AWSRoleAction:
 
     @property
     def role_name(self):
-        role_match = re.match(AWSInstanceProfile.ROLE_NAME_REGEX, self.role_arn)
+        role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
         return role_match.group(1)
 
 
@@ -55,15 +55,13 @@ class AWSInstanceProfile:
     instance_profile_arn: str
     iam_role_arn: str | None = None
 
-    ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
-
     @property
     def role_name(self) -> str | None:
         if self.iam_role_arn:
             arn = self.iam_role_arn
         else:
             arn = self.instance_profile_arn
-        role_match = re.match(self.ROLE_NAME_REGEX, arn)
+        role_match = re.match(AWSResources.ROLE_NAME_REGEX, arn)
         if not role_match:
             logger.error(f"Role ARN is mismatched {self.iam_role_arn}")
             return None
@@ -88,6 +86,7 @@ class AWSResources:
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
+    ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
@@ -355,7 +354,7 @@ class AWSResources:
         assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
         return self._create_role(role_name, assume_role_json)
 
-    def get_instance_profile(self, instance_profile_name: str) -> str | None:
+    def get_instance_profile_arn(self, instance_profile_name: str) -> str | None:
         instance_profile = self._run_json_command(
             f"iam get-instance-profile --instance-profile-name {instance_profile_name}"
         )
@@ -364,6 +363,19 @@ class AWSResources:
             return None
 
         return instance_profile["InstanceProfile"]["Arn"]
+
+    def get_instance_profile_role_arn(self, instance_profile_name: str) -> str | None:
+        instance_profile = self._run_json_command(
+            f"iam get-instance-profile --instance-profile-name {instance_profile_name}"
+        )
+
+        if not instance_profile:
+            return None
+
+        try:
+            return instance_profile["InstanceProfile"]["Roles"][0]["Arn"]
+        except (KeyError, IndexError):
+            return None
 
     def create_instance_profile(self, instance_profile_name: str) -> str | None:
         instance_profile = self._run_json_command(
