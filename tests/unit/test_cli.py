@@ -388,7 +388,9 @@ def test_migrate_locations_azure(ws):
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+    ctx = WorkspaceContext(ws).replace(
+        is_aws=True, is_azure=False, aws_profile="profile", named_parameters={"aws_account_id": "123456789012"}
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
