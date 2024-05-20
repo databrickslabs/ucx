@@ -208,7 +208,9 @@ class IamRoleCreation:
     def run(self, prompts: Prompts, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
 
         iam_list = self._resource_permissions.list_uc_roles(
-            single_role=single_role, role_name=role_name, policy_name=policy_name
+            single_role=single_role,
+            role_name=role_name,
+            policy_name=policy_name,
         )
         if not iam_list:
             logger.info("No IAM Role created")
