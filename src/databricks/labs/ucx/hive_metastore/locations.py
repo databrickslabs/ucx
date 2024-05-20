@@ -141,8 +141,18 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         tf_script = []
         cnt = 1
         for loc in missing_locations:
-            if loc.location.startswith("s3://"):
-                res_name = loc.location[5:].rstrip("/").replace("/", "_")
+            if loc.location.startswith(("s3://", "s3a://", "s3n://")):
+                # Determine the prefix length based on the starting substring
+                if loc.location.startswith("s3://"):
+                    prefix_length = 5
+                elif loc.location.startswith("s3a://"):
+                    prefix_length = 6
+                elif loc.location.startswith("s3n://"):
+                    prefix_length = 6
+                else:
+                    logger.warning(f"unsupported storage format {loc.location}")
+                    continue
+                res_name = loc.location[prefix_length:].rstrip("/").replace("/", "_")
             elif loc.location.startswith("gcs://"):
                 res_name = loc.location[6:].rstrip("/").replace("/", "_")
             elif loc.location.startswith("abfss://"):
