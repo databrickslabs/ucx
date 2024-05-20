@@ -293,7 +293,7 @@ def create_missing_principals(
     w: WorkspaceClient,
     prompts: Prompts,
     ctx: WorkspaceContext | None = None,
-    single_role: bool=False,
+    single_role: bool = False,
     role_name="UC_ROLE",
     policy_name="UC_POLICY",
     **named_parameters,
