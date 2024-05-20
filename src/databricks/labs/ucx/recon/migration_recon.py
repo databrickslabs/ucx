@@ -8,8 +8,6 @@ from databricks.labs.ucx.recon.base import (
     DataComparator,
     SchemaComparator,
     TableIdentifier,
-    SchemaComparisonResult,
-    DataComparisonResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -17,8 +15,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ReconResult:
-    schema_comparison: SchemaComparisonResult
-    data_comparison: DataComparisonResult
+    schema_matches: bool
+    data_matches: bool
+    schema_comparison: str
+    data_comparison: str
 
 
 class MigrationRecon(CrawlerBase[ReconResult]):
@@ -59,8 +59,13 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             )
             schema_comparison = self._schema_comparator.compare_schema(source, target)
             data_comparison = self._data_comparator.compare_data(source, target)
-
-            yield ReconResult(schema_comparison, data_comparison)
+            recon_result = ReconResult(
+                schema_comparison.is_matching,
+                data_comparison.source_row_count == data_comparison.target_row_count,
+                schema_comparison.as_dict(),
+                data_comparison.as_dict(),
+            )
+            yield recon_result
 
     def _try_fetch(self) -> Iterable[ReconResult]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):

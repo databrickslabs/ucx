@@ -1,3 +1,4 @@
+import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -64,6 +65,9 @@ class SchemaComparisonResult:
     is_matching: bool
     data: list[SchemaComparisonEntry]
 
+    def as_dict(self):
+        return dataclasses.asdict(self)
+
 
 @dataclass
 class DataComparisonResult:
@@ -71,6 +75,9 @@ class DataComparisonResult:
     target_row_count: int
     num_missing_records_in_target: int
     num_missing_records_in_source: int
+
+    def as_dict(self):
+        return dataclasses.asdict(self)
 
 
 class TableMetadataRetriever(ABC):
