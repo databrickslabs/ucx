@@ -135,7 +135,7 @@ commands:
       - name: policy-name
         description: (Optional) IAM policy Name to be specified for the UC roles. (default:UC_POLICY)
       - name: single-role
-        description: (Optional) Create a single role for all the S3 locations. (default:True)
+        description: (Optional) Create a single role for all S3 locations. (default:False)
 
   - name: create-uber-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
