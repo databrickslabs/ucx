@@ -200,7 +200,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     mock_ws.cluster_policies.get.return_value = cluster_policy
     aws = create_autospec(AWSResources)
     aws.validate_connection.return_value = {}
-    aws.get_instance_profile.return_value = instance_profile_arn
+    aws.get_instance_profile_arn.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
