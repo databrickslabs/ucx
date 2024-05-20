@@ -205,7 +205,7 @@ class IamRoleCreation:
     def save(self, migration_results: list[CredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
 
-    def run(self, prompts: Prompts, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+    def run(self, prompts: Prompts, *, single_role=False, role_name="UC_ROLE", policy_name="UC_POLICY"):
 
         iam_list = self._resource_permissions.list_uc_roles(
             single_role=single_role,
