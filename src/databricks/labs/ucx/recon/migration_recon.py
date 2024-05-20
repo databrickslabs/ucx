@@ -30,7 +30,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         schema_comparator: SchemaComparator,
         data_comparator: DataComparator,
     ):
-        super().__init__(sbe, "hive_metastore", schema, "recon", ReconResult)
+        super().__init__(sbe, "hive_metastore", schema, "recon_result", ReconResult)
         self._migration_status_refresher = migration_status_refresher
         self._schema_comparator = schema_comparator
         self._data_comparator = data_comparator
