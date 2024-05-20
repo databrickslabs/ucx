@@ -38,6 +38,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Table Migration Workflow](#table-migration-workflow)
     * [Dependency CLI commands](#dependency-cli-commands)
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
+    * [Post Migration Validation Task](#post-migration-validation-task)
     * [Other considerations](#other-considerations)
   * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
 * [Utility commands](#utility-commands)
@@ -459,6 +460,13 @@ There are 3 main table migration workflows, targeting different table types. All
 - Following workflows/tasks are on the roadmap and being developed:
   - Migrate tables using CTAS 
   - Experimentally migrate Delta and Parquet data found in dbfs mount but not registered as Hive Metastore table into UC tables.
+
+### Post Migration Validation Task
+UCX also provides `migrate-recon` workflow to validate the integrity of the migrated tables:
+- Comparing the schema of the source and target tables. 
+- Comparing the row counts of the source and target tables.
+- Compare the content of individual row between source and target tables to identify any discrepancies.
+Once completed, the output will be stored in `$inventory_database.recon_result` Delta table.
 
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.

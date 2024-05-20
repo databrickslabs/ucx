@@ -61,7 +61,11 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             data_comparison = self._data_comparator.compare_data(source, target)
             recon_result = ReconResult(
                 schema_comparison.is_matching,
-                data_comparison.source_row_count == data_comparison.target_row_count,
+                (
+                    data_comparison.source_row_count == data_comparison.target_row_count
+                    and data_comparison.num_missing_records_in_target == 0
+                    and data_comparison.num_missing_records_in_source == 0
+                ),
                 schema_comparison.as_dict(),
                 data_comparison.as_dict(),
             )
