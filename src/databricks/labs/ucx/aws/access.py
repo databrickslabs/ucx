@@ -181,6 +181,20 @@ class AWSResourcePermissions:
             missing_paths.add(external_location.location)
         return missing_paths
 
+    def get_roles_to_migrate(self):
+        """
+        Identify the roles that need to be migrated to UC from the UC compatible roles list.
+        """
+        external_locations = self._locations.snapshot()
+        compatible_roles = self.load_uc_compatible_roles()
+        roles = set()
+        for external_location in external_locations:
+            path = PurePath(external_location.location)
+            for role in compatible_roles:
+                if path.match(role.resource_path):
+                    roles.add(role)
+        return roles
+
     def _get_cluster_policy(self, policy_id: str | None) -> Policy:
         if not policy_id:
             msg = "Cluster policy not found in UCX config"
