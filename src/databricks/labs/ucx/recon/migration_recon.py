@@ -44,26 +44,25 @@ class MigrationRecon(CrawlerBase[ReconResult]):
 
     def _crawl(self) -> Iterable[ReconResult]:
         self._migration_status_refresher.reset()
+        migration_index = self._migration_status_refresher.index()
         tasks = []
-        for migration_status in self._migration_status_refresher.snapshot():
-            if not self._migration_status_refresher.is_migrated(
-                migration_status.src_schema,
-                migration_status.src_table,
-            ):
+        for source in migration_index.snapshot():
+            migration_status = migration_index.get(*source)
+            if migration_status is None:
                 continue
             if not migration_status.dst_catalog or not migration_status.dst_schema or not migration_status.dst_table:
                 continue
-            source = TableIdentifier(
+            source_table = TableIdentifier(
                 "hive_metastore",
                 migration_status.src_schema,
                 migration_status.src_table,
             )
-            target = TableIdentifier(
+            target_table = TableIdentifier(
                 migration_status.dst_catalog,
                 migration_status.dst_schema,
                 migration_status.dst_table,
             )
-            tasks.append(partial(self._recon, source, target))
+            tasks.append(partial(self._recon, source_table, target_table))
         recon_result, errors = Threads.gather("Reconciling data", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while reconciling data")

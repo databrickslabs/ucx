@@ -1,7 +1,7 @@
 import datetime
 import logging
 from dataclasses import dataclass, replace
-from collections.abc import Iterable
+from collections.abc import Iterable, KeysView
 
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -52,6 +52,9 @@ class MigrationIndex:
         if not dst or not dst.dst_table:
             return None
         return dst
+
+    def snapshot(self) -> KeysView[tuple[str, str]]:
+        return self._index.keys()
 
 
 class MigrationStatusRefresher(CrawlerBase[MigrationStatus]):
