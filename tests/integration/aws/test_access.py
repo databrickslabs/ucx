@@ -76,9 +76,10 @@ def test_create_uber_instance_profile(
 ):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     aws = AWSResources(profile)
-    account_id = aws.validate_connection().get("Account")
     sql_backend.save_table(
-        f"{inventory_schema}.external_locations", [ExternalLocation("s3://bucket1/FOLDER1", 1)], ExternalLocation
+        f"{inventory_schema}.external_locations",
+        [ExternalLocation("s3://bucket1/FOLDER1", 1)],
+        ExternalLocation,
     )
     installation = Installation(ws, make_random(4))
     # create a new policy
@@ -91,7 +92,6 @@ def test_create_uber_instance_profile(
         aws,
         ExternalLocations(ws, sql_backend, inventory_schema),
         aws_cli_ctx.principal_acl,
-        account_id,
     )
     aws_permissions.create_uber_principal(
         MockPrompts(

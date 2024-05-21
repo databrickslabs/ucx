@@ -151,7 +151,6 @@ class WorkspaceContext(CliContext):
             self.workspace_client,
             self.aws_resources,
             self.external_locations,
-            self.named_parameters.get("aws_account_id"),
             self.named_parameters.get("kms_key"),
         )
 
