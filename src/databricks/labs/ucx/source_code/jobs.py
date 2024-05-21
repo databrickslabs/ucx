@@ -42,6 +42,10 @@ class JobProblem:
     end_line: int
     end_col: int
 
+    def as_message(self) -> str:
+        message = f"{self.path}:{self.start_line} [{self.code}] {self.message}"
+        return message
+
 
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
