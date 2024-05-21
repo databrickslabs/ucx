@@ -110,8 +110,8 @@ def test_workflow_task_container_builds_dependency_graph_for_python_wheel(mock_p
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
-    assert problems[0].code == "no-dist-info"
-    assert problems[0].message.startswith("No dist-info found for test.whl")
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install")
     assert mock_path_lookup.resolve(Path("test")) is None
     ws.assert_not_called()
 
