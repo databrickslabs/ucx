@@ -183,10 +183,14 @@ class WorkflowLinter:
     def lint_job(self, job_id: int) -> list[JobProblem]:
         try:
             job = self._ws.jobs.get(job_id)
-            return list(self._lint_job(job))
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
             return []
+
+        problems = self._lint_job(job)
+        if len(problems) > 0:
+            logger.warning("Found job problems:\n" + "\n".join([problem.as_message() for problem in problems]))
+        return problems
 
     _UNKNOWN = Path('<UNKNOWN>')
 

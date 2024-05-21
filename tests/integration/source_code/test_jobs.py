@@ -78,7 +78,7 @@ display(spark.read.parquet("/mnt/something"))
         'some_file.py:1 [dbfs-usage] Deprecated file system path in call to: /mnt/foo/bar',
         'second_notebook:4 [dbfs-usage] Deprecated file system path in call to: /mnt/something',
     }
-    assert all(any(message.endswith(expected) for message in caplog.messages) for expected in messages)
+    assert all(any(message.endswith(expected) for message in caplog.messages[-1].split("\n")) for expected in messages)
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(
