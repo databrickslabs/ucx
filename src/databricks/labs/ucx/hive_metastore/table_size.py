@@ -71,6 +71,8 @@ class TableSizeCrawler(CrawlerBase):
     def _safe_get_table_size(self, table_full_name: str) -> int | None:
         logger.debug(f"Evaluating {table_full_name} table size.")
         try:
+            # refresh table statistics to avoid stale stats in HMS
+            self._backend.execute(f"ANALYZE table {table_full_name} compute STATISTICS NOSCAN")
             # pylint: disable-next=protected-access
             return self._spark._jsparkSession.table(table_full_name).queryExecution().analyzed().stats().sizeInBytes()
         except Exception as e:  # pylint: disable=broad-exception-caught
