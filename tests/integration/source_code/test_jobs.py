@@ -12,7 +12,6 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.sdk.service.compute import Library, PythonPyPiLibrary, LibrariesAPI
 from databricks.labs.ucx.assessment import jobs
 from databricks.labs.ucx.source_code.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.languages import Languages
@@ -60,22 +59,30 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
 
 def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make_cluster, make_notebook):
     created_cluster = make_cluster(single_node=True)
+    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
+    entrypoint.mkdir()
 
-    libraries_api = LibrariesAPI(ws.api_client)
-    libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("pandas"))])
-
+    notebook = entrypoint / "notebook.ipynb"
     task = jobs.Task(
         task_key=make_random(4),
         description=make_random(4),
         existing_cluster_id=created_cluster.cluster_id,
-        notebook_task=jobs.NotebookTask(notebook_path=str(make_notebook())),
+        notebook_task=jobs.NotebookTask(
+            notebook_path=str(
+                make_notebook(
+                    path=notebook,
+                    content=b"""import doesnotexist
+import greenlet""",
+                )
+            )
+        ),
         timeout_seconds=0,
     )
     j = make_job(tasks=[task])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
-
-    assert len(problems) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+    assert len([problem for problem in problems if problem.message == "Could not locate import: doesnotexist"]) == 1
 
 
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):

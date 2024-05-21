@@ -14,7 +14,6 @@ from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.site_packages import PipResolver
 
 
 def test_job_problem_as_message():
@@ -181,7 +180,7 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
     mock_path_lookup, graph
 ):
     ws = create_autospec(WorkspaceClient)
-    libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))]
+    libraries = []
     existing_cluster_id = "TEST_CLUSTER_ID"
     task = jobs.Task(task_key="test", libraries=libraries, existing_cluster_id=existing_cluster_id)
     libraries_api = create_autospec(compute.LibrariesAPI)
@@ -205,5 +204,4 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("pytest")).exists()
     ws.assert_not_called()

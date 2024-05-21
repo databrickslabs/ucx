@@ -164,7 +164,7 @@ class WorkflowTaskContainer(SourceContainer):
 
         for library_full_status in library_full_status_list:
             if library_full_status.library:
-                yield self._register_library(graph, library_full_status.library)
+                yield from self._register_library(graph, library_full_status.library)
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
