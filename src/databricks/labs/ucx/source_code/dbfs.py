@@ -18,7 +18,7 @@ class DetectDbfsVisitor(ast.NodeVisitor):
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
         self._reported_locations = set()  # Set to store reported locations
 
-    def visit_Call(self, node):  # pylint: disable=invalid-name
+    def visit_Call(self, node):
         for arg in node.args:
             if isinstance(arg, (ast.Str, ast.Constant)) and isinstance(arg.s, str):
                 if any(arg.s.startswith(prefix) for prefix in self._fs_prefixes):
@@ -79,7 +79,7 @@ class DBFSUsageLinter(Linter):
         tree = ast.parse(code)
         visitor = DetectDbfsVisitor()
         visitor.visit(tree)
-        return visitor.get_advices()
+        yield from visitor.get_advices()
 
 
 class FromDbfsFolder(Linter):
@@ -91,7 +91,7 @@ class FromDbfsFolder(Linter):
         return 'dbfs-query'
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code, dialect='databricks'):
+        for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue
             for table in statement.find_all(Table):

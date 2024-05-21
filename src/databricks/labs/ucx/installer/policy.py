@@ -9,6 +9,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute
 from databricks.sdk.service.sql import GetWorkspaceWarehouseConfigResponse
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +23,15 @@ class ClusterPolicyInstaller:
     def _policy_config(value: str):
         return {"type": "fixed", "value": value}
 
+    def has_ext_hms(self) -> bool:
+        policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
+        if len(policies_with_external_hms) > 0:
+            return True
+        warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
+        if warehouse_config is not None:
+            return True
+        return False
+
     def create(self, inventory_database: str) -> tuple[str, str, dict, str | None]:
         instance_profile = ""
         spark_conf_dict = {}
@@ -29,7 +39,7 @@ class ClusterPolicyInstaller:
         instance_pool_id = self._get_instance_pool_id()
         policies_with_external_hms = list(self._get_cluster_policies_with_external_hive_metastores())
         if len(policies_with_external_hms) > 0 and self._prompts.confirm(
-            "We have identified one or more cluster policies set up for an external metastore"
+            "We have identified one or more cluster policies set up for an external metastore. "
             "Would you like to set UCX to connect to the external metastore?"
         ):
             logger.info("Setting up an external metastore")
@@ -40,7 +50,7 @@ class ClusterPolicyInstaller:
         else:
             warehouse_config = self._get_warehouse_config_with_external_hive_metastore()
             if warehouse_config and self._prompts.confirm(
-                "We have identified the workspace warehouse is set up for an external metastore"
+                "We have identified the workspace warehouse is set up for an external metastore. "
                 "Would you like to set UCX to connect to the external metastore?"
             ):
                 logger.info("Setting up an external metastore")
@@ -89,9 +99,10 @@ class ClusterPolicyInstaller:
 
     def _definition(self, conf: dict, instance_profile: str | None, instance_pool_id: str | None) -> str:
         latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
+        node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         policy_definition = {
             "spark_version": self._policy_config(latest_lts_dbr),
-            "node_type_id": self._policy_config(self._ws.clusters.select_node_type(local_disk=True)),
+            "node_type_id": self._policy_config(node_type_id),
         }
         for key, value in conf.items():
             policy_definition[f"spark_conf.{key}"] = self._policy_config(value)

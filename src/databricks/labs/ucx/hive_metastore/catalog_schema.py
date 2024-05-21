@@ -1,9 +1,14 @@
+import collections
 import logging
+from dataclasses import replace
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
+from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.hive_metastore.grants import PrincipalACL, Grant
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import SchemaInfo
 
 from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 
@@ -11,10 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 class CatalogSchema:
-    def __init__(self, ws: WorkspaceClient, table_mapping: TableMapping):
+    def __init__(
+        self, ws: WorkspaceClient, table_mapping: TableMapping, principal_grants: PrincipalACL, sql_backend: SqlBackend
+    ):
         self._ws = ws
         self._table_mapping = table_mapping
         self._external_locations = self._ws.external_locations.list()
+        self._principal_grants = principal_grants
+        self._backend = sql_backend
 
     def create_all_catalogs_schemas(self, prompts: Prompts):
         candidate_catalogs, candidate_schemas = self._get_missing_catalogs_schemas()
@@ -23,6 +32,43 @@ class CatalogSchema:
         for candidate_catalog, schemas in candidate_schemas.items():
             for candidate_schema in schemas:
                 self._create_schema(candidate_catalog, candidate_schema)
+        self._update_principal_acl()
+
+    def _update_principal_acl(self):
+        grants = self._get_catalog_schema_grants()
+        for grant in grants:
+            acl_migrate_sql = grant.uc_grant_sql()
+            if acl_migrate_sql is None:
+                logger.warning(f"Cannot identify UC grant for {grant.this_type_and_key()}. Skipping.")
+                continue
+            logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
+            self._backend.execute(acl_migrate_sql)
+
+    def _get_catalog_schema_grants(self):
+        catalog_grants: set[Grant] = set()
+        new_grants = []
+        src_trg_schema_mapping = self._get_database_source_target_mapping()
+        grants = self._principal_grants.get_interactive_cluster_grants()
+        # filter on grants to only get database level grants
+        database_grants = [grant for grant in grants if grant.table is None and grant.view is None]
+        for db_grant in database_grants:
+            for schema in src_trg_schema_mapping[db_grant.database]:
+                new_grants.append(replace(db_grant, catalog=schema.catalog_name, database=schema.name))
+        for grant in new_grants:
+            catalog_grants.add(replace(grant, database=None))
+        new_grants.extend(catalog_grants)
+        return new_grants
+
+    def _get_database_source_target_mapping(self) -> dict[str, list[SchemaInfo]]:
+        """Generate a dictionary of source database in hive_metastore and its
+        mapping of target UC catalog and schema combinations from the table mappings."""
+        src_trg_schema_mapping: dict[str, list[SchemaInfo]] = collections.defaultdict(list)
+        table_mappings = self._table_mapping.load()
+        for table_mapping in table_mappings:
+            schema = SchemaInfo(catalog_name=table_mapping.catalog_name, name=table_mapping.dst_schema)
+            if schema not in src_trg_schema_mapping[table_mapping.src_schema]:
+                src_trg_schema_mapping[table_mapping.src_schema].append(schema)
+        return src_trg_schema_mapping
 
     def _create_catalog_validate(self, catalog, prompts: Prompts):
         logger.info(f"Creating UC catalog: {catalog}")

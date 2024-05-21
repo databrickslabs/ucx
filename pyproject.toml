@@ -44,11 +44,11 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-dependencies = ["databricks-sdk==0.24.0",
-                "databricks-labs-lsql>=0.3,<0.5",
-                "databricks-labs-blueprint~=0.4.3",
+dependencies = ["databricks-sdk~=0.27.0",
+                "databricks-labs-lsql~=0.4.0",
+                "databricks-labs-blueprint>=0.4.3,<0.6.0",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=23.9,<23.11"]
+                "sqlglot>=23.9,<23.16"]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
@@ -67,7 +67,7 @@ dependencies = [
     "mypy~=1.9.0",
     "pylint~=3.1.0",
     "pylint-pytest==2.0.0a0",
-    "databricks-labs-pylint~=0.1.0",
+    "databricks-labs-pylint~=0.4.0",
     "pytest~=8.1.0",
     "pytest-cov~=4.1.0",
     "pytest-mock~=3.14.0",
@@ -89,11 +89,11 @@ coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=htm
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
 fmt         = ["black .",
                "ruff check . --fix",
-               "mypy --disable-error-code 'annotation-unchecked' .",
+               "mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 verify      = ["black --check .",
                "ruff .",
-               "mypy .",
+               "mypy --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 
@@ -111,6 +111,7 @@ skip-string-normalization = true
 cache-dir = ".venv/ruff-cache"
 target-version = "py310"
 line-length = 120
+exclude = ["tests/unit/source_code/samples/*"]
 
 [tool.ruff.lint]
 ignore = [
@@ -229,6 +230,7 @@ limit-inference-results = 100
 # usually to register additional checkers.
 load-plugins = [
     "databricks.labs.pylint.mocking",
+    "databricks.labs.pylint.eradicate",
     "pylint_pytest",
     "pylint.extensions.bad_builtin",
     "pylint.extensions.broad_try_clause",
@@ -369,7 +371,7 @@ method-naming-style = "snake_case"
 
 # Regular expression matching correct method names. Overrides method-naming-
 # style. If left empty, method names will be checked with the set naming style.
-method-rgx = "[a-z_][a-z0-9_]{2,}$"
+method-rgx = "(([a-z_][a-z0-9_]{2,})|(visit_.*))$"
 
 # Naming style matching correct module names.
 module-naming-style = "snake_case"

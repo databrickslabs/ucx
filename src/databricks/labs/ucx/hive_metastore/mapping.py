@@ -8,10 +8,10 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict
+from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict, DatabricksError
 from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
-from databricks.labs.ucx.account import WorkspaceInfo
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
@@ -184,7 +184,13 @@ class TableMapping:
         if self.exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        result = self._get_table_properties(table)
+        try:
+            result = self._sql_backend.fetch(
+                f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+            )
+        except DatabricksError as err:
+            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+            return None
         for value in result:
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
@@ -199,16 +205,12 @@ class TableMapping:
                     )
                     return None
                 logger.info(f"The upgrade_to target for {table.key} is missing. Unsetting the upgrade_to property")
-                self._sql_backend.execute(table.sql_unset_upgraded_to())
+                try:
+                    self._sql_backend.execute(table.sql_unset_upgraded_to())
+                except DatabricksError as err:
+                    logger.warning(f"Failed to unset upgraded_to property for Table {table.key}: {err}")
 
         return table_to_migrate
-
-    def _get_table_properties(self, table):
-        if table.is_table_in_mount:
-            return self._sql_backend.fetch(f"SHOW TBLPROPERTIES delta.`{table.location}`")
-        return self._sql_backend.fetch(
-            f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
-        )
 
     def exists_in_uc(self, src_table: Table, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.

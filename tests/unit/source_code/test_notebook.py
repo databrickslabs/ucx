@@ -1,12 +1,16 @@
-from unittest.mock import create_autospec
+from pathlib import Path
 import re
 
 import pytest
-from databricks.sdk.service.workspace import Language, ObjectType
+from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.notebook import Notebook
-from databricks.labs.ucx.source_code.dependencies import DependencyGraph, DependencyLoader, Dependency, SourceContainer
+from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.notebooks.loaders import (
+    NotebookResolver,
+    NotebookLoader,
+)
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
@@ -40,7 +44,8 @@ R_NOTEBOOK_SAMPLE = (
 SQL_NOTEBOOK_SAMPLE = (
     "chf-pqi-scoring.sql.txt",
     Language.SQL,
-    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql', 'sql', 'md', 'sql'],
+    ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql',
+     'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
 SHELL_NOTEBOOK_SAMPLE = (
     "notebook-with-shell-cell.py.txt",
@@ -71,7 +76,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     languages = [cell.language.magic_name for cell in notebook.cells]
     assert languages == source[2]
@@ -91,7 +96,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     new_source = notebook.to_migrated_code()
     # ignore trailing whitespaces
@@ -114,110 +119,93 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
-    notebook = Notebook.parse(path, sources[0], source[1])
+    notebook = Notebook.parse(Path(path), sources[0], source[1])
     assert notebook is not None
     for cell in notebook.cells:
         assert cell.is_runnable()
 
 
-def mock_dependency_loader(paths: list[str], sources: list[str], languages: list[Language]) -> DependencyLoader:
-    def load_dependency_side_effect(*args):
-        dependency = args[0]
-        local_path = dependency.path[2:] if dependency.path.startswith('./') else dependency.path
-        index = paths.index(local_path)
-        if index < 0:
-            raise ValueError(f"Can't locate: {dependency.path}")
-        return Notebook.parse(paths[index], sources[index], languages[index])
-
-    loader = create_autospec(DependencyLoader)
-    loader.load_dependency.side_effect = load_dependency_side_effect
-    return loader
+def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py.txt"))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {mock_path_lookup.cwd / "leaf1.py.txt"}
 
 
-def test_notebook_builds_leaf_dependency_graph():
-    paths = ["leaf1.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
-    container.build_dependency_graph(graph)
-    assert graph.paths == {"leaf1.py.txt"}
+def get_status_side_effect(*args):
+    path = args[0]
+    return ObjectInfo(path=path, object_type=ObjectType.NOTEBOOK, language=Language.PYTHON)
 
 
-def test_notebook_builds_depth1_dependency_graph():
+def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
     paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    assert actual == set(paths)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_depth2_dependency_graph():
+def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
     paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    assert actual == set(paths)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_dependency_graph_avoiding_duplicates():
+def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
     paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    old_load_dependency_side_effect = loader.load_dependency.side_effect
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    visited: list[str] = []
-
-    def load_dependency_side_effect(*args):
-        dep = args[0]
-        visited.append(dep.path)
-        return old_load_dependency_side_effect(*args)
-
-    loader.load_dependency.side_effect = load_dependency_side_effect
-    container = loader.load_dependency(dependency)
-    container.build_dependency_graph(graph)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
     # if visited once only, set and list will have same len
-    assert len(set(visited)) == len(visited)
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_cyclical_dependency_graph():
+def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
     paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    assert actual == set(paths)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_python_dependency_graph():
+def test_notebook_builds_python_dependency_graph(mock_path_lookup):
     paths = ["root4.py.txt", "leaf3.py.txt"]
-    sources: list[str] = _load_sources(SourceContainer, *paths)
-    languages = [Language.PYTHON] * len(paths)
-    loader = mock_dependency_loader(paths, sources, languages)
-    dependency = Dependency(ObjectType.NOTEBOOK, paths[0])
-    graph = DependencyGraph(dependency, None, loader)
-    container = loader.load_dependency(dependency)
-    container.build_dependency_graph(graph)
-    actual = {path[2:] if path.startswith('./') else path for path in graph.paths}
-    assert actual == set(paths)
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    problems = container.build_dependency_graph(graph)
+    assert not problems
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():

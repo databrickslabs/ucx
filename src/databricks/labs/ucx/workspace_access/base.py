@@ -40,7 +40,8 @@ class AclSupport:
 
 
 class StaticListing:
-    """This class is only supposed to be used in testing scenarios."""
+    """This class is only supposed to be used in testing scenarios.
+    It returns a static list of permissions specific object types, that can be used to test the ACL support classes."""
 
     def __init__(self, include_object_permissions: list[str], object_types: set[str]):
         self._include_object_permissions = include_object_permissions

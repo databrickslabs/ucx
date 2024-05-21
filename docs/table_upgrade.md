@@ -3,6 +3,7 @@ Table Upgrade
 
 <!-- TOC -->
 * [Table Upgrade](#table-upgrade)
+* [Migration dashboard](#migration-dashboard)
 * [Common considerations](#common-considerations)
   * [Tables (Parquet/Delta) on DBFS root](#tables-parquetdelta-on-dbfs-root)
   * [Tables (Parquet/Delta) on Cloud Storage](#tables-parquetdelta-on-cloud-storage)
@@ -28,21 +29,25 @@ The Hive Metastore migration process will upgrade the following Assets:
 - External Tables
 - Views
 
-We don't expect this process to be a "one and done" process. This typically is an iterative process and may require a
-few runs.
-
-We suggest to keep track of the migration and provide the user a continuous feedback of the progress and status of the
-upgrade.
-
-The migration process will be set as a job that can be invoked multiple times.
+We don't expect this process to be a "one and done" process. The table migration typically is an iterative process
+and may require a few runs. The migration process is implemented within a workflow that can be invoked multiple times.
 Each time it will upgrade tables it can and report the ones it can't.
+
+[[back to top](#table-upgrade)]
+
+# Migration dashboard
+
+We keep track of the migration and provide the user continuous feedback of the progress and status of the
+upgrade. This feedback is presented in the migration dashboard:
+
+![report](migration-report.png)
 
 [[back to top](#table-upgrade)]
 
 # Common considerations
 
 1. One view per workspace summarizing all the table inventory and various counters
-1. By default we create a single catalog per HMS (<prefix (optional)>_<workspace_name>), happens at the account level.
+1. By default, we create a single catalog per HMS (<prefix (optional)>_<workspace_name>), happens at the account level.
 1. Workspace Name would be set up as part of the installation at the account level.
 1. Consider other mappings of environments/database to catalog/database.
     1. The user will be able to specify a default catalog for the workspace.
@@ -58,7 +63,7 @@ Each time it will upgrade tables it can and report the ones it can't.
    | Table       | hive_metastore.finance.accounts       | 0        | []                               |
    | Cluster     | klasd-kladef-01265                    | 0        | ["Uses Passthru authentication"] |
 
-1. By default the target is the target_catalog/database_name
+1. By default, the target is the target_catalog/database_name
 1. The assessment will generate a mapping file/table. The file will be in CSV format.
 
    | Source Database | Target Catalog | Target Database |
@@ -67,24 +72,24 @@ Each time it will upgrade tables it can and report the ones it can't.
    | hr              | de_dev         | human_resources |
    | sales           | ucx-dev_ws     | sales           |
 1. The user can download the mapping file, override the targets and upload it to the workspace .csx folder.
-1. By default we copy the table content (CTAS)
+1. By default, we copy the table content (CTAS)
 1. Allow skipping individual tables/databases
 1. Explore sizing tables or another threshold (recursively count bytes)
-1. By default we copy the table into a managed table/managed location
+1. By default, we copy the table into a managed table/managed location
 1. Allow overriding target to an external table
 1. We should migrate ACLs for the tables (where applicable). We should highlight cases where we can't (no direct
-   translation/conflicts)
+    translation/conflicts)
 1. We should consider automating ACLs based on Instance Profiles / Service Principals and other legacy security
-   mechanisms
+    mechanisms
 
 [[back to top](#table-upgrade)]
 
 ## Tables (Parquet/Delta) on DBFS root
 
-1. By default we copy the table content (CTAS)
+1. By default, we copy the table content (CTAS)
 1. Allow skipping individual tables/databases
 1. Explore sizing tables or another threshold (recursively count bytes)
-1. By default we copy the table into a managed table/managed location
+1. By default, we copy the table into a managed table/managed location
 1. Allow overriding target to an external table
 1. Allow an exception list in case we want to skip certain tables
 

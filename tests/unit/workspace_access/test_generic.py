@@ -124,13 +124,13 @@ def test_apply(migration_state):
 
 
 def test_relevance():
-    sup = GenericPermissionsSupport(
-        ws=create_autospec(WorkspaceClient), listings=[]
-    )  # no listings since only apply is tested
+    ws = create_autospec(WorkspaceClient)
+    sup = GenericPermissionsSupport(ws=ws, listings=[])  # no listings since only apply is tested
     item = Permissions(object_id="passwords", object_type="passwords", raw="{}")
-    migration_state = create_autospec(MigrationState)
+    migration_state = MigrationState([])
     task = sup.get_apply_task(item, migration_state)
     assert task is not None
+    ws.permissions.update.assert_not_called()
 
 
 def test_safe_get_permissions_when_error_non_retriable():
@@ -139,11 +139,6 @@ def test_safe_get_permissions_when_error_non_retriable():
     sup = GenericPermissionsSupport(ws=ws, listings=[])
     result = sup.load_as_dict("clusters", "test")
     assert not result
-
-    # TODO uncomment after ES-892977 is fixed. The code now is retried.
-    # ws.permissions.get.side_effect = DatabricksError(error_code="SOMETHING_UNEXPECTED")
-    # with pytest.raises(DatabricksError):
-    #     sup._safe_get_permissions("clusters", "test")
 
 
 def test_safe_get_permissions_when_error_retriable():
@@ -280,8 +275,10 @@ def test_response_to_request_mapping():
 
     object_permissions = iam.ObjectPermissions(access_control_list=[response1, response2, response3])
 
-    sup = GenericPermissionsSupport(ws=create_autospec(WorkspaceClient), listings=[])
+    ws = create_autospec(WorkspaceClient)
+    sup = GenericPermissionsSupport(ws=ws, listings=[])
     results = sup._response_to_request(object_permissions.access_control_list)
+    ws.permissions.update.assert_not_called()
 
     assert results == [
         iam.AccessControlRequest(permission_level=iam.PermissionLevel.CAN_BIND, user_name="test1212"),
@@ -854,6 +851,7 @@ def test_verify_task_should_fail_if_acls_missing():
 
     with pytest.raises(ValueError):
         sup.get_verify_task(item)
+    ws.permissions.update.assert_not_called()
 
 
 def test_feature_tables_listing():
@@ -918,3 +916,13 @@ def test_models_page_listing():
     for item in auth_items:
         assert item.object_id == "/root"
         assert item.object_type == "registered-models"
+
+
+def test_serving_endpoints_not_enabled(caplog):
+    ws = create_autospec(WorkspaceClient)
+    ws.serving_endpoints.list.side_effect = NotFound("Model serving is not enabled for your shard")
+
+    sup = GenericPermissionsSupport(ws=ws, listings=[Listing(ws.serving_endpoints.list, "id", "serving-endpoints")])
+    with caplog.at_level('ERROR'):
+        list(sup.get_crawler_tasks())
+    assert "Listing serving-endpoints failed: Model serving is not enabled for your shard" in caplog.text

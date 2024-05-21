@@ -3,6 +3,11 @@ name: acceptance
 on:
   pull_request:
     types: [ opened, synchronize, ready_for_review ]
+  merge_group:
+    types: [ checks_requested ]
+  push:
+    branches:
+      - main
 
 permissions:
   id-token: write
@@ -10,7 +15,8 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: single-acceptance-job-per-repo
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration:

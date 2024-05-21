@@ -1,10 +1,11 @@
 import json
+import logging
 from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
-from databricks.labs.lsql.backends import MockBackend, SqlBackend
+from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
@@ -636,6 +637,26 @@ def test_snapshot_with_group_matched_by_prefix():
     ]
 
 
+def test_snapshot_with_group_matched_by_prefix_not_found(caplog):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        display_name="de_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    wsclient.api_client.do.return_value = {
+        "Resources": [],
+    }
+    GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex="^", workspace_group_replace="px_"
+    ).snapshot()
+    assert "Couldn't find a matching account group for de_(1234) group with regex substitution" in caplog.text
+
+
 def test_snapshot_with_group_matched_by_subset():
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
@@ -675,6 +696,26 @@ def test_snapshot_with_group_matched_by_subset():
     ]
 
 
+def test_snapshot_with_group_matched_by_subset_not_found(caplog):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        display_name="de_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    wsclient.api_client.do.return_value = {
+        "Resources": [],
+    }
+    GroupManager(
+        backend, wsclient, inventory_database="inv", workspace_group_regex=r"\(([1-9]+)\)", account_group_regex="[1-9]+"
+    ).snapshot()
+    assert "Couldn't find a matching account group for de_(1234) group with regex matching" in caplog.text
+
+
 def test_snapshot_with_group_matched_by_external_id():
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
@@ -710,6 +751,24 @@ def test_snapshot_with_group_matched_by_external_id():
             entitlements='[{"value": "allow-cluster-create"}, {"value": "allow-instance-pool-create"}]',
         )
     ]
+
+
+def test_snapshot_with_group_matched_by_external_id_not_found(caplog):
+    caplog.set_level(logging.INFO)
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    group = Group(
+        id="1",
+        display_name="de_(1234)",
+        meta=ResourceMeta(resource_type="WorkspaceGroup"),
+    )
+    wsclient.groups.list.return_value = [group]
+    wsclient.groups.get.return_value = group
+    wsclient.api_client.do.return_value = {
+        "Resources": [],
+    }
+    GroupManager(backend, wsclient, inventory_database="inv", external_id_match=True).snapshot()
+    assert "Couldn't find a matching account group for de_(1234) group with external_id" in caplog.text
 
 
 def test_configure_include_groups():
@@ -825,7 +884,7 @@ def test_state():
 
 
 def test_validate_group_diff_membership():
-    backend = create_autospec(SqlBackend)
+    backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
@@ -871,7 +930,7 @@ def test_validate_group_diff_membership():
 
 
 def test_validate_group_diff_membership_no_members():
-    backend = create_autospec(SqlBackend)
+    backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
@@ -908,7 +967,7 @@ def test_validate_group_diff_membership_no_members():
 
 
 def test_validate_group_diff_membership_no_account_group_found():
-    backend = create_autospec(SqlBackend)
+    backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group = Group(
         id="1",
@@ -1033,6 +1092,8 @@ def test_migration_state_with_filtered_group():
     grp_membership = GroupManager(
         backend, ws, inventory_database="inv", include_group_names=["ds", "irrelevant_group"]
     ).get_migration_state()
+
+    ws.groups.list.assert_not_called()
 
     assert len(grp_membership.groups) == 1
     assert grp_membership.groups == [

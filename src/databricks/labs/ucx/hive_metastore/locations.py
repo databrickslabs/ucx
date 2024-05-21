@@ -89,9 +89,9 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         pattern = r"(\w+)=(.*?)(?=\s*,|\s*\])"
         # Find all matches in the input string
         # Storage properties is of the format
-        # "[personalAccessToken=*********(redacted), \
-        #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com, \
-        #  dbtable=samples.nyctaxi.trips]"
+        # "personalAccessToken=*********(redacted),
+        #  httpPath=/sql/1.0/warehouses/65b52fb5bd86a7be, host=dbc-test1-aa11.cloud.databricks.com,
+        #  dbtable=samples.nyctaxi.trips"
         matches = re.findall(pattern, table.storage_properties)
         # Create a dictionary from the matches
         result_dict = dict(matches)
@@ -101,7 +101,6 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         database = result_dict.get("database", "")
         httppath = result_dict.get("httpPath", "")
         provider = result_dict.get("provider", "")
-        # dbtable = result_dict.get("dbtable", "")
         # currently supporting databricks and mysql external tables
         # add other jdbc types
         if "databricks" in location.lower():
@@ -336,6 +335,8 @@ class TablesInMounts(CrawlerBase[Table]):
                 guess_table = os.path.basename(path)
                 table_location = self._get_table_location(mount, path)
 
+                # A table in mount may have already been identified by the assessment job because they're on the current workspace HMS
+                # We filter those tables as we give better support to migrate those tables to UC
                 if table_location in table_paths_from_assessment:
                     logger.info(
                         f"Path {path} is identified as a table in mount, but is present in current workspace as a registered table {table_paths_from_assessment[table_location]}"
@@ -382,28 +383,28 @@ class TablesInMounts(CrawlerBase[Table]):
 
             root_path = os.path.dirname(root_dir)
             previous_entry = delta_log_folders.get(root_path)
+            table_in_mount = self._assess_path(file_info)
+
             if previous_entry:
                 # Happens when first folder was _delta_log and next folders are partitioned folder
-                if (
-                    previous_entry.format == "DELTA"
-                    and self._is_partitioned(file_info.name)
-                    and not previous_entry.is_partitioned
-                ):
+                if previous_entry.format == "DELTA" and self._is_partitioned(file_info.name):
                     delta_log_folders[root_path] = TableInMount(format=previous_entry.format, is_partitioned=True)
+                # Happens when previous entries where partitioned folders and the current one is delta_log
+                if previous_entry.is_partitioned and table_in_mount and table_in_mount.format == "DELTA":
+                    delta_log_folders[root_path] = TableInMount(format=table_in_mount.format, is_partitioned=True)
                 continue
 
             if self._is_partitioned(file_info.name):
-                table_in_mount = self._find_partition_file_format(file_info.path)
-                if table_in_mount:
-                    delta_log_folders[root_path] = table_in_mount
+                partition_format = self._find_partition_file_format(file_info.path)
+                if partition_format:
+                    delta_log_folders[root_path] = partition_format
                 continue
 
-            table_in_mount = self._assess_path(file_info)
-            if table_in_mount:
-                delta_log_folders[root_path] = table_in_mount
-            else:
+            if not table_in_mount:
                 self._find_delta_log_folders(file_info.path, delta_log_folders)
+                continue
 
+            delta_log_folders[root_path] = table_in_mount
         return delta_log_folders
 
     def _find_partition_file_format(self, root_dir: str) -> TableInMount | None:

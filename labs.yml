@@ -43,6 +43,14 @@ commands:
     is_account_level: true
     description: upload workspace config to all workspaces in the account where ucx is installed
 
+  - name: report-account-compatibility
+    is_account_level: true
+    description: aggregation of UCX output of multiple workspaces in the account. 
+      If --workspace-ids is not provided, it will use all workspaces present in the account.
+    flags:
+      - name: workspace-ids
+        description: List of workspace IDs to create account groups from.
+
   - name: manual-workspace-info
     description: only supposed to be run if cannot get admins to run `databricks labs ucx sync-workspace-info`
 
@@ -113,6 +121,16 @@ commands:
       - name: aws-profile
         description: AWS Profile to use for authentication
 
+  - name: create-missing-principals
+    description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and 
+      creates them. It takes single-role optional parameter. 
+        If set to True, it will create a single role for all the S3 locations.
+    flags:
+      - name: aws-profile
+        description: AWS Profile to use for authentication
+      - name: single-role
+        description: (Optional) Create a single role for all the S3 locations (default:True)
+
   - name: create-uber-principal
     description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
       used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
@@ -132,18 +150,28 @@ commands:
 
   - name: migrate-credentials
     description: Migrate credentials for storage access to UC storage credential
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+      - name: aws-profile
+        description: AWS Profile to use for authentication
 
   - name: create-account-groups
     is_account_level: true
     description: |
-      Creates account level groups for all groups in workspaces provided in workspace_ids.
-      If workspace_ids is not provided, it will use all workspaces present in the account.
+      Creates account level groups for all groups in workspaces provided in --workspace-ids.
+      If --workspace-ids is not provided, it will use all workspaces present in the account.
     flags:
-      - name: workspace_ids
+      - name: workspace-ids
         description: List of workspace IDs to create account groups from.
 
   - name: migrate-locations
     description: Create UC external locations based on the output of guess_external_locations assessment task.
+    flags:
+      - name: subscription-id
+        description: Subscription to scan storage account in
+      - name: aws-profile
+        description: AWS Profile to use for authentication
 
   - name: create-catalogs-schemas
     description: Create UC external catalogs and schemas based on the destinations created from create_table_mapping command.
@@ -157,3 +185,38 @@ commands:
 
   - name: migrate-local-code
     description: (Experimental) Migrate files in the current directory to be more compatible with Unity Catalog.
+
+  - name: show-all-metastores
+    is_account_level: true
+    description: Show all metastores available in the same region as the specified workspace
+    flags:
+      - name: workspace-id
+        description: (Optional) Workspace ID to show metastores for
+
+  - name: assign-metastore
+    is_account_level: true
+    description: Enable Unity Catalog features on a workspace by assign a metastore to it
+    flags:
+      - name: workspace-id
+        description: (Optional) Workspace ID to assign a metastore to
+      - name: metastore-id
+        description: (Optional) If there are multiple metastores in the region, specify the metastore ID to assign
+      - name: default-catalog
+        description: (Optional) Default catalog to assign to the workspace. If not provided, it will be hive_metastore
+
+  - name: migrate-tables
+    description: |
+      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental 
+      workflow and migrate-external-tables-ctas workflow.
+
+  - name: migrate-dbsql-dashboards
+    description: Migrate DBSQL dashboards by replacing legacy HMS tables in DBSQL queries with the corresponding new UC tables.
+    flags:
+      - name: dashboard-id
+        description: (Optional) DBSQL dashboard ID to migrate. If no dashboard ID is provided, all DBSQL dashboards in the workspace will be migrated.
+
+  - name: revert-dbsql-dashboards
+    description: Revert DBSQL dashboards that have been migrated to their original state before the migration.
+    flags:
+      - name: dashboard-id
+        description: (Optional) DBSQL dashboard ID to revert. If no dashboard ID is provided, all migrated DBSQL dashboards in the workspace will be reverted.

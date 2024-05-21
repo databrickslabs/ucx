@@ -2,10 +2,12 @@ import base64
 import re
 from dataclasses import dataclass
 from datetime import timedelta
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, NotFound
 from databricks.sdk.retries import retried
 
@@ -16,8 +18,8 @@ from databricks.labs.ucx.azure.credentials import (
     StorageCredentialManager,
     StorageCredentialValidationResult,
 )
-from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations
 from tests.integration.conftest import StaticServicePrincipalCrawler
 
 
@@ -56,21 +58,28 @@ def extract_test_info(ws, env_or_skip, make_random):
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend):
+def run_migration(sql_backend, inventory_schema, env_or_skip):
     def inner(
+        ws: WorkspaceClient,
         test_info: MigrationTestInfo,
         credentials: set[str] | None = None,
         read_only=False,
         migrate_service_principals: str = "Yes",
         create_access_connectors: str = "No",
+        azurerm: AzureResources | None = None,
+        resource_permissions: AzureResourcePermissions | None = None,
     ) -> list[StorageCredentialValidationResult]:
         azure_mgmt_client = AzureAPIClient(
             ws.config.arm_environment.resource_manager_endpoint,
             ws.config.arm_environment.service_management_endpoint,
         )
         graph_client = AzureAPIClient("https://graph.microsoft.com", "https://graph.microsoft.com")
-        azurerm = AzureResources(azure_mgmt_client, graph_client)
-        locations = ExternalLocations(ws, sql_backend, "dont_need_a_schema")
+        if azurerm is None:
+            azurerm = AzureResources(azure_mgmt_client, graph_client)
+
+        external_location = ExternalLocation(f"{env_or_skip('TEST_MOUNT_CONTAINER')}/folder1", 1)
+        sql_backend.save_table(f"{inventory_schema}.external_locations", [external_location], ExternalLocation)
+        locations = ExternalLocations(ws, sql_backend, inventory_schema)
 
         installation = MockInstallation(
             {
@@ -86,7 +95,8 @@ def run_migration(ws, sql_backend):
                 ]
             }
         )
-        resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
+        if resource_permissions is None:
+            resource_permissions = AzureResourcePermissions(installation, ws, azurerm, locations)
 
         sp_infos = [
             AzureServicePrincipalInfo(
@@ -106,7 +116,7 @@ def run_migration(ws, sql_backend):
             MockPrompts(
                 {
                     "Above Azure Service Principals will be migrated to UC storage credentials *": migrate_service_principals,
-                    "Please confirm to create an access connector for each storage account.": create_access_connectors,
+                    r"\[RECOMMENDED\] Please confirm to create an access connector*": create_access_connectors,
                 }
             ),
             credentials,
@@ -116,7 +126,7 @@ def run_migration(ws, sql_backend):
 
 
 @retried(on=[InternalError], timeout=timedelta(minutes=2))
-def test_spn_migration_existed_storage_credential(extract_test_info, make_storage_credential, run_migration):
+def test_spn_migration_existed_storage_credential(ws, extract_test_info, make_storage_credential, run_migration):
     # create a storage credential for this test
     make_storage_credential(
         credential_name=extract_test_info.credential_name,
@@ -126,7 +136,7 @@ def test_spn_migration_existed_storage_credential(extract_test_info, make_storag
     )
 
     # test that the spn migration will be skipped due to above storage credential is existed
-    migration_result = run_migration(extract_test_info, {extract_test_info.credential_name})
+    migration_result = run_migration(ws, extract_test_info, {extract_test_info.credential_name})
 
     # assert no spn migrated since migration_result will be empty
     assert not migration_result
@@ -146,7 +156,7 @@ def save_delete_credential(ws, name):
 @pytest.mark.parametrize("read_only", [False, True])
 def test_spn_migration(ws, extract_test_info, run_migration, read_only):
     try:
-        migration_results = run_migration(extract_test_info, {"lets_migrate_the_spn"}, read_only)
+        migration_results = run_migration(ws, extract_test_info, {"lets_migrate_the_spn"}, read_only)
         storage_credential = ws.storage_credentials.get(extract_test_info.credential_name)
     finally:
         save_delete_credential(ws, extract_test_info.credential_name)
@@ -161,21 +171,46 @@ def test_spn_migration(ws, extract_test_info, run_migration, read_only):
         match = re.match(r"LIST validation failed with message: .*The specified path does not exist", failures[0])
         assert match is not None, "LIST validation should fail"
     else:
-        # all validation should pass
-        assert not migration_results[0].failures
+        failures = migration_results[0].failures
+        # in this test PATH_EXISTS should fail as validation path does not exist
+        assert failures
+        match = re.match(r"PATH_EXISTS validation failed with message.*", failures[0])
+        assert match is not None, "PATH_EXISTS validation should fail"
 
 
-@pytest.mark.skip(reason="TODO: Let migration create storage credentials.")
 @retried(on=[InternalError], timeout=timedelta(minutes=2))
-def test_spn_migration_access_connector_created(ws, extract_test_info, run_migration):
+def test_spn_migration_access_connector_created(
+    clean_storage_credentials,
+    az_cli_ctx,
+    env_or_skip,
+    extract_test_info,
+    run_migration,
+    product_info,
+    make_random,
+):
     """Storage credentials should be created for the access connectors."""
-    storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
-    assert len(storage_credentials) == 0
+    # Mocking in an integration test because Azure resource can not be created
+    resource_permissions = create_autospec(AzureResourcePermissions)
 
-    try:
-        run_migration(extract_test_info, migrate_service_principals="No", create_access_connectors="Yes")
-    finally:
-        save_delete_credential(ws, extract_test_info.credential_name)
+    # TODO: Remove the replace after 20-05-2024
+    access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR").replace("-external", ""))
+    access_connector = AccessConnector(
+        id=access_connector_id,
+        name=f"test-{make_random()}",
+        location="westeu",
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+    mount = env_or_skip("TEST_MOUNT_CONTAINER")
+    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [(access_connector, mount)]
 
-    storage_credentials = [sc for sc in ws.storage_credentials.list() if sc.name.startswith("ac-")]
-    assert len(storage_credentials) > 0
+    run_migration(
+        az_cli_ctx.workspace_client,
+        extract_test_info,
+        migrate_service_principals="No",
+        create_access_connectors="Yes",
+        resource_permissions=resource_permissions,
+    )
+    assert az_cli_ctx.workspace_client.storage_credentials.get(access_connector.name)

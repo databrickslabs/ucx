@@ -12,7 +12,7 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 
 logger = logging.getLogger(__name__)
@@ -113,13 +113,11 @@ class IamRoleMigration:
     def __init__(
         self,
         installation: Installation,
-        ws: WorkspaceClient,
         resource_permissions: AWSResourcePermissions,
         storage_credential_manager: CredentialManager,
     ):
         self._output_file = "aws_iam_role_migration_result.csv"
         self._installation = installation
-        self._ws = ws
         self._resource_permissions = resource_permissions
         self._storage_credential_manager = storage_credential_manager
 
@@ -151,6 +149,9 @@ class IamRoleMigration:
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[CredentialValidationResult]:
 
         iam_list = self._generate_migration_list(include_names)
+        if len(iam_list) == 0:
+            logger.info("No IAM Role to migrate")
+            return []
 
         plan_confirmed = prompts.confirm(
             "Above IAM roles will be migrated to UC storage credentials, please review and confirm."
@@ -166,7 +167,7 @@ class IamRoleMigration:
                 continue
 
             self._resource_permissions.update_uc_role_trust_policy(
-                iam.role_arn, storage_credential.aws_iam_role.external_id
+                iam.role_name, storage_credential.aws_iam_role.external_id
             )
 
             execution_result.append(self._storage_credential_manager.validate(iam))
@@ -174,9 +175,50 @@ class IamRoleMigration:
         if execution_result:
             results_file = self.save(execution_result)
             logger.info(
-                f"Completed migration from IAM Role to UC Storage credentials"
+                f"Completed migration from IAM Role to UC Storage credentials. "
                 f"Please check {results_file} for validation results"
             )
         else:
             logger.info("No IAM Role migrated to UC Storage credentials")
         return execution_result
+
+
+class IamRoleCreation:
+
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        resource_permissions: AWSResourcePermissions,
+    ):
+        self._output_file = "aws_iam_role_creation_result.csv"
+        self._installation = installation
+        self._ws = ws
+        self._resource_permissions = resource_permissions
+
+    @staticmethod
+    def _print_action_plan(iam_list: list[AWSUCRoleCandidate]):
+        # print action plan to console for customer to review.
+        for iam in iam_list:
+            logger.info(f"Role:{iam.role_name} Policy:{iam.policy_name} Paths:{iam.resource_paths}")
+
+    def save(self, migration_results: list[CredentialValidationResult]) -> str:
+        return self._installation.save(migration_results, filename=self._output_file)
+
+    def run(self, prompts: Prompts, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
+
+        iam_list = self._resource_permissions.list_uc_roles(
+            single_role=single_role, role_name=role_name, policy_name=policy_name
+        )
+        if not iam_list:
+            logger.info("No IAM Role created")
+            return
+        self._print_action_plan(iam_list)
+        plan_confirmed = prompts.confirm(
+            "Above UC Compatible IAM roles will be created and granted access to the corresponding paths, "
+            "please review and confirm."
+        )
+        if plan_confirmed is not True:
+            return
+
+        self._resource_permissions.create_uc_roles(iam_list)

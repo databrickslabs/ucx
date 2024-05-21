@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
-from datetime import timedelta
+from datetime import timedelta, datetime
 from pathlib import Path
 from typing import BinaryIO
 
@@ -43,9 +43,11 @@ from databricks.sdk.service.sql import (
     GetResponse,
     ObjectTypePlural,
     Query,
-    QueryInfo,
+    Dashboard,
+    WidgetOptions,
+    WidgetPosition,
 )
-from databricks.sdk.service.workspace import ImportFormat
+from databricks.sdk.service.workspace import ImportFormat, Language
 
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
@@ -53,6 +55,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
 logger = logging.getLogger(__name__)
+JOBS_PURGE_TIMEOUT = timedelta(days=1)
 
 
 def factory(name, create, remove):
@@ -556,12 +559,22 @@ def make_secret_scope_acl(ws):
 
 @pytest.fixture
 def make_notebook(ws, make_random):
-    def create(*, path: str | None = None, content: BinaryIO | None = None, **kwargs):
+    def create(
+        *,
+        path: str | Path | None = None,
+        content: BinaryIO | None = None,
+        language: Language = Language.PYTHON,
+        format: ImportFormat = ImportFormat.SOURCE,  # pylint:  disable=redefined-builtin
+        overwrite: bool = False,
+    ) -> str:
         if path is None:
-            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}.py"
+            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+        elif isinstance(path, pathlib.Path):
+            path = str(path)
         if content is None:
             content = io.BytesIO(b"print(1)")
-        ws.workspace.upload(path, content, **kwargs)
+        path = str(path)
+        ws.workspace.upload(path, content, language=language, format=format, overwrite=overwrite)
         return path
 
     yield from factory("notebook", create, lambda x: ws.workspace.delete(x))
@@ -613,6 +626,7 @@ def _make_group(name, cfg, interface, make_random):
         roles: list[str] | None = None,
         entitlements: list[str] | None = None,
         display_name: str | None = None,
+        wait_for_provisioning: bool = False,
         **kwargs,
     ):
         kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
@@ -628,6 +642,14 @@ def _make_group(name, cfg, interface, make_random):
             logger.info(f"Account group {group.display_name}: {cfg.host}/users/groups/{group.id}/members")
         else:
             logger.info(f"Workspace group {group.display_name}: {cfg.host}#setting/accounts/groups/{group.id}")
+
+        @retried(on=[NotFound], timeout=timedelta(minutes=2))
+        def _wait_for_provisioning() -> None:
+            interface.get(group.id)
+
+        if wait_for_provisioning:
+            _wait_for_provisioning()
+
         return group
 
     yield from factory(name, create, lambda item: interface.delete(item.id))
@@ -697,7 +719,7 @@ def make_cluster(ws, make_random):
                 kwargs["spark_conf"] = {"spark.databricks.cluster.profile": "singleNode", "spark.master": "local[*]"}
             kwargs["custom_tags"] = {"ResourceClass": "SingleNode"}
         if "instance_pool_id" not in kwargs:
-            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True)
+            kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
 
         return ws.clusters.create(
             cluster_name=cluster_name,
@@ -738,7 +760,7 @@ def make_instance_pool(ws, make_random):
         if instance_pool_name is None:
             instance_pool_name = f"sdk-{make_random(4)}"
         if node_type_id is None:
-            node_type_id = ws.clusters.select_node_type(local_disk=True)
+            node_type_id = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         return ws.instance_pools.create(instance_pool_name, node_type_id, **kwargs)
 
     yield from factory("instance pool", create, lambda item: ws.instance_pools.delete(item.instance_pool_id))
@@ -746,43 +768,47 @@ def make_instance_pool(ws, make_random):
 
 @pytest.fixture
 def make_job(ws, make_random, make_notebook):
-    def create(**kwargs):
+    def create(notebook_path: str | Path | None = None, **kwargs):
         task_spark_conf = None
         if "name" not in kwargs:
             kwargs["name"] = f"sdk-{make_random(4)}"
         if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
+        libraries = None
+        if "libraries" in kwargs:
+            libraries = kwargs.pop("libraries")
+        if isinstance(notebook_path, pathlib.Path):
+            notebook_path = str(notebook_path)
+        if not notebook_path:
+            notebook_path = make_notebook()
+        assert notebook_path is not None
         if "tasks" not in kwargs:
-            if task_spark_conf:
-                kwargs["tasks"] = [
-                    jobs.Task(
-                        task_key=make_random(4),
-                        description=make_random(4),
-                        new_cluster=compute.ClusterSpec(
-                            num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True),
-                            spark_version=ws.clusters.select_spark_version(latest=True),
-                            spark_conf=task_spark_conf,
-                        ),
-                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                        timeout_seconds=0,
-                    )
-                ]
-            else:
-                kwargs["tasks"] = [
-                    jobs.Task(
-                        task_key=make_random(4),
-                        description=make_random(4),
-                        new_cluster=compute.ClusterSpec(
-                            num_workers=1,
-                            node_type_id=ws.clusters.select_node_type(local_disk=True),
-                            spark_version=ws.clusters.select_spark_version(latest=True),
-                        ),
-                        notebook_task=jobs.NotebookTask(notebook_path=make_notebook()),
-                        timeout_seconds=0,
-                    )
-                ]
+            kwargs["tasks"] = [
+                jobs.Task(
+                    task_key=make_random(4),
+                    description=make_random(4),
+                    new_cluster=compute.ClusterSpec(
+                        num_workers=1,
+                        node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+                        spark_version=ws.clusters.select_spark_version(latest=True),
+                        spark_conf=task_spark_conf,
+                    ),
+                    notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
+                    libraries=libraries,
+                    timeout_seconds=0,
+                )
+            ]
+
+        # add RemoveAfter tag for test job cleanup
+        date_to_remove = (datetime.now() + JOBS_PURGE_TIMEOUT).strftime("%Y-%m-%d")
+        remove_after_tag = {"key": "RemoveAfter", "value": date_to_remove}
+
+        if 'tags' not in kwargs:
+            kwargs["tags"] = [remove_after_tag]
+        else:
+            kwargs["tags"].append(remove_after_tag)
+
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
         return job
@@ -817,7 +843,7 @@ def make_pipeline(ws, make_random, make_notebook):
         if "clusters" not in kwargs:
             kwargs["clusters"] = [
                 pipelines.PipelineCluster(
-                    node_type_id=ws.clusters.select_node_type(local_disk=True),
+                    node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
                     label="default",
                     num_workers=1,
                     custom_tags={
@@ -961,8 +987,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
-    # pylint: disable-next=too-many-locals
-    def create(  # pylint: disable=too-many-arguments
+    def create(  # pylint: disable=too-many-locals,too-many-arguments
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
@@ -974,6 +999,8 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         external_delta: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
+        hiveserde_ddl: str | None = None,
+        storage_override: str | None = None,
     ) -> TableInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1029,6 +1056,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
+        if hiveserde_ddl:
+            ddl = hiveserde_ddl
+            data_source_format = None
+            table_type = TableType.EXTERNAL
+            storage_location = storage_override
+
         sql_backend.execute(ddl)
         table_info = TableInfo(
             catalog_name=catalog_name,
@@ -1062,9 +1095,19 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 
 
 @pytest.fixture
-def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., FunctionInfo], None, None]:
+def make_udf(
+    ws,
+    env_or_skip,
+    sql_backend,
+    make_schema,
+    make_random,
+) -> Generator[Callable[..., FunctionInfo], None, None]:
     def create(
-        *, catalog_name="hive_metastore", schema_name: str | None = None, name: str | None = None
+        *,
+        catalog_name="hive_metastore",
+        schema_name: str | None = None,
+        name: str | None = None,
+        hive_udf: bool = False,
     ) -> FunctionInfo:
         if schema_name is None:
             schema = make_schema(catalog_name=catalog_name)
@@ -1075,9 +1118,18 @@ def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., F
             name = f"ucx_T{make_random(4)}".lower()
 
         full_name = f"{catalog_name}.{schema_name}.{name}".lower()
-        ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
-
-        sql_backend.execute(ddl)
+        if hive_udf:
+            cmd_exec = CommandExecutor(
+                ws.clusters,
+                ws.command_execution,
+                lambda: env_or_skip("TEST_DEFAULT_CLUSTER_ID"),
+                language=compute.Language.SQL,
+            )
+            ddl = f"CREATE FUNCTION {full_name} AS 'org.apache.hadoop.hive.ql.udf.generic.GenericUDFAbs';"
+            cmd_exec.run(ddl)
+        else:
+            ddl = f"CREATE FUNCTION {full_name}(x INT) RETURNS FLOAT CONTAINS SQL DETERMINISTIC RETURN 0;"
+            sql_backend.execute(ddl)
         udf_info = FunctionInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,
@@ -1102,13 +1154,14 @@ def make_udf(sql_backend, make_schema, make_random) -> Generator[Callable[..., F
 
 @pytest.fixture
 def make_query(ws, make_table, make_random):
-    def create() -> QueryInfo:
+    def create() -> Query:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
         query = ws.queries.create(
-            name=f"{query_name}",
+            name=query_name,
             description="TEST QUERY FOR UCX",
             query=f"SELECT * FROM {table.schema_name}.{table.name}",
+            tags=["original_query_tag"],
         )
         logger.info(f"Query Created {query_name}: {ws.config.host}/sql/editor/{query.id}")
         return query
@@ -1223,3 +1276,70 @@ def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
     return new_mounted_location
+
+
+@pytest.fixture
+def make_storage_dir(ws, env_or_skip):
+    if ws.config.is_aws:
+        cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
+
+    def create(*, path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.mkdirs('{path}')")
+        else:
+            ws.dbfs.mkdirs(path)
+        return path
+
+    def remove(path: str):
+        if ws.config.is_aws:
+            cmd_exec.run(f"dbutils.fs.rm('{path}', recurse=True)")
+        else:
+            ws.dbfs.delete(path, recursive=True)
+
+    yield from factory("make_storage_dir", create, remove)
+
+
+@pytest.fixture
+def make_dashboard(ws, make_random, make_query):
+    def create() -> Dashboard:
+        query = make_query()
+        viz = ws.query_visualizations.create(
+            type="table",
+            query_id=query.id,
+            options={
+                "itemsPerPage": 1,
+                "condensed": True,
+                "withRowNumber": False,
+                "version": 2,
+                "columns": [
+                    {"name": "id", "title": "id", "allowSearch": True},
+                ],
+            },
+        )
+
+        dashboard_name = f"ucx_D{make_random(4)}"
+        dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
+        ws.dashboard_widgets.create(
+            dashboard_id=dashboard.id,
+            visualization_id=viz.id,
+            width=1,
+            options=WidgetOptions(
+                title="",
+                position=WidgetPosition(
+                    col=0,
+                    row=0,
+                    size_x=3,
+                    size_y=3,
+                ),
+            ),
+        )
+        logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
+        return dashboard
+
+    def remove(dashboard: Dashboard):
+        try:
+            ws.dashboards.delete(dashboard_id=dashboard.id)
+        except RuntimeError as e:
+            logger.info(f"Can't delete dashboard {e}")
+
+    yield from factory("dashboard", create, remove)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os.path
 import re
@@ -13,7 +15,6 @@ from typing import Any
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.parallel import ManyError
-from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import (
@@ -45,7 +46,6 @@ from databricks.sdk.service.workspace import ObjectType
 
 import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.configure import ConfigureClusterOverrides
 from databricks.labs.ucx.framework.tasks import Task
 from databricks.labs.ucx.installer.logs import PartialLogRecord, parse_logs
 from databricks.labs.ucx.installer.mixins import InstallationMixin
@@ -218,9 +218,11 @@ class DeployedWorkflows:
     def _relay_logs(self, workflow, run_id):
         for record in self._fetch_logs(workflow, run_id):
             task_logger = logging.getLogger(record.component)
+            MaxedStreamHandler.install_handler(task_logger)
             task_logger.setLevel(logger.getEffectiveLevel())
             log_level = logging.getLevelName(record.level)
             task_logger.log(log_level, record.message)
+        MaxedStreamHandler.uninstall_handlers()
 
     def _fetch_logs(self, workflow: str, run_id: str) -> Iterator[PartialLogRecord]:
         log_path = f'{self._install_state.install_folder()}/logs/{workflow}'
@@ -399,8 +401,8 @@ class WorkflowsDeployment(InstallationMixin):
         self._skip_dashboards = skip_dashboards
         super().__init__(config, installation, ws)
 
-    def create_jobs(self, prompts):
-        remote_wheel = self._upload_wheel(prompts)
+    def create_jobs(self):
+        remote_wheel = self._upload_wheel()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
@@ -522,17 +524,8 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
 
-    def _upload_wheel(self, prompts: Prompts):
+    def _upload_wheel(self):
         with self._wheels:
-            try:
-                self._wheels.upload_to_dbfs()
-            except PermissionDenied as err:
-                if not prompts:
-                    raise RuntimeWarning("no Prompts instance found") from err
-                logger.warning(f"Uploading wheel file to DBFS failed, DBFS is probably write protected. {err}")
-                configure_cluster_overrides = ConfigureClusterOverrides(self._ws, prompts.choice_from_dict)
-                self._config.override_clusters = configure_cluster_overrides.configure()
-                self._installation.save(self._config)
             return self._wheels.upload_to_wsfs()
 
     def _upload_wheel_runner(self, remote_wheel: str):
@@ -635,12 +628,7 @@ class WorkflowsDeployment(InstallationMixin):
         )
 
     def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
-        if jobs_task.job_cluster_key is not None and "table_migration" in jobs_task.job_cluster_key:
-            # Shared mode cluster cannot use dbfs, need to use WSFS
-            libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
-        else:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1098
-            libraries = [compute.Library(whl=f"dbfs:{remote_wheel}")]
+        libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
         named_parameters = {
             "config": f"/Workspace{self._config_file}",
             "workflow": workflow,
@@ -721,3 +709,72 @@ class WorkflowsDeployment(InstallationMixin):
             remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
+
+
+class MaxedStreamHandler(logging.StreamHandler):
+
+    MAX_STREAM_SIZE = 2**20 - 2**6  # 1 Mb minus some buffer
+    _installed_handlers: dict[str, tuple[logging.Logger, MaxedStreamHandler]] = {}
+
+    @classmethod
+    def install_handler(cls, logger_: logging.Logger):
+        if logger_.handlers:
+            # already installed ?
+            installed = next((h for h in logger_.handlers if isinstance(h, MaxedStreamHandler)), None)
+            if installed:
+                return
+            # any handler to override ?
+            handler = next((h for h in logger_.handlers if isinstance(h, logging.StreamHandler)), None)
+            if handler:
+                to_install = MaxedStreamHandler(cls.MAX_STREAM_SIZE, handler)
+                cls._installed_handlers[logger_.name] = (logger_, to_install)
+                logger_.removeHandler(handler)
+                logger_.addHandler(to_install)
+                return
+        if logger_.parent:
+            cls.install_handler(logger_.parent)
+        if logger_.root:
+            cls.install_handler(logger_.root)
+
+    @classmethod
+    def uninstall_handlers(cls):
+        for pair in cls._installed_handlers.values():
+            logger_ = pair[0]
+            handler = pair[1]
+            logger_.removeHandler(handler)
+            logger_.addHandler(handler.original_handler)
+        cls._installed_handlers.clear()
+
+    def __init__(self, max_bytes: int, original_handler: logging.StreamHandler):
+        super().__init__()
+        self._max_bytes = max_bytes
+        self._sent_bytes = 0
+        self._original_handler = original_handler
+
+    @property
+    def original_handler(self):
+        return self._original_handler
+
+    def emit(self, record):
+        try:
+            msg = self.format(record) + self.terminator
+            if self._prevent_overflow(msg):
+                return
+            self.stream.write(msg)
+            self.flush()
+        except RecursionError:  # See issue 36272
+            raise
+        # the below is copied from Python source
+        # so ensuring not to break the logging logic
+        # pylint: disable=broad-exception-caught
+        except Exception:
+            self.handleError(record)
+
+    def _prevent_overflow(self, msg: str):
+        data = msg.encode("utf-8")
+        if self._sent_bytes + len(data) > self._max_bytes:
+            # ensure readers are aware of why the logs are incomplete
+            self.stream.write(f"MAX LOGS SIZE REACHED: {self._sent_bytes} bytes!!!")
+            self.flush()
+            return True
+        return False

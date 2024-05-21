@@ -29,6 +29,15 @@ class AWSPolicyAction:
 
 
 @dataclass
+class AWSUCRoleCandidate:
+    """Candidates for UC IAM roles with the paths they have access to"""
+
+    role_name: str
+    policy_name: str
+    resource_paths: list[str]
+
+
+@dataclass
 class AWSRoleAction:
     role_arn: str
     resource_type: str
@@ -37,7 +46,7 @@ class AWSRoleAction:
 
     @property
     def role_name(self):
-        role_match = re.match(AWSInstanceProfile.ROLE_NAME_REGEX, self.role_arn)
+        role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
         return role_match.group(1)
 
 
@@ -46,15 +55,13 @@ class AWSInstanceProfile:
     instance_profile_arn: str
     iam_role_arn: str | None = None
 
-    ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
-
     @property
     def role_name(self) -> str | None:
         if self.iam_role_arn:
             arn = self.iam_role_arn
         else:
             arn = self.instance_profile_arn
-        role_match = re.match(self.ROLE_NAME_REGEX, arn)
+        role_match = re.match(AWSResources.ROLE_NAME_REGEX, arn)
         if not role_match:
             logger.error(f"Role ARN is mismatched {self.iam_role_arn}")
             return None
@@ -79,13 +86,14 @@ class AWSResources:
         "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
         "arn:aws:iam::707343435239:role/unity-catalog-dev-UCMasterRole-G3MMN8SP21FO",
     ]
+    ROLE_NAME_REGEX = r"arn:aws:iam::[0-9]+:(?:instance-profile|role)\/([a-zA-Z0-9+=,.@_-]*)$"
 
     def __init__(self, profile: str, command_runner: Callable[[str], tuple[int, str, str]] = run_command):
         self._profile = profile
         self._command_runner = command_runner
 
     def validate_connection(self):
-        validate_command = f"sts get-caller-identity --profile {self._profile}"
+        validate_command = "sts get-caller-identity"
         result = self._run_json_command(validate_command)
         if result:
             logger.info(result)
@@ -93,16 +101,14 @@ class AWSResources:
         return None
 
     def list_role_policies(self, role_name: str):
-        list_policies_cmd = f"iam list-role-policies --profile {self._profile} --role-name {role_name}"
+        list_policies_cmd = f"iam list-role-policies --role-name {role_name}"
         policies = self._run_json_command(list_policies_cmd)
         if not policies:
             return []
         return policies.get("PolicyNames", [])
 
     def list_attached_policies_in_role(self, role_name: str):
-        list_attached_policies_cmd = (
-            f"iam list-attached-role-policies --profile {self._profile} --role-name {role_name}"
-        )
+        list_attached_policies_cmd = f"iam list-attached-role-policies --role-name {role_name}"
         policies = self._run_json_command(list_attached_policies_cmd)
         if not policies:
             return []
@@ -112,7 +118,7 @@ class AWSResources:
         return attached_policies
 
     def list_all_uc_roles(self) -> list[AWSRole]:
-        roles = self._run_json_command(f"iam list-roles --profile {self._profile}")
+        roles = self._run_json_command("iam list-roles")
         uc_roles: list[AWSRole] = []
         roles = roles.get("Roles")
         if not roles:
@@ -158,19 +164,14 @@ class AWSResources:
 
     def get_role_policy(self, role_name, policy_name: str | None = None, attached_policy_arn: str | None = None):
         if policy_name:
-            get_policy = (
-                f"iam get-role-policy --profile {self._profile} --role-name {role_name} " f"--policy-name {policy_name}"
-            )
+            get_policy = f"iam get-role-policy --role-name {role_name} --policy-name {policy_name}"
         elif attached_policy_arn:
-            get_attached_policy = f"iam get-policy --profile {self._profile} --policy-arn {attached_policy_arn}"
+            get_attached_policy = f"iam get-policy --policy-arn {attached_policy_arn}"
             attached_policy = self._run_json_command(get_attached_policy)
             if not attached_policy:
                 return []
             policy_version = attached_policy["Policy"]["DefaultVersionId"]
-            get_policy = (
-                f"iam get-policy-version --profile {self._profile} --policy-arn {attached_policy_arn} "
-                f"--version-id {policy_version}"
-            )
+            get_policy = f"iam get-policy-version --policy-arn {attached_policy_arn} --version-id {policy_version}"
         else:
             logger.error("Failed to retrieve role. No role name or attached role ARN specified.")
             return []
@@ -296,10 +297,10 @@ class AWSResources:
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
         role_document = self._run_json_command(f"iam get-role --role-name {role_name}")
-        role = role_document.get("Role")
-        if not role:
+        if role_document is None:
             logger.error(f"Role {role_name} doesn't exist")
             return None
+        role = role_document.get("Role")
         policy_document = role.get("AssumeRolePolicyDocument")
         if policy_document and policy_document.get("Statement"):
             for idx, statement in enumerate(policy_document["Statement"]):
@@ -322,7 +323,7 @@ class AWSResources:
         else:
             policy_document_json = self._aws_role_trust_doc(external_id)
         update_role = self._run_json_command(
-            f"iam update-assume-role-policy --role-name {role_name} " f"--policy-document {policy_document_json}"
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {policy_document_json}"
         )
         if not update_role:
             return None
@@ -332,8 +333,7 @@ class AWSResources:
         self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
     ) -> bool:
         if not self._run_command(
-            f"iam put-role-policy --role-name {role_name} "
-            f"--policy-name {policy_name} "
+            f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
             f"--policy-document {self._aws_s3_policy(s3_prefixes, account_id, role_name, kms_key)}"
         ):
             return False
@@ -349,7 +349,7 @@ class AWSResources:
         assume_role_json = self._get_json_for_cli(aws_role_trust_doc)
         return self._create_role(role_name, assume_role_json)
 
-    def get_instance_profile(self, instance_profile_name: str) -> str | None:
+    def get_instance_profile_arn(self, instance_profile_name: str) -> str | None:
         instance_profile = self._run_json_command(
             f"iam get-instance-profile --instance-profile-name {instance_profile_name}"
         )
@@ -358,6 +358,19 @@ class AWSResources:
             return None
 
         return instance_profile["InstanceProfile"]["Arn"]
+
+    def get_instance_profile_role_arn(self, instance_profile_name: str) -> str | None:
+        instance_profile = self._run_json_command(
+            f"iam get-instance-profile --instance-profile-name {instance_profile_name}"
+        )
+
+        if not instance_profile:
+            return None
+
+        try:
+            return instance_profile["InstanceProfile"]["Roles"][0]["Arn"]
+        except (KeyError, IndexError):
+            return None
 
     def create_instance_profile(self, instance_profile_name: str) -> str | None:
         instance_profile = self._run_json_command(
@@ -396,7 +409,7 @@ class AWSResources:
 
     def _run_json_command(self, command: str):
         aws_cmd = shutil.which("aws")
-        code, output, error = self._command_runner(f"{aws_cmd} {command} --output json")
+        code, output, error = self._command_runner(f"{aws_cmd} {command} --profile {self._profile} --output json")
         if code != 0:
             logger.error(error)
             return None
@@ -406,7 +419,7 @@ class AWSResources:
 
     def _run_command(self, command: str):
         aws_cmd = shutil.which("aws")
-        code, _, error = self._command_runner(f"{aws_cmd} {command} --output json")
+        code, _, error = self._command_runner(f"{aws_cmd} {command} --profile {self._profile} --output json")
         if code != 0:
             logger.error(error)
             return False

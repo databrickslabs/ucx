@@ -3,11 +3,11 @@ import re
 
 logger = logging.getLogger(__name__)
 
-INCOMPATIBLE_SPARK_CONFIG_KEYS = [
-    "spark.databricks.passthrough.enabled",
-    "spark.hadoop.javax.jdo.option.ConnectionURL",
-    "spark.databricks.hive.metastore.glueCatalog.enabled",
-]
+INCOMPATIBLE_SPARK_CONFIG_KEYS = {
+    "spark.databricks.passthrough.enabled": "Uses passthrough config",
+    "spark.hadoop.javax.jdo.option.ConnectionURL": "Uses external Hive metastore config",
+    "spark.databricks.hive.metastore.glueCatalog.enabled": "Uses Glue catalog config",
+}
 
 AZURE_SP_CONF = [
     "fs.azure.account.auth.type",

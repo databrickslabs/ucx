@@ -55,6 +55,10 @@ unit test coverage suite and the clear difference between _unit tests_ and _inte
 
 See https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html for more details
 
+### `if typing.TYPE_CHECKING:` usage
+
+We don't use `if typing.TYPE_CHECKING:` in our codebase, because PyCharm and `mypy` can handle it without it and `Refactoring -> Move` may produce incorrect results.
+
 ### ..., expression has type "None", variable has type "str"
 
 * Add `assert ... is not None` if it's a body of a method. Example:
@@ -227,7 +231,16 @@ def test_something(ws):
 
 This section provides a step-by-step guide to set up and start working on the project. These steps will help you set up your project environment and dependencies for efficient development.
 
-To begin, run `make dev` to install [Hatch](https://github.com/pypa/hatch), create the default environment and install development dependencies, assuming you've already cloned the github repo.
+To begin, install [Hatch](https://github.com/pypa/hatch), which is our build tool.
+
+On MacOSX, this is achieved using the following:
+```shell
+brew install hatch
+```
+
+The clone the github repo, and `cd` into it.
+
+To begin, run `make dev` to create the default environment and install development dependencies.
 
 ```shell
 make dev

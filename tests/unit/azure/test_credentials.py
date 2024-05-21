@@ -11,7 +11,7 @@ from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.errors.platform import InvalidParameterValue
 from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
-    AzureManagedIdentity,
+    AzureManagedIdentityResponse,
     AzureServicePrincipal,
     StorageCredentialInfo,
     ValidateStorageCredentialResponse,
@@ -33,15 +33,16 @@ from databricks.labs.ucx.azure.credentials import (
     ServicePrincipalMigration,
     ServicePrincipalMigrationInfo,
     StorageCredentialManager,
+    StorageCredentialValidationResult,
 )
-from databricks.labs.ucx.azure.resources import AzureResources
-from databricks.labs.ucx.hive_metastore import ExternalLocations
+from databricks.labs.ucx.azure.resources import (
+    AzureResource,
+    AzureResources,
+    StorageAccount,
+    AccessConnector,
+)
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations
 from tests.unit import DEFAULT_CONFIG
-
-
-@pytest.fixture
-def ws():
-    return create_autospec(WorkspaceClient)
 
 
 @pytest.fixture
@@ -94,13 +95,20 @@ def installation():
     )
 
 
-def side_effect_create_storage_credential(name, azure_service_principal, comment, read_only):
+def side_effect_create_storage_credential(
+    name, comment, read_only, azure_service_principal=None, azure_managed_identity=None
+):
     return StorageCredentialInfo(
-        name=name, azure_service_principal=azure_service_principal, comment=comment, read_only=read_only
+        name=name,
+        comment=comment,
+        read_only=read_only,
+        azure_service_principal=azure_service_principal,
+        azure_managed_identity=azure_managed_identity,
     )
 
 
-def side_effect_validate_storage_credential(storage_credential_name, url, read_only):  # pylint: disable=unused-argument
+def side_effect_validate_storage_credential(storage_credential_name, url, read_only):
+    _ = url
     if "overlap" in storage_credential_name:
         raise InvalidParameterValue
     if "none" in storage_credential_name:
@@ -127,11 +135,12 @@ def side_effect_validate_storage_credential(storage_credential_name, url, read_o
 
 
 @pytest.fixture
-def credential_manager(ws):
+def credential_manager():
+    ws = create_autospec(WorkspaceClient)
     ws.storage_credentials.list.return_value = [
         StorageCredentialInfo(aws_iam_role=AwsIamRoleResponse("arn:aws:iam::123456789012:role/example-role-name")),
         StorageCredentialInfo(
-            azure_managed_identity=AzureManagedIdentity("/subscriptions/.../providers/Microsoft.Databricks/...")
+            azure_managed_identity=AzureManagedIdentityResponse("/subscriptions/.../providers/Microsoft.Databricks/...")
         ),
         StorageCredentialInfo(
             name="included_test",
@@ -148,6 +157,74 @@ def credential_manager(ws):
     ws.storage_credentials.validate.side_effect = side_effect_validate_storage_credential
 
     return StorageCredentialManager(ws)
+
+
+def test_storage_credential_validation_result_from_storage_credential_info_service_principal():
+    """Verify the SP field to be present in the result"""
+    azure_service_principal = AzureServicePrincipal("directory_id", "application_id", "client_secret")
+    storage_credential_info = StorageCredentialInfo(
+        name="test",
+        azure_service_principal=azure_service_principal,
+        read_only=True,
+    )
+    validated_on = "abfss://container@storageaccount.dfs.core.windows.net"
+    failures = ["failure"]
+
+    validation_result = StorageCredentialValidationResult.from_storage_credential_info(
+        storage_credential_info, validated_on, failures
+    )
+
+    assert validation_result.name == storage_credential_info.name
+    assert validation_result.application_id == azure_service_principal.application_id
+    assert validation_result.read_only == storage_credential_info.read_only
+    assert validation_result.validated_on == validated_on
+    assert validation_result.directory_id == azure_service_principal.directory_id
+    assert validation_result.failures == failures
+
+
+@pytest.mark.parametrize(
+    "managed_identity_id",
+    [
+        None,
+        "/subscriptions/sub-test/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-test",
+    ],
+)
+def test_storage_credential_validation_result_from_storage_credential_info_managed_identity(managed_identity_id):
+    """Verify if the fields are correct"""
+    azure_managed_identity = AzureManagedIdentityResponse(
+        "/subscriptions/sub-test/resourceGroups/rg-test/providers/providers/Microsoft.Databricks/accessConnectors/ac-test",
+        managed_identity_id=managed_identity_id,
+    )
+    storage_credential_info = StorageCredentialInfo(
+        name="test",
+        azure_managed_identity=azure_managed_identity,
+        read_only=True,
+    )
+    validated_on = "abfss://container@storageaccount.dfs.core.windows.net"
+    failures = ["failure"]
+
+    validation_result = StorageCredentialValidationResult.from_storage_credential_info(
+        storage_credential_info, validated_on, failures
+    )
+
+    application_id = azure_managed_identity.managed_identity_id or azure_managed_identity.access_connector_id
+
+    assert validation_result.name == storage_credential_info.name
+    assert validation_result.application_id == application_id
+    assert validation_result.read_only == storage_credential_info.read_only
+    assert validation_result.validated_on == validated_on
+    assert validation_result.directory_id is None
+    assert validation_result.failures == failures
+
+
+def test_storage_credential_validation_result_from_storage_credential_info_missing_application_id():
+    """Raise KeyError when application id is missing"""
+    storage_credential_info = StorageCredentialInfo(name="test", read_only=True)
+    validated_on = "abfss://container@storageaccount.dfs.core.windows.net"
+    failures = ["failure"]
+
+    with pytest.raises(KeyError):
+        StorageCredentialValidationResult.from_storage_credential_info(storage_credential_info, validated_on, failures)
 
 
 def test_list_storage_credentials(credential_manager):
@@ -167,7 +244,7 @@ def test_create_storage_credentials(credential_manager):
             "principal_write",
             "WRITE_FILES",
             "Application",
-            "directory_id_1",
+            directory_id="directory_id_1",
         ),
         "test",
     )
@@ -178,7 +255,7 @@ def test_create_storage_credentials(credential_manager):
             "principal_read",
             "READ_FILES",
             "Application",
-            "directory_id_1",
+            directory_id="directory_id_1",
         ),
         "test",
     )
@@ -193,71 +270,112 @@ def test_create_storage_credentials(credential_manager):
 
 
 def test_validate_storage_credentials(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_1", "WRITE_FILES", "Application", "directory_id"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="storage_credential_info",
+        read_only=False,
     )
 
     # validate normal storage credential
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.read_only is False
-    assert validation.name == permission_mapping.principal
+    assert validation.name == storage_credential_info.name
     assert not validation.failures
 
 
 def test_validate_read_only_storage_credentials(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "principal_read", "READ_FILES", "Application", "directory_id_1"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="storage_credential_info",
+        read_only=True,
     )
 
     # validate read-only storage credential
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.read_only is True
-    assert validation.name == permission_mapping.principal
+    assert validation.name == storage_credential_info.name
     assert not validation.failures
 
 
 def test_validate_storage_credentials_overlap_location(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "overlap", "WRITE_FILES", "Application", "directory_id_2"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="overlap",
+        read_only=True,
     )
 
     # prefix used for validation overlaps with existing external location will raise InvalidParameterValue
     # assert InvalidParameterValue is handled
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.failures == [
         "The validation is skipped because an existing external location overlaps with the location used for validation."
     ]
 
 
 def test_validate_storage_credentials_non_response(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "none", "WRITE_FILES", "Application", "directory_id"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="none",
+        read_only=True,
     )
 
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.failures == ["Validation returned no results."]
 
 
 def test_validate_storage_credentials_failed_operation(credential_manager):
-    permission_mapping = StoragePermissionMapping(
-        "prefix", "client_id", "fail", "WRITE_FILES", "Application", "directory_id_2"
+    azure_service_principal = AzureServicePrincipal(directory_id="test", application_id="test", client_secret="secret")
+    storage_credential_info = StorageCredentialInfo(
+        azure_service_principal=azure_service_principal,
+        name="fail",
+        read_only=True,
     )
 
-    validation = credential_manager.validate(permission_mapping)
+    validation = credential_manager.validate(storage_credential_info, "prefix")
     assert validation.failures == ["LIST validation failed with message: fail"]
 
 
 @pytest.fixture
-def sp_migration(ws, installation, credential_manager):
+def sp_migration(installation, credential_manager):
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
 
-    arp = AzureResourcePermissions(
-        installation, ws, create_autospec(AzureResources), create_autospec(ExternalLocations)
+    storage_account = StorageAccount(
+        id=AzureResource("/subscriptions/test/providers/Microsoft.Storage/storageAccount/labsazurethings"),
+        name="labsazurethings",
+        location="westeu",
+        default_network_action="Allow",
+    )
+    azurerm = create_autospec(AzureResources)
+    azurerm.storage_accounts.return_value = [storage_account]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azurerm.create_or_update_access_connector.return_value = AccessConnector(
+        id=access_connector_id,
+        name=f"ac-{storage_account.name}",
+        location=storage_account.location,
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
     )
 
+    external_location = ExternalLocation(f"abfss://things@{storage_account.name}.dfs.core.windows.net/folder1", 1)
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [external_location]
+
+    arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
+
     sp_crawler = create_autospec(AzureServicePrincipalCrawler)
+    arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
     sp_crawler.snapshot.return_value = [
         AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
         AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1"),
@@ -275,33 +393,53 @@ def sp_migration(ws, installation, credential_manager):
         (GetSecretResponse(value=base64.b64encode("Olá, Mundo".encode("iso-8859-1")).decode("iso-8859-1")), 0),
     ],
 )
-def test_read_secret_value_decode(ws, sp_migration, secret_bytes_value, num_migrated):
-    ws.secrets.get_secret.return_value = secret_bytes_value
+def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated):
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = secret_bytes_value
 
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
     assert len(sp_migration.run(prompts)) == num_migrated
 
 
-def test_read_secret_value_none(ws, sp_migration):
-    ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
-    prompts = MockPrompts({"Above Azure Service Principals will be migrated to UC storage credentials*": "Yes"})
+def test_read_secret_value_none(sp_migration):
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = GetSecretResponse(value=None)
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+        }
+    )
     with pytest.raises(AssertionError):
         sp_migration.run(prompts)
 
 
-def test_read_secret_read_exception(caplog, ws, sp_migration):
+def test_read_secret_read_exception(caplog, sp_migration):
     caplog.set_level(logging.INFO)
-    ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
+    # due to abuse of fixtures and the way fixtures are shared in PyTest,
+    # we need to access the protected attribute to keep the test small.
+    # this test also reveals a design flaw in test code and perhaps in
+    # the code under test as well.
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.side_effect = ResourceDoesNotExist()
 
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -309,8 +447,9 @@ def test_read_secret_read_exception(caplog, ws, sp_migration):
     assert re.search(r"removed on the backend: .*", caplog.text)
 
 
-def test_print_action_plan(caplog, ws, sp_migration):
+def test_print_action_plan(caplog, sp_migration):
     caplog.set_level(logging.INFO)
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
@@ -318,7 +457,7 @@ def test_print_action_plan(caplog, ws, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -332,25 +471,26 @@ def test_print_action_plan(caplog, ws, sp_migration):
     assert False, "Action plan is not logged"
 
 
-def test_run_without_confirmation(ws, sp_migration):
+def test_run_without_confirmation(sp_migration):
+    ws = create_autospec(WorkspaceClient)
     ws.secrets.get_secret.return_value = GetSecretResponse(
         value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
     )
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
-            "Please confirm to create an access connector for each storage account.": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
     assert sp_migration.run(prompts) == []
 
 
-def test_run(ws, installation, sp_migration):
+def test_run(installation, sp_migration):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
-            "Please confirm to create an access connector for each storage account.": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
         }
     )
 
@@ -366,3 +506,39 @@ def test_run(ws, installation, sp_migration):
             }
         ],
     )
+
+
+def test_run_warning_non_allow_network_configuration(installation, sp_migration, caplog):
+    """The user should be warned when a network configuration is not 'Allow'"""
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+        }
+    )
+
+    expected_messages = (
+        "At least one Azure Service Principal accesses a storage account with non-Allow default network",
+        "Service principal 'principal_1' accesses storage account 'prefix1' with non-Allow network configuration",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx"):
+        sp_migration.run(prompts)
+
+    for expected_message in expected_messages:
+        assert any(expected_message in message for message in caplog.messages), f"Message not logged {expected_message}"
+
+
+def test_create_access_connectors_for_storage_accounts(sp_migration):
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "No",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
+        }
+    )
+
+    validation_results = sp_migration.run(prompts)
+
+    assert len(validation_results) == 1
+    assert validation_results[0].name.startswith("ac")
+    assert len(validation_results[0].failures) == 0

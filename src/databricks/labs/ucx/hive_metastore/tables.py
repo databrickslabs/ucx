@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial
 
+import sqlglot
+from sqlglot import expressions
+from sqlglot.expressions import LocationProperty
+from sqlglot.errors import ParseError
+
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk.errors import NotFound
@@ -18,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class What(Enum):
     EXTERNAL_SYNC = auto()
+    EXTERNAL_HIVESERDE = auto()
     EXTERNAL_NO_SYNC = auto()
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
@@ -25,6 +31,15 @@ class What(Enum):
     TABLE_IN_MOUNT = auto()
     DB_DATASET = auto()
     UNKNOWN = auto()
+
+
+class HiveSerdeType(Enum):
+    PARQUET = auto()
+    AVRO = auto()
+    ORC = auto()
+    OTHER_HIVESERDE = auto()
+    NOT_HIVESERDE = auto()
+    INVALID_HIVESERDE_INFO = auto()
 
 
 class AclMigrationWhat(Enum):
@@ -128,6 +143,15 @@ class Table:
         return False
 
     @property
+    def is_dbfs_mnt(self) -> bool:
+        if not self.location:
+            return False
+        for dbfs_mnt_prefix in self.DBFS_ROOT_PREFIX_EXCEPTIONS:
+            if self.location.startswith(dbfs_mnt_prefix):
+                return True
+        return False
+
+    @property
     def is_format_supported_for_sync(self) -> bool:
         if self.table_format is None:
             return False
@@ -166,6 +190,8 @@ class Table:
             return What.DBFS_ROOT_NON_DELTA
         if self.kind == "TABLE" and self.is_format_supported_for_sync:
             return What.EXTERNAL_SYNC
+        if self.kind == "TABLE" and self.table_format.upper() == "HIVE":
+            return What.EXTERNAL_HIVESERDE
         if self.kind == "TABLE":
             return What.EXTERNAL_NO_SYNC
         if self.kind == "VIEW":
@@ -175,22 +201,124 @@ class Table:
     def sql_migrate_external(self, target_table_key):
         return f"SYNC TABLE {escape_sql_identifier(target_table_key)} FROM {escape_sql_identifier(self.key)};"
 
-    def sql_migrate_create_like(self, target_table_key):
-        # Create table as a copy of the source table
-        # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
+    def sql_migrate_ctas_external(self, target_table_key, dst_table_location) -> str:
         return (
-            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} LIKE "
-            f"{escape_sql_identifier(self.key)};"
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} "
+            f"LOCATION '{dst_table_location}' "
+            f"AS SELECT * FROM {self.safe_sql_key}"
         )
+
+    def sql_migrate_ctas_managed(self, target_table_key) -> str:
+        return (
+            f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} "
+            f"AS SELECT * FROM {self.safe_sql_key}"
+        )
+
+    def hiveserde_type(self, backend: SqlBackend) -> HiveSerdeType:
+        if self.table_format != "HIVE":
+            return HiveSerdeType.NOT_HIVESERDE
+        # Extract hive serde info, ideally this should be done by table crawler.
+        # But doing here to avoid breaking change to the `tables` table in the inventory schema.
+        describe = {}
+        for key, values, _ in backend.fetch(f"DESCRIBE TABLE EXTENDED {escape_sql_identifier(self.key)}"):
+            describe[key] = values
+        if not {"Serde Library", "InputFormat", "OutputFormat"} <= describe.keys():
+            return HiveSerdeType.INVALID_HIVESERDE_INFO
+        serde = describe["Serde Library"]
+        input_format = describe["InputFormat"]
+        output_format = describe["OutputFormat"]
+        if self._if_parquet_serde(serde, input_format, output_format):
+            return HiveSerdeType.PARQUET
+        if self._if_avro_serde(serde, input_format, output_format):
+            return HiveSerdeType.AVRO
+        if self._if_orc_serde(serde, input_format, output_format):
+            return HiveSerdeType.ORC
+        return HiveSerdeType.OTHER_HIVESERDE
+
+    def _if_parquet_serde(self, serde, input_format, output_format) -> bool:
+        return (
+            serde == "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+            and input_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+        )
+
+    def _if_avro_serde(self, serde, input_format, output_format) -> bool:
+        return (
+            serde == "org.apache.hadoop.hive.serde2.avro.AvroSerDe"
+            and input_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat"
+        )
+
+    def _if_orc_serde(self, serde, input_format, output_format) -> bool:
+        return (
+            serde == "org.apache.hadoop.hive.ql.io.orc.OrcSerde"
+            and input_format == "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat"
+            and output_format == "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"
+        )
+
+    def sql_migrate_external_hiveserde_in_place(
+        self,
+        catalog_name,
+        dst_schema,
+        dst_table,
+        backend: SqlBackend,
+        hiveserde_type: HiveSerdeType,
+        replace_table_location: str | None = None,
+    ) -> str | None:
+        # "PARQUET", "AVRO", "ORC" can be migrated with "SHOW CREATE TABLE..." DDL
+        if hiveserde_type in [HiveSerdeType.PARQUET, HiveSerdeType.AVRO, HiveSerdeType.ORC]:
+            return self._ddl_show_create_table(backend, catalog_name, dst_schema, dst_table, replace_table_location)
+
+        # "TEXTFILE" hiveserde needs extra handling on preparing the DDL
+        # TODO: add support for "TEXTFILE" hiveserde, when the data can be parsed as Spark CSV datasource
+
+        # "JSON", "CSV" hiveserde need extra handling on preparing the DDL
+        # TODO: DBR does not bundle the jars for "JSON", "CSV" hiveserde, it's unlikely we see those tables.
+        #  Although it's possible that users has the jars installed as cluster library and use those tables in Databricks,
+        #  we hold off the implementation for now until we see the real use case.
+        return None
+
+    def _ddl_show_create_table(
+        self, backend: SqlBackend, catalog_name, dst_schema, dst_table, replace_location
+    ) -> str | None:
+        # get raw DDL from "SHOW CREATE TABLE..."
+        createtab_stmt = next(backend.fetch(f"SHOW CREATE {self.kind} {self.safe_sql_key};"))["createtab_stmt"]
+        # parse the DDL and replace the old table name with the new UC table name
+        try:
+            statements = sqlglot.parse(createtab_stmt)
+        except (ValueError, ParseError):
+            logger.exception(f"Exception when parsing 'SHOW CREATE TABLE' DDL for {self.key}")
+            return None
+
+        statement = statements[0]
+        if not statement:
+            logger.error(f"sqlglot parsed none statement from 'SHOW CREATE TABLE' DDL for {self.key}")
+            return None
+
+        src_table = statement.find(expressions.Table)
+        if not src_table:
+            logger.error(f"sqlglot failed to extract table object from parsed DDL for {self.key}")
+            return None
+        new_table = expressions.Table(catalog=catalog_name, db=dst_schema, this=dst_table)
+        src_table.replace(new_table)
+
+        if replace_location:
+            # replace dbfs mnt in ddl if any
+            mnt_loc = statement.find(LocationProperty)
+            if not mnt_loc:
+                logger.error(f"sqlglot failed to extract table location object from parsed DDL for {self.key}")
+                return None
+            new_loc = LocationProperty(this=f"'{replace_location}'")
+            mnt_loc.replace(new_loc)
+
+        new_sql = statement.sql('databricks')
+        return new_sql
 
     def sql_migrate_dbfs(self, target_table_key):
         if not self.is_delta:
             msg = f"{self.key} is not DELTA: {self.table_format}"
             raise ValueError(msg)
         return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} DEEP CLONE {escape_sql_identifier(self.key)};"
-
-    def sql_show_create(self):
-        return f"SHOW CREATE {self.kind} {self.safe_sql_key};"
 
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
@@ -300,19 +428,15 @@ class TablesCrawler(CrawlerBase):
                 table_rows = self._fetch(
                     f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
                 )
+                for _, table, _is_tmp in table_rows:
+                    tasks.append(partial(self._describe, catalog, database, table))
             except NotFound:
-                # TODO: https://github.com/databrickslabs/ucx/issues/406
                 # This make the integration test more robust as many test schemas are being created and deleted quickly.
                 # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend raises NotFound
-                logger.error(
-                    f"Schema {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)} is no longer existed"
-                )
+                logger.warning(f"Schema {catalog}.{database} no longer existed")
                 continue
-            for _, table, _is_tmp in table_rows:
-                tasks.append(partial(self._describe, catalog, database, table))
         catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
         if len(errors) > 0:
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
 
@@ -351,7 +475,10 @@ class TablesCrawler(CrawlerBase):
                 ),  # type: ignore[arg-type]
                 is_partitioned="# Partition Information" in describe,
             )
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
+            return None
         except Exception as e:  # pylint: disable=broad-exception-caught
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch information for table {full_name} : {e}")
             return None

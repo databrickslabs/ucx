@@ -1,11 +1,11 @@
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
-from databricks.sdk.errors import Unknown
+from databricks.sdk.errors import Unknown, NotFound
 
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Udf:
+class Udf:  # pylint: disable=too-many-instance-attributes
     catalog: str
     database: str
     name: str
@@ -24,7 +24,9 @@ class Udf:
     deterministic: bool
     data_access: str
     body: str
-    comment: str = ""
+    comment: str
+    success: int = 1
+    failures: str = ""
 
     @property
     def key(self) -> str:
@@ -72,12 +74,21 @@ class UdfsCrawler(CrawlerBase):
         for database in self._all_databases():
             for task in self._collect_tasks(catalog, database):
                 tasks.append(task)
-        catalog_tables, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
+        udfs, errors = Threads.gather(f"listing udfs in {catalog}", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning udfs in {catalog}")
-        return catalog_tables
+        return self._assess_udfs(udfs)
 
     def _collect_tasks(self, catalog, database) -> Iterable[partial[Udf | None]]:
+        """
+        Hive metastore supports 2 type of UDFs, SQL UDFs & Hive UDFs, both are created using CREATE FUNCTION
+        - https://docs.databricks.com/en/udf/index.html
+        - https://docs.databricks.com/en/sql/language-manual/sql-ref-functions-udf-hive.html
+        We do not have to worry about Python or Scala UDF/UDAFs, as they cannot be permanent registered in HMS. Those
+        UDFs when defined are only valid within the Spark session.
+        Unity Catalog supports SQL UDFs, Python UDFs, which means SQL UDFs can be migrated as is. Hive UDFs cannot be
+        migrated
+        """
         try:
             logger.debug(f"[{catalog}.{database}] listing udfs")
             for (udf,) in self._fetch(
@@ -87,33 +98,49 @@ class UdfsCrawler(CrawlerBase):
                     continue
                 udf_name = udf[udf.rfind(".") + 1 :]  # remove catalog and database info from the name
                 yield partial(self._describe, catalog, database, udf_name)
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
         except Unknown as err:
             logger.error(f"Problem with {database}: {err}")
 
     def _describe(self, catalog: str, database: str, udf: str) -> Udf | None:
         """Fetches metadata like udf type, input, returns, data access and body
         if specified for a specific udf within the given catalog and database.
+        The output is different between SQL UDFs and Hive UDFs. Hive UDFs only returns the class & usage.
         """
         full_name = f"{catalog}.{database}.{udf}"
+        logger.debug(f"[{full_name}] fetching udf metadata")
+        describe = {}
+        current_key = ""
         try:
-            logger.debug(f"[{full_name}] fetching udf metadata")
-            describe = {}
-            for key_value in self._fetch(f"DESCRIBE FUNCTION EXTENDED {escape_sql_identifier(full_name)}"):
-                if ":" in key_value:  # skip free text configs that don't have a key
-                    key, value = key_value.split(":")
-                    describe[key] = value.strip()
+            for row in self._fetch(f"DESCRIBE FUNCTION EXTENDED {escape_sql_identifier(full_name)}"):
+                key_value = row["function_desc"]
+                if ":" in key_value:
+                    current_key, value = key_value.split(":", 1)
+                    describe[current_key] = value.strip()
+                elif current_key != "":  # append multiline returns, e.g. Input
+                    describe[current_key] += f"\n{key_value.strip()}"
             return Udf(
                 catalog=catalog.lower(),
                 database=database.lower(),
                 name=udf.lower(),
-                func_type=describe.get("Type", "UNKNOWN"),
+                func_type=describe.get("Type", describe.get("Class", "UNKNOWN")),
                 func_input=describe.get("Input", "UNKNOWN"),
                 func_returns=describe.get("Returns", "UNKNOWN"),
-                deterministic=describe.get("Deterministic", False),
-                data_access=describe.get("Type", "UNKNOWN"),
+                deterministic=bool(describe.get("Deterministic", False)),
+                data_access=describe.get("Data Access", "UNKNOWN"),
                 comment=describe.get("Comment", "UNKNOWN"),
                 body=describe.get("Body", "UNKNOWN"),
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(f"Couldn't fetch information for udf {full_name} : {e}")
             return None
+
+    @staticmethod
+    def _assess_udfs(udfs: Iterable[Udf]) -> Iterable[Udf]:
+        for udf in udfs:
+            if udf.func_type != "SCALAR":
+                yield replace(udf, success=0, failures="Only SCALAR functions are supported")
+            else:
+                yield replace(udf, success=1)

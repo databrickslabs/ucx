@@ -8,8 +8,15 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import ResourceDoesNotExist
-from databricks.sdk.service.catalog import ExternalLocationInfo, SchemaInfo, TableInfo
+from databricks.sdk.errors import ResourceDoesNotExist, NotFound
+from databricks.sdk.service.catalog import (
+    ExternalLocationInfo,
+    SchemaInfo,
+    TableInfo,
+    Privilege,
+    PermissionsChange,
+    SecurableType,
+)
 from databricks.sdk.service.compute import ClusterSource, DataSecurityMode
 
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
@@ -36,9 +43,9 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ClusterLocationMapping:
-    cluster_id: str
-    locations: dict[str, str]
+class LocationACL:
+    location_name: str
+    principal: str
 
 
 @dataclass(frozen=True)
@@ -166,6 +173,7 @@ class Grant:
             ("DATABASE", "OWN"): self._set_owner_sql,
             ("DATABASE", "READ_METADATA"): self._uc_action("BROWSE"),
             ("CATALOG", "OWN"): self._set_owner_sql,
+            ("CATALOG", "USAGE"): self._uc_action("USE CATALOG"),
         }
         make_query = hive_to_uc.get((object_type, self.action_type), None)
         if make_query is None:
@@ -330,8 +338,11 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 )
                 grants.append(grant)
             return grants
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            logger.warning(f"Schema {catalog}.{database} no longer existed")
+            return []
         except Exception as e:  # pylint: disable=broad-exception-caught
-            # TODO: https://github.com/databrickslabs/ucx/issues/406
             logger.error(f"Couldn't fetch grants for object {on_type} {key}: {e}")
             return []
 
@@ -387,7 +398,8 @@ class AwsACL:
             raise ResourceDoesNotExist(msg) from None
 
         permission_mappings = self._installation.load(
-            list[AWSRoleAction], filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES
+            list[AWSRoleAction],
+            filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME,
         )
         if len(permission_mappings) == 0:
             # if permission mapping is empty, raise an error to run principal_prefix cmd
@@ -405,8 +417,8 @@ class AwsACL:
             cluster_locations[cluster_id] = eligible_locations
         return cluster_locations
 
+    @staticmethod
     def _get_external_locations(
-        self,
         role_name: str,
         external_locations: list[ExternalLocationInfo],
         permission_mappings: list[AWSRoleAction],
@@ -527,9 +539,6 @@ class PrincipalACL:
                 continue
             cluster_usage = self._get_grants(locations, principals, tables, mounts)
             grants.update(cluster_usage)
-            catalog_grants = [Grant(principal, "USE", "hive_metastore") for principal in principals]
-            grants.update(catalog_grants)
-
         return list(grants)
 
     def _get_privilege(self, table: Table, locations: dict[str, str], mounts: list[Mount]):
@@ -555,7 +564,7 @@ class PrincipalACL:
     def _get_database_grants(self, tables: list[Table], principals: list[str]) -> list[Grant]:
         databases = {table.database for table in tables}
         return [
-            Grant(principal, "USE", "hive_metastore", database) for database in databases for principal in principals
+            Grant(principal, "USAGE", "hive_metastore", database) for database in databases for principal in principals
         ]
 
     def _get_grants(
@@ -598,7 +607,10 @@ class PrincipalACL:
     def _get_cluster_principal_mapping(self, cluster_id: str) -> list[str]:
         # gets all the users,groups,spn which have access to the clusters and returns a dataclass of that mapping
         principal_list = []
-        cluster_permission = self._ws.permissions.get("clusters", cluster_id)
+        try:
+            cluster_permission = self._ws.permissions.get("clusters", cluster_id)
+        except ResourceDoesNotExist:
+            return []
         if cluster_permission.access_control_list is None:
             return []
         for acl in cluster_permission.access_control_list:
@@ -611,3 +623,44 @@ class PrincipalACL:
             if acl.service_principal_name is not None:
                 principal_list.append(acl.service_principal_name)
         return principal_list
+
+    def apply_location_acl(self):
+        """
+        Check the interactive cluster and the principals mapped to it
+        identifies the spn or instance profile configured for the interactive cluster
+        identifies any location the spn/instance profile have access to (read or write)
+        applies create_external_table, create_external_volume and read_files permission for all location
+        to the principal
+        """
+        logger.info(
+            "Applying permission for external location (CREATE EXTERNAL TABLE, "
+            "CREATE EXTERNAL VOLUME and READ_FILES for existing eligible interactive cluster users"
+        )
+        # get the eligible location mapped for each interactive cluster
+        for cluster_id, locations in self._cluster_locations.items():
+            # get interactive cluster users
+            principals = self._get_cluster_principal_mapping(cluster_id)
+            if len(principals) == 0:
+                continue
+            for location_url in locations.keys():
+                # get the location name for the given url
+                location_name = self._get_location_name(location_url)
+                if location_name is None:
+                    continue
+                self._update_location_permissions(location_name, principals)
+        logger.info("Applied all the permission on external location")
+
+    def _update_location_permissions(self, location_name: str, principals: list[str]):
+        permissions = [Privilege.CREATE_EXTERNAL_TABLE, Privilege.CREATE_EXTERNAL_VOLUME, Privilege.READ_FILES]
+        changes = [PermissionsChange(add=permissions, principal=principal) for principal in principals]
+        self._ws.grants.update(
+            SecurableType.EXTERNAL_LOCATION,
+            location_name,
+            changes=changes,
+        )
+
+    def _get_location_name(self, location_url: str):
+        for location in self._ws.external_locations.list():
+            if location.url == location_url:
+                return location.name
+        return None

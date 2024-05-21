@@ -301,7 +301,6 @@ class _RequestHandler(http.server.BaseHTTPRequestHandler):
 
         raw = json.dumps(response.as_dict()).encode('utf-8')
         self.wfile.write(raw)
-        # self.wfile.flush()
 
     def do_GET(self):  # pylint: disable=invalid-name
         if not self.path.startswith('/lint'):

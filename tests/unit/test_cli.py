@@ -1,14 +1,14 @@
 import io
 import json
+import time
 from unittest.mock import create_autospec, patch
 
 import pytest
 import yaml
-from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.service import iam, sql, jobs
+from databricks.sdk.service import iam, jobs, sql
 from databricks.sdk.service.catalog import ExternalLocationInfo
 from databricks.sdk.service.compute import ClusterDetails, ClusterSource
 from databricks.sdk.service.workspace import ObjectInfo, ObjectType
@@ -16,32 +16,42 @@ from databricks.sdk.service.workspace import ObjectInfo, ObjectType
 from databricks.labs.ucx.assessment.aws import AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.resources import AzureResources
 from databricks.labs.ucx.cli import (
     alias,
+    assign_metastore,
     cluster_remap,
     create_account_groups,
     create_catalogs_schemas,
+    create_missing_principals,
     create_table_mapping,
     create_uber_principal,
     ensure_assessment_run,
     installations,
+    logs,
     manual_workspace_info,
     migrate_credentials,
+    migrate_dbsql_dashboards,
     migrate_locations,
+    migrate_tables,
     move,
     open_remote_config,
     principal_prefix_access,
     repair_run,
     revert_cluster_remap,
+    revert_dbsql_dashboards,
     revert_migrated_tables,
+    show_all_metastores,
     skip,
     sync_workspace_info,
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    logs,
 )
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.contexts.account_cli import AccountContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
+from databricks.labs.ucx.hive_metastore import TablesCrawler
+from databricks.labs.ucx.hive_metastore.tables import Table
 
 
 @pytest.fixture
@@ -58,7 +68,18 @@ def ws():
                 },
             }
         ),
-        '/Users/foo/.ucx/state.json': json.dumps({'resources': {'jobs': {'assessment': '123'}}}),
+        '/Users/foo/.ucx/state.json': json.dumps(
+            {
+                'resources': {
+                    'jobs': {
+                        'assessment': '123',
+                        'migrate-tables': '456',
+                        'migrate-external-hiveserde-tables-in-place-experimental': '789',
+                        'migrate-external-tables-ctas': '987',
+                    }
+                }
+            }
+        ),
         "/Users/foo/.ucx/uc_roles_access.csv": "role_arn,resource_type,privilege,resource_path\n"
         "arn:aws:iam::123456789012:role/role_name,s3,READ_FILES,s3://labsawsbucket/",
         "/Users/foo/.ucx/azure_storage_account_info.csv": "prefix,client_id,principal,privilege,type,directory_id\ntest,test,test,test,Application,test",
@@ -92,7 +113,7 @@ def ws():
 def test_workflow(ws, caplog):
     workflows(ws)
     assert "Fetching deployed jobs..." in caplog.messages
-    ws.jobs.list_runs.assert_called_once()
+    ws.jobs.list_runs.assert_called()
 
 
 def test_open_remote_config(ws):
@@ -155,7 +176,8 @@ def test_create_account_groups():
     a.get_workspace_client.return_value = w
     w.get_workspace_id.return_value = None
     prompts = MockPrompts({})
-    create_account_groups(a, prompts, new_workspace_client=lambda: w)
+    ctx = AccountContext(a).replace()
+    create_account_groups(a, prompts, ctx=ctx)
     a.groups.list.assert_called_with(attributes="id")
 
 
@@ -165,8 +187,9 @@ def test_create_account_groups_with_id():
     a.get_workspace_client.return_value = w
     w.get_workspace_id.return_value = None
     prompts = MockPrompts({})
+    ctx = AccountContext(a, {"workspace_ids": "123,456"})
     with pytest.raises(ValueError, match="No workspace ids provided in the configuration found in the account"):
-        create_account_groups(a, prompts, workspace_ids="123,456", new_workspace_client=lambda: w)
+        create_account_groups(a, prompts, ctx=ctx)
 
 
 def test_manual_workspace_info(ws):
@@ -314,7 +337,7 @@ def test_migrate_credentials_azure(ws):
     ws.storage_credentials.list.assert_called()
 
 
-def test_migrate_credentials_aws(ws, mocker):
+def test_migrate_credentials_aws(ws):
     aws_resources = create_autospec(AWSResources)
     aws_resources.validate_connection.return_value = {"Account": "123456789012"}
     prompts = MockPrompts({'.*': 'yes'})
@@ -351,13 +374,21 @@ def test_create_uber_principal(ws):
 
 
 def test_migrate_locations_azure(ws):
-    ctx = WorkspaceContext(ws).replace(is_azure=True, azure_cli_authenticated=True, azure_subscription_id='test')
+    azurerm = create_autospec(AzureResources)
+    ctx = WorkspaceContext(ws).replace(
+        is_azure=True,
+        is_aws=False,
+        azure_cli_authenticated=True,
+        azure_subscription_id='test',
+        azure_resources=azurerm,
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
+    azurerm.storage_accounts.assert_called()
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, aws_profile="profile")
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
@@ -383,8 +414,6 @@ def test_cluster_remap(ws, caplog):
         ClusterDetails(cluster_id="123", cluster_name="test_cluster", cluster_source=ClusterSource.UI),
         ClusterDetails(cluster_id="1234", cluster_name="test_cluster1", cluster_source=ClusterSource.JOB),
     ]
-    installation = create_autospec(Installation)
-    installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)
     assert "Remapping the Clusters to UC" in caplog.messages
 
@@ -393,8 +422,6 @@ def test_cluster_remap_error(ws, caplog):
     prompts = MockPrompts({"Please provide the cluster id's as comma separated value from the above list.*": "1"})
     ws = create_autospec(WorkspaceClient)
     ws.clusters.list.return_value = []
-    installation = create_autospec(Installation)
-    installation.save.return_value = "a/b/c"
     cluster_remap(ws, prompts)
     assert "No cluster information present in the workspace" in caplog.messages
 
@@ -412,10 +439,11 @@ def test_revert_cluster_remap_empty(ws, caplog):
     ws = create_autospec(WorkspaceClient)
     revert_cluster_remap(ws, prompts)
     assert "There is no cluster files in the backup folder. Skipping the reverting process" in caplog.messages
+    ws.workspace.list.assert_called_once()
 
 
 def test_relay_logs(ws, caplog):
-    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123)]
+    ws.jobs.list_runs.return_value = [jobs.BaseRun(run_id=123, start_time=int(time.time()))]
     ws.workspace.list.side_effect = [
         [
             ObjectInfo(path='/Users/foo/.ucx/logs/run-123-0', object_type=ObjectType.DIRECTORY),
@@ -425,3 +453,92 @@ def test_relay_logs(ws, caplog):
     ]
     logs(ws)
     assert 'Something is logged' in caplog.messages
+
+
+def test_show_all_metastores(acc_client, caplog):
+    show_all_metastores(acc_client)
+    assert 'Matching metastores are:' in caplog.messages
+
+
+def test_assign_metastore(acc_client, caplog):
+    with pytest.raises(ValueError):
+        assign_metastore(acc_client, "123")
+
+
+def test_migrate_tables(ws):
+    prompts = MockPrompts({})
+    migrate_tables(ws, prompts)
+    ws.jobs.run_now.assert_called_with(456)
+
+
+def test_migrate_external_hiveserde_tables_in_place(ws):
+    tables_crawler = create_autospec(TablesCrawler)
+    table = Table(
+        catalog="hive_metastore", database="test", name="hiveserde", object_type="UNKNOWN", table_format="HIVE"
+    )
+    tables_crawler.snapshot.return_value = [table]
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+
+    prompt = (
+        "Found 1 (.*) hiveserde tables, do you want to run the "
+        "migrate-external-hiveserde-tables-in-place-experimental workflow?"
+    )
+    prompts = MockPrompts({prompt: "Yes"})
+
+    migrate_tables(ws, prompts, ctx=ctx)
+
+    ws.jobs.run_now.assert_called_with(789)
+
+
+def test_migrate_external_tables_ctas(ws):
+    tables_crawler = create_autospec(TablesCrawler)
+    table = Table(
+        catalog="hive_metastore", database="test", name="externalctas", object_type="UNKNOWN", table_format="EXTERNAL"
+    )
+    tables_crawler.snapshot.return_value = [table]
+    ctx = WorkspaceContext(ws).replace(tables_crawler=tables_crawler)
+
+    prompt = (
+        "Found 1 (.*) external tables which cannot be migrated using sync, do you want to run the "
+        "migrate-external-tables-ctas workflow?"
+    )
+
+    prompts = MockPrompts({prompt: "Yes"})
+
+    migrate_tables(ws, prompts, ctx=ctx)
+
+    ws.jobs.run_now.assert_called_with(987)
+
+
+def test_create_missing_principal_aws(ws):
+    aws_resource_permissions = create_autospec(AWSResourcePermissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    prompts = MockPrompts({'.*': 'yes'})
+    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    aws_resource_permissions.create_uc_roles.assert_called_once()
+
+
+def test_create_missing_principal_aws_not_approved(ws):
+    aws_resource_permissions = create_autospec(AWSResourcePermissions)
+    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_resource_permissions=aws_resource_permissions)
+    prompts = MockPrompts({'.*': 'No'})
+    create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    aws_resource_permissions.create_uc_roles.assert_not_called()
+
+
+def test_create_missing_principal_azure(ws, caplog):
+    ctx = WorkspaceContext(ws).replace(is_aws=False, is_azure=True)
+    prompts = MockPrompts({'.*': 'yes'})
+    with pytest.raises(ValueError) as failure:
+        create_missing_principals(ws, prompts=prompts, ctx=ctx)
+    assert str(failure.value) == "Unsupported cloud provider"
+
+
+def test_migrate_dbsql_dashboards(ws, caplog):
+    migrate_dbsql_dashboards(ws)
+    ws.dashboards.list.assert_called_once()
+
+
+def test_revert_dbsql_dashboards(ws, caplog):
+    revert_dbsql_dashboards(ws)
+    ws.dashboards.list.assert_called_once()

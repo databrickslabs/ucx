@@ -3,11 +3,10 @@ import functools
 import collections
 import os
 import logging
-import warnings
 from dataclasses import replace
 from functools import partial, cached_property
 from datetime import timedelta
-
+import shutil
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -20,7 +19,6 @@ from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.assessment.aws import AWSRoleAction
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -29,14 +27,14 @@ from databricks.labs.ucx.assessment.azure import (
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.azure.access import AzureResourcePermissions, StoragePermissionMapping
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.cli_command import WorkspaceContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.grants import Grant
-from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts
+from databricks.labs.ucx.hive_metastore.locations import Mount, Mounts, ExternalLocation
 from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller
+from databricks.labs.ucx.install import WorkspaceInstallation, WorkspaceInstaller, AccountInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
 
 # pylint: disable-next=unused-wildcard-import,wildcard-import
@@ -101,7 +99,7 @@ def sql_fetch_all(sql_backend):
 def make_ucx_group(make_random, make_group, make_acc_group, make_user):
     def inner(workspace_group_name=None, account_group_name=None):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_{make_random(4)}"
+            workspace_group_name = f"ucx_G{make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = make_user()
@@ -124,6 +122,20 @@ def make_group_pair(make_random, make_group):
     return inner
 
 
+def get_azure_spark_conf():
+    return {
+        "spark.databricks.cluster.profile": "singleNode",
+        "spark.master": "local[*]",
+        "fs.azure.account.auth.type.labsazurethings.dfs.core.windows.net": "OAuth",
+        "fs.azure.account.oauth.provider.type.labsazurethings.dfs.core.windows.net": "org.apache.hadoop.fs"
+        ".azurebfs.oauth2.ClientCredsTokenProvider",
+        "fs.azure.account.oauth2.client.id.labsazurethings.dfs.core.windows.net": "dummy_application_id",
+        "fs.azure.account.oauth2.client.secret.labsazurethings.dfs.core.windows.net": "dummy",
+        "fs.azure.account.oauth2.client.endpoint.labsazurethings.dfs.core.windows.net": "https://login"
+        ".microsoftonline.com/directory_12345/oauth2/token",
+    }
+
+
 class StaticTablesCrawler(TablesCrawler):
     def __init__(self, sb: SqlBackend, schema: str, tables: list[TableInfo]):
         super().__init__(sb, schema)
@@ -143,21 +155,6 @@ class StaticTablesCrawler(TablesCrawler):
 
     def snapshot(self) -> list[Table]:
         return self._tables
-
-
-class StaticTableMapping(TableMapping):
-    def __init__(self, workspace_client: WorkspaceClient, sb: SqlBackend, rules: list[Rule]):
-        # TODO: remove this class, it creates difficulties when used together with Permission mapping
-        warnings.warn("switch to using runtime_ctx fixture", DeprecationWarning)
-        installation = Installation(workspace_client, 'ucx')
-        super().__init__(installation, workspace_client, sb)
-        self._rules = rules
-
-    def load(self):
-        return self._rules
-
-    def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
-        raise RuntimeWarning("not available")
 
 
 class StaticServicePrincipalCrawler(AzureServicePrincipalCrawler):
@@ -184,23 +181,11 @@ class StaticMountCrawler(Mounts):
         return self._mounts
 
 
-class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-methods
-    def __init__(
-        self, make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
-    ):
-        super().__init__()
-        self._make_table = make_table_fixture
+class CommonUtils:
+    def __init__(self, make_schema_fixture, env_or_skip_fixture, ws_fixture):
         self._make_schema = make_schema_fixture
-        self._make_udf = make_udf_fixture
-        self._make_group = make_group_fixture
         self._env_or_skip = env_or_skip_fixture
-        self._tables: list[TableInfo] = []
-        self._schemas: list[SchemaInfo] = []
-        self._groups: list[Group] = []
-        self._udfs = []
-        self._grants = []
-        # TODO: add methods to pre-populate the following:
-        self._spn_infos = []
+        self._ws = ws_fixture
 
     def with_dummy_resource_permission(self):
         # TODO: in most cases (except prepared_principal_acl) it's just a sign of a bad logic, fix it
@@ -218,22 +203,72 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
                 ]
             )
         if self.workspace_client.config.is_aws:
-            self.with_aws_storage_permissions(
-                [
-                    AWSRoleAction(
-                        self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
-                        's3',
-                        'WRITE_FILES',
-                        f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
-                    )
-                ]
-            )
+            instance_profile_mapping = [
+                AWSRoleAction(
+                    self._env_or_skip("TEST_WILDCARD_INSTANCE_PROFILE"),
+                    's3',
+                    'WRITE_FILES',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                )
+            ]
+            uc_roles_mapping = [
+                AWSRoleAction(
+                    self._env_or_skip("TEST_STORAGE_CREDENTIAL"),
+                    's3',
+                    'WRITE_FILES',
+                    f'{self._env_or_skip("TEST_MOUNT_CONTAINER")}/*',
+                )
+            ]
+            self.with_aws_storage_permissions(instance_profile_mapping, uc_roles_mapping)
 
     def with_azure_storage_permissions(self, mapping: list[StoragePermissionMapping]):
         self.installation.save(mapping, filename=AzureResourcePermissions.FILENAME)
 
-    def with_aws_storage_permissions(self, mapping: list[AWSRoleAction]):
-        self.installation.save(mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAMES)
+    def with_aws_storage_permissions(
+        self,
+        instance_profile_mapping: list[AWSRoleAction],
+        uc_roles_mapping: list[AWSRoleAction],
+    ):
+        self.installation.save(instance_profile_mapping, filename=AWSResourcePermissions.INSTANCE_PROFILES_FILE_NAME)
+        self.installation.save(uc_roles_mapping, filename=AWSResourcePermissions.UC_ROLES_FILE_NAME)
+
+    @cached_property
+    def installation(self):
+        return MockInstallation()
+
+    @cached_property
+    def inventory_database(self) -> str:
+        return self._make_schema(catalog_name="hive_metastore").name
+
+    @cached_property
+    def workspace_client(self):
+        return self._ws
+
+
+class TestRuntimeContext(CommonUtils, RuntimeContext):
+    def __init__(
+        self,
+        make_table_fixture,
+        make_schema_fixture,
+        make_udf_fixture,
+        make_group_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+    ):
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        RuntimeContext.__init__(self)
+        self._make_table = make_table_fixture
+        self._make_schema = make_schema_fixture
+        self._make_udf = make_udf_fixture
+        self._make_group = make_group_fixture
+        self._env_or_skip = env_or_skip_fixture
+        self._tables: list[TableInfo] = []
+        self._schemas: list[SchemaInfo] = []
+        self._groups: list[Group] = []
+        self._udfs = []
+        self._grants = []
+        # TODO: add methods to pre-populate the following:
+        self._spn_infos = []
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
@@ -309,24 +344,31 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
             include_databases=self.created_databases,
         )
 
-    def save_tables(self):
+    def save_tables(self, is_hiveserde: bool = False):
         # populate the tables crawled, as it is used by get_tables_to_migrate in the migrate-tables workflow
-        return self.sql_backend.save_table(
-            f"{self.inventory_database}.tables",
-            [
+        default_table_format = "HIVE" if is_hiveserde else ""
+        tables_to_save = []
+        for table in self._tables:
+            if not table.catalog_name:
+                continue
+            if not table.schema_name:
+                continue
+            if not table.name:
+                continue
+            table_type = table.table_type.value if table.table_type else ""
+            table_format = table.data_source_format.value if table.data_source_format else default_table_format
+            tables_to_save.append(
                 Table(
                     catalog=table.catalog_name,
                     database=table.schema_name,
                     name=table.name,
-                    object_type=str(table.table_type.value or ""),
-                    table_format=table.data_source_format.value if table.data_source_format is not None else "",
+                    object_type=table_type,
+                    table_format=table_format,
                     location=str(table.storage_location or ""),
                     view_text=table.view_definition,
                 )
-                for table in self._tables
-            ],
-            Table,
-        )
+            )
+        return self.sql_backend.save_table(f"{self.inventory_database}.tables", tables_to_save, Table)
 
     def save_mounts(self):
         return self.sql_backend.save_table(
@@ -361,14 +403,6 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
             ],
             Grant,
         )
-
-    @cached_property
-    def installation(self):
-        return MockInstallation()
-
-    @cached_property
-    def inventory_database(self) -> str:
-        return self._make_schema(catalog_name="hive_metastore").name
 
     @cached_property
     def created_databases(self):
@@ -433,15 +467,42 @@ class TestRuntimeContext(RuntimeContext):  # pylint: disable=too-many-public-met
 
 @pytest.fixture
 def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
-    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip)
+    ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class LocalAzureCliTest(WorkspaceContext):
-    def __init__(self, _ws: WorkspaceClient, env_or_skip_fixture: Callable[[str], str]):
-        super().__init__(_ws, {})
-        self._env_or_skip = env_or_skip_fixture
+class TestWorkspaceContext(CommonUtils, WorkspaceContext):
+    def __init__(
+        self,
+        make_schema_fixture,
+        env_or_skip_fixture,
+        ws_fixture,
+    ):
+        super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
+        WorkspaceContext.__init__(self, ws_fixture)
 
+    @cached_property
+    def config(self) -> WorkspaceConfig:
+        return WorkspaceConfig(
+            warehouse_id=self._env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
+            inventory_database=self.inventory_database,
+            connect=self.workspace_client.config,
+            renamed_group_prefix=f'tmp-{self.inventory_database}-',
+        )
+
+    def save_locations(self):
+        if self.workspace_client.config.is_azure:
+            locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
+        if self.workspace_client.config.is_aws:
+            locations = [ExternalLocation("s3://labs-things/a", 1)]
+        return self.sql_backend.save_table(
+            f"{self.inventory_database}.external_locations",
+            locations,
+            ExternalLocation,
+        )
+
+
+class LocalAzureCliTest(TestWorkspaceContext):
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -456,12 +517,35 @@ class LocalAzureCliTest(WorkspaceContext):
 
 
 @pytest.fixture
-def az_cli_ctx(ws, env_or_skip):
-    return LocalAzureCliTest(ws, env_or_skip)
+def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
+    ctx = LocalAzureCliTest(make_schema, env_or_skip, ws)
+    return ctx.replace(sql_backend=sql_backend)
+
+
+class LocalAwsCliTest(TestWorkspaceContext):
+    @cached_property
+    def aws_cli_run_command(self):
+        if not self.is_aws:
+            pytest.skip("Aws only")
+        if not shutil.which("aws"):
+            pytest.skip("Local test only")
+        return True
+
+    @cached_property
+    def aws_profile(self):
+        return self._env_or_skip("AWS_PROFILE")
+
+
+@pytest.fixture
+def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
+    ctx = LocalAwsCliTest(make_schema, env_or_skip, ws)
+    return ctx.replace(sql_backend=sql_backend)
 
 
 class TestInstallationContext(TestRuntimeContext):
-    def __init__(
+    __test__ = False
+
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         make_table_fixture,
         make_schema_fixture,
@@ -471,17 +555,23 @@ class TestInstallationContext(TestRuntimeContext):
         make_random_fixture,
         make_acc_group_fixture,
         make_user_fixture,
+        ws_fixture,
     ):
         super().__init__(
-            make_table_fixture, make_schema_fixture, make_udf_fixture, make_group_fixture, env_or_skip_fixture
+            make_table_fixture,
+            make_schema_fixture,
+            make_udf_fixture,
+            make_group_fixture,
+            env_or_skip_fixture,
+            ws_fixture,
         )
         self._make_random = make_random_fixture
         self._make_acc_group = make_acc_group_fixture
         self._make_user = make_user_fixture
 
-    def make_ucx_group(self, workspace_group_name=None, account_group_name=None):
+    def make_ucx_group(self, workspace_group_name=None, account_group_name=None, wait_for_provisioning=False):
         if not workspace_group_name:
-            workspace_group_name = f"ucx_{self._make_random(4)}"
+            workspace_group_name = f"ucx_G{self._make_random(4)}"
         if not account_group_name:
             account_group_name = workspace_group_name
         user = self._make_user()
@@ -490,8 +580,11 @@ class TestInstallationContext(TestRuntimeContext):
             display_name=workspace_group_name,
             members=members,
             entitlements=["allow-cluster-create"],
+            wait_for_provisioning=wait_for_provisioning,
         )
-        acc_group = self._make_acc_group(display_name=account_group_name, members=members)
+        acc_group = self._make_acc_group(
+            display_name=account_group_name, members=members, wait_for_provisioning=wait_for_provisioning
+        )
         return ws_group, acc_group
 
     @cached_property
@@ -517,18 +610,23 @@ class TestInstallationContext(TestRuntimeContext):
         return Installation(self.workspace_client, self.product_info.product_name())
 
     @cached_property
+    def account_client(self):
+        return AccountClient(product="ucx", product_version=__version__)
+
+    @cached_property
+    def account_installer(self):
+        return AccountInstaller(self.account_client)
+
+    @cached_property
     def environ(self) -> dict[str, str]:
         return {**os.environ}
 
     @cached_property
     def workspace_installer(self):
         return WorkspaceInstaller(
-            self.prompts,
-            self.installation,
             self.workspace_client,
-            self.product_info,
             self.environ,
-        )
+        ).replace(prompts=self.prompts, installation=self.installation, product_info=self.product_info)
 
     @cached_property
     def config_transform(self) -> Callable[[WorkspaceConfig], WorkspaceConfig]:
@@ -638,50 +736,132 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_user,
 ):
     ctx = TestInstallationContext(
-        make_table,
-        make_schema,
-        make_udf,
-        make_group,
-        env_or_skip,
-        make_random,
-        make_acc_group,
-        make_user,
+        make_table, make_schema, make_udf, make_group, env_or_skip, make_random, make_acc_group, make_user, ws
     )
     yield ctx.replace(workspace_client=ws, sql_backend=sql_backend)
     ctx.workspace_installation.uninstall()
 
 
-@pytest.fixture
-def prepare_tables_for_migration(
-    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip
-) -> tuple[dict[str, TableInfo], SchemaInfo]:
-    # create external and managed tables to be migrated
-    schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{make_random(5).lower()}")
+def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[str, TableInfo]:
+    tables: dict[str, TableInfo] = {}
+
+    parquet_table_name = f"parquet_serde_{random}"
+    parquet_ddl = f"CREATE TABLE hive_metastore.{schema.name}.{parquet_table_name} (id INT, region STRING) PARTITIONED BY (region) STORED AS PARQUETFILE LOCATION '{table_base_dir}/{parquet_table_name}'"
+    tables[parquet_table_name] = context.make_table(
+        schema_name=schema.name,
+        name=parquet_table_name,
+        hiveserde_ddl=parquet_ddl,
+        storage_override=f"{table_base_dir}/{parquet_table_name}",
+    )
+
+    orc_table_name = f"orc_serde_{random}"
+    orc_ddl = f"CREATE TABLE hive_metastore.{schema.name}.{orc_table_name} (id INT, region STRING) PARTITIONED BY (region) STORED AS ORC LOCATION '{table_base_dir}/{orc_table_name}'"
+    tables[orc_table_name] = context.make_table(
+        schema_name=schema.name,
+        name=orc_table_name,
+        hiveserde_ddl=orc_ddl,
+        storage_override=f"{table_base_dir}/{orc_table_name}",
+    )
+
+    avro_table_name = f"avro_serde_{random}"
+    avro_ddl = f"""CREATE TABLE hive_metastore.{schema.name}.{avro_table_name} (id INT, region STRING) 
+                        ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
+                        STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
+                                  OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
+                        TBLPROPERTIES ('avro.schema.literal'='{{
+                            "namespace": "org.apache.hive", 
+                            "name": "first_schema", 
+                            "type": "record",
+                            "fields": [
+                                {{ "name":"id", "type":"int" }},
+                                {{ "name":"region", "type":"string" }}
+                            ] }}') 
+                        LOCATION '{table_base_dir}/{avro_table_name}'
+                    """
+    tables[avro_table_name] = context.make_table(
+        schema_name=schema.name,
+        name=avro_table_name,
+        hiveserde_ddl=avro_ddl,
+        storage_override=f"{table_base_dir}/{avro_table_name}",
+    )
+    return tables
+
+
+def prepare_regular_tables(context, external_csv, schema) -> dict[str, TableInfo]:
     tables: dict[str, TableInfo] = {
-        "src_managed_table": installation_ctx.make_table(schema_name=schema.name),
-        "src_external_table": installation_ctx.make_table(schema_name=schema.name, external_csv=make_mounted_location),
+        "src_managed_table": context.make_table(schema_name=schema.name),
+        "src_managed_non_delta_table": context.make_table(
+            catalog_name=schema.catalog_name, non_delta=True, schema_name=schema.name
+        ),
+        "src_external_table": context.make_table(schema_name=schema.name, external_csv=external_csv),
     }
     src_view1_text = f"SELECT * FROM {tables['src_managed_table'].full_name}"
-    tables["src_view1"] = installation_ctx.make_table(
+    tables["src_view1"] = context.make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view1_text,
         view=True,
     )
     src_view2_text = f"SELECT * FROM {tables['src_view1'].full_name}"
-    tables["src_view2"] = installation_ctx.make_table(
+    tables["src_view2"] = context.make_table(
         catalog_name=schema.catalog_name,
         schema_name=schema.name,
         ctas=src_view2_text,
         view=True,
     )
+    return tables
+
+
+@pytest.fixture
+def prepare_tables_for_migration(
+    ws, installation_ctx, make_catalog, make_random, make_mounted_location, env_or_skip, make_storage_dir, request
+) -> tuple[dict[str, TableInfo], SchemaInfo]:
+    # Here we use pytest indirect parametrization, so the test function can pass arguments to this fixture and the
+    # arguments will be available in the request.param. If the argument is "hiveserde", we will prepare hiveserde
+    # tables, otherwise we will prepare regular tables.
+    # see documents here for details https://docs.pytest.org/en/8.1.x/example/parametrize.html#indirect-parametrization
+    scenario = request.param
+    is_hiveserde = scenario == "hiveserde"
+    random = make_random(5).lower()
+    # create external and managed tables to be migrated
+    if is_hiveserde:
+        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"hiveserde_in_place_{random}")
+        table_base_dir = make_storage_dir(
+            path=f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/hiveserde_in_place_{random}'
+        )
+        tables = prepare_hiveserde_tables(installation_ctx, random, schema, table_base_dir)
+    else:
+        schema = installation_ctx.make_schema(catalog_name="hive_metastore", name=f"migrate_{random}")
+        tables = prepare_regular_tables(installation_ctx, make_mounted_location, schema)
+
     # create destination catalog and schema
     dst_catalog = make_catalog()
     dst_schema = installation_ctx.make_schema(catalog_name=dst_catalog.name, name=schema.name)
     migrate_rules = [Rule.from_src_dst(table, dst_schema) for _, table in tables.items()]
     installation_ctx.with_table_mapping_rules(migrate_rules)
     installation_ctx.with_dummy_resource_permission()
-    installation_ctx.save_tables()
+    installation_ctx.save_tables(is_hiveserde=is_hiveserde)
     installation_ctx.save_mounts()
     installation_ctx.with_dummy_grants_and_tacls()
     return tables, dst_schema
+
+
+@pytest.fixture
+def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make_catalog, make_schema):
+    src_schema = make_schema(catalog_name="hive_metastore")
+    src_external_table = runtime_ctx.make_table(
+        catalog_name=src_schema.catalog_name,
+        schema_name=src_schema.name,
+        external_csv=make_mounted_location,
+    )
+    dst_catalog = make_catalog()
+    dst_schema = make_schema(catalog_name=dst_catalog.name, name=src_schema.name)
+    rules = [Rule.from_src_dst(src_external_table, dst_schema)]
+    runtime_ctx.with_table_mapping_rules(rules)
+    runtime_ctx.with_dummy_resource_permission()
+    return (
+        runtime_ctx,
+        f"{dst_catalog.name}.{dst_schema.name}.{src_external_table.name}",
+        f"{dst_catalog.name}.{dst_schema.name}",
+        dst_catalog.name,
+    )

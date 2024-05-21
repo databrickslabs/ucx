@@ -13,7 +13,7 @@ from databricks.labs.ucx.hive_metastore import ExternalLocations
 
 
 @pytest.fixture
-def run_migration(ws, sql_backend, env_or_skip):
+def run_migration(ws, sql_backend, env_or_skip, aws_cli_ctx):
     def inner(credentials: set[str], read_only=False) -> list[CredentialValidationResult]:
         installation = MockInstallation(
             {
@@ -30,9 +30,15 @@ def run_migration(ws, sql_backend, env_or_skip):
 
         aws = AWSResources(env_or_skip("AWS_DEFAULT_PROFILE"))
         location = ExternalLocations(ws, sql_backend, "inventory_schema")
-        resource_permissions = AWSResourcePermissions(installation, ws, sql_backend, aws, location, "inventory_schema")
+        resource_permissions = AWSResourcePermissions(
+            installation,
+            ws,
+            aws,
+            location,
+            aws_cli_ctx.principal_acl,
+        )
 
-        instance_profile_migration = IamRoleMigration(installation, ws, resource_permissions, CredentialManager(ws))
+        instance_profile_migration = IamRoleMigration(installation, resource_permissions, CredentialManager(ws))
 
         return instance_profile_migration.run(
             MockPrompts({"Above IAM roles will be migrated to UC storage credentials *": "Yes"}),

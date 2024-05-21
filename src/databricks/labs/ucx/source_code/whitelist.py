@@ -1,12 +1,59 @@
+from __future__ import annotations
+
 import abc
+import logging
 import sys
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
+from collections.abc import Iterable
+
 from yaml import load_all as load_yaml, Loader
+
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+from databricks.labs.ucx.source_code.graph import (
+    BaseImportResolver,
+    DependencyGraph,
+    DependencyProblem,
+    MaybeDependency,
+    SourceContainer,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class WhitelistResolver(BaseImportResolver):
+
+    def __init__(self, whitelist: Whitelist, next_resolver: BaseImportResolver | None = None):
+        super().__init__(next_resolver)
+        self._whitelist = whitelist
+
+    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
+        return WhitelistResolver(self._whitelist, resolver)
+
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+        compatibility = self._whitelist.compatibility(name)
+        if compatibility == UCCompatibility.FULL:
+            return MaybeDependency(None, [])
+        if compatibility == UCCompatibility.NONE:
+            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
+            problem = DependencyProblem("dependency-check", f"Use of dependency {name} is deprecated")
+            return MaybeDependency(None, [problem])
+        if compatibility == UCCompatibility.PARTIAL:
+            problem = DependencyProblem("dependency-check", f"Package {name} is only partially supported by UC")
+            return MaybeDependency(None, [problem])
+        return super().resolve_import(path_lookup, name)
+
+
+class StubContainer(SourceContainer):
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return []
 
 
 class UCCompatibility(Enum):
+    UNKNOWN = "unknown"
     NONE = "none"
     PARTIAL = "partial"
     FULL = "full"
@@ -35,7 +82,7 @@ class KnownPackage(abc.ABC):
 
     @abc.abstractmethod
     def compatibility_of(self, name: str) -> UCCompatibility:
-        raise NotImplementedError()
+        """returns the compatibility of a symbol"""
 
 
 @dataclass
@@ -60,6 +107,16 @@ class PythonPackage:
 class PipPackage(KnownPackage):
     packages: dict[str, PythonPackage]
 
+    @classmethod
+    def compatible(cls, name: str):
+        return cls(
+            Identifier(name=name),
+            name,
+            {
+                name: PythonPackage(name=name, compatibility=UCCompatibility.FULL),
+            },
+        )
+
     def compatibility_of(self, name: str) -> UCCompatibility:
         while len(name) > 0:
             package = self.packages.get(name, None)
@@ -74,7 +131,7 @@ class PipPackage(KnownPackage):
 
 class Whitelist:
     @classmethod
-    def parse(cls, data: str):
+    def parse(cls, data: str, use_defaults=True):
         yamls = load_yaml(data, Loader=Loader)
         # @dataclass(kw_only=True) fails to convert inner structs, so deserialize manually
         pips: list[PipPackage] = []
@@ -83,16 +140,32 @@ class Whitelist:
             top_level = yaml['top_level']
             packages = {p.name: p for p in [PythonPackage(**package) for package in yaml['packages']]}
             pips.append(PipPackage(identifier, top_level, packages))
-        return Whitelist(pips)
+        return Whitelist(use_defaults, pips)
 
-    def __init__(self, pips: Iterable[PipPackage] | None = None):
+    def __init__(self, use_defaults=True, pips: Iterable[PipPackage] | None = None):
         python_version = sys.version
         known_packages: list[KnownPackage] = [
             PythonBuiltinPackage(Identifier(**{"name": name, "version": python_version}), name)
             for name in sys.stdlib_module_names
         ]
+        if use_defaults:
+            # default white list
+            known_packages.extend(
+                [
+                    PipPackage.compatible("click"),
+                    PipPackage.compatible("databricks"),
+                    PipPackage.compatible("google"),
+                    PipPackage.compatible("pandas"),
+                    PipPackage.compatible("pytest"),
+                    PipPackage.compatible("requests"),
+                    PipPackage.compatible("sqlglot"),
+                    PipPackage.compatible("urllib3"),
+                    PipPackage.compatible("yaml"),
+                ]
+            )
         if pips is not None:
             known_packages.extend(pips)
+
         self._known_packages: dict[str, list[KnownPackage]] = {}
         for known in known_packages:
             top_levels: list[str] = known.top_level if isinstance(known.top_level, list) else [known.top_level]
@@ -103,11 +176,13 @@ class Whitelist:
                     self._known_packages[top_level] = packs
                 packs.append(known)
 
-    def compatibility(self, name: str) -> UCCompatibility | None:
+    def compatibility(self, name: str) -> UCCompatibility:
+        if not name:
+            return UCCompatibility.UNKNOWN
         root = name.split('.')[0]
         packages = self._known_packages.get(root, None)
         if packages is None:
-            return None
+            return UCCompatibility.UNKNOWN
         # TODO ignore versioning for now, see https://github.com/databrickslabs/ucx/issues/1382
         known_package = packages[0]
         return known_package.compatibility_of(name)

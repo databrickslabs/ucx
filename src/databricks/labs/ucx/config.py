@@ -41,8 +41,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     uber_spn_id: str | None = None
     uber_instance_profile: str | None = None
 
-    # Flag to see if terraform has been used for deploying certain entities
-    is_terraform_used: bool = False
+    is_terraform_used: bool = False  # Not used, keep for backwards compatability
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None

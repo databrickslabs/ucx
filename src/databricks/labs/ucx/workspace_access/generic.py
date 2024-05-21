@@ -55,8 +55,11 @@ class Listing:
 
     def __iter__(self):
         started = datetime.datetime.now()
-        for item in self._func():
-            yield GenericPermissionsInfo(getattr(item, self._id_attribute), self._object_type)
+        try:
+            for item in self._func():
+                yield GenericPermissionsInfo(getattr(item, self._id_attribute), self._object_type)
+        except NotFound as e:
+            logger.error(f"Listing {self._object_type} failed: {e}")
         since = datetime.datetime.now() - started
         logger.info(f"Listed {self._object_type} in {since}")
 
@@ -70,6 +73,8 @@ class GenericPermissionsSupport(AclSupport):
         ws: WorkspaceClient,
         listings: list[Listing],
         verify_timeout: timedelta | None = timedelta(minutes=1),
+        # this parameter is for testing scenarios only - [{object_type}:{object_id}]
+        # it will use StaticListing class to return only object ids that has the same object type
         include_object_permissions: list[str] | None = None,
     ):
         self._ws = ws
