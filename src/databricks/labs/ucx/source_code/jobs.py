@@ -107,7 +107,7 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.notebook_task:
             return []
         notebook_path = self._task.notebook_task.notebook_path
-        logger.info(f'Disovering {self._task.task_key} entrypoint: {notebook_path}')
+        logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
