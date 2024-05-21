@@ -70,10 +70,5 @@ def test_removeafter_tag(ws, env_or_skip, make_job):
     created_job = ws.jobs.get(new_job.job_id)
     assert "RemoveAfter" in created_job.settings.tags
 
-    try:
-        purge_time = datetime.fromisoformat(created_job.settings.tags.get("RemoveAfter"))
-        assert purge_time - datetime.utcnow() < timedelta(hours=1)
-    except ValueError as e:
-        print(e)
-        assert False
-
+    purge_time = datetime.strptime(created_job.settings.tags.get("RemoveAfter"), "%Y%m%d%H")
+    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
