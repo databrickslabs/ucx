@@ -1,3 +1,4 @@
+import logging
 from dataclasses import replace
 from pathlib import Path
 
@@ -48,7 +49,7 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
     assert len(problems) == 0
 
 
-def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random):
+def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
     entrypoint.mkdir()
 
@@ -67,7 +68,8 @@ display(spark.read.parquet("/mnt/something"))
     some_file = entrypoint / 'some_file.py'
     some_file.write_text('display(spark.read.parquet("/mnt/foo/bar"))')
 
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     messages = {replace(p, path=Path(p.path).relative_to(entrypoint)).as_message() for p in problems}
     assert messages == {
@@ -76,6 +78,7 @@ display(spark.read.parquet("/mnt/something"))
         'some_file.py:1 [dbfs-usage] Deprecated file system path in call to: /mnt/foo/bar',
         'second_notebook:4 [dbfs-usage] Deprecated file system path in call to: /mnt/something',
     }
+    assert all(any(message.endswith(expected) for message in caplog.messages) for expected in messages)
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(
