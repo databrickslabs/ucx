@@ -476,7 +476,7 @@ def lint_local_code(w: WorkspaceClient, path: Path | None = None, ctx: LocalCont
         path = Path.cwd()
     if ctx is None:
         ctx = LocalContext(w)
-    ctx.local_files_linter.lint(path)
+    return ctx.local_files_linter.lint(path)
 
 
 if __name__ == "__main__":

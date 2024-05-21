@@ -13,8 +13,4 @@ start_price = 10
 
 # COMMAND ----------
 
-# MAGIC %run "./leaf1.py.txt"
-
-# COMMAND ----------
-
-# MAGIC %run "./__NOT_FOUND__"
+# MAGIC %run "./cyclical1.run.py"

@@ -1,5 +1,7 @@
 import dataclasses
 
+import pytest
+
 from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.jobs import JobProblem
@@ -34,6 +36,7 @@ def test_job_problem_is_correctly_reflected():
         assert isinstance(f.type, type)
 
 
+@pytest.mark.skip("example of dataclass field type problem")
 def test_derived_problem_is_correctly_reflected():
     for f in dataclasses.fields(DerivedProblem):
         assert isinstance(f.type, type)

@@ -1,6 +1,7 @@
 import io
 import json
 import time
+from pathlib import Path
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -546,4 +547,6 @@ def test_revert_dbsql_dashboards(ws, caplog):
 
 
 def test_lint_local_code(ws):
-    lint_local_code(ws)
+    path_to_scan = Path(Path(__file__).parent, "source_code", "samples")
+    problems = lint_local_code(ws, path=path_to_scan)
+    assert len(problems) > 0

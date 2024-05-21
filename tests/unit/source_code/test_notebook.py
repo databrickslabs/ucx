@@ -18,42 +18,42 @@ from tests.unit import _load_sources
 # the following samples are real samples from https://github.com/databricks-industry-solutions
 # please keep them untouched, we want our unit tests to run against genuinely representative data
 PYTHON_NOTEBOOK_SAMPLE = (
-    "00_var_context.py.txt",
+    "00_var_context.py",
     Language.PYTHON,
     ['md', 'md', 'md', 'python', 'python', 'python', 'md', 'python', 'md'],
 )
 PYTHON_NOTEBOOK_WITH_RUN_SAMPLE = (
-    "01_var_market_etl.py.txt",
+    "01_var_market_etl.py",
     Language.PYTHON,
     ['md', 'run', 'md', 'python', 'md', 'python', 'python', 'python', 'python', 'md', 'python', 'python',
      'md', 'python', 'python', 'python', 'md', 'python', 'md', 'python', 'python', 'md', 'python'],
 )
 SCALA_NOTEBOOK_SAMPLE = (
-    "01_HL7Streaming.scala.txt",
+    "01_HL7Streaming.scala",
     Language.SCALA,
     ['md', 'md', 'scala', 'sql', 'md', 'scala', 'scala', 'md', 'md', 'scala', 'md', 'scala', 'sql', 'sql',
      'md', 'scala', 'md', 'scala', 'sql', 'sql', 'sql', 'sql', 'sql', 'sql', 'sql', 'md', 'scala', 'md', 'md'],
 )
 R_NOTEBOOK_SAMPLE = (
-    "3_SparkR_Fine Grained Demand Forecasting.r.txt",
+    "3_SparkR_Fine Grained Demand Forecasting.r",
     Language.R,
     ['md', 'md', 'md', 'r', 'r', 'md', 'run', 'r', 'md', 'sql', 'md', 'sql', 'md', 'sql', 'md', 'md', 'r', 'md',
      'r', 'md', 'r', 'md', 'r', 'md', 'r', 'md', 'md', 'r', 'md', 'md', 'r', 'md', 'r', 'md', 'r', 'md', 'md',
      'r', 'md', 'r', 'md', 'r', 'md', 'r', 'md', 'sql', 'md', 'sql', 'md'],
 )
 SQL_NOTEBOOK_SAMPLE = (
-    "chf-pqi-scoring.sql.txt",
+    "chf-pqi-scoring.sql",
     Language.SQL,
     ['md', 'sql', 'sql', 'md', 'sql', 'python', 'sql', 'sql', 'sql', 'md', 'sql',
      'sql', 'md', 'sql', 'sql', 'md', 'sql'],
 )
 SHELL_NOTEBOOK_SAMPLE = (
-    "notebook-with-shell-cell.py.txt",
+    "notebook-with-shell-cell.py",
     Language.PYTHON,
     ['python', 'sh'],
 )
 PIP_NOTEBOOK_SAMPLE = (
-    "notebook-with-pip-cell.py.txt",
+    "notebook-with-pip-cell.py",
     Language.PYTHON,
     ['python', 'pip'],
 )
@@ -129,12 +129,12 @@ def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
-    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py.txt"))
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
     problems = container.build_dependency_graph(graph)
     assert not problems
-    assert graph.all_paths == {mock_path_lookup.cwd / "leaf1.py.txt"}
+    assert graph.all_paths == {mock_path_lookup.cwd / "leaf1.py"}
 
 
 def get_status_side_effect(*args):
@@ -143,7 +143,7 @@ def get_status_side_effect(*args):
 
 
 def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
-    paths = ["root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
+    paths = ["root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
@@ -156,7 +156,7 @@ def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
 
 
 def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
-    paths = ["root2.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
+    paths = ["root2.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
@@ -169,7 +169,7 @@ def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
 
 
 def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
-    paths = ["root3.run.py.txt", "root1.run.py.txt", "leaf1.py.txt", "leaf2.py.txt"]
+    paths = ["root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
@@ -183,7 +183,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
 
 
 def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
-    paths = ["cyclical1.run.py.txt", "cyclical2.run.py.txt"]
+    paths = ["cyclical1.run.py", "cyclical2.run.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
@@ -196,7 +196,7 @@ def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
 
 
 def test_notebook_builds_python_dependency_graph(mock_path_lookup):
-    paths = ["root4.py.txt", "leaf3.py.txt"]
+    paths = ["root4.py", "leaf3.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
@@ -209,7 +209,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup):
 
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py.txt")
+    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
     linter = PythonLinter()
     advices = list(linter.lint(sources[0]))
     assert [
@@ -225,7 +225,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
 
 
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(SourceContainer, "root4.py.txt")
+    sources: list[str] = _load_sources(SourceContainer, "root4.py")
     linter = PythonLinter()
     advices = list(linter.lint(sources[0]))
     assert [
@@ -235,7 +235,7 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
             start_line=2,
             start_col=0,
             end_line=2,
-            end_col=38,
+            end_col=34,
         )
     ] == advices
 
