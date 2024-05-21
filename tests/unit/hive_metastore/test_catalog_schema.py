@@ -70,6 +70,14 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
                     'src_table': 'abfss://container@msft/path/dest3',
                     'workspace_name': 'workspace',
                 },
+                {
+                    'catalog_name': 'catalog4',
+                    'dst_schema': 'schema4',
+                    'dst_table': 'table1',
+                    'src_schema': 'schema1',
+                    'src_table': 'abfss://container@msft/path/dest4',
+                    'workspace_name': 'workspace',
+                },
             ]
         }
     )
@@ -86,9 +94,9 @@ def prepare_test(ws, backend: MockBackend | None = None) -> CatalogSchema:
     return CatalogSchema(ws, table_mapping, principal_acl, backend)
 
 
-@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test"])
+@pytest.mark.parametrize("location", ["s3://foo/bar", "s3://foo/bar/test", "s3://foo/bar/test/baz"])
 def test_create_all_catalogs_schemas_creates_catalogs(location: str):
-    """Catalog 2 and 3 should be created; catalog 1 already exists."""
+    """Catalog 2-4 should be created; catalog 1 already exists."""
     ws = create_autospec(WorkspaceClient)
     mock_prompts = MockPrompts({"Please provide storage location url for catalog: *": location})
 
@@ -98,6 +106,7 @@ def test_create_all_catalogs_schemas_creates_catalogs(location: str):
     calls = [
         call("catalog2", storage_root=location, comment="Created by UCX"),
         call("catalog3", storage_root=location, comment="Created by UCX"),
+        call("catalog4", storage_root=location, comment="Created by UCX"),
     ]
     ws.catalogs.create.assert_has_calls(calls, any_order=True)
 
