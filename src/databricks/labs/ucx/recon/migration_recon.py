@@ -1,6 +1,10 @@
+import json
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import partial
+
+from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
@@ -25,7 +29,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
     def __init__(
         self,
         sbe: SqlBackend,
-        schema,
+        schema: str,
         migration_status_refresher: MigrationStatusRefresher,
         schema_comparator: SchemaComparator,
         data_comparator: DataComparator,
@@ -40,36 +44,45 @@ class MigrationRecon(CrawlerBase[ReconResult]):
 
     def _crawl(self) -> Iterable[ReconResult]:
         self._migration_status_refresher.reset()
+        tasks = []
         for migration_status in self._migration_status_refresher.snapshot():
+            if not self._migration_status_refresher.is_migrated(
+                migration_status.src_schema,
+                migration_status.src_table,
+            ):
+                continue
+            if not migration_status.dst_catalog or not migration_status.dst_schema or not migration_status.dst_table:
+                continue
             source = TableIdentifier(
                 "hive_metastore",
                 migration_status.src_schema,
                 migration_status.src_table,
             )
-            if not self._migration_status_refresher.is_migrated(
-                migration_status.src_schema, migration_status.src_table
-            ):
-                continue
-            if not migration_status.dst_catalog or not migration_status.dst_schema or not migration_status.dst_table:
-                continue
             target = TableIdentifier(
                 migration_status.dst_catalog,
                 migration_status.dst_schema,
                 migration_status.dst_table,
             )
-            schema_comparison = self._schema_comparator.compare_schema(source, target)
-            data_comparison = self._data_comparator.compare_data(source, target)
-            recon_result = ReconResult(
-                schema_comparison.is_matching,
-                (
-                    data_comparison.source_row_count == data_comparison.target_row_count
-                    and data_comparison.num_missing_records_in_target == 0
-                    and data_comparison.num_missing_records_in_source == 0
-                ),
-                schema_comparison.as_dict(),
-                data_comparison.as_dict(),
-            )
-            yield recon_result
+            tasks.append(partial(self._recon, source, target))
+        recon_result, errors = Threads.gather("Reconciling data", tasks)
+        if len(errors) > 0:
+            logger.error(f"Detected {len(errors)} while reconciling data")
+        return recon_result
+
+    def _recon(self, source: TableIdentifier, target: TableIdentifier) -> ReconResult:
+        schema_comparison = self._schema_comparator.compare_schema(source, target)
+        data_comparison = self._data_comparator.compare_data(source, target)
+        recon_result = ReconResult(
+            schema_comparison.is_matching,
+            (
+                data_comparison.source_row_count == data_comparison.target_row_count
+                and data_comparison.num_missing_records_in_target == 0
+                and data_comparison.num_missing_records_in_source == 0
+            ),
+            json.dumps(schema_comparison.as_dict()),
+            json.dumps(data_comparison.as_dict()),
+        )
+        return recon_result
 
     def _try_fetch(self) -> Iterable[ReconResult]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):

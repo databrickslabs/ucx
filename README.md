@@ -462,7 +462,7 @@ There are 3 main table migration workflows, targeting different table types. All
   - Experimentally migrate Delta and Parquet data found in dbfs mount but not registered as Hive Metastore table into UC tables.
 
 ### Post Migration Validation Task
-UCX also provides `migrate-recon` workflow to validate the integrity of the migrated tables:
+UCX also provides `migrate-data-reconciliation` workflow to validate the integrity of the migrated tables:
 - Comparing the schema of the source and target tables. 
 - Comparing the row counts of the source and target tables.
 - Compare the content of individual row between source and target tables to identify any discrepancies.
