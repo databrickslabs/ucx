@@ -105,9 +105,7 @@ class WorkflowTaskContainer(SourceContainer):
                 with tempfile.TemporaryDirectory() as directory:
                     local_file = Path(directory) / Path(library.whl).name
                     local_file.write_bytes(remote_file.read())
-                    problems = graph.register_library(local_file.as_posix())
-            if problems:
-                yield from problems
+                    yield from graph.register_library(local_file.as_posix())
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
             logger.info(f"Registering libraries from {library.requirements}")
             with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
