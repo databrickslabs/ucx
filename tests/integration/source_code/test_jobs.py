@@ -50,6 +50,13 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
 
 
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
+    expected_messages = {
+        "second_notebook:4 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/something",
+        "some_file.py:1 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/foo/bar",
+        "some_file.py:1 [dbfs-usage] Deprecated file system path in call to: /mnt/foo/bar",
+        "second_notebook:4 [dbfs-usage] Deprecated file system path in call to: /mnt/something",
+    }
+
     entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
     entrypoint.mkdir()
 
@@ -72,13 +79,10 @@ display(spark.read.parquet("/mnt/something"))
         problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     messages = {replace(p, path=Path(p.path).relative_to(entrypoint)).as_message() for p in problems}
-    assert messages == {
-        'second_notebook:4 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/something',
-        'some_file.py:1 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/foo/bar',
-        'some_file.py:1 [dbfs-usage] Deprecated file system path in call to: /mnt/foo/bar',
-        'second_notebook:4 [dbfs-usage] Deprecated file system path in call to: /mnt/something',
-    }
-    assert all(any(message.endswith(expected) for message in caplog.messages[-1].split("\n")) for expected in messages)
+    assert messages == expected_messages
+
+    last_messages = caplog.messages[-1].split("\n")
+    assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
 
 def test_workflow_linter_lints_job_with_import_pypi_library(

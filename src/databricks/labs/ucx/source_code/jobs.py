@@ -189,7 +189,8 @@ class WorkflowLinter:
 
         problems = self._lint_job(job)
         if len(problems) > 0:
-            logger.warning("Found job problems:\n%s", "\n".join([problem.as_message() for problem in problems]))
+            problem_messages = "\n".join([problem.as_message() for problem in problems])
+            logger.warning("Found job problems:\n%s", problem_messages)
         return problems
 
     _UNKNOWN = Path('<UNKNOWN>')
