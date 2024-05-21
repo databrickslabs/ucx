@@ -159,8 +159,7 @@ class WorkflowTaskContainer(SourceContainer):
             return
 
         # load libraries installed on the referred cluster
-        libraries_api = compute.LibrariesAPI(self._ws.api_client)
-        library_full_status_list = libraries_api.cluster_status(self._task.existing_cluster_id)
+        library_full_status_list = self._ws.libraries.cluster_status(self._task.existing_cluster_id)
 
         for library_full_status in library_full_status_list:
             if library_full_status.library:
