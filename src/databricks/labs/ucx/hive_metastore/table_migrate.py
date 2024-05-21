@@ -298,29 +298,6 @@ class TablesMigrator:
     def _migrate_dbfs_root_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
         target_table_key = rule.as_uc_table_key
         table_migrate_sql = src_table.sql_migrate_dbfs(target_table_key)
-        logger.debug(f"Migrating managed table {src_table.key} to using SQL query: {table_migrate_sql}")
-        self._backend.execute(table_migrate_sql)
-        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
-        return self._migrate_acl(src_table, rule, grants)
-
-    def _migrate_table_in_mount(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        target_table_key = rule.as_uc_table_key
-        table_schema = self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
-        table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, table_schema)
-        logger.info(
-            f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
-        )
-        self._backend.execute(table_migrate_sql)
-        self._backend.execute(src_table.sql_table_in_mount_alter_from(rule.as_uc_table_key))
-        return self._migrate_acl(src_table, rule, grants)
-
-    def _migrate_non_sync_table(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
-        table_migrate_sql = self._get_create_in_place_sql(src_table, rule)
-        logger.debug(f"Migrating table (No Sync) {src_table.key} to using SQL query: {table_migrate_sql}")
-        self._backend.execute(table_migrate_sql)
-        self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         logger.debug(
             f"Migrating managed table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
         )
@@ -348,6 +325,21 @@ class TablesMigrator:
         try:
             self._backend.execute(table_migrate_sql)
             self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
+            self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        except DatabricksError as e:
+            logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
+            return False
+        return self._migrate_acl(src_table, rule, grants)
+
+    def _migrate_table_in_mount(self, src_table: Table, rule: Rule, grants: list[Grant] | None = None):
+        target_table_key = rule.as_uc_table_key
+        try:
+            table_schema = self._backend.fetch(f"DESCRIBE TABLE delta.`{src_table.location}`;")
+            table_migrate_sql = src_table.sql_migrate_table_in_mount(target_table_key, table_schema)
+            logger.info(
+                f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
+            )
+            self._backend.execute(table_migrate_sql)
             self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")

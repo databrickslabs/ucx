@@ -117,12 +117,6 @@ class Table:
             f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
 
-    def sql_table_in_mount_alter_from(self, target_table_key: str) -> str:
-        return (
-            f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
-            f"('upgraded_from' = '{self.location}');"
-        )
-
     def sql_unset_upgraded_to(self):
         return f"ALTER {self.kind} {escape_sql_identifier(self.key)} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
