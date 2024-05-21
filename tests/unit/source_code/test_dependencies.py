@@ -141,9 +141,7 @@ def test_dependency_resolver_raises_problem_with_unresolved_import(mock_path_loo
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolvers, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(Path('root7.py'))
     assert list(maybe.problems) == [
-        DependencyProblem(
-            'import-not-found', 'Could not locate import: some_library', Path("root7.py"), 1, 0, 1, 19
-        )
+        DependencyProblem('import-not-found', 'Could not locate import: some_library', Path("root7.py"), 1, 0, 1, 19)
     ]
 
 
