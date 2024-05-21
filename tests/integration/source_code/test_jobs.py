@@ -278,17 +278,16 @@ def test_workflow_linter_lints_job_with_import_whl_library(
     make_job,
     make_notebook,
     make_random,
+    make_directory,
 ):
-    # TODO: Clean this directory
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
-    entrypoint.mkdir()
+    entrypoint = make_directory()
 
     simple_ctx = simple_ctx.replace(
         whitelist=Whitelist([]),  # databricks is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
-    notebook = entrypoint / "notebook.ipynb"
+    notebook = f"{entrypoint}/notebook.ipynb"
     make_notebook(path=notebook, content=b"import databricks.labs.ucx")
     problem_message = "Could not locate import: databricks.labs.ucx"
 
