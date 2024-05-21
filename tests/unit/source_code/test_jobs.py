@@ -10,8 +10,18 @@ from databricks.sdk.service import compute, jobs
 
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
-from databricks.labs.ucx.source_code.jobs import WorkflowLinter, WorkflowTaskContainer
+from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+
+
+def test_job_problem_as_message():
+    expected_message = "UNKNOWN:-1 [library-not-found] Library not found: lib"
+
+    problem = JobProblem(
+        1234, "test-job", "test-task", "UNKNOWN", "library-not-found", "Library not found: lib", -1, -1, -1, -1
+    )
+
+    assert problem.as_message() == expected_message
 
 
 @pytest.fixture
