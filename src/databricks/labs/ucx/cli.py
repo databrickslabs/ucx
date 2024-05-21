@@ -470,10 +470,8 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 
 
 @ucx.command
-def lint_local_code(w: WorkspaceClient, path: Path | None = None, ctx: LocalContext | None = None):
+def lint_local_code(w: WorkspaceClient, path: Path, ctx: LocalContext | None = None):
     """Lint local code files looking for problems in notebooks and python files."""
-    if path is None:
-        path = Path.cwd()
     if ctx is None:
         ctx = LocalContext(w)
     return ctx.local_files_linter.lint(path)
