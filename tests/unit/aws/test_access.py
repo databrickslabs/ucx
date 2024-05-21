@@ -315,7 +315,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     aws_resource_permissions = AWSResourcePermissions(installation_single_role, mock_ws, aws, locations)
     role_creation = IamRoleCreation(installation_single_role, mock_ws, aws_resource_permissions)
     aws.list_all_uc_roles.return_value = []
-    role_creation.run(MockPrompts({"Above *": "yes"}))
+    role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
     assert aws.create_uc_role.assert_called
     assert (
         call('UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None)
