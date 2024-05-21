@@ -15,7 +15,7 @@ from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
-from databricks.labs.ucx.source_code.files import LocalFilesMigrator, LocalFilesLinter
+from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFilesLinter
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
@@ -173,13 +173,13 @@ class WorkspaceContext(CliContext):
         return NotebookLoader()
 
 
-class LocalContext(WorkspaceContext):
+class LocalCheckoutContext(WorkspaceContext):
     """Local context extends Workspace context to provide extra properties
     for running local operations."""
 
     @cached_property
-    def local_files_migrator(self):
-        return LocalFilesMigrator(self.languages)
+    def local_file_migrator(self):
+        return LocalFileMigrator(self.languages)
 
     @cached_property
     def local_files_linter(self):

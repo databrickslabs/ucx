@@ -29,8 +29,6 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 logger = logging.getLogger(__name__)
 
 
-# TODO remove duplicate code by inheriting from LocatedAdvice once https://github.com/databrickslabs/lsql/issues/103 is fixed
-# pylint: disable=duplicate-code
 @dataclass
 class JobProblem:
     job_id: int

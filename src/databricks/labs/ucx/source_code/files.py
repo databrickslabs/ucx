@@ -1,11 +1,11 @@
 from __future__ import annotations  # for type hints
 
 import logging
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Callable
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
@@ -76,19 +76,6 @@ class LocalDirectory(SourceContainer):
         return f"<LocalDirectory {self._path}>"
 
 
-# TODO remove duplicate code by inheriting from LocatedAdvice once https://github.com/databrickslabs/lsql/issues/103 is fixed
-# pylint: disable=duplicate-code
-@dataclass
-class FileProblem:
-    path: str
-    code: str
-    message: str
-    start_line: int
-    start_col: int
-    end_line: int
-    end_col: int
-
-
 class LocalFilesLinter:
 
     def __init__(
@@ -106,29 +93,26 @@ class LocalFilesLinter:
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
-    def lint(self, path: Path) -> list[FileProblem]:
+    def lint(self, path: Path) -> list[LocatedAdvice]:
         return list(self._lint(path))
 
-    def _lint(self, path: Path) -> Iterable[FileProblem]:
+    def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
         loader = self._dir_loader if path.is_dir() else self._file_loader
         dependency = Dependency(loader, path)
         graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
         dependency_problems = container.build_dependency_graph(graph)
-        if dependency_problems:
-            problems = [
-                self._file_problem_from_dependency_problem(dependency_problem)
-                for dependency_problem in dependency_problems
-            ]
-            yield from problems
+        for dependency_problem in dependency_problems:
+            advice = self._located_advice_from_dependency_problem(dependency_problem)
+            yield advice
         for child_path in graph.all_paths:
             yield from self._lint_one(child_path)
 
     @staticmethod
-    def _file_problem_from_dependency_problem(problem: DependencyProblem):
-        return FileProblem(
-            path=problem.source_path.as_posix() if problem.source_path.name != MISSING_SOURCE_PATH else 'UNKNOWN',
+    def _located_advice_from_dependency_problem(problem: DependencyProblem):
+        return LocatedAdvice(
+            path=problem.source_path.absolute() if problem.source_path.name != MISSING_SOURCE_PATH else Path('UNKNOWN'),
             code=problem.code,
             message=problem.message,
             start_line=problem.start_line,
@@ -137,31 +121,22 @@ class LocalFilesLinter:
             end_col=problem.end_col,
         )
 
-    def _lint_one(self, path: Path) -> Iterable[FileProblem]:
+    def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
         if path.is_dir():
             return []
         linter = FileLinter(self._languages, path)
         advices = linter.lint()
-        return [self._file_problem_from_advice(path, advice) for advice in advices]
-
-    @staticmethod
-    def _file_problem_from_advice(path: Path, advice: Advice):
-        return FileProblem(
-            path=path.absolute().as_posix(),
-            code=advice.code,
-            message=advice.message,
-            start_line=advice.start_line,
-            start_col=advice.start_col,
-            end_line=advice.end_line,
-            end_col=advice.end_col,
-        )
+        return [advice.for_path(path) for advice in advices]
 
 
-class LocalFilesMigrator:
+class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(self, languages: Languages):
-        self._languages = languages
+    def __init__(
+        self, migration_index: MigrationIndex, languages_factory: Callable[[MigrationIndex], Languages] = Languages
+    ):
+        self._migration_index = migration_index
+        self._languages_factory = languages_factory
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
     def apply(self, path: Path) -> bool:
@@ -185,7 +160,8 @@ class LocalFilesMigrator:
             return False
         logger.info(f"Analysing {path}")
         # Get the linter for the language
-        linter = self._languages.linter(language)
+        languages = self._languages_factory(self._migration_index)
+        linter = languages.linter(language)
         # Open the file and read the code
         with path.open("r") as f:
             code = f.read()
@@ -193,7 +169,7 @@ class LocalFilesMigrator:
             # Lint the code and apply fixes
             for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
-                fixer = self._languages.fixer(language, advice.code)
+                fixer = languages.fixer(language, advice.code)
                 if not fixer:
                     continue
                 logger.info(f"Applying fix for {advice}")
