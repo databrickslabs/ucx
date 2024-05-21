@@ -1,6 +1,7 @@
 import collections
 import logging
 from dataclasses import replace
+import fnmatch
 from pathlib import PurePath
 
 from databricks.labs.blueprint.tui import Prompts
@@ -137,14 +138,14 @@ class CatalogSchema:
         if location == "metastore":
             return True
         try:
-            location_path = PurePath(location)
+            PurePath(location)
         except ValueError:
             logger.error(f"Invalid location path {location}")
             return False
         for external_location in self._external_locations:
             if location == external_location.url:
                 return True
-            if location_path.match(f"{external_location.url}/*"):
+            if external_location.url is not None and fnmatch.fnmatch(location, external_location.url + '*'):
                 return True
         return False
 
