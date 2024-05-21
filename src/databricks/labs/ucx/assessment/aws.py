@@ -80,6 +80,7 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
+    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*\/)).*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
@@ -216,22 +217,29 @@ class AWSResources:
             s3_actions = [actions]
         return s3_actions
 
-    def _aws_role_trust_doc(self, external_id="0000"):
+    def _aws_role_trust_doc(self, self_assume_arn: str, external_id="0000"):
         return self._get_json_for_cli(
             {
                 "Version": "2012-10-17",
-                "Statement": [self._databricks_trust_statement(external_id)],
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": [
+                                "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
+                                self_assume_arn,
+                            ]
+                        },
+                        "Action": "sts:AssumeRole",
+                        "Condition": self._databricks_trust_statement(external_id),
+                    }
+                ],
             }
         )
 
     @staticmethod
     def _databricks_trust_statement(external_id="0000"):
-        return {
-            "Effect": "Allow",
-            "Principal": {"AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},
-            "Action": "sts:AssumeRole",
-            "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
-        }
+        return {"StringEquals": {"sts:ExternalId": external_id}}
 
     def _aws_s3_policy(self, s3_prefixes, account_id, role_name, kms_key=None):
         """
@@ -239,14 +247,21 @@ class AWSResources:
         """
         s3_prefixes_strip = set()
         for path in s3_prefixes:
-            match = re.match(AWSResources.S3_PATH_REGEX, path)
+            match = re.match(AWSResources.S3_BUCKET, path)
             if match:
-                s3_prefixes_strip.add(match.group(4))
+                s3_prefixes_strip.add(match.group(1))
 
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes_strip])
         statement = [
             {
-                "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"],
+                "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:PutObjectAcl",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                ],
                 "Resource": s3_prefixes_enriched,
                 "Effect": "Allow",
             },
@@ -282,13 +297,13 @@ class AWSResources:
             return None
         return add_role["Role"]["Arn"]
 
-    def create_uc_role(self, role_name: str) -> str | None:
+    def create_uc_role(self, role_name: str, role_arn: str) -> str | None:
         """
         Create an IAM role for Unity Catalog to access the S3 buckets.
         the AssumeRole condition will be modified later with the external ID captured from the UC credential.
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
-        return self._create_role(role_name, self._aws_role_trust_doc())
+        return self._create_role(role_name, self._aws_role_trust_doc(role_arn))
 
     def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> str | None:
         """
@@ -318,7 +333,7 @@ class AWSResources:
                     continue
                 if not self._is_uc_principal(principal):
                     continue
-                policy_document["Statement"][idx] = self._databricks_trust_statement(external_id)
+                policy_document["Statement"][idx]["Condition"] = self._databricks_trust_statement(external_id)
             policy_document_json = self._get_json_for_cli(policy_document)
         else:
             policy_document_json = self._aws_role_trust_doc(external_id)

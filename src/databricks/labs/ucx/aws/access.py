@@ -52,11 +52,11 @@ class AWSResourcePermissions:
         """
         roles: list[AWSUCRoleCandidate] = []
         missing_paths = self._identify_missing_paths()
-        s3_prefixes = set()
+        s3_buckets = set()
         for missing_path in missing_paths:
-            match = re.match(AWSResources.S3_PATH_REGEX, missing_path)
+            match = re.match(AWSResources.S3_BUCKET_REGEX, missing_path)
             if match:
-                s3_prefixes.add(missing_path)
+                s3_buckets.add(match.group(1))
         if single_role:
             roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes)))
         else:
@@ -67,11 +67,15 @@ class AWSResourcePermissions:
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
         roles_created = []
         for role in roles:
-            if self._aws_resources.create_uc_role(role.role_name):
+            expanded_paths = set()
+            for path in role.resource_paths:
+                expanded_paths.add(path)
+                expanded_paths.add(f"{path}/*")
+            if self._aws_resources.create_uc_role(role.role_name, self._get_role_arn(role.role_name)):
                 self._aws_resources.put_role_policy(
                     role.role_name,
                     role.policy_name,
-                    set(role.resource_paths),
+                    expanded_paths,
                     self._aws_account_id,
                     self._kms_key,
                 )
@@ -136,6 +140,9 @@ class AWSResourcePermissions:
             tasks.append(partial(self._get_role_access_task, role.arn, role.role_name))
         # Aggregating the outputs from all the tasks
         return sum(Threads.strict("Scanning Roles", tasks), [])
+
+    def _get_role_arn(self, role_name: str):
+        return f"arn:aws:iam::{self._aws_account_id}:role/" + role_name
 
     def _get_role_access_task(self, arn: str, role_name: str):
         policy_actions = []
