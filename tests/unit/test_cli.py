@@ -390,7 +390,23 @@ def test_migrate_locations_azure(ws):
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+    successful_return = """
+    {
+        "UserId": "uu@mail.com",
+        "Account": "1234",
+        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
+    }
+    """
+
+    def successful_call(_):
+        return 0, successful_return, ""
+
+    ctx = WorkspaceContext(ws).replace(
+        is_aws=True,
+        is_azure=False,
+        aws_profile="profile",
+        aws_cli_run_command=successful_call,
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
@@ -550,3 +566,11 @@ def test_lint_local_code(ws):
     path_to_scan = Path(Path(__file__).parent, "source_code", "samples")
     problems = lint_local_code(ws, path=path_to_scan)
     assert len(problems) > 0
+
+
+def test_cli_missing_awscli(ws, mocker, caplog):
+    mocker.patch("shutil.which", side_effect=ValueError("Couldn't find AWS CLI in path"))
+    with pytest.raises(ValueError):
+        ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+        migrate_locations(ws, ctx)
+

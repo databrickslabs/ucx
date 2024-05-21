@@ -330,7 +330,12 @@ class AWSResources:
         return update_role["Role"]["Arn"]
 
     def put_role_policy(
-        self, role_name: str, policy_name: str, s3_prefixes: set[str], account_id: str, kms_key=None
+        self,
+        role_name: str,
+        policy_name: str,
+        s3_prefixes: set[str],
+        account_id: str,
+        kms_key=None,
     ) -> bool:
         if not self._run_command(
             f"iam put-role-policy --role-name {role_name} --policy-name {policy_name} "
