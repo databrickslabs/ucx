@@ -33,14 +33,13 @@ class AWSResourcePermissions:
         ws: WorkspaceClient,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
-        aws_account_id=None,
         kms_key=None,
     ):
         self._installation = installation
         self._aws_resources = aws_resources
         self._ws = ws
         self._locations = external_locations
-        self._aws_account_id = aws_account_id
+        self._aws_account_id = aws_resources.validate_connection().get("Account")
         self._kms_key = kms_key
 
     def list_uc_roles(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
