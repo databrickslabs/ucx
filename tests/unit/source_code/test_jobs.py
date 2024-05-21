@@ -99,6 +99,23 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
     ws.assert_not_called()
 
 
+def test_workflow_task_container_builds_dependency_graph_for_python_wheel(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"test")
+
+    libraries = [compute.Library(whl="test.whl")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "no-dist-info"
+    assert problems[0].message.startswith("No dist-info found for test.whl")
+    assert mock_path_lookup.resolve(Path("test")) is None
+    ws.assert_not_called()
+
+
 def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_lookup, empty_index, caplog):
     expected_message = "Found job problems:\nUNKNOWN:-1 [library-install-failed] Failed to install unknown-library"
 
