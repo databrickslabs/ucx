@@ -199,7 +199,7 @@ def test_create_uber_principal_existing_role_in_policy(mock_ws, mock_installatio
     )
     mock_ws.cluster_policies.get.return_value = cluster_policy
     aws = create_autospec(AWSResources)
-    aws.get_instance_profile.return_value = instance_profile_arn
+    aws.get_instance_profile_arn.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"We have identified existing UCX migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
@@ -228,7 +228,7 @@ def test_create_uber_principal_existing_role(mock_ws, mock_installation, backend
     )
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws = create_autospec(AWSResources)
-    aws.get_instance_profile.return_value = instance_profile_arn
+    aws.get_instance_profile_arn.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts(
         {
@@ -267,7 +267,7 @@ def test_create_uber_principal_no_existing_role(mock_ws, mock_installation, back
     instance_profile_arn = "arn:aws:iam::12345:instance-profile/role1"
     aws.create_migration_role.return_value = instance_profile_arn
     aws.create_instance_profile.return_value = instance_profile_arn
-    aws.get_instance_profile.return_value = instance_profile_arn
+    aws.get_instance_profile_arn.return_value = instance_profile_arn
     locations = ExternalLocations(mock_ws, backend, "ucx")
     prompts = MockPrompts({"Do you want to create new migration role *": "yes"})
     aws_resource_permissions = AWSResourcePermissions(
@@ -460,6 +460,7 @@ def test_get_uc_compatible_roles(mock_ws, mock_installation, locations):
 
 def test_instance_profiles_empty_mapping(mock_ws, mock_installation, locations, caplog):
     aws = create_autospec(AWSResources)
+    aws.get_instance_profile_role_arn.return_value = "arn:aws:iam::12345:role/role1"
     aws_resource_permissions = AWSResourcePermissions(
         mock_installation,
         mock_ws,
@@ -488,6 +489,7 @@ def test_uc_roles_empty_mapping(mock_ws, mock_installation, locations, caplog):
 
 def test_save_instance_profile_permissions(mock_ws, mock_installation, locations):
     aws = create_autospec(AWSResources)
+    aws.get_instance_profile_role_arn.return_value = "arn:aws:iam::12345:role/role1"
     aws.get_role_policy.side_effect = [
         [
             AWSPolicyAction(
@@ -682,3 +684,60 @@ def test_save_uc_compatible_roles(mock_ws, mock_installation, locations):
             },
         ],
     )
+
+
+def test_instance_profile_lookup():
+    def instance_lookup(_):
+        ip_doc = """
+{
+    "InstanceProfile": {
+        "Path": "/",
+        "InstanceProfileName": "instance_profile_1",
+        "InstanceProfileId": "778899",
+        "Arn": "arn:aws:iam::12345678:instance-profile/instance_profile_1",
+        "CreateDate": "2024-01-01T12:00:00+00:00",
+        "Roles": [
+            {
+                "Path": "/",
+                "RoleName": "arn:aws:iam::12345678:role/role_1",
+                "RoleId": "445566",
+                "Arn": "arn:aws:iam::12345678:role/role_1",
+                "CreateDate": "2024-01-01T12:00:00+00:00"
+            }
+        ]
+    }
+}
+
+        """
+        return 0, ip_doc, ""
+
+    aws = AWSResources("profile", instance_lookup)
+    assert aws.get_instance_profile_role_arn("instance_profile_1") == "arn:aws:iam::12345678:role/role_1"
+
+
+def test_instance_profile_failed_lookup():
+    def instance_lookup(_):
+        ip_doc = ""
+        return 0, ip_doc, ""
+
+    aws = AWSResources("profile", instance_lookup)
+    assert aws.get_instance_profile_role_arn("instance_profile_1") is None
+
+
+def test_instance_profile_malformed_lookup():
+    def instance_lookup(_):
+        ip_doc = """
+{
+    "InstanceProfile": {
+        "Path": "/",
+        "InstanceProfileName": "instance_profile_1",
+        "InstanceProfileId": "778899",
+        "Arn": "arn:aws:iam::12345678:instance-profile/instance_profile_1"
+    }
+}
+
+        """
+        return 0, ip_doc, ""
+
+    aws = AWSResources("profile", instance_lookup)
+    assert aws.get_instance_profile_role_arn("instance_profile_1") is None

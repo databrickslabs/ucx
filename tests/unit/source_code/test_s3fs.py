@@ -112,7 +112,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     sample.write_text(source)
     mock_path_lookup.append_path(tmp_path)
     yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
-    whitelist = Whitelist.parse(yml.read_text())
+    whitelist = Whitelist.parse(yml.read_text(), use_defaults=True)
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
@@ -143,7 +143,7 @@ def test_detect_s3fs_import_in_dependencies(
 ):
     yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     file_loader = FileLoader()
-    whitelist = Whitelist.parse(yml.read_text())
+    whitelist = Whitelist.parse(yml.read_text(), use_defaults=True)
     import_resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
     dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolvers, mock_path_lookup)
     sample = mock_path_lookup.cwd / "root9.py.txt"

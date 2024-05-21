@@ -88,7 +88,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     entrypoint.mkdir()
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist([]),  # pytest is in default list
+        whitelist=Whitelist(use_defaults=False),  # pytest is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
     )
 
