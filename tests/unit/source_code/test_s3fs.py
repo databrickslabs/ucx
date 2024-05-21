@@ -23,7 +23,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -37,7 +37,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -53,7 +53,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -68,7 +68,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=2,
                     start_col=4,
                     end_line=2,
@@ -82,7 +82,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 DependencyProblem(
                     code='dependency-check',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -96,7 +96,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 DependencyProblem(
                     code='dependency-check',
                     message='Use of dependency s3fs.subpackage is deprecated',
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -129,7 +129,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
             DependencyProblem(
                 code='dependency-check',
                 message='Use of dependency s3fs is deprecated',
-                source_path=Path('leaf9.py.txt'),
+                source_path=Path('leaf9.py'),
                 start_line=1,
                 start_col=0,
                 end_line=1,
@@ -146,6 +146,6 @@ def test_detect_s3fs_import_in_dependencies(
     whitelist = Whitelist.parse(yml.read_text(), use_defaults=True)
     import_resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
     dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolvers, mock_path_lookup)
-    sample = mock_path_lookup.cwd / "root9.py.txt"
+    sample = mock_path_lookup.cwd / "root9.py"
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == expected

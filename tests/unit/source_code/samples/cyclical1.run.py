@@ -13,4 +13,4 @@ start_price = 10
 
 # COMMAND ----------
 
-# MAGIC %run "./root1.run.py.txt"
+# MAGIC %run "./cyclical2.run.py"

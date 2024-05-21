@@ -84,6 +84,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 - Databricks CLI v0.213 or later. See [instructions](#authenticate-databricks-cli). 
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
+- Databricks Premium or Enterprise workspace.
 - Network access to your Databricks Workspace used for the [installation process](#install-ucx).
 - Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
 - Databricks Workspace Administrator privileges for the user, that runs the installation. Running UCX as a Service Principal is not supported.
