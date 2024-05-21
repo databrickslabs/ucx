@@ -55,7 +55,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
 logger = logging.getLogger(__name__)
-JOBS_PURGE_TIMEOUT = timedelta(days=1)
+JOBS_PURGE_TIMEOUT = timedelta(hours=1)
 
 
 def factory(name, create, remove):
@@ -801,7 +801,7 @@ def make_job(ws, make_random, make_notebook):
             ]
 
         # add RemoveAfter tag for test job cleanup
-        date_to_remove = (datetime.now() + JOBS_PURGE_TIMEOUT).strftime("%Y-%m-%d")
+        date_to_remove = (datetime.utcnow() + JOBS_PURGE_TIMEOUT).isoformat()
         remove_after_tag = {"key": "RemoveAfter", "value": date_to_remove}
 
         if 'tags' not in kwargs:

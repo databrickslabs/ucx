@@ -1,6 +1,6 @@
 import json
 import time
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
@@ -67,6 +67,13 @@ pass
 
 def test_removeafter_tag(ws, env_or_skip, make_job):
     new_job = make_job(spark_conf=_SPARK_CONF)
-
     created_job = ws.jobs.get(new_job.job_id)
     assert "RemoveAfter" in created_job.settings.tags
+
+    try:
+        purge_time = datetime.fromisoformat(created_job.settings.tags.get("RemoveAfter"))
+        assert purge_time - datetime.utcnow() < timedelta(hours=1)
+    except ValueError as e:
+        print(e)
+        assert False
+
