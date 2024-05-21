@@ -42,6 +42,10 @@ class JobProblem:
     end_line: int
     end_col: int
 
+    def as_message(self) -> str:
+        message = f"{self.path}:{self.start_line} [{self.code}] {self.message}"
+        return message
+
 
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
@@ -179,10 +183,15 @@ class WorkflowLinter:
     def lint_job(self, job_id: int) -> list[JobProblem]:
         try:
             job = self._ws.jobs.get(job_id)
-            return list(self._lint_job(job))
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
             return []
+
+        problems = self._lint_job(job)
+        if len(problems) > 0:
+            problem_messages = "\n".join([problem.as_message() for problem in problems])
+            logger.warning(f"Found job problems:\n{problem_messages}")
+        return problems
 
     _UNKNOWN = Path('<UNKNOWN>')
 
