@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -68,7 +69,7 @@ display(spark.read.parquet("/mnt/something"))
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
-    messages = {f'{Path(p.path).relative_to(entrypoint)}:{p.start_line} [{p.code}] {p.message}' for p in problems}
+    messages = {replace(p, path=Path(p.path).relative_to(entrypoint)).as_message() for p in problems}
     assert messages == {
         'second_notebook:4 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/something',
         'some_file.py:1 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/foo/bar',
