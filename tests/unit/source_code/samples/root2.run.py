@@ -13,9 +13,4 @@ start_price = 10
 
 # COMMAND ----------
 
-# MAGIC %run "./leaf1.py.txt"
-
-# COMMAND ----------
-
-# MAGIC %run "./leaf2.py.txt"
-
+# MAGIC %run "./root1.run.py"

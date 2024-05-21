@@ -94,8 +94,6 @@ class MockPathLookup(PathLookup):
 
     def resolve(self, path: Path) -> Path | None:
         candidates = [path]
-        if not path.name.endswith('.txt'):
-            candidates.append(Path(f"{path}.txt"))
         for candidate in candidates:
             absolute_path = super().resolve(candidate)
             if not absolute_path:
