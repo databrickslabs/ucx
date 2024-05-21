@@ -48,7 +48,6 @@ class AclMigrationWhat(Enum):
 
 
 @dataclass
-# pylint: disable-next=too-many-public-methods
 class Table:
     catalog: str
     database: str
@@ -107,17 +106,6 @@ class Table:
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
 
-    def sql_alter_to(self, target_table_key):
-        return f"ALTER {self.kind} {escape_sql_identifier(self.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
-
-    def sql_alter_from(self, target_table_key, ws_id):
-        source = self.location if self.is_table_in_mount else self.key
-        return (
-            f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
-            f"('upgraded_from' = '{source}'"
-            f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
-        )
-
     def sql_unset_upgraded_to(self):
         return f"ALTER {self.kind} {escape_sql_identifier(self.key)} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
 
@@ -151,14 +139,6 @@ class Table:
         if self.table_format is None:
             return False
         return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT", "AVRO"}
-
-    @property
-    def is_format_supported_for_create_like(self) -> bool:
-        # Based on documentation
-        # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
-        if self.table_format is None:
-            return False
-        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "TEXT"}
 
     @property
     def is_databricks_dataset(self) -> bool:

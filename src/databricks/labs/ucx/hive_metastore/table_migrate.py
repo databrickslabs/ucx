@@ -6,6 +6,7 @@ from functools import partial
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
+from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.sdk import WorkspaceClient
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler, Mounts
@@ -214,9 +215,9 @@ class TablesMigrator:
         logger.debug(f"Migrating view {src_view.src.key} to using SQL query: {view_migrate_sql}")
         try:
             self._backend.execute(view_migrate_sql)
-            self._backend.execute(src_view.src.sql_alter_to(src_view.rule.as_uc_table_key))
+            self._backend.execute(self._sql_alter_to(src_view.src, src_view.rule.as_uc_table_key))
             self._backend.execute(
-                src_view.src.sql_alter_from(src_view.rule.as_uc_table_key, self._ws.get_workspace_id())
+                self._sql_alter_from(src_view.src, src_view.rule.as_uc_table_key, self._ws.get_workspace_id())
             )
         except DatabricksError as e:
             logger.warning(f"Failed to migrate view {src_view.src.key} to {src_view.rule.as_uc_table_key}: {e}")
@@ -243,7 +244,7 @@ class TablesMigrator:
                 f"Status code: {sync_result.status_code}. Description: {sync_result.description}"
             )
             return False
-        self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+        self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         return self._migrate_acl(src_table, rule, grants)
 
     def _migrate_external_table_hiveserde_in_place(
@@ -282,8 +283,8 @@ class TablesMigrator:
         )
         try:
             self._backend.execute(table_migrate_sql)
-            self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-            self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -297,8 +298,8 @@ class TablesMigrator:
         )
         try:
             self._backend.execute(table_migrate_sql)
-            self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-            self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -318,8 +319,8 @@ class TablesMigrator:
         logger.debug(f"Migrating table {src_table.key} to {rule.as_uc_table_key} using SQL query: {table_migrate_sql}")
         try:
             self._backend.execute(table_migrate_sql)
-            self._backend.execute(src_table.sql_alter_to(rule.as_uc_table_key))
-            self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._backend.execute(self._sql_alter_to(src_table, rule.as_uc_table_key))
+            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -334,7 +335,7 @@ class TablesMigrator:
                 f"Migrating table in mount {src_table.location} to UC table {rule.as_uc_table_key} using SQL query: {table_migrate_sql}"
             )
             self._backend.execute(table_migrate_sql)
-            self._backend.execute(src_table.sql_alter_from(rule.as_uc_table_key, self._ws.get_workspace_id()))
+            self._backend.execute(self._sql_alter_from(src_table, rule.as_uc_table_key, self._ws.get_workspace_id()))
         except DatabricksError as e:
             logger.warning(f"Failed to migrate table {src_table.key} to {rule.as_uc_table_key}: {e}")
             return False
@@ -477,3 +478,14 @@ class TablesMigrator:
                 grant = dataclasses.replace(grant, principal=matched_group[0])
             matched_grants.append(grant)
         return matched_grants
+
+    def _sql_alter_to(self, table: Table, target_table_key: str):
+        return f"ALTER {table.kind} {escape_sql_identifier(table.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
+
+    def _sql_alter_from(self, table: Table, target_table_key: str, ws_id: int):
+        source = table.location if table.is_table_in_mount else table.key
+        return (
+            f"ALTER {table.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
+            f"('upgraded_from' = '{source}'"
+            f" , '{table.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
+        )
