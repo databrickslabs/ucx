@@ -1203,14 +1203,13 @@ def test_table_in_mount_mapping_with_table_owner():
         group_manager,
         migration_status_refresher,
         principal_grants,
-        "GROUP_TEST",
     )
-    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER])
+    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
         "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal)  LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
-    assert 'ALTER TABLE tgt_catalog.tgt_db.test OWNER TO `GROUP_TEST`' in backend.queries
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
 
 def test_table_in_mount_mapping_with_partition_information():
@@ -1252,16 +1251,15 @@ def test_table_in_mount_mapping_with_partition_information():
         group_manager,
         migration_status_refresher,
         principal_grants,
-        "GROUP_TEST",
     )
-    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER])
+    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
     assert (
         "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal) PARTITIONED BY (col1) LOCATION 'abfss://bucket@msft/path/test';"
         in backend.queries
     )
-    assert 'ALTER TABLE tgt_catalog.tgt_db.test OWNER TO `GROUP_TEST`' in backend.queries
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
 
-    
+
 def test_migrate_view_failed(ws, caplog):
     errors = {"CREATE OR REPLACE VIEW": "error"}
     create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
@@ -1315,6 +1313,7 @@ def test_migrate_dbfs_root_tables_failed(ws, caplog):
     table_migrate = TablesMigrator(
         table_crawler,
         grant_crawler,
+        ws,
         backend,
         table_mapping,
         group_manager,
@@ -1338,4 +1337,3 @@ def test_revert_migrated_tables_failed(caplog):
     table_migrate = get_table_migrator(backend)
     table_migrate.revert_migrated_tables(schema="test_schema1")
     assert "Failed to revert table hive_metastore.test_schema1.test_table1: error" in caplog.text
-

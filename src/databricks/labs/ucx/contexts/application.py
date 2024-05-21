@@ -242,7 +242,6 @@ class GlobalContext(abc.ABC):
             self.group_manager,
             self.migration_status_refresher,
             self.principal_acl,
-            self.config.default_table_owner,
         )
 
     @cached_property

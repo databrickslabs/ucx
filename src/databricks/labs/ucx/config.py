@@ -51,8 +51,6 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_mounts: list[str] | None = None
     exclude_paths_in_mount: list[str] | None = None
     include_paths_in_mount: list[str] | None = None
-    # Whether we have to set a specific owner to tables created by TablesInMounts
-    default_table_owner: str | None = None
 
     # Whether to trigger assessment job after installation
     trigger_job: bool = False

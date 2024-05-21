@@ -5,6 +5,7 @@ from databricks.labs.ucx.hive_metastore.workflows import (
     MigrateExternalTablesCTAS,
     MigrateHiveSerdeTablesInPlace,
     MigrateTablesInMounts,
+    ScanTablesInMounts,
 )
 
 
@@ -54,7 +55,14 @@ def test_migrate_ctas_views(run_workflow):
 
 
 @pytest.mark.parametrize(
-    "workflow", [TableMigration, MigrateHiveSerdeTablesInPlace, MigrateExternalTablesCTAS, MigrateTablesInMounts]
+    "workflow",
+    [
+        TableMigration,
+        MigrateHiveSerdeTablesInPlace,
+        MigrateExternalTablesCTAS,
+        ScanTablesInMounts,
+        MigrateTablesInMounts,
+    ],
 )
 def test_refresh_migration_status_is_refreshed(run_workflow, workflow):
     """Migration status is refreshed by deleting and showing new tables"""

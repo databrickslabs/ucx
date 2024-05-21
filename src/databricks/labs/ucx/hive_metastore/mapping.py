@@ -184,14 +184,11 @@ class TableMapping:
         if self.exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        try:
-            result = self._sql_backend.fetch(
-                f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
-            )
-        except DatabricksError as err:
-            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+        properties = self._get_table_properties(table)
+        if not properties:
             return None
-        for value in result:
+
+        for value in properties:
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
                 return None
@@ -211,6 +208,17 @@ class TableMapping:
                     logger.warning(f"Failed to unset upgraded_to property for Table {table.key}: {err}")
 
         return table_to_migrate
+
+    def _get_table_properties(self, table: Table):
+        table_identifier = f"{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+        if table.is_table_in_mount:
+            table_identifier = f"delta.`{table.location}`"
+
+        try:
+            return self._sql_backend.fetch(f"SHOW TBLPROPERTIES {table_identifier}")
+        except DatabricksError as err:
+            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+            return None
 
     def exists_in_uc(self, src_table: Table, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.

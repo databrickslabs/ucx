@@ -563,6 +563,7 @@ def test_migrate_external_tables_with_principal_acl_aws(
             break
     assert match
 
+
 def test_migrate_table_in_mount(
     ws,
     sql_backend,
@@ -576,12 +577,10 @@ def test_migrate_table_in_mount(
 ):
     if not ws.config.is_azure:
         pytest.skip("temporary: only works in azure test env")
-    owner_group = make_acc_group()
     config = WorkspaceConfig(
         warehouse_id=env_or_skip("TEST_DEFAULT_WAREHOUSE_ID"),
         inventory_database=inventory_schema,
         connect=ws.config,
-        default_table_owner=owner_group.display_name,
     )
     runtime_ctx = runtime_ctx.replace(config=config)
     tbl_path = make_random(4).lower()
@@ -594,7 +593,7 @@ def test_migrate_table_in_mount(
     # This is done because we have to create the external table in a mount point, but TablesInMounts() has to use the adls/ path
     # Otherwise, if we keep the dbfs:/ path, the entire logic of TablesInMounts won't work
     src_external_table.storage_location = table_in_mount_location
-
+    runtime_ctx.save_tables()
     dst_catalog = make_catalog()
     dst_schema = make_schema(catalog_name=dst_catalog.name)
 
@@ -610,19 +609,16 @@ def test_migrate_table_in_mount(
             ),
         ]
     )
-    runtime_ctx.with_dummy_azure_resource_permission()
+    runtime_ctx.with_dummy_resource_permission()
 
-    runtime_ctx.tables_migrator.migrate_tables(
-        what=What.TABLE_IN_MOUNT, acl_strategy=[AclMigrationWhat.DEFAULT_TABLE_OWNER]
-    )
+    runtime_ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
 
     target_tables = list(sql_backend.fetch(f"SHOW TABLES IN {dst_schema.full_name}"))
     assert len(target_tables) == 1
     target_table_properties = ws.tables.get(f"{dst_schema.full_name}.{src_external_table.name}")
     assert target_table_properties.properties["upgraded_from"] == table_in_mount_location
-    assert target_table_properties.owner == owner_group.display_name
 
-    
+
 def test_migrate_external_tables_with_spn_azure(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
 ):

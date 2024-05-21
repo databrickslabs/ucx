@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 
 class TablesMigrator:
-    # pylint: disable-next=too-many-arguments
     def __init__(
         self,
         table_crawler: TablesCrawler,
@@ -46,7 +45,6 @@ class TablesMigrator:
         group_manager: GroupManager,
         migration_status_refresher: MigrationStatusRefresher,
         principal_grants: PrincipalACL,
-        default_table_owner: str | None = None,
     ):
         self._tc = table_crawler
         self._gc = grant_crawler
@@ -57,7 +55,6 @@ class TablesMigrator:
         self._migration_status_refresher = migration_status_refresher
         self._seen_tables: dict[str, str] = {}
         self._principal_grants = principal_grants
-        self._default_table_owner = default_table_owner
 
     def index(self):
         return self._migration_status_refresher.index()
@@ -153,9 +150,6 @@ class TablesMigrator:
             grants.extend(self._match_grants(table, all_grants_to_migrate, all_migrated_groups))
         if AclMigrationWhat.PRINCIPAL in acl_strategy:
             grants.extend(self._match_grants(table, all_principal_grants, all_migrated_groups))
-        if AclMigrationWhat.DEFAULT_TABLE_OWNER in acl_strategy:
-            if self._default_table_owner:
-                grants.append(Grant(self._default_table_owner, "OWN", table.catalog, table.database, table.name))
         return grants
 
     def _migrate_table(

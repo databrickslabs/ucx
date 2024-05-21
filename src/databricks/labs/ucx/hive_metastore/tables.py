@@ -45,10 +45,10 @@ class HiveSerdeType(Enum):
 class AclMigrationWhat(Enum):
     LEGACY_TACL = auto()
     PRINCIPAL = auto()
-    DEFAULT_TABLE_OWNER = auto()
 
 
 @dataclass
+# pylint: disable-next=too-many-public-methods
 class Table:
     catalog: str
     database: str
@@ -111,9 +111,10 @@ class Table:
         return f"ALTER {self.kind} {escape_sql_identifier(self.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
 
     def sql_alter_from(self, target_table_key, ws_id):
+        source = self.location if self.is_table_in_mount else self.key
         return (
             f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
-            f"('upgraded_from' = '{self.key}'"
+            f"('upgraded_from' = '{source}'"
             f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
         )
 

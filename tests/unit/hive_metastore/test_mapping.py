@@ -10,7 +10,6 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import ResourceConflict
 from databricks.sdk.service.catalog import TableInfo
 
-from databricks.labs.ucx.account import WorkspaceInfo
 from databricks.labs.ucx.hive_metastore.mapping import (
     Rule,
     TableMapping,
@@ -644,7 +643,7 @@ def test_is_target_exists():
     assert not table_mapping.exists_in_uc(src_table, "cat1.schema1.dest1")
     assert table_mapping.exists_in_uc(src_table, "cat1.schema2.dest2")
 
-    
+
 def test_tables_in_mounts():
     client = create_autospec(WorkspaceClient)
     client.workspace.download.return_value = io.BytesIO(
@@ -780,6 +779,7 @@ def test_mapping_table_in_mount_exists_in_uc_with_bad_properties():
         except ManyError as e:
             assert len(e.errs) == 1
             raise e.errs[0]
+
 
 def test_mapping_broken_table(caplog):
     client = create_autospec(WorkspaceClient)
