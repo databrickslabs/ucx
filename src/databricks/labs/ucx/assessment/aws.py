@@ -352,6 +352,7 @@ class AWSResources:
             logger.error(f"Role {role_name} doesn't exist")
             return None
         role = role_document.get("Role")
+        arn = role.get("Arn")
         policy_document = role.get("AssumeRolePolicyDocument")
         if policy_document and policy_document.get("Statement"):
             for idx, statement in enumerate(policy_document["Statement"]):
@@ -372,7 +373,7 @@ class AWSResources:
                 policy_document["Statement"][idx]["Condition"] = self._databricks_trust_statement(external_id)
             policy_document_json = self._get_json_for_cli(policy_document)
         else:
-            policy_document_json = self._aws_role_trust_doc(external_id)
+            policy_document_json = self._aws_role_trust_doc(arn, external_id)
         update_role = self._run_json_command(
             f"iam update-assume-role-policy --role-name {role_name} --policy-document {policy_document_json}"
         )

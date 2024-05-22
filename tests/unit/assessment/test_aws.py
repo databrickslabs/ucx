@@ -638,7 +638,9 @@ def test_update_uc_trust_role(mocker):
         '{"Version":"2012-10-17",'
         '"Statement":['
         '{"Effect":"Allow",'
-        '"Principal":{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},'
+        '"Principal":{"AWS":'
+        '["arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",'
+        '"arn:aws:iam::0123456789:role/Test-Role"]},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
         '--profile Fake_Profile --output json'
     ) in command_calls
@@ -658,7 +660,8 @@ def test_create_uc_role_policy_no_kms(mocker):
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
-        '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:DeleteObject",'
+        '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:PutObjectAcl",'
+        '"s3:DeleteObject",'
         '"s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
@@ -681,6 +684,7 @@ def test_create_uc_role_kms(mocker):
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '
         '--policy-document {"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject",'
+        '"s3:PutObjectAcl",'
         '"s3:DeleteObject","s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'

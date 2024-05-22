@@ -14,7 +14,7 @@ from databricks.sdk.service.catalog import (
     StorageCredentialInfo,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSCredentialCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import CredentialManager, IamRoleMigration
 from tests.unit import DEFAULT_CONFIG
@@ -60,36 +60,33 @@ def test_list_storage_credentials(credential_manager):
 
 
 def test_create_storage_credentials(credential_manager):
-    first_iam = AWSRoleAction(
-        role_arn="arn:aws:iam::123456789012:role/example-role-name",
-        resource_type="s3",
-        privilege=Privilege.WRITE_FILES.value,
-        resource_path="s3://example-bucket",
+    first_iam = StorageCredentialInfo(
+        name="example-role-name",
+        aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/example-role-name"),
+        read_only=False,
     )
-    second_iam = AWSRoleAction(
-        role_arn="arn:aws:iam::123456789012:role/another-role-name",
-        resource_type="s3",
-        privilege=Privilege.READ_FILES.value,
-        resource_path="s3://example-bucket",
+    second_iam = StorageCredentialInfo(
+        name="another-role-name",
+        aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/another-role-name"),
+        read_only=True,
     )
 
     storage_credential = credential_manager.create(first_iam)
-    assert first_iam.role_name == storage_credential.name
+    assert first_iam.name == storage_credential.name
 
     storage_credential = credential_manager.create(second_iam)
-    assert second_iam.role_name == storage_credential.name
+    assert second_iam.name == storage_credential.name
 
 
 @pytest.fixture
 def instance_profile_migration(installation, credential_manager):
     def generate_instance_profiles(num_instance_profiles: int):
         arp = create_autospec(AWSResourcePermissions)
-        arp.load_uc_compatible_roles.return_value = [
-            AWSRoleAction(
+        arp.get_roles_to_migrate.return_value = [
+            AWSCredentialCandidate(
                 role_arn=f"arn:aws:iam::123456789012:role/prefix{i}",
-                resource_type="s3",
                 privilege=Privilege.WRITE_FILES.value,
-                resource_path=f"s3://example-bucket-{i}",
+                paths={f"s3://example-bucket-{i}/*"},
             )
             for i in range(num_instance_profiles)
         ]
@@ -105,7 +102,7 @@ def test_print_action_plan(caplog, instance_profile_migration, credential_manage
 
     instance_profile_migration(10).run(prompts)
 
-    log_pattern = r"arn:aws:iam:.* on s3:.*"
+    log_pattern = r"arn:aws:iam:.*"
     for msg in caplog.messages:
         if re.search(log_pattern, msg):
             assert True
