@@ -59,7 +59,8 @@ class LocalDirectory(SourceContainer):
         return self._path
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._path.name in {"__pycache__", "site-packages"}:
+        # don't directly scan non-source directories, let it be done for relevant imports only
+        if self._path.name in {"__pycache__", ".git", ".github", ".venv", "site-packages"}:
             return []
         return list(self._build_dependency_graph(parent))
 
