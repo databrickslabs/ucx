@@ -39,6 +39,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Dependency CLI commands](#dependency-cli-commands)
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
     * [Other considerations](#other-considerations)
+  * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -466,6 +467,17 @@ There are 3 main table migration workflows, targeting different table types. All
   - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
 - Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
+
+[[back to top](#databricks-labs-ucx)]
+
+## Jobs Static Code Analysis Workflow
+
+> Please note that this is an experimental workflow.
+
+The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
+workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+
+![code compatibility problems](docs/code_compatibility_problems.png)
 
 [[back to top](#databricks-labs-ucx)]
 
