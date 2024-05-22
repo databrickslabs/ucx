@@ -9,7 +9,6 @@ from collections.abc import Iterable
 
 from yaml import load_all as load_yaml, Loader
 
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 from databricks.labs.ucx.source_code.graph import (
     DependencyGraph,
@@ -27,7 +26,7 @@ class WhitelistResolver:
         super().__init__()
         self._whitelist = whitelist
 
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
+    def resolve_import(self, name: str) -> MaybeDependency | None:
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         compatibility = self._whitelist.compatibility(name)
         if compatibility == UCCompatibility.FULL:

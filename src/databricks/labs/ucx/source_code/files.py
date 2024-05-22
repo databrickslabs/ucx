@@ -125,7 +125,7 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        maybe = self._whitelist_resolver.resolve_import(path_lookup, name)
+        maybe = self._whitelist_resolver.resolve_import(name)
         if maybe is not None:
             return maybe
         maybe = self._resolve_import(path_lookup, name)
