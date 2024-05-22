@@ -1,5 +1,6 @@
 import json
 import re
+import time
 import typing
 from collections.abc import Iterable
 from functools import partial
@@ -54,13 +55,13 @@ class AWSResourcePermissions:
         missing_paths = self._identify_missing_paths()
         s3_buckets = set()
         for missing_path in missing_paths:
-            match = re.match(AWSResources.S3_BUCKET_REGEX, missing_path)
+            match = re.match(AWSResources.S3_BUCKET, missing_path)
             if match:
                 s3_buckets.add(match.group(1))
         if single_role:
-            roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes)))
+            roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_buckets)))
         else:
-            for idx, s3_prefix in enumerate(sorted(list(s3_prefixes))):
+            for idx, s3_prefix in enumerate(sorted(list(s3_buckets))):
                 roles.append(AWSUCRoleCandidate(f"{role_name}_{idx+1}", policy_name, [s3_prefix]))
         return roles
 
@@ -71,7 +72,8 @@ class AWSResourcePermissions:
             for path in role.resource_paths:
                 expanded_paths.add(path)
                 expanded_paths.add(f"{path}/*")
-            if self._aws_resources.create_uc_role(role.role_name, self._get_role_arn(role.role_name)):
+            role_arn = self._aws_resources.create_uc_role(role.role_name)
+            if role_arn:
                 self._aws_resources.put_role_policy(
                     role.role_name,
                     role.policy_name,
@@ -80,6 +82,8 @@ class AWSResourcePermissions:
                     self._kms_key,
                 )
                 roles_created.append(role)
+                time.sleep(30)
+                self._aws_resources.update_uc_role(role.role_name, role_arn)
         return roles_created
 
     def update_uc_role_trust_policy(self, role_name, external_id="0000"):

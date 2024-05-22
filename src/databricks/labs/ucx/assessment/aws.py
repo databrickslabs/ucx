@@ -80,7 +80,7 @@ class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
-    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*\/)).*$"
+    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))\/.*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
@@ -217,7 +217,14 @@ class AWSResources:
             s3_actions = [actions]
         return s3_actions
 
-    def _aws_role_trust_doc(self, self_assume_arn: str, external_id="0000"):
+    def _aws_role_trust_doc(self, self_assume_arn: str | None = None, external_id="0000"):
+        if self_assume_arn:
+            arns = [
+                self_assume_arn,
+                "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
+            ]
+        else:
+            arns = "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
         return self._get_json_for_cli(
             {
                 "Version": "2012-10-17",
@@ -225,10 +232,7 @@ class AWSResources:
                     {
                         "Effect": "Allow",
                         "Principal": {
-                            "AWS": [
-                                "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
-                                self_assume_arn,
-                            ]
+                            "AWS": arns
                         },
                         "Action": "sts:AssumeRole",
                         "Condition": self._databricks_trust_statement(external_id),
@@ -247,9 +251,9 @@ class AWSResources:
         """
         s3_prefixes_strip = set()
         for path in s3_prefixes:
-            match = re.match(AWSResources.S3_BUCKET, path)
+            match = re.match(AWSResources.S3_PATH_REGEX, path)
             if match:
-                s3_prefixes_strip.add(match.group(1))
+                s3_prefixes_strip.add(match.group(4))
 
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes_strip])
         statement = [
@@ -297,13 +301,33 @@ class AWSResources:
             return None
         return add_role["Role"]["Arn"]
 
-    def create_uc_role(self, role_name: str, role_arn: str) -> str | None:
+    def _update_role(self, role_name: str, assume_role_json: str) -> str | None:
+        """
+        Create an AWS role with the given name and assume role policy document.
+        """
+        add_role = self._run_json_command(
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
+        )
+        if not add_role:
+            return None
+        return add_role["Role"]["Arn"]
+
+    def create_uc_role(self, role_name: str) -> str | None:
         """
         Create an IAM role for Unity Catalog to access the S3 buckets.
         the AssumeRole condition will be modified later with the external ID captured from the UC credential.
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
-        return self._create_role(role_name, self._aws_role_trust_doc(role_arn))
+        return self._create_role(role_name, self._aws_role_trust_doc())
+
+    def update_uc_role(self, role_name: str, role_arn: str) -> str | None:
+        """
+        Create an IAM role for Unity Catalog to access the S3 buckets.
+        the AssumeRole condition will be modified later with the external ID captured from the UC credential.
+        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
+        """
+        result = self._update_role(role_name, self._aws_role_trust_doc(role_arn))
+        return result
 
     def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> str | None:
         """
