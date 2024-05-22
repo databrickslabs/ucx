@@ -39,6 +39,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Dependency CLI commands](#dependency-cli-commands)
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
     * [Other considerations](#other-considerations)
+  * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
