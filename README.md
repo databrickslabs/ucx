@@ -472,7 +472,7 @@ There are 3 main table migration workflows, targeting different table types. All
 
 ## Jobs Static Code Analysis Workflow
 
-Please note that this is an experimental workflow.
+> Please note that this is an experimental workflow.
 
 The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
 workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
