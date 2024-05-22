@@ -126,14 +126,14 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         maybe = self._whitelist_resolver.resolve_import(path_lookup, name)
-        if maybe.dependency is not None or len(maybe.problems) > 0:
+        if maybe is not None:
             return maybe
         maybe = self._resolve_import(path_lookup, name)
-        if maybe.dependency is not None or len(maybe.problems) > 0:
+        if maybe is not None:
             return maybe
         return self._fail('import-not-found', f"Could not locate import: {name}")
 
-    def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
         if not name:
             return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
         parts = []
@@ -156,7 +156,7 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
                 continue
             dependency = Dependency(self._file_loader, absolute_path)
             return MaybeDependency(dependency, [])
-        return MaybeDependency(None, [])
+        return None
 
     @staticmethod
     def _fail(code: str, message: str):

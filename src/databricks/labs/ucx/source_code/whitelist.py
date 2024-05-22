@@ -12,7 +12,6 @@ from yaml import load_all as load_yaml, Loader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 from databricks.labs.ucx.source_code.graph import (
-    BaseImportResolver,
     DependencyGraph,
     DependencyProblem,
     MaybeDependency,
@@ -22,13 +21,13 @@ from databricks.labs.ucx.source_code.graph import (
 logger = logging.getLogger(__name__)
 
 
-class WhitelistResolver(BaseImportResolver):
+class WhitelistResolver:
 
     def __init__(self, whitelist: Whitelist):
         super().__init__()
         self._whitelist = whitelist
 
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency | None:
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
         compatibility = self._whitelist.compatibility(name)
         if compatibility == UCCompatibility.FULL:
@@ -40,7 +39,7 @@ class WhitelistResolver(BaseImportResolver):
         if compatibility == UCCompatibility.PARTIAL:
             problem = DependencyProblem("dependency-check", f"Package {name} is only partially supported by UC")
             return MaybeDependency(None, [problem])
-        return MaybeDependency(None, [])
+        return None
 
 
 class StubContainer(SourceContainer):

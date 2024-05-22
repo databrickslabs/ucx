@@ -291,7 +291,10 @@ def test_dependency_resolver_resolves_already_installed_library_dependency(mock_
     file_loader = FileLoader()
     whitelist = Whitelist()
     dependency_resolver = DependencyResolver(
-        [PipResolver(file_loader, whitelist)], mock_notebook_resolver, LocalFileResolver(file_loader, whitelist), path_lookup
+        [PipResolver(file_loader, whitelist)],
+        mock_notebook_resolver,
+        LocalFileResolver(file_loader, whitelist),
+        path_lookup,
     )
     maybe = dependency_resolver.build_library_dependency_graph(Path("astroid"))
     library_graph = maybe.graph
