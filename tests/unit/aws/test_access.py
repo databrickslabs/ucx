@@ -20,6 +20,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from tests.unit import DEFAULT_CONFIG
 
 
@@ -750,3 +751,21 @@ def test_instance_profile_malformed_lookup():
 
     aws = AWSResources("profile", instance_lookup)
     assert aws.get_instance_profile_role_arn("instance_profile_1") is None
+
+
+def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles):
+    def command_call(_: str):
+        return 0, '{"account":"1234"}', ""
+
+    aws = AWSResources("profile", command_call)
+
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("s3://BUCKET1", 1),
+        ExternalLocation("s3://BUCKET2/Folder1", 1),
+    ]
+    resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, external_locations)
+    roles = resource_permissions.get_roles_to_migrate()
+    assert len(roles) == 1
+    assert len(roles[0].paths) == 2
+    external_locations.snapshot.assert_called_once()

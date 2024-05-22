@@ -208,13 +208,17 @@ class AWSResourcePermissions:
         for external_location in external_locations:
             path = PurePath(external_location.location)
             for role in compatible_roles:
-                if not path.match(role.resource_path + "/*"):
+                if not (path.match(role.resource_path) or path.match(role.resource_path + "/*")):
                     continue
-                if role.privilege == Privilege.READ_FILES.value and role.role_arn in roles:
-                    roles[role.role_arn].paths.add(external_location.location)
+                if role.role_arn not in roles:
+                    roles[role.role_arn] = AWSCredentialCandidate(
+                        role_arn=role.role_arn, privilege=role.privilege, paths=set([external_location.location])
+                    )
                     continue
-                roles[role.role_arn] = AWSCredentialCandidate(role_arn=role.role_arn, privilege=role.privilege)
                 roles[role.role_arn].paths.add(external_location.location)
+                if role.privilege == Privilege.WRITE_FILES.value:
+                    roles[role.role_arn].privilege = Privilege.WRITE_FILES.value
+
         return list(roles.values())
 
     def _get_cluster_policy(self, policy_id: str | None) -> Policy:
