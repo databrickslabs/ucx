@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 
 
 def test_pip_cell_language_is_pip():

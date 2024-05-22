@@ -1,5 +1,5 @@
 from databricks.labs.ucx.source_code.graph import SourceContainer
-from databricks.labs.ucx.source_code.whitelist import UCCompatibility, Whitelist
+from databricks.labs.ucx.source_code.known import UCCompatibility, Whitelist
 from tests.unit import _load_sources
 
 

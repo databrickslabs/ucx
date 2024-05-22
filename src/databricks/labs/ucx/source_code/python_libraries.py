@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import collections
+import email
 import os
 import subprocess
 import tempfile
+from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     BaseLibraryResolver,
@@ -16,8 +20,10 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     WrappingLoader,
 )
+from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 
 
 class PipResolver(BaseLibraryResolver):
@@ -191,6 +197,13 @@ class DistInfoPackage:
         self._module_paths = module_paths
         self._library_names = library_names
 
+    @cached_property
+    def name(self):
+        with Path(self._dist_info_path, "METADATA").open() as f:
+            message = email.message_from_file(f)
+            name = message.get('Name', 'unknown')
+            return name.lower()
+
     @property
     def top_levels(self) -> list[str]:
         return self._top_levels
@@ -205,3 +218,35 @@ class DistInfoPackage:
 
     def __repr__(self):
         return f"<DistInfoPackage {self._dist_info_path}>"
+
+
+if __name__ == "__main__":
+    root = Path.cwd()
+    empty_index = MigrationIndex([])
+    path_lookup = PathLookup.from_sys_path(root)
+    known_distributions = {}
+    # TODO: re-read known.json and only update the known distributions
+    for library_root in path_lookup.library_roots:
+        for dist_info_folder in library_root.glob("*.dist-info"):
+            dist_info = DistInfoPackage.parse(dist_info_folder)
+            known_distributions[dist_info.name] = collections.OrderedDict()
+            for module_path in dist_info.module_paths:
+                if not module_path.is_file():
+                    continue
+                if module_path.name in {'__main__.py', '__version__.py', '__about__.py'}:
+                    continue
+                relative_path = module_path.relative_to(library_root)
+                package_ref = relative_path.as_posix().replace('/', '.')
+                for suffix in ('.py', '.__init__'):
+                    if package_ref.endswith(suffix):
+                        package_ref = package_ref[:-len(suffix)]
+                languages = Languages(empty_index)
+                linter = FileLinter(languages, module_path)
+                problems = []
+                for problem in linter.lint():
+                    problems.append(f'line {problem.start_line}: {problem.message}')
+                known_distributions[dist_info.name][package_ref] = problems
+    with Path(__file__).parent.joinpath('known.json').open('w') as f:
+        import json
+        json.dump(dict(sorted(known_distributions.items())), f, indent=2)
+    print("done")

@@ -5,7 +5,7 @@ from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import DistInfoPackage, PipResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 from tests.unit import locate_site_packages
 
 

@@ -18,7 +18,7 @@ from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

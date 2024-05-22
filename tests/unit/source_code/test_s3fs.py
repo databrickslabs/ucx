@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 
 
 S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"

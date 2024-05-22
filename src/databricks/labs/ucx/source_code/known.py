@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from collections.abc import Iterable
+from pathlib import Path
 
 from yaml import load_all as load_yaml, Loader
 

@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 from tests.unit import (
     locate_site_packages,
     _samples_path,
