@@ -116,6 +116,7 @@ def test_single_dot_import():
 site_packages = locate_site_packages()
 
 
+@pytest.mark.skip("Manual testing for troubleshooting")
 @pytest.mark.parametrize("path", [(Path(site_packages, "mypy", "build.py"))])
 def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
