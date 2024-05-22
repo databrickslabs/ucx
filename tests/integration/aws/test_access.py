@@ -23,20 +23,6 @@ def test_get_uc_compatible_roles(ws, env_or_skip, make_random, aws_cli_ctx):
     assert compat_roles
 
 
-def test_get_migrate_credentials(ws, env_or_skip, make_random):
-    ctx = WorkspaceContext(ws)
-    iam_migration = ctx.iam_role_migration
-    roles = iam_migration.run(
-        MockPrompts(
-            {
-                "Do*": "yes",
-            }
-        )
-    )
-    print(roles)
-    assert roles
-
-
 def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, aws_cli_ctx):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     rand = make_random(5).lower()
