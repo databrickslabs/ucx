@@ -491,7 +491,7 @@ def lint_local_code(
         # can't find a way to create for files a supported GH-like link with line number
         # so sticking to file path only for now
         link = escape_mask.format("", f"file://{advice.path}", advice.path)
-        print(f"Issue with file: {link} -> {advice.advice.__repr__()}")
+        print(f"Issue with file: {link} -> {repr(advice.advice)}")
     return located_advices
 
 

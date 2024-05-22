@@ -5,6 +5,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
+from typing import cast
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.python_linter import (
@@ -161,7 +162,10 @@ class DependencyGraph:
         linter = ASTLinter.parse(python_code)
         syspath_changes = PythonLinter.list_sys_path_changes(linter)
         run_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources = PythonLinter.list_import_sources(linter)
+        import_sources_and_problems = PythonLinter.list_import_sources(linter, DependencyProblem)
+        import_sources = import_sources_and_problems[0]
+        import_problems = import_sources_and_problems[1]
+        problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
         for base_node in sorted(nodes, key=lambda node: node.node.lineno * 10000 + node.node.col_offset):

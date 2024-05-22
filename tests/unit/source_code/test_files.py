@@ -2,24 +2,37 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
+import pytest
+from databricks.labs.ucx.source_code.graph import DependencyResolver
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.whitelist import Whitelist, WhitelistResolver
+
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFileResolver, FileLoader
+from databricks.labs.ucx.source_code.files import (
+    LocalFileMigrator,
+    LocalFileResolver,
+    FileLoader,
+    LocalFilesLinter,
+    DirectoryLoader,
+)
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from tests.unit import locate_site_packages
 
 
 def test_files_fix_ignores_unsupported_extensions():
     languages = Languages(MigrationIndex([]))
-    files = LocalFileMigrator(languages)
+    files = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
     assert not files.apply(path)
 
 
 def test_files_fix_ignores_unsupported_language():
     languages = Languages(MigrationIndex([]))
-    files = LocalFileMigrator(languages)
+    files = LocalFileMigrator(lambda: languages)
     files._extensions[".py"] = None  # pylint: disable=protected-access
     path = Path('unsupported.py')
     assert not files.apply(path)
@@ -98,3 +111,22 @@ def test_single_dot_import():
     assert not maybe.problems
     assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
+
+
+site_packages = locate_site_packages()
+
+
+@pytest.mark.parametrize("path", [(Path(site_packages, "mypy", "build.py"))])
+def test_known_issues(path: Path, migration_index):
+    file_loader = FileLoader()
+    dir_loader = DirectoryLoader(file_loader)
+    path_lookup = PathLookup.from_sys_path(Path.cwd())
+    whitelist = Whitelist()
+    notebook_resolver = NotebookResolver(NotebookLoader())
+    file_resolver = LocalFileResolver(file_loader)
+    whitelist_resolver = WhitelistResolver(whitelist)
+    resolver = DependencyResolver(
+        [PipResolver(file_loader, whitelist)], notebook_resolver, [file_resolver, whitelist_resolver], path_lookup
+    )
+    linter = LocalFilesLinter(file_loader, dir_loader, path_lookup, resolver, lambda: Languages(migration_index))
+    linter.lint(path)

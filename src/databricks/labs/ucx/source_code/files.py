@@ -59,6 +59,8 @@ class LocalDirectory(SourceContainer):
         return self._path
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        if self._path.name in {"__pycache__", "site-packages"}:
+            return []
         return list(self._build_dependency_graph(parent))
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
