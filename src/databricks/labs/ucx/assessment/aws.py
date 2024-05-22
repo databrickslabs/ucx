@@ -218,13 +218,6 @@ class AWSResources:
         return s3_actions
 
     def _aws_role_trust_doc(self, self_assume_arn: str | None = None, external_id="0000"):
-        if self_assume_arn:
-            arns = [
-                self_assume_arn,
-                "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
-            ]
-        else:
-            arns = "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
         return self._get_json_for_cli(
             {
                 "Version": "2012-10-17",
@@ -232,7 +225,14 @@ class AWSResources:
                     {
                         "Effect": "Allow",
                         "Principal": {
-                            "AWS": arns
+                            "AWS": (
+                                [
+                                    "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
+                                    self_assume_arn,
+                                ]
+                                if self_assume_arn
+                                else "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                            )
                         },
                         "Action": "sts:AssumeRole",
                         "Condition": self._databricks_trust_statement(external_id),

@@ -82,8 +82,12 @@ class AWSResourcePermissions:
                     self._kms_key,
                 )
                 roles_created.append(role)
-                time.sleep(30)
-                self._aws_resources.update_uc_role(role.role_name, role_arn)
+        time.sleep(15)
+        # We need to create a buffer between the role creation and the role update, Otherwise the update fails.
+        for created_role in roles_created:
+            self._aws_resources.update_uc_role(
+                created_role.role_name, f"arn:aws:iam::{self._aws_account_id}:role/{created_role.role_name}"
+            )
         return roles_created
 
     def update_uc_role_trust_policy(self, role_name, external_id="0000"):
