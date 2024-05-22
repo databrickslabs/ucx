@@ -440,6 +440,10 @@ class WorkflowsDeployment(InstallationMixin):
     def _is_testing(self):
         return self._product_info.product_name() != "ucx"
 
+    @staticmethod
+    def _get_purge_time() -> str:
+        return (datetime.utcnow() + JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
         markdown = [
@@ -556,8 +560,7 @@ class WorkflowsDeployment(InstallationMixin):
         return settings
 
     def _job_settings(self, step_name: str, remote_wheel: str):
-        def get_purge_time() -> str:
-            return (datetime.utcnow() + JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+
 
         email_notifications = None
         remove_after_tag = {}
@@ -569,7 +572,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         if self._is_testing():
             # add RemoveAfter tag for test job cleanup
-            date_to_remove = get_purge_time()
+            date_to_remove = self._get_purge_time()
             remove_after_tag = {"RemoveAfter": date_to_remove}
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
