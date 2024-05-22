@@ -317,12 +317,12 @@ class AWSResources:
         """
         Create an AWS role with the given name and assume role policy document.
         """
-        add_role = self._run_json_command(
+        update_role = self._run_json_command(
             f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
         )
-        if not add_role:
+        if not update_role:
             return None
-        return add_role["Role"]["Arn"]
+        return update_role["Role"]["Arn"]
 
     def create_uc_role(self, role_name: str) -> str | None:
         """
