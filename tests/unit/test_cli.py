@@ -573,4 +573,3 @@ def test_cli_missing_awscli(ws, mocker, caplog):
     with pytest.raises(ValueError):
         ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
         migrate_locations(ws, ctx)
-

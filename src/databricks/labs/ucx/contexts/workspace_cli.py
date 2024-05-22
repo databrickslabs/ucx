@@ -183,5 +183,5 @@ class LocalCheckoutContext(WorkspaceContext):
     @cached_property
     def local_files_linter(self):
         return LocalFilesLinter(
-            self.languages, self.file_loader, self.directory_loader, self.path_lookup, self.dependency_resolver
+            self.file_loader, self.directory_loader, self.path_lookup, self.dependency_resolver, lambda: self.languages
         )

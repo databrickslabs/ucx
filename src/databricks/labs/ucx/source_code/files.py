@@ -4,7 +4,6 @@ import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
 
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -22,7 +21,6 @@ from databricks.labs.ucx.source_code.graph import (
     MaybeDependency,
     SourceContainer,
     DependencyResolver,
-    MISSING_SOURCE_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,18 +78,18 @@ class LocalFilesLinter:
 
     def __init__(
         self,
-        languages: Languages,
         file_loader: FileLoader,
         dir_loader: DirectoryLoader,
         path_lookup: PathLookup,
         dependency_resolver: DependencyResolver,
+        languages_factory: Callable[[], Languages],
     ) -> None:
-        self._languages = languages
         self._file_loader = file_loader
         self._dir_loader = dir_loader
         self._path_lookup = path_lookup
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+        self._languages_factory = languages_factory
 
     def lint(self, path: Path) -> list[LocatedAdvice]:
         return list(self._lint(path))
@@ -102,42 +100,27 @@ class LocalFilesLinter:
         graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
-        dependency_problems = container.build_dependency_graph(graph)
-        for dependency_problem in dependency_problems:
-            advice = self._located_advice_from_dependency_problem(dependency_problem)
-            yield advice
+        problems = container.build_dependency_graph(graph)
+        for problem in problems:
+            path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
+            yield LocatedAdvice(path=path, advice=problem.as_advisory())
         for child_path in graph.all_paths:
             yield from self._lint_one(child_path)
-
-    @staticmethod
-    def _located_advice_from_dependency_problem(problem: DependencyProblem):
-        return LocatedAdvice(
-            path=problem.source_path.absolute() if problem.source_path.name != MISSING_SOURCE_PATH else Path('UNKNOWN'),
-            code=problem.code,
-            message=problem.message,
-            start_line=problem.start_line,
-            start_col=problem.start_col,
-            end_line=problem.end_line,
-            end_col=problem.end_col,
-        )
 
     def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
         if path.is_dir():
             return []
-        linter = FileLinter(self._languages, path)
-        advices = linter.lint()
-        return [advice.for_path(path) for advice in advices]
+        languages = self._languages_factory()
+        linter = FileLinter(languages, path)
+        return [advice.for_path(path) for advice in linter.lint()]
 
 
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(
-        self, migration_index: MigrationIndex, languages_factory: Callable[[MigrationIndex], Languages] = Languages
-    ):
-        self._migration_index = migration_index
-        self._languages_factory = languages_factory
+    def __init__(self, languages_factory: Callable[[], Languages]):
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+        self._languages_factory = languages_factory
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
@@ -160,7 +143,7 @@ class LocalFileMigrator:
             return False
         logger.info(f"Analysing {path}")
         # Get the linter for the language
-        languages = self._languages_factory(self._migration_index)
+        languages = self._languages_factory()
         linter = languages.linter(language)
         # Open the file and read the code
         with path.open("r") as f:
