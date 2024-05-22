@@ -564,7 +564,7 @@ def test_revert_dbsql_dashboards(ws, caplog):
 
 def test_lint_local_code(ws):
     path_to_scan = Path(Path(__file__).parent, "source_code", "samples")
-    problems = lint_local_code(ws, path=path_to_scan)
+    problems = lint_local_code(ws, MockPrompts({}), path=path_to_scan.as_posix())
     assert len(problems) > 0
 
 
