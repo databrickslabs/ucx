@@ -73,8 +73,8 @@ class SchemaComparisonResult:
 class DataComparisonResult:
     source_row_count: int
     target_row_count: int
-    num_missing_records_in_target: int
-    num_missing_records_in_source: int
+    num_missing_records_in_target: int = 0
+    num_missing_records_in_source: int = 0
 
     def as_dict(self):
         return dataclasses.asdict(self)
@@ -106,7 +106,12 @@ class SchemaComparator(ABC):
 
 class DataComparator(ABC):
     @abstractmethod
-    def compare_data(self, source: TableIdentifier, target: TableIdentifier) -> DataComparisonResult:
+    def compare_data(
+        self,
+        source: TableIdentifier,
+        target: TableIdentifier,
+        row_comparison: bool,
+    ) -> DataComparisonResult:
         """
         Compare data for two tables
         """

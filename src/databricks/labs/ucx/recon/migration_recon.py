@@ -4,14 +4,17 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 
+from databricks.sdk.errors import DatabricksError
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
+from databricks.labs.ucx.hive_metastore.mapping import TableMapping
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationStatusRefresher
 from databricks.labs.ucx.recon.base import (
     DataComparator,
     SchemaComparator,
     TableIdentifier,
+    DataComparisonResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,13 +34,17 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         sbe: SqlBackend,
         schema: str,
         migration_status_refresher: MigrationStatusRefresher,
+        table_mapping: TableMapping,
         schema_comparator: SchemaComparator,
         data_comparator: DataComparator,
+        default_threshold: float,
     ):
         super().__init__(sbe, "hive_metastore", schema, "recon_result", ReconResult)
         self._migration_status_refresher = migration_status_refresher
+        self._table_mapping = table_mapping
         self._schema_comparator = schema_comparator
         self._data_comparator = data_comparator
+        self._default_threshold = default_threshold
 
     def snapshot(self) -> Iterable[ReconResult]:
         return self._snapshot(self._try_fetch, self._crawl)
@@ -45,6 +52,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
     def _crawl(self) -> Iterable[ReconResult]:
         self._migration_status_refresher.reset()
         migration_index = self._migration_status_refresher.index()
+        migration_rules = self._table_mapping.load()
         tasks = []
         for source in migration_index.snapshot():
             migration_status = migration_index.get(*source)
@@ -62,19 +70,44 @@ class MigrationRecon(CrawlerBase[ReconResult]):
                 migration_status.dst_schema,
                 migration_status.dst_table,
             )
-            tasks.append(partial(self._recon, source_table, target_table))
+            row_comparison = False
+            reconciliation_threshold = self._default_threshold
+            for rule in migration_rules:
+                if rule.match(source_table):
+                    row_comparison = rule.row_comparison
+                    reconciliation_threshold = rule.reconciliation_threshold
+                    break
+            tasks.append(
+                partial(
+                    self._recon,
+                    source_table,
+                    target_table,
+                    row_comparison,
+                    reconciliation_threshold,
+                )
+            )
         recon_result, errors = Threads.gather("Reconciling data", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while reconciling data")
         return recon_result
 
-    def _recon(self, source: TableIdentifier, target: TableIdentifier) -> ReconResult:
-        schema_comparison = self._schema_comparator.compare_schema(source, target)
-        data_comparison = self._data_comparator.compare_data(source, target)
+    def _recon(
+        self,
+        source: TableIdentifier,
+        target: TableIdentifier,
+        row_comparison: bool,
+        reconciliation_threshold: int,
+    ) -> ReconResult | None:
+        try:
+            schema_comparison = self._schema_comparator.compare_schema(source, target)
+            data_comparison = self._data_comparator.compare_data(source, target, row_comparison)
+        except DatabricksError as e:
+            logger.warning(f"Error while comparing {source.fqn_escaped} and {target.fqn_escaped}: {e}")
+            return None
         recon_result = ReconResult(
             schema_comparison.is_matching,
             (
-                data_comparison.source_row_count == data_comparison.target_row_count
+                self._percentage_difference(data_comparison) <= reconciliation_threshold
                 and data_comparison.num_missing_records_in_target == 0
                 and data_comparison.num_missing_records_in_source == 0
             ),
@@ -82,6 +115,16 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             json.dumps(data_comparison.as_dict()),
         )
         return recon_result
+
+    @staticmethod
+    def _percentage_difference(result: DataComparisonResult) -> int:
+        source_row_count = result.source_row_count
+        target_row_count = result.target_row_count
+        if source_row_count == 0 and target_row_count == 0:
+            return 0
+        if source_row_count == 0 and target_row_count > 0:
+            return 100
+        return round(abs(source_row_count - target_row_count) / source_row_count * 100)
 
     def _try_fetch(self) -> Iterable[ReconResult]:
         for row in self._fetch(f"SELECT * FROM {self._schema}.{self._table}"):

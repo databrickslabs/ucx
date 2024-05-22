@@ -435,8 +435,10 @@ class GlobalContext(abc.ABC):
             self.sql_backend,
             self.inventory_database,
             self.migration_status_refresher,
+            self.table_mapping,
             self.schema_comparator,
             self.data_comparator,
+            self.config.reconciliation_threshold,
         )
 
 

@@ -16,6 +16,7 @@ from databricks.labs.ucx.hive_metastore.workflows import (
     MigrateHiveSerdeTablesInPlace,
     MigrateExternalTablesCTAS,
 )
+from databricks.labs.ucx.recon.workflows import MigrationRecon
 from databricks.labs.ucx.source_code.workflows import ExperimentalWorkflowLinter
 from databricks.labs.ucx.workspace_access.workflows import (
     GroupMigration,
@@ -54,6 +55,7 @@ class Workflows:
                 MigrateTablesInMounts(),
                 PermissionsMigrationAPI(),
                 ExperimentalWorkflowLinter(),
+                MigrationRecon(),
                 Failing(),
             ]
         )

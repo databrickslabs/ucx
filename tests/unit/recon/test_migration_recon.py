@@ -1,4 +1,3 @@
-import logging
 from unittest.mock import create_autospec
 
 import pytest
@@ -13,8 +12,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-
-logger = logging.getLogger(__name__)
+from tests.unit import mock_table_mapping
 
 
 @pytest.fixture
@@ -73,8 +71,10 @@ def test_migrate_recon_should_produce_proper_queries(
         backend,
         "inventory_database",
         migration_status_refresher,
+        mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other"]),
         schema_comparator,
         data_comparator,
+        0,
     )
     results = list(migration_recon.snapshot())
     assert len(results) == 1

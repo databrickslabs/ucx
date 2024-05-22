@@ -52,7 +52,12 @@ class StandardDataComparator(DataComparator):
         self._sql_backend = sql_backend
         self._data_profiler = data_profiler
 
-    def compare_data(self, source: TableIdentifier, target: TableIdentifier) -> DataComparisonResult:
+    def compare_data(
+        self,
+        source: TableIdentifier,
+        target: TableIdentifier,
+        row_comparison: bool = False,
+    ) -> DataComparisonResult:
         """
         This method compares the data of two tables. It takes two TableIdentifier objects as input, which represent
         the source and target tables for which the data are to be compared.
@@ -63,6 +68,11 @@ class StandardDataComparator(DataComparator):
         """
         source_data_profile = self._data_profiler.profile_data(source)
         target_data_profile = self._data_profiler.profile_data(target)
+        if row_comparison:
+            return DataComparisonResult(
+                source_row_count=source_data_profile.row_count,
+                target_row_count=target_data_profile.row_count,
+            )
         comparison_query = StandardDataComparator.build_data_comparison_query(
             source_data_profile,
             target_data_profile,
