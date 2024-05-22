@@ -39,6 +39,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
     * [Dependency CLI commands](#dependency-cli-commands)
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
     * [Other considerations](#other-considerations)
+  * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -489,6 +490,17 @@ There are 3 main table migration workflows, targeting different table types. All
   - run the [`create-table-mapping` command](#create-table-mapping-command)
     - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
 
+
+[[back to top](#databricks-labs-ucx)]
+
+## Jobs Static Code Analysis Workflow
+
+> Please note that this is an experimental workflow.
+
+The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
+workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+
+![code compatibility problems](docs/code_compatibility_problems.png)
 
 [[back to top](#databricks-labs-ucx)]
 
