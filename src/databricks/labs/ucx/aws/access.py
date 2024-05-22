@@ -11,6 +11,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 
 from databricks.labs.ucx.assessment.aws import (
@@ -19,6 +20,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSRoleAction,
     logger,
     AWSUCRoleCandidate,
+    AWSCredentialCandidate,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -196,19 +198,24 @@ class AWSResourcePermissions:
             missing_paths.add(external_location.location)
         return missing_paths
 
-    def get_roles_to_migrate(self):
+    def get_roles_to_migrate(self) -> list[AWSCredentialCandidate]:
         """
         Identify the roles that need to be migrated to UC from the UC compatible roles list.
         """
         external_locations = self._locations.snapshot()
         compatible_roles = self.load_uc_compatible_roles()
-        roles = set()
+        roles: dict[str, AWSCredentialCandidate] = {}
         for external_location in external_locations:
             path = PurePath(external_location.location)
             for role in compatible_roles:
-                if path.match(role.resource_path):
-                    roles.add(role)
-        return roles
+                if not path.match(role.resource_path + "/*"):
+                    continue
+                if role.privilege == Privilege.READ_FILES.value and role.role_arn in roles:
+                    roles[role.role_arn].paths.add(external_location.location)
+                    continue
+                roles[role.role_arn] = AWSCredentialCandidate(role_arn=role.role_arn, privilege=role.privilege)
+                roles[role.role_arn].paths.add(external_location.location)
+        return list(roles.values())
 
     def _get_cluster_policy(self, policy_id: str | None) -> Policy:
         if not policy_id:

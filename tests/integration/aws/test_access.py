@@ -11,25 +11,38 @@ from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 
 
 def test_get_uc_compatible_roles(ws, env_or_skip, make_random, aws_cli_ctx):
     resource_permissions = aws_cli_ctx.aws_resource_permissions
-    # compat_roles = resource_permissions.save_uc_compatible_roles()
-    role_access = resource_permissions._get_role_access_task("arn:aws:iam::332745928618:role/serge", "serge")
-    # print(compat_roles)
-    # assert compat_roles
-    print(role_access)
-    assert role_access
+    compat_roles = resource_permissions.save_uc_compatible_roles()
+    print(compat_roles)
+    assert compat_roles
+
+
+def test_get_migrate_credentials(ws, env_or_skip, make_random):
+    ctx = WorkspaceContext(ws)
+    iam_migration = ctx.iam_role_migration
+    roles = iam_migration.run(
+        MockPrompts(
+            {
+                "Do*": "yes",
+            }
+        )
+    )
+    print(roles)
+    assert roles
 
 
 def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, aws_cli_ctx):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     rand = make_random(5).lower()
     sql_backend.save_table(
-        f"{inventory_schema}.external_locations", [ExternalLocation(f"s3://bucket{rand}/FOLDER1", 1)], ExternalLocation
+        f"{inventory_schema}.external_locations",
+        [ExternalLocation(f"s3://bucket{rand}/FOLDER1", 1), ExternalLocation(f"s3://bucket{rand}/FOLDER2", 1)],
     )
     aws = AWSResources(profile)
     role_name = f"UCX_ROLE_{rand}"

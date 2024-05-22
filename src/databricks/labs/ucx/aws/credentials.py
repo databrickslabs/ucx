@@ -13,7 +13,7 @@ from databricks.sdk.service.catalog import (
     AwsIamRoleResponse,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate, AWSCredentialCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 
 logger = logging.getLogger(__name__)
@@ -129,14 +129,15 @@ class IamRoleMigration:
         self._storage_credential_manager = storage_credential_manager
 
     @staticmethod
-    def _print_action_plan(iam_list: list[AWSRoleAction]):
+    def _print_action_plan(iam_list: list[AWSCredentialCandidate]):
         # print action plan to console for customer to review.
         for iam in iam_list:
-            logger.info(f"{iam.role_arn}: {iam.privilege} on {iam.resource_path}")
+            logger.info(f"Credential {iam.role_name} --> {iam.role_arn}: {iam.privilege}")
 
-    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSRoleAction]:
+    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSCredentialCandidate]:
         """
-        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm
+        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm.
+        It returns a list of ARNs
         """
         # load IAM role list
         iam_list = self._resource_permissions.get_roles_to_migrate()
@@ -188,7 +189,9 @@ class IamRoleMigration:
                 self._resource_permissions.update_uc_role_trust_policy(
                     iam.role_name, storage_credential.aws_iam_role.external_id
                 )
-            execution_result.append(self._storage_credential_manager.validate(iam))
+            for path in iam.paths:
+                role_action = AWSRoleAction(iam.role_arn, "s3", path, iam.privilege)
+                execution_result.append(self._storage_credential_manager.validate(role_action))
 
         if execution_result:
             results_file = self.save(execution_result)

@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import typing
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 from databricks.sdk.service.catalog import Privilege
@@ -65,6 +65,18 @@ class AWSInstanceProfile:
         if not role_match:
             logger.error(f"Role ARN is mismatched {self.iam_role_arn}")
             return None
+        return role_match.group(1)
+
+
+@dataclass()
+class AWSCredentialCandidate:
+    role_arn: str
+    privilege: str
+    paths: set[str] = field(default_factory=set)
+
+    @property
+    def role_name(self):
+        role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
         return role_match.group(1)
 
 
