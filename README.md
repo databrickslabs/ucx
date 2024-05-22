@@ -469,7 +469,7 @@ There are 3 main table migration workflows, targeting different table types. All
 
 [[back to top](#databricks-labs-ucx)]
 
-## Workflow Linter Workflow
+## Jobs Static Code Analysis Workflow
 
 Please note that this is an experimental workflow.
 
