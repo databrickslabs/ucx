@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.labs.ucx.source_code.whitelist import Whitelist, WhitelistResolver
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.source_code.languages import Languages
@@ -111,12 +112,10 @@ class FileLoader(DependencyLoader):
 
 class LocalFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, next_resolver: BaseImportResolver | None = None):
-        super().__init__(next_resolver)
+    def __init__(self, file_loader: FileLoader, whitelist: Whitelist):
+        super().__init__()
+        self._whitelist_resolver = WhitelistResolver(whitelist)
         self._file_loader = file_loader
-
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        return LocalFileResolver(self._file_loader, resolver)
 
     def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
         absolute_path = path_lookup.resolve(path)
@@ -126,6 +125,15 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [problem])
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        maybe = self._whitelist_resolver.resolve_import(path_lookup, name)
+        if maybe.dependency is not None or len(maybe.problems) > 0:
+            return maybe
+        maybe = self._resolve_import(path_lookup, name)
+        if maybe.dependency is not None or len(maybe.problems) > 0:
+            return maybe
+        return self._fail('import-not-found', f"Could not locate import: {name}")
+
+    def _resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         if not name:
             return MaybeDependency(None, [DependencyProblem("ucx-bug", "Import name is empty")])
         parts = []
@@ -148,7 +156,11 @@ class LocalFileResolver(BaseImportResolver, BaseFileResolver):
                 continue
             dependency = Dependency(self._file_loader, absolute_path)
             return MaybeDependency(dependency, [])
-        return super().resolve_import(path_lookup, name)
+        return MaybeDependency(None, [])
+
+    @staticmethod
+    def _fail(code: str, message: str):
+        return MaybeDependency(None, [DependencyProblem(code, message)])
 
     def __repr__(self):
         return "LocalFileResolver()"

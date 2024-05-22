@@ -24,12 +24,9 @@ logger = logging.getLogger(__name__)
 
 class WhitelistResolver(BaseImportResolver):
 
-    def __init__(self, whitelist: Whitelist, next_resolver: BaseImportResolver | None = None):
-        super().__init__(next_resolver)
+    def __init__(self, whitelist: Whitelist):
+        super().__init__()
         self._whitelist = whitelist
-
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        return WhitelistResolver(self._whitelist, resolver)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
@@ -43,7 +40,7 @@ class WhitelistResolver(BaseImportResolver):
         if compatibility == UCCompatibility.PARTIAL:
             problem = DependencyProblem("dependency-check", f"Package {name} is only partially supported by UC")
             return MaybeDependency(None, [problem])
-        return super().resolve_import(path_lookup, name)
+        return MaybeDependency(None, [])
 
 
 class StubContainer(SourceContainer):
