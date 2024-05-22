@@ -91,3 +91,15 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
 
     assert len(problems) == 0
     assert graph.path_lookup.resolve(Path("pkgdir")).exists()
+
+
+def test_pip_cell_build_dependency_graph_handles_multiline_code():
+    graph = create_autospec(DependencyGraph)
+
+    code = "%pip install databricks\nmore code defined"
+    cell = PipCell(code)
+
+    problems = cell.build_dependency_graph(graph)
+
+    assert len(problems) == 0
+    graph.register_library.assert_called_once_with("databricks")

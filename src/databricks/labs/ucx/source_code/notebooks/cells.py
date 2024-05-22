@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
@@ -184,7 +185,7 @@ class PipCell(Cell):
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         # TODO: this is very basic code, we need to improve it
-        splits = self.original_code.split(' ')
+        splits = re.split(r" |\n", self.original_code)
         if len(splits) < 3:
             return [DependencyProblem("library-install-failed", f"Missing arguments in '{self.original_code}'")]
         if splits[1] != "install":
