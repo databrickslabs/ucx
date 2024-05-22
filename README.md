@@ -922,6 +922,20 @@ clusters to be UC compatible.
 
 [[back to top](#databricks-labs-ucx)]
 
+## `lint-local-code` command
+
+```text
+databricks labs ucx lint-local-code
+```
+
+Once [table migration](#table-migration-workflow) is complete, you can run this command to 
+assess all migrations required in a local directory or a file. It only takes seconds to run and it
+gives you an initial overview of what needs to be migrated without actually performing any migration.
+
+This command detects all dependencies, and analyzes them. It is still experimental and at the moment only supports Python and SQL files.
+On the `ucx` code base, it takes only a few seconds to run. It should take even less with your code base. 
+Future versions of `ucx` will add support for more source types, and more migration details.
+
 ## `migrate-local-code` command
 
 ```text
