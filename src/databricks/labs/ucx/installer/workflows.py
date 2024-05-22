@@ -52,6 +52,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
 
+JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -555,13 +556,21 @@ class WorkflowsDeployment(InstallationMixin):
         return settings
 
     def _job_settings(self, step_name: str, remote_wheel: str):
+        def get_purge_time() -> str:
+            return (datetime.utcnow() + JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+
         email_notifications = None
+        remove_after_tag = {}
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
+        else:
+            # add RemoveAfter tag for test job cleanup
+            date_to_remove = get_purge_time()
+            remove_after_tag = {"RemoveAfter": date_to_remove}
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
         for task in self._tasks:
@@ -576,7 +585,7 @@ class WorkflowsDeployment(InstallationMixin):
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         return {
             "name": self._name(step_name),
-            "tags": {"version": f"v{version}"},
+            "tags": {"version": f"v{version}", **remove_after_tag},
             "job_clusters": self._job_clusters(job_clusters),
             "email_notifications": email_notifications,
             "tasks": job_tasks,
