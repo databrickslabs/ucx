@@ -567,7 +567,7 @@ class WorkflowsDeployment(InstallationMixin):
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
-        else:
+        if self._is_testing():
             # add RemoveAfter tag for test job cleanup
             date_to_remove = get_purge_time()
             remove_after_tag = {"RemoveAfter": date_to_remove}
