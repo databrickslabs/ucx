@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ReconResult:
+    src_schema: str
+    src_table: str
+    dst_catalog: str
+    dst_schema: str
+    dst_table: str
     schema_matches: bool
     data_matches: bool
     schema_comparison: str
@@ -105,6 +110,11 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             logger.warning(f"Error while comparing {source.fqn_escaped} and {target.fqn_escaped}: {e}")
             return None
         recon_result = ReconResult(
+            source.schema,
+            source.table,
+            target.catalog,
+            target.schema,
+            target.table,
             schema_comparison.is_matching,
             (
                 self._percentage_difference(data_comparison) <= reconciliation_threshold

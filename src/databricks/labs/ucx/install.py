@@ -61,6 +61,7 @@ from databricks.labs.ucx.installer.logs import LogRecord
 from databricks.labs.ucx.installer.mixins import InstallationMixin
 from databricks.labs.ucx.installer.policy import ClusterPolicyInstaller
 from databricks.labs.ucx.installer.workflows import WorkflowsDeployment
+from databricks.labs.ucx.recon.migration_recon import ReconResult
 from databricks.labs.ucx.runtime import Workflows
 from databricks.labs.ucx.source_code.jobs import JobProblem
 from databricks.labs.ucx.workspace_access.base import Permissions
@@ -105,6 +106,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workflow_problems", JobProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
+            functools.partial(table, "recon_result", ReconResult),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
@@ -112,6 +114,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
     deployer.deploy_view("misc_patterns", "queries/views/misc_patterns.sql")
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
+    deployer.deploy_view("reconciliation_results", "queries/views/reconciliation_results.sql")
 
 
 def extract_major_minor(version_string):
@@ -214,6 +217,9 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
+        reconciliation_threshold = int(
+            self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)
+        )
         return WorkspaceConfig(
             inventory_database=inventory_database,
             workspace_group_regex=configure_groups.workspace_group_regex,
@@ -226,6 +232,7 @@ class WorkspaceInstaller(WorkspaceContext):
             num_threads=num_threads,
             include_databases=include_databases,
             trigger_job=trigger_job,
+            reconciliation_threshold=reconciliation_threshold,
         )
 
     def _compare_remote_local_versions(self):
