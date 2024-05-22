@@ -11,6 +11,7 @@ from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -281,7 +282,10 @@ class GlobalContext(abc.ABC):
     def principal_locations(self):
         eligible_locations = {}
         if self.is_azure:
-            eligible_locations = self.azure_acl.get_eligible_locations_principals()
+            try:
+                eligible_locations = self.azure_acl.get_eligible_locations_principals()
+            except ResourceDoesNotExist as e:
+                pass
         if self.is_aws:
             eligible_locations = self.aws_acl.get_eligible_locations_principals()
         if self.is_gcp:
