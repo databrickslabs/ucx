@@ -168,27 +168,19 @@ class IamRoleMigration:
             return []
 
         execution_result = []
-        new_credentials = {}
         for iam in iam_list:
-            if iam.role_arn not in new_credentials:
-                credential = StorageCredentialInfo(
-                    name=iam.role_name,
-                    aws_iam_role=AwsIamRoleResponse(role_arn=iam.role_arn),
-                    read_only=iam.privilege == Privilege.READ_FILES.value,
-                )
-                new_credentials[iam.role_arn] = credential
-            else:
-                credential = new_credentials[iam.role_arn]
-                if credential.read_only is True and iam.privilege == Privilege.WRITE_FILES.value:
-                    credential.read_only = False
-            for credential in new_credentials.values():
-                storage_credential = self._storage_credential_manager.create(credential)
-                if storage_credential.aws_iam_role is None:
-                    logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
-                    continue
-                self._resource_permissions.update_uc_role_trust_policy(
-                    iam.role_name, storage_credential.aws_iam_role.external_id
-                )
+            credential = StorageCredentialInfo(
+                name=iam.role_name,
+                aws_iam_role=AwsIamRoleResponse(role_arn=iam.role_arn),
+                read_only=iam.privilege == Privilege.READ_FILES.value,
+            )
+            storage_credential = self._storage_credential_manager.create(credential)
+            if storage_credential.aws_iam_role is None:
+                logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
+                continue
+            self._resource_permissions.update_uc_role_trust_policy(
+                iam.role_name, storage_credential.aws_iam_role.external_id
+            )
             for path in iam.paths:
                 role_action = AWSRoleAction(iam.role_arn, "s3", path, iam.privilege)
                 execution_result.append(self._storage_credential_manager.validate(role_action))
