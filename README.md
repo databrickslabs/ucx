@@ -474,7 +474,7 @@ There are 3 main table migration workflows, targeting different table types. All
 Please note that this is an experimental workflow.
 
 The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
-workspace. The linting emits problems telling what needs to be resolved to make the code Unity Catalog compatible.
+workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
 
 [[back to top](#databricks-labs-ucx)]
 
