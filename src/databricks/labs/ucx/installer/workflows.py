@@ -52,7 +52,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
 
-JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)
+TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -441,8 +441,8 @@ class WorkflowsDeployment(InstallationMixin):
         return self._product_info.product_name() != "ucx"
 
     @staticmethod
-    def _get_purge_time() -> str:
-        return (datetime.utcnow() + JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+    def _get_test_purge_time() -> str:
+        return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
 
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
@@ -561,7 +561,6 @@ class WorkflowsDeployment(InstallationMixin):
 
     def _job_settings(self, step_name: str, remote_wheel: str):
 
-
         email_notifications = None
         remove_after_tag = {}
         if not self._config.override_clusters and "@" in self._my_username:
@@ -572,7 +571,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         if self._is_testing():
             # add RemoveAfter tag for test job cleanup
-            date_to_remove = self._get_purge_time()
+            date_to_remove = self._get_test_purge_time()
             remove_after_tag = {"RemoveAfter": date_to_remove}
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
