@@ -284,7 +284,7 @@ class GlobalContext(abc.ABC):
         if self.is_azure:
             try:
                 eligible_locations = self.azure_acl.get_eligible_locations_principals()
-            except ResourceDoesNotExist as e:
+            except ResourceDoesNotExist:
                 pass
         if self.is_aws:
             eligible_locations = self.aws_acl.get_eligible_locations_principals()

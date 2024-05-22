@@ -492,6 +492,7 @@ def lint_local_code(
         # so sticking to file path only for now
         link = escape_mask.format("", f"file://{advice.path}", advice.path)
         print(f"Issue with file: {link} -> {advice.advice.__repr__()}")
+    return located_advices
 
 
 if __name__ == "__main__":
