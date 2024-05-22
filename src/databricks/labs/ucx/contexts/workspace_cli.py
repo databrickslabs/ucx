@@ -8,14 +8,14 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.assessment.aws import run_command, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.credentials import IamRoleMigration, IamRoleCreation
+from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
 from databricks.labs.ucx.azure.credentials import StorageCredentialManager, ServicePrincipalMigration
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
-from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
-from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFilesLinter
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
 
