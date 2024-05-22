@@ -562,7 +562,6 @@ class WorkflowsDeployment(InstallationMixin):
     def _job_settings(self, step_name: str, remote_wheel: str):
 
         email_notifications = None
-        remove_after_tag = {}
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
             # installation and not the integration test.
