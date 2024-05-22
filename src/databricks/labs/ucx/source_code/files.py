@@ -63,11 +63,8 @@ class LocalDirectory(SourceContainer):
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
-            if child_path.is_dir():
-                dependency = Dependency(self._dir_loader, child_path)
-                yield from parent.register_dependency(dependency).problems
-                continue
-            dependency = Dependency(self._file_loader, child_path)
+            loader = self._dir_loader if child_path.is_dir() else self._file_loader
+            dependency = Dependency(loader, child_path)
             yield from parent.register_dependency(dependency).problems
 
     def __repr__(self):
@@ -173,7 +170,7 @@ class FileLoader(DependencyLoader):
         if not absolute_path:
             return None
         # for now we only support python
-        if not absolute_path.as_posix().endswith(".py"):
+        if not absolute_path.suffix == ".py":
             return None
         for encoding in ("utf-8", "ascii"):
             try:
