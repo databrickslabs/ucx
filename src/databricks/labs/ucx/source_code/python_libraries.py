@@ -59,15 +59,11 @@ class PipResolver(BaseLibraryResolver):
     def _locate_dist_info(self, library_path: Path, library: Path) -> Path | None:
         if not library_path.parent.exists():
             return None
-        packages = library_path.parent.iterdir()
-        dist_info_dir = next(
-            (
-                package
-                for package in packages
-                if package.name.startswith(library.name) and package.name.endswith(".dist-info")
-            ),
-            None,
-        )
+        dist_info_dir = None
+        for package in library_path.parent.iterdir():
+            if package.name.startswith(library.name) and package.name.endswith(".dist-info"):
+                dist_info_dir = package
+                break  # TODO: Matching multiple .dist-info's, https://github.com/databrickslabs/ucx/issues/1751
         if dist_info_dir is not None:
             return dist_info_dir
         # maybe the name needs tweaking
