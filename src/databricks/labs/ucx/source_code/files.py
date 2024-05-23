@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, ExtensionsHelper
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
@@ -37,10 +37,13 @@ class LocalFile(SourceContainer):
         self._language = CellLanguage.of_language(language)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is not CellLanguage.PYTHON:
-            logger.warning(f"Unsupported language: {self._language.language}")
+        if self._language is CellLanguage.PYTHON:
+            return parent.build_graph_from_python_source(self._original_code)
+        # supported language that does not generate dependencies
+        if self._language is CellLanguage.SQL:
             return []
-        return parent.build_graph_from_python_source(self._original_code)
+        logger.warning(f"Unsupported language: {self._language.language}")
+        return []
 
     @property
     def path(self) -> Path:
@@ -62,7 +65,7 @@ class LocalDirectory(SourceContainer):
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         # don't directly scan non-source directories, let it be done for relevant imports only
-        if self._path.name in {"__pycache__", ".git", ".github", ".venv", "site-packages"}:
+        if self._path.name in {"__pycache__", ".git", ".github", ".venv", ".mypy_cache", "site-packages"}:
             return []
         return list(self._build_dependency_graph(parent))
 
@@ -103,13 +106,11 @@ class LocalCodeLinter:
             )
             path = Path(response)
         located_advices = list(self._lint(path))
-        for advice in located_advices:
-            # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST
-            escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
-            # can't find a way to create for files a supported GH-like link with line number
-            # so sticking to file path only for now
-            link = escape_mask.format("", f"file://{advice.path}", advice.path)
-            sys.stdout.writelines(f"Issue with file: {link} -> {repr(advice.advice)}\n")
+        for located in located_advices:
+            advice_path = located.path.relative_to(path)
+            advice = located.advice
+            message = f"{advice_path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}\n"
+            sys.stdout.write(message)
         return located_advices
 
     def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
@@ -185,18 +186,28 @@ class LocalFileMigrator:
                 return True
 
 
+class StubContainer(SourceContainer):
+
+    def __init__(self, path: Path):
+        super().__init__()
+        self._path = path
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return []
+
+
 class FileLoader(DependencyLoader):
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        # for now we only support python
-        if not absolute_path.suffix == ".py":
-            return None
+        language = ExtensionsHelper.SUPPORTED_SUFFIXES.get(absolute_path.suffix.lower())
+        if not language:
+            return StubContainer(absolute_path)
         for encoding in ("utf-8", "ascii"):
             try:
                 code = absolute_path.read_text(encoding)
-                return LocalFile(absolute_path, code, Language.PYTHON)
+                return LocalFile(absolute_path, code, language)
             except UnicodeDecodeError:
                 pass
         return None
