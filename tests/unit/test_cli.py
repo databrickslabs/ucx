@@ -1,7 +1,6 @@
 import io
 import json
 import time
-from pathlib import Path
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -48,7 +47,6 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
-    lint_local_code,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -560,12 +558,6 @@ def test_migrate_dbsql_dashboards(ws, caplog):
 def test_revert_dbsql_dashboards(ws, caplog):
     revert_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
-
-
-def test_lint_local_code(ws):
-    path_to_scan = Path(Path(__file__).parent, "source_code", "samples")
-    problems = lint_local_code(ws, MockPrompts({}), path=path_to_scan.as_posix())
-    assert len(problems) > 0
 
 
 def test_cli_missing_awscli(ws, mocker, caplog):
