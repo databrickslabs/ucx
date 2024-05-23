@@ -25,6 +25,13 @@ def test_pip_resolver_does_not_resolve_unknown_library(mock_path_lookup):
     assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
 
 
+def test_pip_resolver_locates_dist_info_without_parent(mock_path_lookup):
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    path = pip_resolver._locate_dist_info(Path("/non/existing/path/to/library"), Path("library"))
+
+    assert path is None
+
+
 def test_dist_info_package_parses_installed_package_with_toplevel():
     site_packages_path = locate_site_packages()
     astroid_path = Path(site_packages_path, "astroid-3.1.0.dist-info")
