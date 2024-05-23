@@ -57,7 +57,7 @@ class Advice:
         return Convention(**self.__dict__)
 
     def for_path(self, path: Path) -> LocatedAdvice:
-        return LocatedAdvice(path=path, advice=self)
+        return LocatedAdvice(self, path)
 
 
 @dataclass
