@@ -1,6 +1,8 @@
 from pathlib import Path
+from unittest.mock import create_autospec
 
 from databricks.labs.ucx.source_code.files import FileLoader
+from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import DistInfoPackage, PipResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -23,6 +25,18 @@ def test_pip_resolver_does_not_resolve_unknown_library(mock_path_lookup):
     assert maybe.problems[0].code == "library-install-failed"
     assert maybe.problems[0].message.startswith("Failed to install unknown-library-name")
     assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
+
+
+def test_pip_resolver_locates_dist_info_without_parent():
+    mock_path_lookup = create_autospec(PathLookup)
+    mock_path_lookup.resolve.return_value = Path("/non/existing/path/")
+
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    maybe = pip_resolver.resolve_library(mock_path_lookup, Path("library"))
+
+    assert len(maybe.problems) == 1
+    assert maybe.problems[0] == DependencyProblem("no-dist-info", "No dist-info found for library")
+    mock_path_lookup.resolve.assert_called_once()
 
 
 def test_dist_info_package_parses_installed_package_with_toplevel():
