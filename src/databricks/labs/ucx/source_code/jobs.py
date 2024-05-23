@@ -1,5 +1,6 @@
 import functools
 import logging
+import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +10,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
@@ -86,8 +88,7 @@ class WorkflowTaskContainer(SourceContainer):
         for library in self._task.libraries:
             yield from self._register_library(graph, library)
 
-    @staticmethod
-    def _register_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
+    def _register_library(self, graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
             problems = graph.register_library(library.pypi.package)
             if problems:
@@ -100,9 +101,11 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
             yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
         if library.requirements:
-            # TODO: download and add every entry via graph.register_library
-            # TODO: https://github.com/databrickslabs/ucx/issues/1644
-            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+            with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
+                with tempfile.TemporaryDirectory() as directory:
+                    local_file = Path(directory) / Path(library.requirements).name
+                    local_file.write_bytes(remote_file.read())
+                    yield from graph.register_library(local_file.as_posix())
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
