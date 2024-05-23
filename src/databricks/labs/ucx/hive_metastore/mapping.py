@@ -52,7 +52,7 @@ class Rule:
             dst_schema=str(dst_schema.name or ""),
             src_table=str(src_table.name or ""),
             dst_table=str(src_table.name or ""),
-            recon_tolerance_percent=5,
+            recon_tolerance_percent=0,
         )
 
     def match(self, table: TableIdentifier) -> bool:
