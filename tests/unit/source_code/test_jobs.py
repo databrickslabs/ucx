@@ -1,4 +1,5 @@
 import logging
+import io
 from pathlib import Path
 from unittest.mock import create_autospec
 
@@ -114,3 +115,20 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
         linter.lint_job(1234)
 
     assert any(message.startswith(expected_message) for message in caplog.messages)
+
+
+def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"test")
+
+    libraries = [compute.Library(requirements="requirements.txt")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install")
+    assert mock_path_lookup.resolve(Path("test")) is None
+    ws.assert_not_called()
