@@ -103,7 +103,8 @@ class WorkflowTaskContainer(SourceContainer):
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
             logger.info(f"Registering libraries from {library.requirements}")
             with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
-                for requirement in StringIO(remote_file.read().decode()).readlines():
+                contents = remote_file.read().decode()
+                for requirement in contents.splitlines():
                     clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
                     if clean_requirement.startswith("-r"):
                         logger.warning(f"References to other requirements file is not supported: {requirement}")
