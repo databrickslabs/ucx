@@ -10,8 +10,9 @@ from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
 from databricks.labs.ucx.framework.tasks import Task, Workflow, parse_args
 from databricks.labs.ucx.installer.logs import TaskLogger
 from databricks.labs.ucx.hive_metastore.workflows import (
-    MigrateTablesInMounts,
+    ScanTablesInMounts,
     TableMigration,
+    MigrateTablesInMounts,
     MigrateHiveSerdeTablesInPlace,
     MigrateExternalTablesCTAS,
 )
@@ -49,6 +50,7 @@ class Workflows:
                 MigrateExternalTablesCTAS(),
                 ValidateGroupPermissions(),
                 RemoveWorkspaceLocalGroups(),
+                ScanTablesInMounts(),
                 MigrateTablesInMounts(),
                 PermissionsMigrationAPI(),
                 ExperimentalWorkflowLinter(),

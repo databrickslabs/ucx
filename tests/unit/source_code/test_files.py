@@ -89,8 +89,7 @@ def test_files_walks_directory():
 
 
 def test_triple_dot_import():
-    file_loader = FileLoader()
-    file_resolver = LocalFileResolver(file_loader)
+    file_resolver = ImportFileResolver(FileLoader(), Whitelist())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/foo.py')
@@ -102,8 +101,7 @@ def test_triple_dot_import():
 
 
 def test_single_dot_import():
-    file_loader = FileLoader()
-    file_resolver = LocalFileResolver(file_loader)
+    file_resolver = ImportFileResolver(FileLoader(), Whitelist())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')

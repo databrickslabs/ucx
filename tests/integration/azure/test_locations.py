@@ -257,7 +257,6 @@ def test_run_validate_acl(make_cluster_permissions, ws, make_user, make_cluster,
         )
 
 
-@pytest.mark.skip("Waiting for change to use access connector in integration tests")
 def test_run_external_locations_using_access_connector(
     clean_storage_credentials,
     clean_external_locations,
@@ -270,8 +269,7 @@ def test_run_external_locations_using_access_connector(
     # Mocking in an integration test because Azure resource can not be created
     resource_permissions = create_autospec(AzureResourcePermissions)
 
-    # TODO: Remove the replace after 20-05-2024
-    access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR").replace("-external", ""))
+    access_connector_id = AzureResource(env_or_skip("TEST_ACCESS_CONNECTOR"))
     mount = env_or_skip("TEST_MOUNT_CONTAINER")
     storage_account_name = urlparse(mount).hostname.removesuffix(".dfs.core.windows.net")
     access_connector = AccessConnector(
@@ -308,7 +306,7 @@ def test_run_external_locations_using_access_connector(
     )
 
     az_cli_ctx.service_principal_migration.run(prompts)  # Create storage credential for above access connector
-    az_cli_ctx.azure_external_locations_migration.run()  # Create external location using storage credential
+    az_cli_ctx.external_locations_migration.run()  # Create external location using storage credential
 
     all_external_locations = az_cli_ctx.workspace_client.external_locations.list()
     assert len([loc for loc in all_external_locations if loc.url == external_location.location]) > 0

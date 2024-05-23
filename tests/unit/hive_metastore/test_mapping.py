@@ -10,8 +10,12 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.errors.platform import ResourceConflict
 from databricks.sdk.service.catalog import TableInfo
 
+from databricks.labs.ucx.hive_metastore.mapping import (
+    Rule,
+    TableMapping,
+    TableToMigrate,
+)
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
-from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import Table, TablesCrawler
 
 MANAGED_DELTA_TABLE = Table(
@@ -638,6 +642,143 @@ def test_is_target_exists():
     )
     assert not table_mapping.exists_in_uc(src_table, "cat1.schema1.dest1")
     assert table_mapping.exists_in_uc(src_table, "cat1.schema2.dest2")
+
+
+def test_tables_in_mounts():
+    client = create_autospec(WorkspaceClient)
+    client.workspace.download.return_value = io.BytesIO(
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "fake_ws,cat1,schema1,schema1,table1,dest1\r\n".encode("utf8")
+    )
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    tables_crawler.snapshot.return_value = []
+    table_mapping.get_tables_to_migrate(tables_crawler)
+
+    assert ["DESCRIBE SCHEMA EXTENDED schema1"] == backend.queries
+
+
+def test_mapping_table_in_mount():
+    client = create_autospec(WorkspaceClient)
+    client.workspace.download.return_value = io.BytesIO(
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "prod_ws,cat1,mounted_dlk,schema1,abfss://bucket@msft/path/dest1,dest1\r\n".encode("utf8")
+    )
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client.tables.get.side_effect = NotFound()
+    client.catalogs.list.return_value = []
+    client.schemas.list.return_value = []
+    client.tables.list.return_value = []
+
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    src_table = Table(
+        object_type="EXTERNAL",
+        table_format="DELTA",
+        catalog="hive_metastore",
+        database="mounted_dlk",
+        name="table1",
+        location="abfss://bucket@msft/path/dest1",
+    )
+    tables_crawler.snapshot.return_value = [
+        src_table,
+    ]
+    tables = table_mapping.get_tables_to_migrate(tables_crawler)
+    assert "SHOW TBLPROPERTIES delta.`abfss://bucket@msft/path/dest1`" in backend.queries
+    assert tables == [
+        TableToMigrate(
+            src=src_table,
+            rule=Rule(
+                workspace_name='prod_ws',
+                catalog_name='cat1',
+                src_schema='mounted_dlk',
+                dst_schema='schema1',
+                src_table='abfss://bucket@msft/path/dest1',
+                dst_table='dest1',
+            ),
+        )
+    ]
+
+
+def test_mapping_table_in_mount_exists_in_uc_with_properties():
+    client = create_autospec(WorkspaceClient)
+    client.workspace.download.return_value = io.BytesIO(
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "prod_ws,cat1,mounted_dlk,schema1,abfss://bucket@msft/path/dest1,dest1\r\n".encode("utf8")
+    )
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client.tables.get.side_effect = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="dest1",
+            full_name="cat1.schema1.test_table1",
+            storage_location="abfss://bucket@msft/path/dest1",
+        ),
+    ]
+
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    src_table = Table(
+        object_type="EXTERNAL",
+        table_format="DELTA",
+        catalog="hive_metastore",
+        database="mounted_dlk",
+        name="table1",
+        location="abfss://bucket@msft/path/dest1",
+    )
+    tables_crawler.snapshot.return_value = [src_table]
+    tables = table_mapping.get_tables_to_migrate(tables_crawler)
+    assert not tables
+
+
+def test_mapping_table_in_mount_exists_in_uc_with_bad_properties():
+    client = create_autospec(WorkspaceClient)
+    client.workspace.download.return_value = io.BytesIO(
+        "workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table\r\n"
+        "prod_ws,cat1,mounted_dlk,schema1,abfss://bucket@msft/path/dest1,dest1\r\n".encode("utf8")
+    )
+    errors = {}
+    rows = {}
+    backend = MockBackend(fails_on_first=errors, rows=rows)
+    client.tables.get.side_effect = [
+        TableInfo(
+            catalog_name="cat1",
+            schema_name="schema1",
+            name="dest1",
+            full_name="cat1.schema1.test_table1",
+            storage_location="abfss://bucket@msft/path/dest34",
+        ),
+    ]
+
+    installation = Installation(client, "ucx")
+    table_mapping = TableMapping(installation, client, backend)
+    tables_crawler = create_autospec(TablesCrawler)
+    src_table = Table(
+        object_type="EXTERNAL",
+        table_format="DELTA",
+        catalog="hive_metastore",
+        database="mounted_dlk",
+        name="table1",
+        location="abfss://bucket@msft/path/dest1",
+    )
+    tables_crawler.snapshot.return_value = [src_table]
+    with pytest.raises(ResourceConflict):
+        try:
+            table_mapping.get_tables_to_migrate(tables_crawler)
+        except ManyError as e:
+            assert len(e.errs) == 1
+            raise e.errs[0]
 
 
 def test_mapping_broken_table(caplog):

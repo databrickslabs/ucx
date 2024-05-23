@@ -279,21 +279,9 @@ class BaseNotebookResolver(abc.ABC):
 
 class BaseImportResolver(abc.ABC):
 
-    def __init__(self, next_resolver: BaseImportResolver | None):
-        self._next_resolver = next_resolver
-
     @abc.abstractmethod
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        """required to create a linked list of resolvers"""
-
-    @property
-    def next_resolver(self):
-        return self._next_resolver
-
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        # TODO: remove StubResolver and return MaybeDependency(None, [...])
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_import(path_lookup, name)
+        """resolve a simple or composite import name"""
 
 
 class BaseFileResolver(abc.ABC):
@@ -319,22 +307,6 @@ class StubLibraryResolver(BaseLibraryResolver):
         return MaybeDependency(None, [DependencyProblem(code, message)])
 
 
-class StubImportResolver(BaseImportResolver):
-
-    def __init__(self):
-        super().__init__(None)
-
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        raise NotImplementedError("Should never happen!")
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        return self._fail('import-not-found', f"Could not locate import: {name}")
-
-    @staticmethod
-    def _fail(code: str, message: str):
-        return MaybeDependency(None, [DependencyProblem(code, message)])
-
-
 @dataclass
 class MaybeDependency:
     dependency: Dependency | None
@@ -353,26 +325,18 @@ class DependencyResolver:
         self,
         library_resolvers: list[BaseLibraryResolver],
         notebook_resolver: BaseNotebookResolver,
-        import_resolvers: list[BaseImportResolver],
+        import_resolver: BaseImportResolver,
         path_lookup: PathLookup,
     ):
         self._library_resolver = self._chain_library_resolvers(library_resolvers)
         self._notebook_resolver = notebook_resolver
-        self._import_resolver = self._chain_import_resolvers(import_resolvers)
+        self._import_resolver = import_resolver
         self._path_lookup = path_lookup
 
     @staticmethod
     def _chain_library_resolvers(library_resolvers: list[BaseLibraryResolver]) -> BaseLibraryResolver:
         previous: BaseLibraryResolver = StubLibraryResolver()
         for resolver in library_resolvers:
-            resolver = resolver.with_next_resolver(previous)
-            previous = resolver
-        return previous
-
-    @staticmethod
-    def _chain_import_resolvers(import_resolvers: list[BaseImportResolver]) -> BaseImportResolver:
-        previous: BaseImportResolver = StubImportResolver()
-        for resolver in import_resolvers:
             resolver = resolver.with_next_resolver(previous)
             previous = resolver
         return previous
@@ -408,11 +372,8 @@ class DependencyResolver:
 
     @property
     def _local_file_resolver(self) -> BaseFileResolver | None:
-        resolver = self._import_resolver
-        while resolver is not None:
-            if isinstance(resolver, BaseFileResolver):
-                return resolver
-            resolver = resolver.next_resolver
+        if isinstance(self._import_resolver, BaseFileResolver):
+            return self._import_resolver
         return None
 
     def build_notebook_dependency_graph(self, path: Path) -> MaybeGraph:

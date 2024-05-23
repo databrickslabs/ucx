@@ -9,41 +9,14 @@ from collections.abc import Iterable
 
 from yaml import load_all as load_yaml, Loader
 
-from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 from databricks.labs.ucx.source_code.graph import (
-    BaseImportResolver,
     DependencyGraph,
     DependencyProblem,
-    MaybeDependency,
     SourceContainer,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class WhitelistResolver(BaseImportResolver):
-
-    def __init__(self, whitelist: Whitelist, next_resolver: BaseImportResolver | None = None):
-        super().__init__(next_resolver)
-        self._whitelist = whitelist
-
-    def with_next_resolver(self, resolver: BaseImportResolver) -> BaseImportResolver:
-        return WhitelistResolver(self._whitelist, resolver)
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
-        compatibility = self._whitelist.compatibility(name)
-        if compatibility == UCCompatibility.FULL:
-            return MaybeDependency(None, [])
-        if compatibility == UCCompatibility.NONE:
-            # TODO move to linter, see https://github.com/databrickslabs/ucx/issues/1527
-            problem = DependencyProblem("dependency-check", f"Use of dependency {name} is deprecated")
-            return MaybeDependency(None, [problem])
-        if compatibility == UCCompatibility.PARTIAL:
-            problem = DependencyProblem("dependency-check", f"Package {name} is only partially supported by UC")
-            return MaybeDependency(None, [problem])
-        return super().resolve_import(path_lookup, name)
 
 
 class StubContainer(SourceContainer):

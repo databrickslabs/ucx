@@ -179,9 +179,9 @@ class MigrateExternalTablesCTAS(Workflow):
         dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
-class MigrateTablesInMounts(Workflow):
+class ScanTablesInMounts(Workflow):
     def __init__(self):
-        super().__init__('migrate-tables-in-mounts-experimental')
+        super().__init__('scan-tables-in-mounts-experimental')
 
     @job_task
     def scan_tables_in_mounts_experimental(self, ctx: RuntimeContext):
@@ -191,6 +191,26 @@ class MigrateTablesInMounts(Workflow):
         ctx.tables_in_mounts.snapshot()
 
     @job_task(job_cluster="table_migration", depends_on=[scan_tables_in_mounts_experimental])
+    def refresh_migration_status(self, ctx: RuntimeContext):
+        """Refresh the migration status to present it in the dashboard."""
+        ctx.tables_migrator.index_full_refresh()
+
+    @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
+    def migration_report(self, ctx: RuntimeContext):
+        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
+        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
+
+
+class MigrateTablesInMounts(Workflow):
+    def __init__(self):
+        super().__init__('migrate-tables-in-mounts-experimental')
+
+    @job_task(job_cluster="table_migration", depends_on=[ScanTablesInMounts.scan_tables_in_mounts_experimental])
+    def migrate_tables_in_mounts_experimental(self, ctx: RuntimeContext):
+        """[EXPERIMENTAL] This workflow migrates `delta tables stored in mount points` to Unity Catalog using a Create Table statement."""
+        ctx.tables_migrator.migrate_tables(what=What.TABLE_IN_MOUNT)
+
+    @job_task(job_cluster="table_migration", depends_on=[migrate_tables_in_mounts_experimental])
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
