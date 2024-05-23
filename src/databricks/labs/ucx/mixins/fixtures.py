@@ -721,11 +721,14 @@ def make_cluster(ws, make_random):
         if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
 
+        if "custom_tags" not in kwargs:
+            kwargs["custom_tags"] = {"RemoveAfter": get_test_purge_time()}
+        else:
+            kwargs["custom_tags"]["RemoveAfter"] = get_test_purge_time()
         return ws.clusters.create(
             cluster_name=cluster_name,
             spark_version=spark_version,
             autotermination_minutes=autotermination_minutes,
-            custom_tags={"RemoveAfter": get_test_purge_time()},
             **kwargs,
         )
 
