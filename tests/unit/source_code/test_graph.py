@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, StubLibraryResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
@@ -14,7 +14,7 @@ def test_dependency_graph_registers_library(mock_path_lookup):
     dependency_resolver = DependencyResolver(
         [PipResolver(file_loader, whitelist)],
         NotebookResolver(NotebookLoader()),
-        LocalFileResolver(file_loader, whitelist),
+        ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
     )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)

@@ -40,7 +40,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -383,7 +383,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def file_resolver(self):
-        return LocalFileResolver(self.file_loader, self.whitelist)
+        return ImportFileResolver(self.file_loader, self.whitelist)
 
     @cached_property
     def dependency_resolver(self):

@@ -110,7 +110,7 @@ class FileLoader(DependencyLoader):
         return "FileLoader()"
 
 
-class LocalFileResolver(BaseImportResolver, BaseFileResolver):
+class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
     def __init__(self, file_loader: FileLoader, whitelist: Whitelist):
         super().__init__()

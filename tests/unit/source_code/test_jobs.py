@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
 
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
@@ -31,7 +31,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     resolver = DependencyResolver(
         [PipResolver(file_loader, whitelist)],
         NotebookResolver(NotebookLoader()),
-        LocalFileResolver(file_loader, whitelist),
+        ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
     )
     return resolver

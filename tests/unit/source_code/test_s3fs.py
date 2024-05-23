@@ -6,7 +6,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     DependencyProblem,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
@@ -116,7 +116,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = LocalFileResolver(file_loader, whitelist)
+    import_resolver = ImportFileResolver(file_loader, whitelist)
     dependency_resolver = DependencyResolver([], notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
@@ -144,7 +144,7 @@ def test_detect_s3fs_import_in_dependencies(
     yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     file_loader = FileLoader()
     whitelist = Whitelist.parse(yml.read_text(), use_defaults=True)
-    import_resolver = LocalFileResolver(file_loader, whitelist)
+    import_resolver = ImportFileResolver(file_loader, whitelist)
     dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolver, mock_path_lookup)
     sample = mock_path_lookup.cwd / "root9.py"
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
