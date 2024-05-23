@@ -975,7 +975,9 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
             name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
         sql_backend.execute(f"CREATE SCHEMA {full_name}")
-        schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
+        remove_after_property = {"RemoveAfter": get_test_purge_time()}
+        schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name,
+                                 properties=remove_after_property)
         logger.info(
             f"Schema {schema_info.full_name}: "
             f"{ws.config.host}/explore/data/{schema_info.catalog_name}/{schema_info.name}"
@@ -1063,8 +1065,12 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
-            str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
-            ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
+            tbl_properties.update({"RemoveAfter": get_test_purge_time()})
+        else:
+            tbl_properties = {"RemoveAfter": get_test_purge_time()}
+
+        str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+        ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
         if hiveserde_ddl:
             ddl = hiveserde_ddl
