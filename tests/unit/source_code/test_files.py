@@ -3,8 +3,8 @@ from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
 import pytest
-from databricks.labs.blueprint.tui import Prompts
-from databricks.labs.ucx.source_code.graph import DependencyResolver
+from databricks.labs.blueprint.tui import Prompts, MockPrompts
+from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -18,74 +18,93 @@ from databricks.labs.ucx.source_code.files import (
     LocalCodeLinter,
     FolderLoader,
     ImportFileResolver,
+    Folder,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from tests.unit import locate_site_packages
+from tests.unit import locate_site_packages, _samples_path
 
 
-def test_files_fix_ignores_unsupported_extensions():
+def test_migrator_fix_ignores_unsupported_extensions():
     languages = Languages(MigrationIndex([]))
-    files = LocalFileMigrator(lambda: languages)
+    migrator = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
-    assert not files.apply(path)
+    assert not migrator.apply(path)
 
 
-def test_files_fix_ignores_unsupported_language():
+def test_migrator_fix_ignores_unsupported_language():
     languages = Languages(MigrationIndex([]))
-    files = LocalFileMigrator(lambda: languages)
-    files._extensions[".py"] = None  # pylint: disable=protected-access
+    migrator = LocalFileMigrator(lambda: languages)
+    migrator._extensions[".py"] = None  # pylint: disable=protected-access
     path = Path('unsupported.py')
-    assert not files.apply(path)
+    assert not migrator.apply(path)
 
 
-def test_files_fix_reads_supported_extensions(migration_index):
+def test_migrator_fix_reads_supported_extensions(migration_index):
     languages = Languages(migration_index)
-    files = LocalFileMigrator(lambda: languages)
+    migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
-    assert not files.apply(path)
+    assert not migrator.apply(path)
 
 
-def test_files_supported_language_no_diagnostics():
+def test_migrator_supported_language_no_diagnostics():
     languages = create_autospec(Languages)
     languages.linter(Language.PYTHON).lint.return_value = []
-    files = LocalFileMigrator(lambda: languages)
+    migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
-    files.apply(path)
+    migrator.apply(path)
     languages.fixer.assert_not_called()
 
 
-def test_files_supported_language_no_fixer():
+def test_migrator_supported_language_no_fixer():
     languages = create_autospec(Languages)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer.return_value = None
-    files = LocalFileMigrator(lambda: languages)
+    migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
-    files.apply(path)
+    migrator.apply(path)
     languages.fixer.assert_called_once_with(Language.PYTHON, 'some-code')
 
 
-def test_files_supported_language_with_fixer():
+def test_migrator_supported_language_with_fixer():
     languages = create_autospec(Languages)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer(Language.PYTHON, 'some-code').apply.return_value = "Hi there!"
-    files = LocalFileMigrator(lambda: languages)
+    migrator = LocalFileMigrator(lambda: languages)
     with tempfile.NamedTemporaryFile(mode="w+t", suffix=".py") as file:
         file.writelines(["import tempfile"])
         path = Path(file.name)
-        files.apply(path)
+        migrator.apply(path)
         assert file.readline() == "Hi there!"
 
 
-def test_files_walks_directory():
+def test_migrator_walks_directory():
     languages = create_autospec(Languages)
     languages.linter(Language.PYTHON).lint.return_value = [Mock(code='some-code')]
     languages.fixer.return_value = None
-    files = LocalFileMigrator(lambda: languages)
+    migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__).parent
-    files.apply(path)
+    migrator.apply(path)
     languages.fixer.assert_called_with(Language.PYTHON, 'some-code')
     assert languages.fixer.call_count > 1
+
+
+def test_linter_walks_directory(mock_path_lookup, migration_index):
+    mock_path_lookup.append_path(_samples_path(SourceContainer))
+    file_loader = FileLoader()
+    folder_loader = FolderLoader(file_loader)
+    whitelist = Whitelist()
+    resolver = DependencyResolver(
+        [PipResolver(file_loader, whitelist)],
+        NotebookResolver(NotebookLoader()),
+        ImportFileResolver(file_loader, whitelist),
+        mock_path_lookup,
+    )
+    path = Path(Path(__file__).parent, "samples", "simulate-sys-path")
+    prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
+    linter = LocalCodeLinter(file_loader, folder_loader, mock_path_lookup, resolver, lambda: Languages(migration_index))
+    advices = linter.lint(prompts, None)
+    assert not advices
 
 
 def test_triple_dot_import():
@@ -110,6 +129,12 @@ def test_single_dot_import():
     assert not maybe.problems
     assert maybe.dependency.path == Path('/some/path/to/folder/foo.py')
     path_lookup.resolve.assert_called_once_with(Path('/some/path/to/folder/foo.py'))
+
+
+def test_folder_has_repr():
+    file_loader = FileLoader()
+    folder = Folder(Path("test"), file_loader, FolderLoader(file_loader))
+    assert len(repr(folder)) > 0
 
 
 site_packages = locate_site_packages()
