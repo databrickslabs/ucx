@@ -57,13 +57,19 @@ class PipResolver(BaseLibraryResolver):
         return None
 
     def _locate_dist_info(self, library_path: Path, library: Path) -> Path | None:
-        packages = os.listdir(library_path.parent.as_posix())
+        if not library_path.parent.exists():
+            return None
+        packages = library_path.parent.iterdir()
         dist_info_dir = next(
-            (package for package in packages if package.startswith(library.name) and package.endswith(".dist-info")),
+            (
+                package
+                for package in packages
+                if package.name.startswith(library.name) and package.name.endswith(".dist-info")
+            ),
             None,
         )
         if dist_info_dir is not None:
-            return Path(library_path.parent, Path(dist_info_dir))
+            return dist_info_dir
         # maybe the name needs tweaking
         if "-" in library.name:
             name = library.name.replace("-", "_")
