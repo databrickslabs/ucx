@@ -976,8 +976,9 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
         full_name = f"{catalog_name}.{name}".lower()
         sql_backend.execute(f"CREATE SCHEMA {full_name}")
         remove_after_property = {"RemoveAfter": get_test_purge_time()}
-        schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name,
-                                 properties=remove_after_property)
+        schema_info = SchemaInfo(
+            catalog_name=catalog_name, name=name, full_name=full_name, properties=remove_after_property
+        )
         logger.info(
             f"Schema {schema_info.full_name}: "
             f"{ws.config.host}/explore/data/{schema_info.catalog_name}/{schema_info.name}"
