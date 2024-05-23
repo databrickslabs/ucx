@@ -2,7 +2,6 @@ import functools
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
