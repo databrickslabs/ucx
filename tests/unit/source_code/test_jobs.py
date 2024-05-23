@@ -1,4 +1,5 @@
 import logging
+import io
 from pathlib import Path
 from unittest.mock import create_autospec
 
@@ -7,6 +8,7 @@ from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
@@ -47,13 +49,13 @@ def graph(mock_path_lookup, dependency_resolver) -> DependencyGraph:
 def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
     # Goal of test is to raise test coverage, remove after implementing
     ws = create_autospec(WorkspaceClient)
-    library = compute.Library(jar="library.jar", egg="library.egg", whl="library.whl", requirements="requirements.txt")
+    library = compute.Library(jar="library.jar", egg="library.egg", whl="library.whl")
     task = jobs.Task(task_key="test", libraries=[library], existing_cluster_id="id")
 
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(problems) == 5
+    assert len(problems) == 4
     assert all(problem.code == "not-yet-implemented" for problem in problems)
     ws.assert_not_called()
 
@@ -114,3 +116,60 @@ def test_workflow_linter_lint_job_logs_problems(dependency_resolver, mock_path_l
         linter.lint_job(1234)
 
     assert any(message.startswith(expected_message) for message in caplog.messages)
+
+
+def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"test")
+
+    libraries = [compute.Library(requirements="requirements.txt")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install")
+    assert mock_path_lookup.resolve(Path("test")) is None
+    ws.assert_not_called()
+
+
+def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_other_requirements(
+    mock_path_lookup, graph, caplog
+):
+    expected_message = "References to other requirements file is not supported: -r other-requirements.txt"
+
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"-r other-requirements.txt")
+
+    libraries = [compute.Library(requirements="requirements.txt")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        workflow_task_container.build_dependency_graph(graph)
+
+    assert expected_message in caplog.messages
+    ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constrains(
+    mock_path_lookup, graph, caplog
+):
+    expected_message = "References to constrains file is not supported: -c constrains.txt"
+
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"-c constrains.txt")
+
+    libraries = [compute.Library(requirements="requirements.txt")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        workflow_task_container.build_dependency_graph(graph)
+
+    assert expected_message in caplog.messages
+    ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
