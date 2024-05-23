@@ -392,7 +392,6 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def whitelist(self):
-        # TODO: fill in the whitelist
         return Whitelist()
 
     @cached_property

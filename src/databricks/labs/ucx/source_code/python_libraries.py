@@ -137,7 +137,7 @@ class DistInfoContainer(SourceContainer):
             if maybe.problems:
                 problems.extend(maybe.problems)
         for library_name in self._package.library_names:
-            compatibility = self._white_list.compatibility(library_name)
+            compatibility = self._white_list.distribution_compatibility(library_name)
             if compatibility is not None:
                 # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
                 continue
@@ -228,8 +228,8 @@ if __name__ == "__main__":
     root = Path.cwd()
     empty_index = MigrationIndex([])
     path_lookup = PathLookup.from_sys_path(root)
-    known_json = Path(__file__).parent.joinpath('known.json')
-    with known_json.open() as f:
+    known_json = Path(__file__).parent / 'known.json'
+    with known_json.open('r') as f:
         known_distributions = json.load(f)
     for library_root in path_lookup.library_roots:
         for dist_info_folder in library_root.glob("*.dist-info"):
@@ -256,6 +256,5 @@ if __name__ == "__main__":
                 for problem in linter.lint():
                     problems.append(f'line {problem.start_line}: {problem.message}')
                 known_distributions[dist_info.name][module_ref] = problems
-    with Path(__file__).parent.joinpath('known.json').open('w') as f:
+    with known_json.open('w') as f:
         json.dump(dict(sorted(known_distributions.items())), f, indent=2)
-    print("done")
