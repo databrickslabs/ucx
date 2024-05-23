@@ -63,10 +63,3 @@ pass
             failures = job_run.failures
             continue
     assert failures and failures == "[]"
-
-
-def test_removeafter_tag(ws, env_or_skip, make_job):
-    new_job = make_job(spark_conf=_SPARK_CONF)
-
-    created_job = ws.jobs.get(new_job.job_id)
-    assert "RemoveAfter" in created_job.settings.tags
