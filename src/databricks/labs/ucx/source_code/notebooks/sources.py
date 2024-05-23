@@ -139,7 +139,7 @@ class FileLinter:
         '.egg',
         '.class',
         '.iml',
-        '.gz'
+        '.gz',
     }
     _IGNORED_NAMES = {
         '.ds_store',
@@ -153,8 +153,7 @@ class FileLinter:
         'wheel',
         'record',
         'notice',
-        'zip-safe'
-
+        'zip-safe',
     }
 
     def __init__(self, langs: Languages, path: Path, content: str | None = None):
@@ -196,7 +195,9 @@ class FileLinter:
                 linter = self._languages.linter(language)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
-                yield Failure("unsupported-content", f"Error while parsing content of {self._path.as_posix()}: {err}", 0, 0, 1, 1)
+                yield Failure(
+                    "unsupported-content", f"Error while parsing content of {self._path.as_posix()}: {err}", 0, 0, 1, 1
+                )
 
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())

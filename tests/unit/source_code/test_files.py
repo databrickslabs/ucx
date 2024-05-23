@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.files import (
     LocalFileResolver,
     FileLoader,
     LocalCodeLinter,
-    DirectoryLoader,
+    FolderLoader,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -121,7 +121,7 @@ site_packages = locate_site_packages()
 @pytest.mark.parametrize("path", [(Path(site_packages, "mypy", "build.py"))])
 def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
-    dir_loader = DirectoryLoader(file_loader)
+    folder_loader = FolderLoader(file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     whitelist = Whitelist()
     notebook_resolver = NotebookResolver(NotebookLoader())
@@ -130,5 +130,5 @@ def test_known_issues(path: Path, migration_index):
     resolver = DependencyResolver(
         [PipResolver(file_loader, whitelist)], notebook_resolver, [file_resolver, whitelist_resolver], path_lookup
     )
-    linter = LocalCodeLinter(file_loader, dir_loader, path_lookup, resolver, lambda: Languages(migration_index))
+    linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: Languages(migration_index))
     linter.lint(Prompts(), path)

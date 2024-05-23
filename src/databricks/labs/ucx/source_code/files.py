@@ -53,11 +53,11 @@ class LocalFile(SourceContainer):
         return f"<LocalFile {self._path}>"
 
 
-class LocalDirectory(SourceContainer):
-    def __init__(self, path: Path, file_loader: FileLoader, dir_loader: DirectoryLoader):
+class Folder(SourceContainer):
+    def __init__(self, path: Path, file_loader: FileLoader, folder_loader: FolderLoader):
         self._path = path
         self._file_loader = file_loader
-        self._dir_loader = dir_loader
+        self._folder_loader = folder_loader
 
     @property
     def path(self) -> Path:
@@ -71,7 +71,7 @@ class LocalDirectory(SourceContainer):
 
     def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
         for child_path in self._path.iterdir():
-            loader = self._dir_loader if child_path.is_dir() else self._file_loader
+            loader = self._folder_loader if child_path.is_dir() else self._file_loader
             dependency = Dependency(loader, child_path)
             yield from parent.register_dependency(dependency).problems
 
@@ -84,13 +84,13 @@ class LocalCodeLinter:
     def __init__(
         self,
         file_loader: FileLoader,
-        dir_loader: DirectoryLoader,
+        folder_loader: FolderLoader,
         path_lookup: PathLookup,
         dependency_resolver: DependencyResolver,
         languages_factory: Callable[[], Languages],
     ) -> None:
         self._file_loader = file_loader
-        self._dir_loader = dir_loader
+        self._folder_loader = folder_loader
         self._path_lookup = path_lookup
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
@@ -109,12 +109,14 @@ class LocalCodeLinter:
         for located in located_advices:
             advice_path = located.path.relative_to(path)
             advice = located.advice
-            message = f"{advice_path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}\n"
+            message = (
+                f"{advice_path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}\n"
+            )
             sys.stdout.write(message)
         return located_advices
 
     def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
-        loader = self._dir_loader if path.is_dir() else self._file_loader
+        loader = self._folder_loader if path.is_dir() else self._file_loader
         dependency = Dependency(loader, path)
         graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)
         container = dependency.load(self._path_lookup)
@@ -219,7 +221,7 @@ class FileLoader(DependencyLoader):
         return "FileLoader()"
 
 
-class DirectoryLoader(FileLoader):
+class FolderLoader(FileLoader):
 
     def __init__(self, file_loader: FileLoader):
         self._file_loader = file_loader
@@ -228,7 +230,7 @@ class DirectoryLoader(FileLoader):
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        return LocalDirectory(absolute_path, self._file_loader, self)
+        return Folder(absolute_path, self._file_loader, self)
 
 
 class LocalFileResolver(BaseImportResolver, BaseFileResolver):

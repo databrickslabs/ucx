@@ -3,8 +3,6 @@ import sys
 from dataclasses import replace
 from io import StringIO
 from pathlib import Path
-from typing import TextIO
-from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk.service import compute
@@ -132,14 +130,14 @@ def test_lint_local_code(simple_ctx):
     path_to_scan = Path(ucx_path, "src")
     linter = LocalCodeLinter(
         light_ctx.file_loader,
-        light_ctx.directory_loader,
+        light_ctx.folder_loader,
         light_ctx.path_lookup,
         light_ctx.dependency_resolver,
         lambda: light_ctx.languages,
     )
     old_stdout = sys.stdout
     try:
-        sys.stdout = create_autospec(TextIO)
+        sys.stdout = StringIO()
         problems = linter.lint(Prompts(), path_to_scan)
         assert len(problems) > 0
     finally:

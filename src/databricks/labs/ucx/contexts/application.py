@@ -41,7 +41,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, DirectoryLoader
+from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver, FolderLoader
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
@@ -381,8 +381,8 @@ class GlobalContext(abc.ABC):
         return FileLoader()
 
     @cached_property
-    def directory_loader(self):
-        return DirectoryLoader(self.file_loader)
+    def folder_loader(self):
+        return FolderLoader(self.file_loader)
 
     @cached_property
     def whitelist(self):

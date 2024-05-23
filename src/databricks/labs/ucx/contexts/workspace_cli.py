@@ -183,5 +183,5 @@ class LocalCheckoutContext(WorkspaceContext):
     @cached_property
     def local_code_linter(self):
         return LocalCodeLinter(
-            self.file_loader, self.directory_loader, self.path_lookup, self.dependency_resolver, lambda: self.languages
+            self.file_loader, self.folder_loader, self.path_lookup, self.dependency_resolver, lambda: self.languages
         )
