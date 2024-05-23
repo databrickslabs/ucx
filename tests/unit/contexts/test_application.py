@@ -10,7 +10,9 @@ from databricks.labs.ucx.source_code.languages import Languages
 from tests.unit import mock_workspace_client
 
 
-@pytest.mark.parametrize("attribute", ["dependency_resolver", "pip_resolver", "site_packages_path", "notebook_loader"])
+@pytest.mark.parametrize(
+    "attribute", ["dependency_resolver", "pip_resolver", "site_packages_path", "notebook_loader", "folder_loader"]
+)
 def test_global_context_attributes_not_none(attribute: str):
     """Attributes should be not None"""
     # Goal is to improve test coverage

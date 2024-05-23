@@ -125,7 +125,7 @@ class LocalCodeLinter:
         problems = container.build_dependency_graph(graph)
         for problem in problems:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield LocatedAdvice(problem.as_advisory(), problem_path)
+            yield problem.as_advisory().for_path(problem_path)
         for child_path in graph.all_paths:
             yield from self._lint_one(child_path)
 
