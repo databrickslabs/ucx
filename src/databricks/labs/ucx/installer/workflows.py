@@ -52,6 +52,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 
 logger = logging.getLogger(__name__)
 
+TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -439,6 +440,10 @@ class WorkflowsDeployment(InstallationMixin):
     def _is_testing(self):
         return self._product_info.product_name() != "ucx"
 
+    @staticmethod
+    def _get_test_purge_time() -> str:
+        return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
         markdown = [
@@ -555,6 +560,7 @@ class WorkflowsDeployment(InstallationMixin):
         return settings
 
     def _job_settings(self, step_name: str, remote_wheel: str):
+
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -562,6 +568,7 @@ class WorkflowsDeployment(InstallationMixin):
             email_notifications = jobs.JobEmailNotifications(
                 on_success=[self._my_username], on_failure=[self._my_username]
             )
+
         job_tasks = []
         job_clusters: set[str] = {Task.job_cluster}
         for task in self._tasks:
@@ -574,9 +581,14 @@ class WorkflowsDeployment(InstallationMixin):
         job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheel))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
+        tags = {"version": f"v{version}"}
+        if self._is_testing():
+            # add RemoveAfter tag for test job cleanup
+            date_to_remove = self._get_test_purge_time()
+            tags.update({"RemoveAfter": date_to_remove})
         return {
             "name": self._name(step_name),
-            "tags": {"version": f"v{version}"},
+            "tags": tags,
             "job_clusters": self._job_clusters(job_clusters),
             "email_notifications": email_notifications,
             "tasks": job_tasks,

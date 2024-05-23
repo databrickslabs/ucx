@@ -48,7 +48,7 @@ dependencies = ["databricks-sdk~=0.27.0",
                 "databricks-labs-lsql~=0.4.0",
                 "databricks-labs-blueprint>=0.4.3,<0.7.0",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=23.9,<23.18"]
+                "sqlglot>=23.9,<24.1"]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"

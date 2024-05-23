@@ -1,5 +1,5 @@
 import logging
-
+from datetime import timedelta, datetime
 import pytest
 
 # pylint: disable-next=import-private-name
@@ -10,6 +10,9 @@ from databricks.sdk.service.workspace import AclPermission
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
+_SPARK_CONF = {
+    "spark.databricks.cluster.profile": "singleNode",
+}
 
 
 @pytest.fixture  # type: ignore[no-redef]
@@ -102,3 +105,12 @@ def test_table_fixture(make_table):
 
 def test_dbfs_fixture(make_mounted_location):
     logger.info(f"Created new dbfs data copy:{make_mounted_location}")
+
+
+def test_removeafter_tag(ws, env_or_skip, make_job):
+    new_job = make_job(spark_conf=_SPARK_CONF)
+    created_job = ws.jobs.get(new_job.job_id)
+    assert "RemoveAfter" in created_job.settings.tags
+
+    purge_time = datetime.strptime(created_job.settings.tags.get("RemoveAfter"), "%Y%m%d%H")
+    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
