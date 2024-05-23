@@ -45,7 +45,9 @@ from databricks.sdk.service.sql import (
     Query,
     Dashboard,
     WidgetOptions,
-    WidgetPosition, EndpointTagPair, EndpointTags,
+    WidgetPosition,
+    EndpointTagPair,
+    EndpointTags,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -765,8 +767,9 @@ def make_instance_pool(ws, make_random):
             instance_pool_name = f"sdk-{make_random(4)}"
         if node_type_id is None:
             node_type_id = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
-        return ws.instance_pools.create(instance_pool_name, node_type_id,
-                                        custom_tags={"RemoveAfter": get_test_purge_time()}, **kwargs)
+        return ws.instance_pools.create(
+            instance_pool_name, node_type_id, custom_tags={"RemoveAfter": get_test_purge_time()}, **kwargs
+        )
 
     yield from factory("instance pool", create, lambda item: ws.instance_pools.delete(item.instance_pool_id))
 
@@ -1344,6 +1347,7 @@ def make_dashboard(ws, make_random, make_query):
             logger.info(f"Can't delete dashboard {e}")
 
     yield from factory("dashboard", create, remove)
+
 
 def get_test_purge_time() -> str:
     return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
