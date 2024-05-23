@@ -40,10 +40,10 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
-from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -382,18 +382,13 @@ class GlobalContext(abc.ABC):
         return Whitelist()
 
     @cached_property
-    def whitelist_resolver(self):
-        return WhitelistResolver(self.whitelist)
-
-    @cached_property
     def file_resolver(self):
-        return LocalFileResolver(self.file_loader)
+        return ImportFileResolver(self.file_loader, self.whitelist)
 
     @cached_property
     def dependency_resolver(self):
-        import_resolvers = [self.file_resolver, self.whitelist_resolver]
         library_resolvers = [self.pip_resolver]
-        return DependencyResolver(library_resolvers, self.notebook_resolver, import_resolvers, self.path_lookup)
+        return DependencyResolver(library_resolvers, self.notebook_resolver, self.file_resolver, self.path_lookup)
 
     @cached_property
     def workflow_linter(self):
