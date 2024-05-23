@@ -101,7 +101,7 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
             yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
-            with (self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file):
+            with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
                 for requirement in StringIO(remote_file.read().decode()).readlines():
                     clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
                     if clean_requirement.startswith("-r"):
