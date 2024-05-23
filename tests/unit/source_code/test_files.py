@@ -7,17 +7,17 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist, WhitelistResolver
+from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import (
     LocalFileMigrator,
-    LocalFileResolver,
     FileLoader,
     LocalCodeLinter,
     FolderLoader,
+    ImportFileResolver,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -123,10 +123,9 @@ def test_known_issues(path: Path, migration_index):
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     whitelist = Whitelist()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    file_resolver = LocalFileResolver(file_loader)
-    whitelist_resolver = WhitelistResolver(whitelist)
+    import_resolver = ImportFileResolver(file_loader, whitelist)
     resolver = DependencyResolver(
-        [PipResolver(file_loader, whitelist)], notebook_resolver, [file_resolver, whitelist_resolver], path_lookup
+        [PipResolver(file_loader, whitelist)], notebook_resolver, import_resolver, path_lookup
     )
     linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: Languages(migration_index))
     linter.lint(Prompts(), path)
