@@ -301,4 +301,4 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [DependencyProblem(code, message)])
 
     def __repr__(self):
-        return "LocalFileResolver()"
+        return "ImportFileResolver()"
