@@ -162,9 +162,7 @@ class DependencyGraph:
         linter = ASTLinter.parse(python_code)
         syspath_changes = PythonLinter.list_sys_path_changes(linter)
         run_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources_and_problems = PythonLinter.list_import_sources(linter, DependencyProblem)
-        import_sources = import_sources_and_problems[0]
-        import_problems = import_sources_and_problems[1]
+        import_sources, import_problems = PythonLinter.list_import_sources(linter, DependencyProblem)
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort

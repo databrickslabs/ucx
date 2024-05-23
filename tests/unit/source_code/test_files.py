@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
 import pytest
-from databricks.labs.blueprint.tui import MockPrompts, Prompts
+from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PipResolver

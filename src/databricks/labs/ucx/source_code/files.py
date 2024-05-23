@@ -120,8 +120,8 @@ class LocalCodeLinter:
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
         for problem in problems:
-            path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield LocatedAdvice(path=path, advice=problem.as_advisory())
+            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
+            yield LocatedAdvice(problem.as_advisory(), problem_path)
         for child_path in graph.all_paths:
             yield from self._lint_one(child_path)
 
