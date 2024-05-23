@@ -153,3 +153,23 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
 
     assert expected_message in caplog.messages
     ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_constrains(
+    mock_path_lookup, graph, caplog
+):
+    expected_message = "References to constrains file is not supported: -c constrains.txt"
+
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"-c constrains.txt")
+
+    libraries = [compute.Library(requirements="requirements.txt")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        workflow_task_container.build_dependency_graph(graph)
+
+    assert expected_message in caplog.messages
+    ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
