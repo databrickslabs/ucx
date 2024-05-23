@@ -37,7 +37,7 @@ class PipResolver(BaseLibraryResolver):
 
     def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
         library_path = self._locate_library(path_lookup, library)
-        if library_path is None:  # not installed yet
+        if library_path is None or library_path.suffix == ".txt":  # not installed yet
             return self._install_library(path_lookup, library)
         dist_info_path = self._locate_dist_info(library_path, library)
         if dist_info_path is None:  # old package style
@@ -77,7 +77,7 @@ class PipResolver(BaseLibraryResolver):
         # invoke pip install via subprocess to install this library into self._lib_install_folder
         venv = self._temporary_virtual_environment(path_lookup).as_posix()
         existing_packages = os.listdir(venv)
-        pip_install_arguments = ["pip", "install", library.name, "-t", venv]
+        pip_install_arguments = ["pip", "install", library.as_posix(), "-t", venv]
         try:
             subprocess.run(pip_install_arguments, check=True)
         except CalledProcessError as e:
