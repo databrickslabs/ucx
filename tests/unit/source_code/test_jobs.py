@@ -8,6 +8,7 @@ from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
@@ -132,3 +133,23 @@ def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mo
     assert problems[0].message.startswith("Failed to install")
     assert mock_path_lookup.resolve(Path("test")) is None
     ws.assert_not_called()
+
+
+def test_workflow_task_container_build_dependency_graph_warns_about_reference_to_other_requirements(
+    mock_path_lookup, graph, caplog
+):
+    expected_message = "References to other requirements file is not supported: -r other-requirements.txt"
+
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"-r other-requirements.txt")
+
+    libraries = [compute.Library(requirements="requirements.txt")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
+        workflow_task_container.build_dependency_graph(graph)
+
+    assert expected_message in caplog.messages
+    ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
