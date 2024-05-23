@@ -67,6 +67,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
 * [Code migration commands](#code-migration-commands)
+  * [`lint-local-code` command](#lint-local-code-command)
   * [`migrate-local-code` command](#migrate-local-code-command)
   * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
   * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
@@ -949,6 +950,8 @@ On the `ucx` code base, it takes only a few seconds to run. It should take even 
 Future versions of `ucx` will add support for more source types, and more migration details.
 
 ## `migrate-local-code` command
+
+[[back to top](#databricks-labs-ucx)]
 
 ```text
 databricks labs ucx migrate-local-code
