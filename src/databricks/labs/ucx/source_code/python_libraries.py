@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import collections
 import email
+import json
 import os
 import subprocess
 import tempfile
 from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
+
+from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import FileLoader
@@ -221,14 +224,20 @@ class DistInfoPackage:
 
 
 if __name__ == "__main__":
+    logger = get_logger(__file__)  # this only works for __main__
     root = Path.cwd()
     empty_index = MigrationIndex([])
     path_lookup = PathLookup.from_sys_path(root)
-    known_distributions = {}
-    # TODO: re-read known.json and only update the known distributions
+    known_json = Path(__file__).parent.joinpath('known.json')
+    with known_json.open() as f:
+        known_distributions = json.load(f)
     for library_root in path_lookup.library_roots:
         for dist_info_folder in library_root.glob("*.dist-info"):
             dist_info = DistInfoPackage.parse(dist_info_folder)
+            if dist_info.name in known_distributions:
+                logger.debug(f"Skipping distribution: {dist_info.name}")
+                continue
+            logger.debug(f"Processing distribution: {dist_info.name}")
             known_distributions[dist_info.name] = collections.OrderedDict()
             for module_path in dist_info.module_paths:
                 if not module_path.is_file():
@@ -236,17 +245,17 @@ if __name__ == "__main__":
                 if module_path.name in {'__main__.py', '__version__.py', '__about__.py'}:
                     continue
                 relative_path = module_path.relative_to(library_root)
-                package_ref = relative_path.as_posix().replace('/', '.')
+                module_ref = relative_path.as_posix().replace('/', '.')
                 for suffix in ('.py', '.__init__'):
-                    if package_ref.endswith(suffix):
-                        package_ref = package_ref[:-len(suffix)]
+                    if module_ref.endswith(suffix):
+                        module_ref = module_ref[:-len(suffix)]
+                logger.debug(f"Processing module: {module_ref}")
                 languages = Languages(empty_index)
                 linter = FileLinter(languages, module_path)
                 problems = []
                 for problem in linter.lint():
                     problems.append(f'line {problem.start_line}: {problem.message}')
-                known_distributions[dist_info.name][package_ref] = problems
+                known_distributions[dist_info.name][module_ref] = problems
     with Path(__file__).parent.joinpath('known.json').open('w') as f:
-        import json
         json.dump(dict(sorted(known_distributions.items())), f, indent=2)
     print("done")

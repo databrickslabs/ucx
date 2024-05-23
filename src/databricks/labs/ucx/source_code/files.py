@@ -9,7 +9,7 @@ from typing import TextIO
 from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
+from databricks.labs.ucx.source_code.known import Whitelist, UCCompatibility
 from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
