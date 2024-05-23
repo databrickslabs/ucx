@@ -466,7 +466,7 @@ UCX also provides `migrate-data-reconciliation` workflow to validate the integri
 - Compare the schema of the source and target tables. 
 - Compare the row counts of the source and target tables.
 - Compare the content of individual row between source and target tables to identify any discrepancies.
-Once completed, the output will be stored in `$inventory_database.recon_result` Delta table.
+Once completed, the output will be stored in `$inventory_database.reconciliation_results` view.
 
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.

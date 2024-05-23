@@ -438,7 +438,7 @@ class GlobalContext(abc.ABC):
             self.table_mapping,
             self.schema_comparator,
             self.data_comparator,
-            self.config.reconciliation_threshold,
+            self.config.reconciliation_failure_tolerance_percent,
         )
 
 

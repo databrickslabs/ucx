@@ -42,7 +42,7 @@ def test_data_comparison(metadata_row_factory, row_count_row_factory, data_comp_
 
     data_profiler = StandardDataProfiler(sql_backend, DatabricksTableMetadataRetriever(sql_backend))
     data_comparator = StandardDataComparator(sql_backend, data_profiler)
-    actual_comparison_result = data_comparator.compare_data(source, target)
+    actual_comparison_result = data_comparator.compare_data(source, target, True)
 
     assert actual_comparison_result == expected_comparison_result
 

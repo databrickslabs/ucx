@@ -106,7 +106,7 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "workflow_problems", JobProblem),
             functools.partial(table, "udfs", Udf),
             functools.partial(table, "logs", LogRecord),
-            functools.partial(table, "recon_result", ReconResult),
+            functools.partial(table, "recon_results", ReconResult),
         ],
     )
     deployer.deploy_view("objects", "queries/views/objects.sql")
@@ -217,7 +217,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
-        reconciliation_threshold = int(
+        reconciliation_failure_tolerance_percent = int(
             self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)
         )
         return WorkspaceConfig(
@@ -232,7 +232,7 @@ class WorkspaceInstaller(WorkspaceContext):
             num_threads=num_threads,
             include_databases=include_databases,
             trigger_job=trigger_job,
-            reconciliation_threshold=reconciliation_threshold,
+            reconciliation_failure_tolerance_percent=reconciliation_failure_tolerance_percent,
         )
 
     def _compare_remote_local_versions(self):

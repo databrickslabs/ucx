@@ -44,7 +44,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         data_comparator: DataComparator,
         default_threshold: float,
     ):
-        super().__init__(sbe, "hive_metastore", schema, "recon_result", ReconResult)
+        super().__init__(sbe, "hive_metastore", schema, "recon_results", ReconResult)
         self._migration_status_refresher = migration_status_refresher
         self._table_mapping = table_mapping
         self._schema_comparator = schema_comparator
@@ -75,41 +75,41 @@ class MigrationRecon(CrawlerBase[ReconResult]):
                 migration_status.dst_schema,
                 migration_status.dst_table,
             )
-            row_comparison = False
-            reconciliation_threshold = self._default_threshold
+            compare_rows = False
+            reconciliation_failure_tolerance_percent = self._default_threshold
             for rule in migration_rules:
                 if rule.match(source_table):
-                    row_comparison = rule.row_comparison
-                    reconciliation_threshold = rule.reconciliation_threshold
+                    compare_rows = rule.compare_rows
+                    reconciliation_failure_tolerance_percent = rule.reconciliation_failure_tolerance_percent
                     break
             tasks.append(
                 partial(
                     self._recon,
                     source_table,
                     target_table,
-                    row_comparison,
-                    reconciliation_threshold,
+                    compare_rows,
+                    reconciliation_failure_tolerance_percent,
                 )
             )
-        recon_result, errors = Threads.gather("Reconciling data", tasks)
+        recon_results, errors = Threads.gather("reconciling data", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while reconciling data")
-        return recon_result
+        return recon_results
 
     def _recon(
         self,
         source: TableIdentifier,
         target: TableIdentifier,
-        row_comparison: bool,
-        reconciliation_threshold: int,
+        compare_rows: bool,
+        reconciliation_failure_tolerance_percent: int,
     ) -> ReconResult | None:
         try:
             schema_comparison = self._schema_comparator.compare_schema(source, target)
-            data_comparison = self._data_comparator.compare_data(source, target, row_comparison)
+            data_comparison = self._data_comparator.compare_data(source, target, compare_rows)
         except DatabricksError as e:
             logger.warning(f"Error while comparing {source.fqn_escaped} and {target.fqn_escaped}: {e}")
             return None
-        recon_result = ReconResult(
+        recon_results = ReconResult(
             source.schema,
             source.table,
             target.catalog,
@@ -117,14 +117,14 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             target.table,
             schema_comparison.is_matching,
             (
-                self._percentage_difference(data_comparison) <= reconciliation_threshold
-                and data_comparison.num_missing_records_in_target == 0
-                and data_comparison.num_missing_records_in_source == 0
+                self._percentage_difference(data_comparison) <= reconciliation_failure_tolerance_percent
+                and data_comparison.target_missing_count == 0
+                and data_comparison.source_missing_count == 0
             ),
             json.dumps(schema_comparison.as_dict()),
             json.dumps(data_comparison.as_dict()),
         )
-        return recon_result
+        return recon_results
 
     @staticmethod
     def _percentage_difference(result: DataComparisonResult) -> int:

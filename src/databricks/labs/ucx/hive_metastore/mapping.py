@@ -28,11 +28,11 @@ class Rule:
     dst_schema: str
     src_table: str
     dst_table: str
-    reconciliation_threshold: int = 0  # threshold for row count comparison
-    row_comparison: bool = False  # whether to compare row by row
+    reconciliation_failure_tolerance_percent: int = 0  # threshold for row count comparison
+    compare_rows: bool = False  # whether to compare row by row
 
     @classmethod
-    def initial(cls, workspace_name: str, catalog_name: str, table: Table, reconciliation_threshold: int) -> "Rule":
+    def initial(cls, workspace_name: str, catalog_name: str, table: Table, reconciliation_failure_tolerance_percent: int) -> "Rule":
         return cls(
             workspace_name=workspace_name,
             catalog_name=catalog_name,
@@ -40,7 +40,7 @@ class Rule:
             dst_schema=table.database,
             src_table=table.name,
             dst_table=table.name,
-            reconciliation_threshold=reconciliation_threshold,
+            reconciliation_failure_tolerance_percent=reconciliation_failure_tolerance_percent,
         )
 
     @classmethod
@@ -52,7 +52,7 @@ class Rule:
             dst_schema=str(dst_schema.name or ""),
             src_table=str(src_table.name or ""),
             dst_table=str(src_table.name or ""),
-            reconciliation_threshold=5,
+            reconciliation_failure_tolerance_percent=5,
         )
 
     def match(self, table: TableIdentifier) -> bool:
@@ -88,12 +88,12 @@ class TableMapping:
         installation: Installation,
         ws: WorkspaceClient,
         sql_backend: SqlBackend,
-        reconciliation_threshold: int = 0,
+        reconciliation_failure_tolerance_percent: int = 0,
     ):
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
-        self._reconciliation_threshold = reconciliation_threshold
+        self._reconciliation_failure_tolerance_percent = reconciliation_failure_tolerance_percent
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
         tables_snapshot = tables.snapshot()
@@ -101,7 +101,7 @@ class TableMapping:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
             raise ValueError(msg)
         for table in tables_snapshot:
-            yield Rule.initial(workspace_name, catalog_name, table, self._reconciliation_threshold)
+            yield Rule.initial(workspace_name, catalog_name, table, self._reconciliation_failure_tolerance_percent)
 
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
