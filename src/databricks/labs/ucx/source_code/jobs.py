@@ -1,8 +1,8 @@
 import functools
 import logging
-import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -100,12 +100,17 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
             yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
-        if library.requirements:
-            with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
-                with tempfile.TemporaryDirectory() as directory:
-                    local_file = Path(directory) / Path(library.requirements).name
-                    local_file.write_bytes(remote_file.read())
-                    yield from graph.register_library(local_file.as_posix())
+        if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
+            with (self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file):
+                for requirement in StringIO(remote_file.read().decode()).readlines():
+                    clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
+                    if clean_requirement.startswith("-r"):
+                        logger.warning(f"References to other requirements file is not supported: {requirement}")
+                        continue
+                    if clean_requirement.startswith("-c"):
+                        logger.warning(f"References to constrains file is not supported: {requirement}")
+                        continue
+                    yield from graph.register_library(clean_requirement)
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
