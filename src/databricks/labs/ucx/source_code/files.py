@@ -77,7 +77,7 @@ class Folder(SourceContainer):
             yield from parent.register_dependency(dependency).problems
 
     def __repr__(self):
-        return f"<LocalDirectory {self._path}>"
+        return f"<Folder {self._path}>"
 
 
 class LocalCodeLinter:
