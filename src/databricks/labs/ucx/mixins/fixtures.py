@@ -1071,7 +1071,15 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             tbl_properties = {"RemoveAfter": get_test_purge_time()}
 
         str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
-        ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
+
+        # table properties fails with CTAS statements
+        ctas_tbl_properties_ddl = ""
+        if ctas or non_delta:
+            ctas_tbl_properties_ddl = (
+                f'ALTER {"VIEW" if view else "TABLE"} {full_name} SET TBLPROPERTIES ({str_properties})'
+            )
+        else:
+            ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
         if hiveserde_ddl:
             ddl = hiveserde_ddl
@@ -1080,6 +1088,11 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             storage_location = storage_override
 
         sql_backend.execute(ddl)
+
+        # CTAS AND NON_DELTA does not support TBLPROPERTIES
+        if ctas or non_delta:
+            sql_backend.execute(ctas_tbl_properties_ddl)
+
         table_info = TableInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,
