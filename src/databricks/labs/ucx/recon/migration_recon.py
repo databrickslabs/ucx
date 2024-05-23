@@ -27,10 +27,11 @@ class ReconResult:
     dst_catalog: str
     dst_schema: str
     dst_table: str
-    schema_matches: bool
-    data_matches: bool
-    schema_comparison: str
-    data_comparison: str
+    schema_matches: bool = False
+    data_matches: bool = False
+    schema_comparison: str | None = None
+    data_comparison: str | None = None
+    error_message: str | None = None
 
 
 class MigrationRecon(CrawlerBase[ReconResult]):
@@ -108,7 +109,14 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             data_comparison = self._data_comparator.compare_data(source, target, compare_rows)
         except DatabricksError as e:
             logger.warning(f"Error while comparing {source.fqn_escaped} and {target.fqn_escaped}: {e}")
-            return None
+            return ReconResult(
+                source.schema,
+                source.table,
+                target.catalog,
+                target.schema,
+                target.table,
+                error_message=str(e),
+            )
         recon_results = ReconResult(
             source.schema,
             source.table,

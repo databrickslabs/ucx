@@ -24,6 +24,7 @@ SELECT
   data_comparison_result.target_row_count,
   data_comparison_result.source_missing_count,
   data_comparison_result.target_missing_count,
-  schema_comparison_result.data AS column_comparison
+  schema_comparison_result.data AS column_comparison,
+  error_message
 FROM
   flattened
