@@ -192,13 +192,12 @@ class DirectFilesystemAccessMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-
         if not isinstance(table_arg, ast.Constant):
             return
-
         if not table_arg.value:
             return
-
+        if not isinstance(table_arg.value, str):
+            return
         if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
             yield Deprecation(
                 code='direct-filesystem-access',
@@ -209,7 +208,6 @@ class DirectFilesystemAccessMatcher(Matcher):
                 end_col=node.end_col_offset or 0,
             )
             return
-
         if table_arg.value.startswith("/") and self._check_call_context(node):
             yield Deprecation(
                 code='direct-filesystem-access',

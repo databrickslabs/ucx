@@ -71,8 +71,14 @@
   "mypy-extensions": {
     "mypy_extensions": []
   },
+  "numpy": {
+    "numpy": []
+  },
   "packaging": {
     "packaging": []
+  },
+  "pandas": {
+    "pandas": []
   },
   "pathspec": {
     "pathspec": []
@@ -115,6 +121,12 @@
   "pytest-xdist": {
     "xdist": []
   },
+  "python-dateutil": {
+    "dateutil": []
+  },
+  "pytz": {
+    "pytz": []
+  },
   "pyyaml": {
     "_yaml": [],
     "yaml": []
@@ -133,6 +145,9 @@
     "pkg_resources": [],
     "setuptools": []
   },
+  "six": {
+    "six": []
+  },
   "sqlglot": {
     "sqlglot": []
   },
@@ -146,6 +161,9 @@
   "types-requests": {},
   "typing_extensions": {
     "typing_extensions": []
+  },
+  "tzdata": {
+    "tzdata": []
   },
   "urllib3": {
     "urllib3": []
