@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Rule:
     workspace_name: str
-    src_schema: str
-    src_table: str
     catalog_name: str
+    src_schema: str
     dst_schema: str
+    src_table: str
     dst_table: str
     recon_tolerance_percent: int = 0  # threshold for row count comparison
     compare_rows: bool = False  # whether to compare row by row
