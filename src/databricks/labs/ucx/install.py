@@ -217,7 +217,7 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups.run()
         include_databases = self._select_databases()
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
-        reconciliation_failure_tolerance_percent = int(
+        recon_tolerance_percent = int(
             self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)
         )
         return WorkspaceConfig(
@@ -232,7 +232,7 @@ class WorkspaceInstaller(WorkspaceContext):
             num_threads=num_threads,
             include_databases=include_databases,
             trigger_job=trigger_job,
-            reconciliation_failure_tolerance_percent=reconciliation_failure_tolerance_percent,
+            recon_tolerance_percent=recon_tolerance_percent,
         )
 
     def _compare_remote_local_versions(self):

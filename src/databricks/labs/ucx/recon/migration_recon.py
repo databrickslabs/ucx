@@ -76,11 +76,11 @@ class MigrationRecon(CrawlerBase[ReconResult]):
                 migration_status.dst_table,
             )
             compare_rows = False
-            reconciliation_failure_tolerance_percent = self._default_threshold
+            recon_tolerance_percent = self._default_threshold
             for rule in migration_rules:
                 if rule.match(source_table):
                     compare_rows = rule.compare_rows
-                    reconciliation_failure_tolerance_percent = rule.reconciliation_failure_tolerance_percent
+                    recon_tolerance_percent = rule.recon_tolerance_percent
                     break
             tasks.append(
                 partial(
@@ -88,7 +88,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
                     source_table,
                     target_table,
                     compare_rows,
-                    reconciliation_failure_tolerance_percent,
+                    recon_tolerance_percent,
                 )
             )
         recon_results, errors = Threads.gather("reconciling data", tasks)
@@ -101,7 +101,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
         source: TableIdentifier,
         target: TableIdentifier,
         compare_rows: bool,
-        reconciliation_failure_tolerance_percent: int,
+        recon_tolerance_percent: int,
     ) -> ReconResult | None:
         try:
             schema_comparison = self._schema_comparator.compare_schema(source, target)
@@ -117,7 +117,7 @@ class MigrationRecon(CrawlerBase[ReconResult]):
             target.table,
             schema_comparison.is_matching,
             (
-                self._percentage_difference(data_comparison) <= reconciliation_failure_tolerance_percent
+                self._percentage_difference(data_comparison) <= recon_tolerance_percent
                 and data_comparison.target_missing_count == 0
                 and data_comparison.source_missing_count == 0
             ),

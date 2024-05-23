@@ -47,11 +47,20 @@ def test_migrate_recon_should_produce_proper_queries(
     rows = {
         'SELECT \\* FROM inventory_database.migration_status': MIGRATION_STATUS[
             (source.schema, source.table, target.catalog, target.schema, target.table, "2021-01-01T00:00:00Z"),
-            (source_2.schema, source_2.table, target_2.catalog, target_2.schema, target_2.table, "2021-01-01T00:00:00Z"),
+            (
+                source_2.schema,
+                source_2.table,
+                target_2.catalog,
+                target_2.schema,
+                target_2.table,
+                "2021-01-01T00:00:00Z",
+            ),
             ("schema_none", "table_none", None, "schema_a", "table_a", "2021-01-01T00:00:00Z"),
         ],
         f"SHOW TBLPROPERTIES {source.schema}.{source.table} \\('upgraded_to'\\)": UPGRADED_TO[("value", "fake_dest"),],
-        f"SHOW TBLPROPERTIES {source_2.schema}.{source_2.table} \\('upgraded_to'\\)": UPGRADED_TO[("value", "fake_dest"),],
+        f"SHOW TBLPROPERTIES {source_2.schema}.{source_2.table} \\('upgraded_to'\\)": UPGRADED_TO[
+            ("value", "fake_dest"),
+        ],
         "DESCRIBE TABLE": metadata_row_factory[
             ("col1", "int"),
             ("col2", "string"),

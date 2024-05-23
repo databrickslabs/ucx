@@ -463,7 +463,7 @@ def test_save_config(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
-            'reconciliation_failure_tolerance_percent': 5,
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -525,7 +525,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
-            'reconciliation_failure_tolerance_percent': 5,
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -573,7 +573,7 @@ def test_create_cluster_policy(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
-            'reconciliation_failure_tolerance_percent': 5,
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -1228,7 +1228,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
             'num_days_submit_runs_history': 30,
-            'reconciliation_failure_tolerance_percent': 5,
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -1393,7 +1393,7 @@ def test_fresh_install(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
-            'reconciliation_failure_tolerance_percent': 5,
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -1895,6 +1895,6 @@ def test_save_config_ext_hms(ws, mock_installation):
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
             'num_days_submit_runs_history': 30,
-            'reconciliation_failure_tolerance_percent': 5,
+            'recon_tolerance_percent': 5,
         },
     )
