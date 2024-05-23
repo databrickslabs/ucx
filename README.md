@@ -463,10 +463,18 @@ There are 3 main table migration workflows, targeting different table types. All
 
 ### Post Migration Data Reconciliation Task
 UCX also provides `migrate-data-reconciliation` workflow to validate the integrity of the migrated tables:
-- Compare the schema of the source and target tables. 
-- Compare the row counts of the source and target tables.
-- Compare the content of individual row between source and target tables to identify any discrepancies.
-Once completed, the output will be stored in `$inventory_database.reconciliation_results` view.
+- Compare the schema of the source and target tables. The result is `schema_matches`, and column by column comparison
+is stored as `column_comparison` struct.
+- Compare the row counts of the source and target tables. If the row count is within the reconciliation threshold
+(defaults to 5%), `data_matches` is True.
+- Compare the content of individual row between source and target tables to identify any discrepancies (when `compare_rows` 
+flag is enabled). This is done using hash comparison, and number of missing rows are stored as `source_missing_count`
+and `target_missing_count`
+
+Once the workflow completes, the output will be stored in `$inventory_database.reconciliation_results` view, and displayed
+in the Migration dashboard.
+
+![reconciliation results](docs/recon_results.png)
 
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
