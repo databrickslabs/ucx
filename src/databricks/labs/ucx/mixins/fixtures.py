@@ -46,6 +46,8 @@ from databricks.sdk.service.sql import (
     Dashboard,
     WidgetOptions,
     WidgetPosition,
+    EndpointTagPair,
+    EndpointTags,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -721,6 +723,10 @@ def make_cluster(ws, make_random):
         if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
 
+        if "custom_tags" not in kwargs:
+            kwargs["custom_tags"] = {"RemoveAfter": get_test_purge_time()}
+        else:
+            kwargs["custom_tags"]["RemoveAfter"] = get_test_purge_time()
         return ws.clusters.create(
             cluster_name=cluster_name,
             spark_version=spark_version,
@@ -761,7 +767,9 @@ def make_instance_pool(ws, make_random):
             instance_pool_name = f"sdk-{make_random(4)}"
         if node_type_id is None:
             node_type_id = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
-        return ws.instance_pools.create(instance_pool_name, node_type_id, **kwargs)
+        return ws.instance_pools.create(
+            instance_pool_name, node_type_id, custom_tags={"RemoveAfter": get_test_purge_time()}, **kwargs
+        )
 
     yield from factory("instance pool", create, lambda item: ws.instance_pools.delete(item.instance_pool_id))
 
@@ -812,9 +820,6 @@ def make_job(ws, make_random, make_notebook):
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
         return job
-
-    def get_test_purge_time() -> str:
-        return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
 
     yield from factory("job", create, lambda item: ws.jobs.delete(item.job_id))
 
@@ -877,12 +882,14 @@ def make_warehouse(ws, make_random):
         if cluster_size is None:
             cluster_size = "2X-Small"
 
+        remove_after_tags = EndpointTags(custom_tags=[EndpointTagPair(key="RemoveAfter", value=get_test_purge_time())])
         return ws.warehouses.create(
             name=warehouse_name,
             cluster_size=cluster_size,
             warehouse_type=warehouse_type,
             max_num_clusters=max_num_clusters,
             enable_serverless_compute=enable_serverless_compute,
+            tags=remove_after_tags,
             **kwargs,
         )
 
@@ -1346,3 +1353,7 @@ def make_dashboard(ws, make_random, make_query):
             logger.info(f"Can't delete dashboard {e}")
 
     yield from factory("dashboard", create, remove)
+
+
+def get_test_purge_time() -> str:
+    return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
