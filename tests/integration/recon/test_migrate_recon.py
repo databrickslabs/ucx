@@ -21,6 +21,7 @@ def test_migrate_managed_tables_and_recon(ws, sql_backend, runtime_ctx, make_cat
 
     runtime_ctx.with_dummy_resource_permission()
     runtime_ctx.tables_migrator.migrate_tables(what=What.DBFS_ROOT_DELTA)
+    runtime_ctx.tables_migrator.index()
 
     recon_result = runtime_ctx.migration_recon.snapshot()
     assert len(list(recon_result)) == 1, "Expected 1 recon result"
