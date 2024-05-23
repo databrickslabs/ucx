@@ -68,7 +68,7 @@ class StandardDataComparator(DataComparator):
         """
         source_data_profile = self._data_profiler.profile_data(source)
         target_data_profile = self._data_profiler.profile_data(target)
-        if row_comparison:
+        if not row_comparison:
             return DataComparisonResult(
                 source_row_count=source_data_profile.row_count,
                 target_row_count=target_data_profile.row_count,

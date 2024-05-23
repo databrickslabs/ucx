@@ -40,14 +40,18 @@ def test_migrate_recon_should_produce_proper_queries(
     data_comp_row_factory,
 ):
     source = TableIdentifier("hive_metastore", "db1", "table1")
+    source_2 = TableIdentifier("hive_metastore", "db2", "table2")
     target = TableIdentifier("catalog1", "schema1", "table1")
+    target_2 = TableIdentifier("catalog2", "schema2", "table2")
     errors = {}
     rows = {
         'SELECT \\* FROM inventory_database.migration_status': MIGRATION_STATUS[
             (source.schema, source.table, target.catalog, target.schema, target.table, "2021-01-01T00:00:00Z"),
+            (source_2.schema, source_2.table, target_2.catalog, target_2.schema, target_2.table, "2021-01-01T00:00:00Z"),
             ("schema_none", "table_none", None, "schema_a", "table_a", "2021-01-01T00:00:00Z"),
         ],
         f"SHOW TBLPROPERTIES {source.schema}.{source.table} \\('upgraded_to'\\)": UPGRADED_TO[("value", "fake_dest"),],
+        f"SHOW TBLPROPERTIES {source_2.schema}.{source_2.table} \\('upgraded_to'\\)": UPGRADED_TO[("value", "fake_dest"),],
         "DESCRIBE TABLE": metadata_row_factory[
             ("col1", "int"),
             ("col2", "string"),
@@ -56,8 +60,14 @@ def test_migrate_recon_should_produce_proper_queries(
             ("col1", "int"),
             ("col2", "string"),
         ],
+        f"{target_2.catalog_escaped}\\.information_schema\\.columns": metadata_row_factory[
+            ("col1", "int"),
+            ("col2", "string"),
+        ],
         f"SELECT COUNT\\(\\*\\) as row_count FROM {source.fqn_escaped}": row_count_row_factory[100,],
         f"SELECT COUNT\\(\\*\\) as row_count FROM {target.fqn_escaped}": row_count_row_factory[2,],
+        f"SELECT COUNT\\(\\*\\) as row_count FROM {source_2.fqn_escaped}": row_count_row_factory[0,],
+        f"SELECT COUNT\\(\\*\\) as row_count FROM {target_2.fqn_escaped}": row_count_row_factory[0,],
         "WITH compare_results": data_comp_row_factory[(102, 100, 2),],
     }
     backend = MockBackend(fails_on_first=errors, rows=rows)
@@ -77,4 +87,4 @@ def test_migrate_recon_should_produce_proper_queries(
         0,
     )
     results = list(migration_recon.snapshot())
-    assert len(results) == 1
+    assert len(results) == 2
