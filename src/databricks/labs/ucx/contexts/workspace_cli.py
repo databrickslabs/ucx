@@ -14,7 +14,7 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialManager, Serv
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
-from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalFilesLinter
+from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
@@ -181,7 +181,7 @@ class LocalCheckoutContext(WorkspaceContext):
         return LocalFileMigrator(self.languages)
 
     @cached_property
-    def local_files_linter(self):
-        return LocalFilesLinter(
+    def local_code_linter(self):
+        return LocalCodeLinter(
             self.file_loader, self.directory_loader, self.path_lookup, self.dependency_resolver, lambda: self.languages
         )

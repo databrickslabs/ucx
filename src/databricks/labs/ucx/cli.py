@@ -475,24 +475,9 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 def lint_local_code(
     w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
 ):
-    """Lint local code files looking for problems in notebooks and python files."""
-    if path is None:
-        path = prompts.question(
-            "Which file or directory do you want to lint ?",
-            default=Path.cwd().as_posix(),
-            validate=lambda p_: Path(p_).exists(),
-        )
     if ctx is None:
         ctx = LocalCheckoutContext(w)
-    located_advices = ctx.local_files_linter.lint(Path(path))
-    for advice in located_advices:
-        # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST
-        escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
-        # can't find a way to create for files a supported GH-like link with line number
-        # so sticking to file path only for now
-        link = escape_mask.format("", f"file://{advice.path}", advice.path)
-        print(f"Issue with file: {link} -> {repr(advice.advice)}")
-    return located_advices
+    ctx.local_code_linter.lint(prompts, Path(path))
 
 
 if __name__ == "__main__":

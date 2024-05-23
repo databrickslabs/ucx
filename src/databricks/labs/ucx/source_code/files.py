@@ -3,11 +3,13 @@ from __future__ import annotations  # for type hints
 import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
+from sys import stdout
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service.workspace import Language
+from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
@@ -74,7 +76,7 @@ class LocalDirectory(SourceContainer):
         return f"<LocalDirectory {self._path}>"
 
 
-class LocalFilesLinter:
+class LocalCodeLinter:
 
     def __init__(
         self,
@@ -91,8 +93,24 @@ class LocalFilesLinter:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._languages_factory = languages_factory
 
-    def lint(self, path: Path) -> list[LocatedAdvice]:
-        return list(self._lint(path))
+    def lint(self, prompts: Prompts, path: Path | None) -> list[LocatedAdvice]:
+        """Lint local code files looking for problems in notebooks and python files."""
+        if path is None:
+            response = prompts.question(
+                "Which file or directory do you want to lint ?",
+                default=Path.cwd().as_posix(),
+                validate=lambda p_: Path(p_).exists(),
+            )
+            path = Path(response)
+        located_advices = list(self._lint(path))
+        for advice in located_advices:
+            # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST
+            escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
+            # can't find a way to create for files a supported GH-like link with line number
+            # so sticking to file path only for now
+            link = escape_mask.format("", f"file://{advice.path}", advice.path)
+            stdout.write(f"Issue with file: {link} -> {repr(advice.advice)}")
+        return located_advices
 
     def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
         loader = self._dir_loader if path.is_dir() else self._file_loader

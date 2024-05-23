@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import Mock, create_autospec
 
 import pytest
+from databricks.labs.blueprint.tui import MockPrompts, Prompts
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
@@ -15,7 +16,7 @@ from databricks.labs.ucx.source_code.files import (
     LocalFileMigrator,
     LocalFileResolver,
     FileLoader,
-    LocalFilesLinter,
+    LocalCodeLinter,
     DirectoryLoader,
 )
 from databricks.labs.ucx.source_code.languages import Languages
@@ -129,5 +130,5 @@ def test_known_issues(path: Path, migration_index):
     resolver = DependencyResolver(
         [PipResolver(file_loader, whitelist)], notebook_resolver, [file_resolver, whitelist_resolver], path_lookup
     )
-    linter = LocalFilesLinter(file_loader, dir_loader, path_lookup, resolver, lambda: Languages(migration_index))
-    linter.lint(path)
+    linter = LocalCodeLinter(file_loader, dir_loader, path_lookup, resolver, lambda: Languages(migration_index))
+    linter.lint(Prompts(), path)
