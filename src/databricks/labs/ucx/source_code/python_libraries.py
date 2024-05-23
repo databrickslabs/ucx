@@ -237,7 +237,7 @@ if __name__ == "__main__":
             if dist_info.name in known_distributions:
                 logger.debug(f"Skipping distribution: {dist_info.name}")
                 continue
-            logger.debug(f"Processing distribution: {dist_info.name}")
+            logger.info(f"Processing distribution: {dist_info.name}")
             known_distributions[dist_info.name] = collections.OrderedDict()
             for module_path in dist_info.module_paths:
                 if not module_path.is_file():
@@ -249,7 +249,7 @@ if __name__ == "__main__":
                 for suffix in ('.py', '.__init__'):
                     if module_ref.endswith(suffix):
                         module_ref = module_ref[:-len(suffix)]
-                logger.debug(f"Processing module: {module_ref}")
+                logger.info(f"Processing module: {module_ref}")
                 languages = Languages(empty_index)
                 linter = FileLinter(languages, module_path)
                 problems = []

@@ -61,6 +61,9 @@
   "isort": {
     "isort": []
   },
+  "joblib": {
+    "joblib": []
+  },
   "mccabe": {
     "mccabe": []
   },
@@ -140,6 +143,12 @@
   "ruff": {
     "ruff": []
   },
+  "scikit-learn": {
+    "sklearn": []
+  },
+  "scipy": {
+    "scipy": []
+  },
   "setuptools": {
     "_distutils_hack": [],
     "pkg_resources": [],
@@ -150,6 +159,9 @@
   },
   "sqlglot": {
     "sqlglot": []
+  },
+  "threadpoolctl": {
+    "threadpoolctl": []
   },
   "tomli": {
     "tomli": []
