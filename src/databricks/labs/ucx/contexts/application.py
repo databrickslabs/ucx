@@ -281,15 +281,15 @@ class GlobalContext(abc.ABC):
     @cached_property
     def principal_locations(self):
         eligible_locations = {}
-        if self.is_azure:
-            try:
+        try:
+            if self.is_azure:
                 eligible_locations = self.azure_acl.get_eligible_locations_principals()
-            except ResourceDoesNotExist:
-                pass
-        if self.is_aws:
-            eligible_locations = self.aws_acl.get_eligible_locations_principals()
-        if self.is_gcp:
-            raise NotImplementedError("Not implemented for GCP.")
+            if self.is_aws:
+                eligible_locations = self.aws_acl.get_eligible_locations_principals()
+            if self.is_gcp:
+                raise NotImplementedError("Not implemented for GCP.")
+        except ResourceDoesNotExist:
+            pass
         return eligible_locations
 
     @cached_property
