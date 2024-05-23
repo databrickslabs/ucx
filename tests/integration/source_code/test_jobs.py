@@ -1,6 +1,10 @@
 import logging
+import sys
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
+from typing import TextIO
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.sdk.service import compute
@@ -122,6 +126,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
 
 
 def test_lint_local_code(simple_ctx):
+    # no need to connect
     light_ctx = simple_ctx.replace(languages=Languages(MigrationIndex([])))
     ucx_path = Path(__file__).parent.parent.parent.parent
     path_to_scan = Path(ucx_path, "src")
@@ -132,5 +137,10 @@ def test_lint_local_code(simple_ctx):
         light_ctx.dependency_resolver,
         lambda: light_ctx.languages,
     )
-    problems = linter.lint(Prompts(), path_to_scan)
-    assert len(problems) > 0
+    old_stdout = sys.stdout
+    try:
+        sys.stdout = create_autospec(TextIO)
+        problems = linter.lint(Prompts(), path_to_scan)
+        assert len(problems) > 0
+    finally:
+        sys.stdout = old_stdout

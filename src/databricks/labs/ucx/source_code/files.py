@@ -3,7 +3,7 @@ from __future__ import annotations  # for type hints
 import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
-from sys import stdout
+import sys
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
@@ -109,7 +109,7 @@ class LocalCodeLinter:
             # can't find a way to create for files a supported GH-like link with line number
             # so sticking to file path only for now
             link = escape_mask.format("", f"file://{advice.path}", advice.path)
-            stdout.write(f"Issue with file: {link} -> {repr(advice.advice)}")
+            sys.stdout.writelines(f"Issue with file: {link} -> {repr(advice.advice)}\n")
         return located_advices
 
     def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
