@@ -43,23 +43,23 @@
     "eradicate": []
   },
   "exceptiongroup": {
-    "exceptiongroup": [],
+    "exceptiongroup": []
   },
   "execnet": {
-    "execnet": [],
+    "execnet": []
   },
   "google-auth": {
     "google.auth": [],
     "google.oauth2": []
   },
   "idna": {
-    "idna": [],
+    "idna": []
   },
   "iniconfig": {
-    "iniconfig": [],
+    "iniconfig": []
   },
   "isort": {
-    "isort": [],
+    "isort": []
   },
   "mccabe": {
     "mccabe": []
