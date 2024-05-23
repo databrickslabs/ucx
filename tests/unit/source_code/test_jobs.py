@@ -47,13 +47,13 @@ def graph(mock_path_lookup, dependency_resolver) -> DependencyGraph:
 def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
     # Goal of test is to raise test coverage, remove after implementing
     ws = create_autospec(WorkspaceClient)
-    library = compute.Library(jar="library.jar", egg="library.egg", whl="library.whl", requirements="requirements.txt")
+    library = compute.Library(jar="library.jar", egg="library.egg", whl="library.whl")
     task = jobs.Task(task_key="test", libraries=[library], existing_cluster_id="id")
 
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(problems) == 5
+    assert len(problems) == 4
     assert all(problem.code == "not-yet-implemented" for problem in problems)
     ws.assert_not_called()
 
