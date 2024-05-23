@@ -990,7 +990,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
-    def create(  # pylint: disable=too-many-locals,too-many-arguments
+    def create(  # pylint: disable=too-many-locals,too-many-arguments,too-many-statements
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
@@ -999,6 +999,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         non_delta: bool = False,
         external: bool = False,
         external_csv: str | None = None,
+        external_delta: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
         hiveserde_ddl: str | None = None,
@@ -1036,6 +1037,11 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             data_source_format = DataSourceFormat.CSV
             storage_location = external_csv
             ddl = f"{ddl} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
+        elif external_delta is not None:
+            table_type = TableType.EXTERNAL
+            data_source_format = DataSourceFormat.DELTA
+            storage_location = external_delta
+            ddl = f"{ddl} (id string) LOCATION '{storage_location}'"
         elif external:
             # external table
             table_type = TableType.EXTERNAL

@@ -158,6 +158,8 @@ class TableMapping:
         return Threads.strict("checking databases for skip property", tasks)
 
     def _get_database_in_scope_task(self, database: str) -> str | None:
+        if database.startswith("mounted_"):
+            return database
         describe = {}
         try:
             for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
@@ -182,14 +184,11 @@ class TableMapping:
         if self.exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        try:
-            result = self._sql_backend.fetch(
-                f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
-            )
-        except DatabricksError as err:
-            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+        properties = self._get_table_properties(table)
+        if not properties:
             return None
-        for value in result:
+
+        for value in properties:
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
                 return None
@@ -210,20 +209,45 @@ class TableMapping:
 
         return table_to_migrate
 
+    def _get_table_properties(self, table: Table):
+        table_identifier = f"{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+        if table.is_table_in_mount:
+            table_identifier = f"delta.`{table.location}`"
+
+        try:
+            return self._sql_backend.fetch(f"SHOW TBLPROPERTIES {table_identifier}")
+        except DatabricksError as err:
+            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+            return None
+
     def exists_in_uc(self, src_table: Table, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.
-        try:
-            table_info = self._ws.tables.get(target_key)
-            if not table_info.properties:
-                return True
-            upgraded_from = table_info.properties.get("upgraded_from")
-            if upgraded_from and upgraded_from != src_table.key:
-                raise ResourceConflict(
-                    f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
-                    "You can skip this error using the CLI command: "
-                    "databricks labs ucx skip "
-                    f"--schema {src_table.database} --table {src_table.name}"
-                )
-            return True
-        except NotFound:
+        table_info = self._try_get_table_in_uc(target_key)
+        if not table_info:
             return False
+        # Corner case for tables in mounts where the table exists in UC, but the location is not the same
+        # from the one provided in the mapping
+        if src_table.is_table_in_mount and table_info.storage_location != src_table.location:
+            raise ResourceConflict(
+                f"Expected to be migrated from {src_table.key}, but got {table_info.storage_location}. "
+                "You can skip this error using the CLI command: "
+                "databricks labs ucx skip "
+                f"--schema {src_table.database} --table {src_table.name}"
+            )
+        if not table_info.properties:
+            return True
+        upgraded_from = table_info.properties.get("upgraded_from")
+        if upgraded_from and upgraded_from != src_table.key and not src_table.is_table_in_mount:
+            raise ResourceConflict(
+                f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
+                "You can skip this error using the CLI command: "
+                "databricks labs ucx skip "
+                f"--schema {src_table.database} --table {src_table.name}"
+            )
+        return True
+
+    def _try_get_table_in_uc(self, target_key: str):
+        try:
+            return self._ws.tables.get(target_key)
+        except NotFound:
+            return None
