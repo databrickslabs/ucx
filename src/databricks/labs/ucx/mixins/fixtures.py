@@ -974,10 +974,9 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
         if name is None:
             name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
-        sql_backend.execute(f"CREATE SCHEMA {full_name}")
-        remove_after_property = {"RemoveAfter": get_test_purge_time()}
+        sql_backend.execute(f"CREATE SCHEMA {full_name} WITH DBPROPERTIES (RemoveAfter={get_test_purge_time()})")
         schema_info = SchemaInfo(
-            catalog_name=catalog_name, name=name, full_name=full_name, properties=remove_after_property
+            catalog_name=catalog_name, name=name, full_name=full_name
         )
         logger.info(
             f"Schema {schema_info.full_name}: "
