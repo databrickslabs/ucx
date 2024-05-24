@@ -1070,9 +1070,9 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
 
         # table properties fails with CTAS statements
-        alter_table_tbl_properties_ddl = ""
+        alter_table_tbl_properties = ""
         if ctas or non_delta:
-            alter_table_tbl_properties_ddl = (
+            alter_table_tbl_properties = (
                 f'ALTER {"VIEW" if view else "TABLE"} {full_name} SET TBLPROPERTIES ({str_properties})'
             )
         else:
@@ -1088,7 +1088,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 
         # CTAS AND NON_DELTA does not support TBLPROPERTIES
         if ctas or non_delta:
-            sql_backend.execute(alter_table_tbl_properties_ddl)
+            sql_backend.execute(alter_table_tbl_properties)
 
         table_info = TableInfo(
             catalog_name=catalog_name,
