@@ -153,4 +153,4 @@ def test_known_issues(path: Path, migration_index):
         [PipResolver(file_loader, whitelist)], notebook_resolver, import_resolver, path_lookup
     )
     linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: Languages(migration_index))
-    linter.lint(Prompts(), path)
+    linter.lint(MockPrompts(), path)
