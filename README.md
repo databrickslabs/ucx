@@ -987,9 +987,13 @@ This command detects all dependencies, and analyzes them. It is still experiment
 We expect this command to run within a minute on code bases up to 50.000 lines of code.
 Future versions of `ucx` will add support for more source types, and more migration details.
 
-## `migrate-local-code` command
+When run from an IDE terminal, this command generates output as follows:
+![img.png](docs/lint-local-code-output.png)
+With modern IDEs, clicking on the file link opens the file at the problematic line
 
 [[back to top](#databricks-labs-ucx)]
+
+## `migrate-local-code` command
 
 ```text
 databricks labs ucx migrate-local-code

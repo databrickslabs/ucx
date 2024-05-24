@@ -1,6 +1,5 @@
 import io
 import logging
-import sys
 from dataclasses import replace
 from io import StringIO
 from pathlib import Path
@@ -137,13 +136,8 @@ def test_lint_local_code(simple_ctx):
         light_ctx.dependency_resolver,
         lambda: light_ctx.languages,
     )
-    old_stdout = sys.stdout
-    try:
-        sys.stdout = StringIO()
-        problems = linter.lint(Prompts(), path_to_scan)
-        assert len(problems) > 0
-    finally:
-        sys.stdout = old_stdout
+    problems = linter.lint(Prompts(), path_to_scan, StringIO())
+    assert len(problems) > 0
 
 
 def test_workflow_linter_lints_job_with_requirements_dependency(

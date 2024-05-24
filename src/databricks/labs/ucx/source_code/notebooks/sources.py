@@ -104,12 +104,10 @@ class NotebookLinter:
         return "notebook-linter"
 
 
-class ExtensionsHelper:
-
-    SUPPORTED_SUFFIXES = {
-        '.py': Language.PYTHON,
-        '.sql': Language.SQL,
-    }
+SUPPORTED_EXTENSION_LANGUAGES = {
+    '.py': Language.PYTHON,
+    '.sql': Language.SQL,
+}
 
 
 class FileLinter:
@@ -166,7 +164,7 @@ class FileLinter:
         return self._path.read_text() if self._content is None else self._content
 
     def _file_language(self):
-        return ExtensionsHelper.SUPPORTED_SUFFIXES.get(self._path.suffix.lower())
+        return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
 
     def _is_notebook(self):
         language = self._file_language()

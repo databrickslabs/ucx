@@ -4,9 +4,10 @@ import logging
 from collections.abc import Iterable, Callable
 from pathlib import Path
 import sys
+from typing import TextIO
 
 from databricks.labs.ucx.source_code.base import LocatedAdvice
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, ExtensionsHelper
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 from databricks.sdk.service.workspace import Language
@@ -97,7 +98,7 @@ class LocalCodeLinter:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._languages_factory = languages_factory
 
-    def lint(self, prompts: Prompts, path: Path | None) -> list[LocatedAdvice]:
+    def lint(self, prompts: Prompts, path: Path | None, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
         """Lint local code files looking for problems in notebooks and python files."""
         if path is None:
             response = prompts.question(
@@ -113,7 +114,7 @@ class LocalCodeLinter:
             message = (
                 f"{advice_path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}\n"
             )
-            sys.stdout.write(message)
+            stdout.write(message)
         return located_advices
 
     def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
@@ -204,7 +205,7 @@ class FileLoader(DependencyLoader):
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        language = ExtensionsHelper.SUPPORTED_SUFFIXES.get(absolute_path.suffix.lower())
+        language = SUPPORTED_EXTENSION_LANGUAGES.get(absolute_path.suffix.lower())
         if not language:
             return StubContainer(absolute_path)
         for encoding in ("utf-8", "ascii"):
