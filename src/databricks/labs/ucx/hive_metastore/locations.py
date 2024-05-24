@@ -152,7 +152,7 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
                     container_sep_loc = loc.location.index("@")
                     container_name = loc.location[prefix_len:container_sep_loc]
                     res_name = (
-                        loc.location[container_sep_loc + 1:]
+                        loc.location[container_sep_loc + 1 :]
                         .replace(".dfs.core.windows.net", "")
                         .rstrip("/")
                         .replace("/", "_")
