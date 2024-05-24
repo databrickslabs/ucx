@@ -1,7 +1,7 @@
 import base64
 import logging
 import re
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, Mock
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -377,7 +377,7 @@ def sp_migration(installation, credential_manager):
     sp_crawler = create_autospec(AzureServicePrincipalCrawler)
     arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
     sp_crawler.snapshot.return_value = [
-        AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "labsazurethings"),
+        AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
         AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1"),
         AzureServicePrincipalInfo("app_secret3", "test_scope", "", "tenant_id_2", "storage1"),
         AzureServicePrincipalInfo("app_secret4", "", "", "tenant_id_2", "storage1"),
@@ -546,15 +546,59 @@ def test_create_access_connectors_for_storage_accounts(sp_migration):
     assert len(validation_results[0].failures) == 0
 
 
-@pytest.mark.parametrize(
-    "secret_bytes_value, num_migrated",
-    [
-        (GetSecretResponse(value=base64.b64encode("Olá, Mundo".encode("iso-8859-1")).decode("iso-8859-1")), 1),
-    ],
-)
-def test_create_access_connectors_for_spn_no_secret(sp_migration, secret_bytes_value, num_migrated):
-    # pylint: disable-next=protected-access
-    sp_migration._ws.secrets.get_secret.return_value = secret_bytes_value
+@pytest.fixture
+def sp_migration_1(installation, credential_manager):
+    ws = create_autospec(WorkspaceClient)
+    ws.secrets.get_secret.return_value = GetSecretResponse(
+        value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")
+    )
+
+    mock_get_secret = Mock()
+    mock_get_secret.side_effect = [
+        GetSecretResponse(value=base64.b64encode("hello world".encode("utf-8")).decode("utf-8")),
+        ResourceDoesNotExist(),
+    ]
+    ws.secrets.get_secret = mock_get_secret
+
+    storage_account = StorageAccount(
+        id=AzureResource("/subscriptions/test/providers/Microsoft.Storage/storageAccount/labsazurethings"),
+        name="labsazurethings",
+        location="westeu",
+        default_network_action="Allow",
+    )
+    azurerm = create_autospec(AzureResources)
+    azurerm.storage_accounts.return_value = [storage_account]
+
+    access_connector_id = AzureResource(
+        "/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Databricks/accessConnectors/ac-test"
+    )
+    azurerm.create_or_update_access_connector.return_value = AccessConnector(
+        id=access_connector_id,
+        name=f"ac-{storage_account.name}",
+        location=storage_account.location,
+        provisioning_state="Succeeded",
+        identity_type="SystemAssigned",
+        principal_id="test",
+        tenant_id="test",
+    )
+
+    external_location = ExternalLocation(f"abfss://things@{storage_account.name}.dfs.core.windows.net/folder1", 1)
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [external_location]
+
+    sp_crawler = create_autospec(AzureServicePrincipalCrawler)
+    arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
+    sp_crawler.snapshot.return_value = [
+        AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
+        AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "labsazurethings"),
+        AzureServicePrincipalInfo("app_secret3", "test_scope", "", "tenant_id_2", "storage1"),
+        AzureServicePrincipalInfo("app_secret4", "", "", "tenant_id_2", "storage1"),
+    ]
+
+    return ServicePrincipalMigration(installation, ws, arp, sp_crawler, credential_manager)
+
+
+def test_create_access_connectors_for_spn_no_secret(sp_migration_1):
     prompts = MockPrompts(
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
@@ -562,6 +606,6 @@ def test_create_access_connectors_for_spn_no_secret(sp_migration, secret_bytes_v
             "Please confirm whether to create an access connector with a managed identity*": "Yes",
         }
     )
-    validation_results = sp_migration.run(prompts)
-    assert len(validation_results) == num_migrated
+    validation_results = sp_migration_1.run(prompts)
+    assert len(validation_results) == 2
     assert len(validation_results[0].failures) == 0
