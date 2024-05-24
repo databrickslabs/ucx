@@ -159,4 +159,3 @@ def test_remove_after_property_schema(ws, make_schema, sql_backend):
     for row in sql_response:
         if row.database_description_item == "Properties":
             assert "RemoveAfter" in row[1]
-

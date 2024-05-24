@@ -975,9 +975,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
             name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
         sql_backend.execute(f"CREATE SCHEMA {full_name} WITH DBPROPERTIES (RemoveAfter={get_test_purge_time()})")
-        schema_info = SchemaInfo(
-            catalog_name=catalog_name, name=name, full_name=full_name
-        )
+        schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
         logger.info(
             f"Schema {schema_info.full_name}: "
             f"{ws.config.host}/explore/data/{schema_info.catalog_name}/{schema_info.name}"
@@ -1072,9 +1070,9 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
 
         # table properties fails with CTAS statements
-        ctas_tbl_properties_ddl = ""
+        alter_table_tbl_properties_ddl = ""
         if ctas or non_delta:
-            ctas_tbl_properties_ddl = (
+            alter_table_tbl_properties_ddl = (
                 f'ALTER {"VIEW" if view else "TABLE"} {full_name} SET TBLPROPERTIES ({str_properties})'
             )
         else:
@@ -1090,7 +1088,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
 
         # CTAS AND NON_DELTA does not support TBLPROPERTIES
         if ctas or non_delta:
-            sql_backend.execute(ctas_tbl_properties_ddl)
+            sql_backend.execute(alter_table_tbl_properties_ddl)
 
         table_info = TableInfo(
             catalog_name=catalog_name,
