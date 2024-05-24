@@ -101,7 +101,7 @@ class LocalCodeLinter:
         """Lint local code files looking for problems in notebooks and python files."""
         if path is None:
             response = prompts.question(
-                "Which file or directory do you want to lint ?",
+                "Which file or directory do you want to lint?",
                 default=Path.cwd().as_posix(),
                 validate=lambda p_: Path(p_).exists(),
             )
