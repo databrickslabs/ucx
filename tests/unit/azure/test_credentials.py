@@ -377,7 +377,7 @@ def sp_migration(installation, credential_manager):
     sp_crawler = create_autospec(AzureServicePrincipalCrawler)
     arp = AzureResourcePermissions(installation, ws, azurerm, external_locations)
     sp_crawler.snapshot.return_value = [
-        AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "storage1"),
+        AzureServicePrincipalInfo("app_secret1", "test_scope", "test_key", "tenant_id_1", "labsazurethings"),
         AzureServicePrincipalInfo("app_secret2", "test_scope", "test_key", "tenant_id_1", "storage1"),
         AzureServicePrincipalInfo("app_secret3", "test_scope", "", "tenant_id_2", "storage1"),
         AzureServicePrincipalInfo("app_secret4", "", "", "tenant_id_2", "storage1"),
@@ -405,6 +405,7 @@ def test_read_secret_value_decode(sp_migration, secret_bytes_value, num_migrated
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+            "Please confirm whether to create an access connector with a managed identity*": "No",
         }
     )
     assert len(sp_migration.run(prompts)) == num_migrated
@@ -440,6 +441,7 @@ def test_read_secret_read_exception(caplog, sp_migration):
         {
             "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+            "Please confirm whether to create an access connector with a managed identity*": "No",
         }
     )
 
@@ -541,4 +543,25 @@ def test_create_access_connectors_for_storage_accounts(sp_migration):
 
     assert len(validation_results) == 1
     assert validation_results[0].name.startswith("ac")
+    assert len(validation_results[0].failures) == 0
+
+
+@pytest.mark.parametrize(
+    "secret_bytes_value, num_migrated",
+    [
+        (GetSecretResponse(value=base64.b64encode("Olá, Mundo".encode("iso-8859-1")).decode("iso-8859-1")), 1),
+    ],
+)
+def test_create_access_connectors_for_spn_no_secret(sp_migration, secret_bytes_value, num_migrated):
+    # pylint: disable-next=protected-access
+    sp_migration._ws.secrets.get_secret.return_value = secret_bytes_value
+    prompts = MockPrompts(
+        {
+            "Above Azure Service Principals will be migrated to UC storage credentials*": "Yes",
+            r"\[RECOMMENDED\] Please confirm to create an access connector*": "No",
+            "Please confirm whether to create an access connector with a managed identity*": "Yes",
+        }
+    )
+    validation_results = sp_migration.run(prompts)
+    assert len(validation_results) == num_migrated
     assert len(validation_results[0].failures) == 0
