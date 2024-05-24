@@ -137,34 +137,30 @@ class ExternalLocations(CrawlerBase[ExternalLocation]):
         ):
             yield ExternalLocation(*row)
 
-    def _get_ext_location_definitions(self, missing_locations: list[ExternalLocation]) -> list:
+    @staticmethod
+    def _get_ext_location_definitions(missing_locations: list[ExternalLocation]) -> list:
         tf_script = []
         cnt = 1
+        res_name = ""
+        supported_prefixes = ("s3://", "s3a://", "s3n://", "gcs://", "abfss://")
         for loc in missing_locations:
-            if loc.location.startswith(("s3://", "s3a://", "s3n://")):
-                # Determine the prefix length based on the starting substring
-                if loc.location.startswith("s3://"):
-                    prefix_length = 5
-                elif loc.location.startswith("s3a://"):
-                    prefix_length = 6
-                elif loc.location.startswith("s3n://"):
-                    prefix_length = 6
-                else:
-                    logger.warning(f"unsupported storage format {loc.location}")
+            for prefix in supported_prefixes:
+                prefix_len = len(prefix)
+                if not loc.location.startswith(prefix):
                     continue
-                res_name = loc.location[prefix_length:].rstrip("/").replace("/", "_")
-            elif loc.location.startswith("gcs://"):
-                res_name = loc.location[6:].rstrip("/").replace("/", "_")
-            elif loc.location.startswith("abfss://"):
-                container_name = loc.location[8 : loc.location.index("@")]
-                res_name = (
-                    loc.location[loc.location.index("@") + 1 :]
-                    .replace(".dfs.core.windows.net", "")
-                    .rstrip("/")
-                    .replace("/", "_")
-                )
-                res_name = f"{container_name}_{res_name}"
-            else:
+                if prefix == "abfss://":
+                    container_sep_loc = loc.location.index("@")
+                    container_name = loc.location[prefix_len:container_sep_loc]
+                    res_name = (
+                        loc.location[container_sep_loc + 1:]
+                        .replace(".dfs.core.windows.net", "")
+                        .rstrip("/")
+                        .replace("/", "_")
+                    )
+                    res_name = f"{container_name}_{res_name}"
+                else:
+                    res_name = loc.location[prefix_len:].rstrip("/").replace("/", "_")
+            if res_name == "":
                 # if the cloud storage url doesn't match the above condition or incorrect (example wasb://)
                 # dont generate tf script and ignore
                 logger.warning(f"unsupported storage format {loc.location}")
