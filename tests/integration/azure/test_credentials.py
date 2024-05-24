@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import create_autospec
+from urllib.parse import urlparse
 
 import pytest
 from databricks.labs.blueprint.installation import MockInstallation
@@ -12,7 +13,7 @@ from databricks.sdk.errors import InternalError, NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
-from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.access import AzureResourcePermissions, AccessConnectorWithStorageUrl
 from databricks.labs.ucx.azure.credentials import (
     ServicePrincipalMigration,
     StorageCredentialManager,
@@ -203,7 +204,9 @@ def test_spn_migration_access_connector_created(
         tenant_id="test",
     )
     mount = env_or_skip("TEST_MOUNT_CONTAINER")
-    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [(access_connector, mount)]
+    storage_account_name = urlparse(mount).hostname.removesuffix(".dfs.core.windows.net")
+    access_connector_w_str_url = AccessConnectorWithStorageUrl(access_connector, mount, storage_account_name)
+    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [access_connector_w_str_url]
 
     run_migration(
         az_cli_ctx.workspace_client,

@@ -9,7 +9,7 @@ from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.compute import DataSecurityMode
 from databricks.sdk.service.catalog import SecurableType, PermissionsChange, Privilege, PrivilegeAssignment
 
-from databricks.labs.ucx.azure.access import AzureResourcePermissions
+from databricks.labs.ucx.azure.access import AzureResourcePermissions, AccessConnectorWithStorageUrl
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -281,7 +281,8 @@ def test_run_external_locations_using_access_connector(
         principal_id="test",
         tenant_id="test",
     )
-    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [(access_connector, mount)]
+    access_connector_w_str_url = AccessConnectorWithStorageUrl(access_connector, mount, storage_account_name)
+    resource_permissions.create_access_connectors_for_storage_accounts.return_value = [access_connector_w_str_url]
 
     az_cli_ctx = az_cli_ctx.replace(azure_resource_permissions=resource_permissions)
 
@@ -302,6 +303,7 @@ def test_run_external_locations_using_access_connector(
         {
             r"\[RECOMMENDED\] Please confirm to create an access connector*": "Yes",
             "Above Azure Service Principals will be migrated to UC storage credentials *": "No",
+            "Please confirm whether to create an access connector with a managed identity*": "No",
         }
     )
 
