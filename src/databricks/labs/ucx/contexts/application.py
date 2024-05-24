@@ -17,6 +17,7 @@ from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -46,7 +47,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, FolderLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.whitelist import Whitelist
@@ -286,12 +287,15 @@ class GlobalContext(abc.ABC):
     @cached_property
     def principal_locations(self):
         eligible_locations = {}
-        if self.is_azure:
-            eligible_locations = self.azure_acl.get_eligible_locations_principals()
-        if self.is_aws:
-            eligible_locations = self.aws_acl.get_eligible_locations_principals()
-        if self.is_gcp:
-            raise NotImplementedError("Not implemented for GCP.")
+        try:
+            if self.is_azure:
+                eligible_locations = self.azure_acl.get_eligible_locations_principals()
+            if self.is_aws:
+                eligible_locations = self.aws_acl.get_eligible_locations_principals()
+            if self.is_gcp:
+                raise NotImplementedError("Not implemented for GCP.")
+        except ResourceDoesNotExist:
+            pass
         return eligible_locations
 
     @cached_property
@@ -381,6 +385,10 @@ class GlobalContext(abc.ABC):
     @cached_property
     def file_loader(self):
         return FileLoader()
+
+    @cached_property
+    def folder_loader(self):
+        return FolderLoader(self.file_loader)
 
     @cached_property
     def whitelist(self):

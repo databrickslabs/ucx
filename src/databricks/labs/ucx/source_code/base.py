@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
+
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -53,6 +55,15 @@ class Advice:
 
     def as_convention(self) -> 'Convention':
         return Convention(**self.__dict__)
+
+    def for_path(self, path: Path) -> LocatedAdvice:
+        return LocatedAdvice(self, path)
+
+
+@dataclass
+class LocatedAdvice:
+    advice: Advice
+    path: Path
 
 
 class Advisory(Advice):

@@ -68,6 +68,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
 * [Code migration commands](#code-migration-commands)
+  * [`lint-local-code` command](#lint-local-code-command)
   * [`migrate-local-code` command](#migrate-local-code-command)
   * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
   * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
@@ -970,6 +971,25 @@ After you're done with the [table migration](#table-migration-workflow), you can
 
 Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
 clusters to be UC compatible.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `lint-local-code` command
+
+```text
+databricks labs ucx lint-local-code
+```
+
+At any time, you can run this command to assess all migrations required in a local directory or a file. It only takes seconds to run and it
+gives you an initial overview of what needs to be migrated without actually performing any migration. A great way to start a migration!
+
+This command detects all dependencies, and analyzes them. It is still experimental and at the moment only supports Python and SQL files.
+We expect this command to run within a minute on code bases up to 50.000 lines of code.
+Future versions of `ucx` will add support for more source types, and more migration details.
+
+When run from an IDE terminal, this command generates output as follows:
+![img.png](docs/lint-local-code-output.png)
+With modern IDEs, clicking on the file link opens the file at the problematic line
 
 [[back to top](#databricks-labs-ucx)]
 

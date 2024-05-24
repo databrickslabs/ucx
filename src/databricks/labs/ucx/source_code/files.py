@@ -1,11 +1,17 @@
 from __future__ import annotations  # for type hints
 
 import logging
+from collections.abc import Iterable, Callable
 from pathlib import Path
+import sys
+from typing import TextIO
 
+from databricks.labs.ucx.source_code.base import LocatedAdvice
+from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import Whitelist, UCCompatibility
 from databricks.sdk.service.workspace import Language
+from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
@@ -18,6 +24,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
     MaybeDependency,
     SourceContainer,
+    DependencyResolver,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,10 +39,13 @@ class LocalFile(SourceContainer):
         self._language = CellLanguage.of_language(language)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        if self._language is not CellLanguage.PYTHON:
-            logger.warning(f"Unsupported language: {self._language.language}")
+        if self._language is CellLanguage.PYTHON:
+            return parent.build_graph_from_python_source(self._original_code)
+        # supported language that does not generate dependencies
+        if self._language is CellLanguage.SQL:
             return []
-        return parent.build_graph_from_python_source(self._original_code)
+        logger.warning(f"Unsupported language: {self._language.language}")
+        return []
 
     @property
     def path(self) -> Path:
@@ -45,12 +55,95 @@ class LocalFile(SourceContainer):
         return f"<LocalFile {self._path}>"
 
 
+class Folder(SourceContainer):
+    def __init__(self, path: Path, file_loader: FileLoader, folder_loader: FolderLoader):
+        self._path = path
+        self._file_loader = file_loader
+        self._folder_loader = folder_loader
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        # don't directly scan non-source directories, let it be done for relevant imports only
+        if self._path.name in {"__pycache__", ".git", ".github", ".venv", ".mypy_cache", "site-packages"}:
+            return []
+        return list(self._build_dependency_graph(parent))
+
+    def _build_dependency_graph(self, parent: DependencyGraph) -> Iterable[DependencyProblem]:
+        for child_path in self._path.iterdir():
+            loader = self._folder_loader if child_path.is_dir() else self._file_loader
+            dependency = Dependency(loader, child_path)
+            yield from parent.register_dependency(dependency).problems
+
+    def __repr__(self):
+        return f"<Folder {self._path}>"
+
+
+class LocalCodeLinter:
+
+    def __init__(
+        self,
+        file_loader: FileLoader,
+        folder_loader: FolderLoader,
+        path_lookup: PathLookup,
+        dependency_resolver: DependencyResolver,
+        languages_factory: Callable[[], Languages],
+    ) -> None:
+        self._file_loader = file_loader
+        self._folder_loader = folder_loader
+        self._path_lookup = path_lookup
+        self._dependency_resolver = dependency_resolver
+        self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+        self._languages_factory = languages_factory
+
+    def lint(self, prompts: Prompts, path: Path | None, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
+        """Lint local code files looking for problems in notebooks and python files."""
+        if path is None:
+            response = prompts.question(
+                "Which file or directory do you want to lint?",
+                default=Path.cwd().as_posix(),
+                validate=lambda p_: Path(p_).exists(),
+            )
+            path = Path(response)
+        located_advices = list(self._lint(path))
+        for located in located_advices:
+            advice_path = located.path.relative_to(path)
+            advice = located.advice
+            message = (
+                f"{advice_path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}\n"
+            )
+            stdout.write(message)
+        return located_advices
+
+    def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
+        loader = self._folder_loader if path.is_dir() else self._file_loader
+        dependency = Dependency(loader, path)
+        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)
+        container = dependency.load(self._path_lookup)
+        assert container is not None  # because we just created it
+        problems = container.build_dependency_graph(graph)
+        for problem in problems:
+            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
+            yield problem.as_advisory().for_path(problem_path)
+        for child_path in graph.all_paths:
+            yield from self._lint_one(child_path)
+
+    def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
+        if path.is_dir():
+            return []
+        languages = self._languages_factory()
+        linter = FileLinter(languages, path)
+        return [advice.for_path(path) for advice in linter.lint()]
+
+
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(self, languages: Languages):
-        self._languages = languages
+    def __init__(self, languages_factory: Callable[[], Languages]):
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
+        self._languages_factory = languages_factory
 
     def apply(self, path: Path) -> bool:
         if path.is_dir():
@@ -73,7 +166,8 @@ class LocalFileMigrator:
             return False
         logger.info(f"Analysing {path}")
         # Get the linter for the language
-        linter = self._languages.linter(language)
+        languages = self._languages_factory()
+        linter = languages.linter(language)
         # Open the file and read the code
         with path.open("r") as f:
             code = f.read()
@@ -81,7 +175,7 @@ class LocalFileMigrator:
             # Lint the code and apply fixes
             for advice in linter.lint(code):
                 logger.info(f"Found: {advice}")
-                fixer = self._languages.fixer(language, advice.code)
+                fixer = languages.fixer(language, advice.code)
                 if not fixer:
                     continue
                 logger.info(f"Applying fix for {advice}")
@@ -96,18 +190,49 @@ class LocalFileMigrator:
                 return True
 
 
+class StubContainer(SourceContainer):
+
+    def __init__(self, path: Path):
+        super().__init__()
+        self._path = path
+
+    def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        return []
+
+
 class FileLoader(DependencyLoader):
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
         absolute_path = path_lookup.resolve(dependency.path)
         if not absolute_path:
             return None
-        return LocalFile(absolute_path, absolute_path.read_text("utf-8"), Language.PYTHON)
+        language = SUPPORTED_EXTENSION_LANGUAGES.get(absolute_path.suffix.lower())
+        if not language:
+            return StubContainer(absolute_path)
+        for encoding in ("utf-8", "ascii"):
+            try:
+                code = absolute_path.read_text(encoding)
+                return LocalFile(absolute_path, code, language)
+            except UnicodeDecodeError:
+                pass
+        return None
 
     def exists(self, path: Path) -> bool:
         return path.exists()
 
     def __repr__(self):
         return "FileLoader()"
+
+
+class FolderLoader(FileLoader):
+
+    def __init__(self, file_loader: FileLoader):
+        self._file_loader = file_loader
+
+    def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
+        absolute_path = path_lookup.resolve(dependency.path)
+        if not absolute_path:
+            return None
+        return Folder(absolute_path, self._file_loader, self)
 
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
@@ -177,4 +302,4 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return MaybeDependency(None, [DependencyProblem(code, message)])
 
     def __repr__(self):
-        return "LocalFileResolver()"
+        return "ImportFileResolver()"
