@@ -475,7 +475,7 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 def lint_local_code(
     w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
 ):
-    """Lint the code files based on their language."""
+    """Lint local code files looking for problems."""
     if ctx is None:
         ctx = LocalCheckoutContext(w)
     ctx.local_code_linter.lint(prompts, None if path is None else Path(path))
