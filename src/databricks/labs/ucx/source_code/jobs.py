@@ -9,6 +9,7 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
@@ -86,8 +87,7 @@ class WorkflowTaskContainer(SourceContainer):
         for library in self._task.libraries:
             yield from self._register_library(graph, library)
 
-    @staticmethod
-    def _register_library(graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
+    def _register_library(self, graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
             problems = graph.register_library(library.pypi.package)
             if problems:
@@ -99,10 +99,19 @@ class WorkflowTaskContainer(SourceContainer):
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
             yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
-        if library.requirements:
-            # TODO: download and add every entry via graph.register_library
-            # TODO: https://github.com/databrickslabs/ucx/issues/1644
-            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+        if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
+            logger.info(f"Registering libraries from {library.requirements}")
+            with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
+                contents = remote_file.read().decode()
+                for requirement in contents.splitlines():
+                    clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
+                    if clean_requirement.startswith("-r"):
+                        logger.warning(f"References to other requirements file is not supported: {requirement}")
+                        continue
+                    if clean_requirement.startswith("-c"):
+                        logger.warning(f"References to constrains file is not supported: {requirement}")
+                        continue
+                    yield from graph.register_library(clean_requirement)
         if library.jar:
             # TODO: https://github.com/databrickslabs/ucx/issues/1641
             yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')

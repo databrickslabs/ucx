@@ -438,6 +438,7 @@ def test_save_config(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "2",
             r".*": "",
             r".*days to analyze submitted runs.*": "1",
+            r"Reconciliation threshold, in percentage.*": "5",
         }
     )
     install = WorkspaceInstaller(ws).replace(
@@ -462,6 +463,7 @@ def test_save_config(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -495,6 +497,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r".*workspace group names.*": "g1, g2, g99",
             r".*": "",
+            r"Reconciliation threshold, in percentage.*": "5",
         }
     )
     ws.workspace.get_status = not_found
@@ -522,6 +525,7 @@ def test_save_config_strip_group_names(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -542,6 +546,7 @@ def test_create_cluster_policy(ws, mock_installation):
             r".*workspace group names.*": "g1, g2, g99",
             r".*We have identified one or more cluster.*": "No",
             r".*Choose a cluster policy.*": "0",
+            r"Reconciliation threshold, in percentage.*": "5",
             r".*": "",
         }
     )
@@ -568,6 +573,7 @@ def test_create_cluster_policy(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -1194,6 +1200,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r"Comma-separated list of databases to migrate.*": "db1,db2",
+            r"Reconciliation threshold, in percentage.*": "5",
             r".*": "",
         }
     )
@@ -1221,6 +1228,7 @@ def test_save_config_should_include_databases(ws, mock_installation):
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
             'num_days_submit_runs_history': 30,
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -1356,6 +1364,7 @@ def test_fresh_install(ws, mock_installation):
             r"Parallelism for migrating.*": "1000",
             r"Min workers for auto-scale.*": "2",
             r"Max workers for auto-scale.*": "20",
+            r"Reconciliation threshold, in percentage.*": "5",
             r".*": "",
         }
     )
@@ -1384,6 +1393,7 @@ def test_fresh_install(ws, mock_installation):
             'renamed_group_prefix': 'db-temp-',
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
+            'recon_tolerance_percent': 5,
         },
     )
 
@@ -1857,6 +1867,7 @@ def test_save_config_ext_hms(ws, mock_installation):
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
             r"Choose how to map the workspace groups.*": "2",  # specify names
             r"Comma-separated list of databases to migrate.*": "db1,db2",
+            r"Reconciliation threshold, in percentage.*": "5",
             r".*": "",
         }
     )
@@ -1884,5 +1895,6 @@ def test_save_config_ext_hms(ws, mock_installation):
             'warehouse_id': 'abc',
             'workspace_start_path': '/',
             'num_days_submit_runs_history': 30,
+            'recon_tolerance_percent': 5,
         },
     )

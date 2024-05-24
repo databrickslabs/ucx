@@ -1,3 +1,4 @@
+import io
 import logging
 import sys
 from dataclasses import replace
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from databricks.sdk.service import compute
+from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.blueprint.tui import Prompts
 
@@ -142,3 +144,34 @@ def test_lint_local_code(simple_ctx):
         assert len(problems) > 0
     finally:
         sys.stdout = old_stdout
+
+        
+def test_workflow_linter_lints_job_with_requirements_dependency(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_random,
+    make_directory,
+    tmp_path,
+):
+    expected_problem_message = "Could not locate import: yaml"
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=Whitelist(use_defaults=False),  # yaml is in default list
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the yaml locally
+    )
+
+    entrypoint = make_directory()
+
+    requirements_file = f"{entrypoint}/requirements.txt"
+    ws.workspace.upload(requirements_file, io.BytesIO(b"pyyaml"), format=ImportFormat.AUTO)
+    library = compute.Library(requirements=requirements_file)
+
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import yaml")
+    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+

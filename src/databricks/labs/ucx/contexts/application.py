@@ -9,6 +9,12 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
+
+from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
+from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
+from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
+from databricks.labs.ucx.recon.migration_recon import MigrationRecon
+from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.errors import ResourceDoesNotExist
@@ -413,6 +419,34 @@ class GlobalContext(abc.ABC):
             self.migration_status_refresher.index(),
             self.workspace_client,
             self.installation,
+        )
+
+    @cached_property
+    def metadata_retriever(self):
+        return DatabricksTableMetadataRetriever(self.sql_backend)
+
+    @cached_property
+    def schema_comparator(self):
+        return StandardSchemaComparator(self.metadata_retriever)
+
+    @cached_property
+    def data_profiler(self):
+        return StandardDataProfiler(self.sql_backend, self.metadata_retriever)
+
+    @cached_property
+    def data_comparator(self):
+        return StandardDataComparator(self.sql_backend, self.data_profiler)
+
+    @cached_property
+    def migration_recon(self):
+        return MigrationRecon(
+            self.sql_backend,
+            self.inventory_database,
+            self.migration_status_refresher,
+            self.table_mapping,
+            self.schema_comparator,
+            self.data_comparator,
+            self.config.recon_tolerance_percent,
         )
 
 

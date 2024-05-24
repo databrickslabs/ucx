@@ -44,7 +44,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-dependencies = ["databricks-sdk~=0.27.0",
+dependencies = ["databricks-sdk>=0.27,<0.29",
                 "databricks-labs-lsql~=0.4.0",
                 "databricks-labs-blueprint>=0.4.3,<0.7.0",
                 "PyYAML>=6.0.0,<7.0.0",
