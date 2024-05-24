@@ -145,7 +145,7 @@ def test_lint_local_code(simple_ctx):
     finally:
         sys.stdout = old_stdout
 
-        
+
 def test_workflow_linter_lints_job_with_requirements_dependency(
     simple_ctx,
     ws,
@@ -174,4 +174,3 @@ def test_workflow_linter_lints_job_with_requirements_dependency(
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
-
