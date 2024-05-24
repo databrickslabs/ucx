@@ -31,7 +31,9 @@ def test_table_migration_job_refreshes_migration_status(ws, installation_ctx, pr
     migration_status_query = f"SELECT * FROM {ctx.config.inventory_database}.migration_status"
     migration_statuses = list(ctx.sql_backend.fetch(migration_status_query))
 
-    assert len(migration_statuses) > 0, "No migration statuses found"
+    if len(migration_statuses) == 0:
+        ctx.deployed_workflows.relay_logs(workflow)
+        assert False, "No migration statuses found"
 
     asserts = []
     for table in tables.values():
