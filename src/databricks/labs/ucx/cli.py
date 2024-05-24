@@ -11,7 +11,7 @@ from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
-from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
+from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
 
 ucx = App(__file__)
@@ -398,7 +398,7 @@ def revert_cluster_remap(w: WorkspaceClient, prompts: Prompts):
 @ucx.command
 def migrate_local_code(w: WorkspaceClient, prompts: Prompts):
     """Fix the code files based on their language."""
-    ctx = WorkspaceContext(w)
+    ctx = LocalCheckoutContext(w)
     working_directory = Path.cwd()
     if not prompts.confirm("Do you want to apply UC migration to all files in the current directory?"):
         return
@@ -469,6 +469,16 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
     """Revert migrated DBSQL Dashboard queries back to their original state"""
     ctx = WorkspaceContext(w)
     ctx.redash.revert_dashboards(dashboard_id)
+
+
+@ucx.command
+def lint_local_code(
+    w: WorkspaceClient, prompts: Prompts, path: str | None = None, ctx: LocalCheckoutContext | None = None
+):
+    """Lint local code files looking for problems."""
+    if ctx is None:
+        ctx = LocalCheckoutContext(w)
+    ctx.local_code_linter.lint(prompts, None if path is None else Path(path))
 
 
 if __name__ == "__main__":

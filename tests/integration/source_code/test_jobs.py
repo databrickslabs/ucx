@@ -1,13 +1,19 @@
 import io
 import logging
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
 
 import pytest
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import ImportFormat
 
+from databricks.labs.blueprint.tui import Prompts
+
+from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
+from databricks.labs.ucx.source_code.files import LocalCodeLinter
+from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
@@ -19,7 +25,9 @@ def test_running_real_workflow_linter_job(installation_ctx):
     ctx.deployed_workflows.validate_step("experimental-workflow-linter")
     cursor = ctx.sql_backend.fetch(f"SELECT COUNT(*) AS count FROM {ctx.inventory_database}.workflow_problems")
     result = next(cursor)
-    assert result['count'] > 0
+    if result['count'] == 0:
+        ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
+        assert False, "No workflow problems found"
 
 
 @pytest.fixture
@@ -116,6 +124,22 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
+
+
+def test_lint_local_code(simple_ctx):
+    # no need to connect
+    light_ctx = simple_ctx.replace(languages=Languages(MigrationIndex([])))
+    ucx_path = Path(__file__).parent.parent.parent.parent
+    path_to_scan = Path(ucx_path, "src")
+    linter = LocalCodeLinter(
+        light_ctx.file_loader,
+        light_ctx.folder_loader,
+        light_ctx.path_lookup,
+        light_ctx.dependency_resolver,
+        lambda: light_ctx.languages,
+    )
+    problems = linter.lint(Prompts(), path_to_scan, StringIO())
+    assert len(problems) > 0
 
 
 def test_workflow_linter_lints_job_with_requirements_dependency(
