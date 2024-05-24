@@ -15,6 +15,7 @@ from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.recon.base import TableIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,11 @@ class Rule:
     dst_schema: str
     src_table: str
     dst_table: str
+    recon_tolerance_percent: int = 0  # threshold for row count comparison
+    compare_rows: bool = False  # whether to compare row by row
 
     @classmethod
-    def initial(cls, workspace_name: str, catalog_name: str, table: Table) -> "Rule":
+    def initial(cls, workspace_name: str, catalog_name: str, table: Table, recon_tolerance_percent: int) -> "Rule":
         return cls(
             workspace_name=workspace_name,
             catalog_name=catalog_name,
@@ -37,6 +40,7 @@ class Rule:
             dst_schema=table.database,
             src_table=table.name,
             dst_table=table.name,
+            recon_tolerance_percent=recon_tolerance_percent,
         )
 
     @classmethod
@@ -48,7 +52,11 @@ class Rule:
             dst_schema=str(dst_schema.name or ""),
             src_table=str(src_table.name or ""),
             dst_table=str(src_table.name or ""),
+            recon_tolerance_percent=0,
         )
+
+    def match(self, table: TableIdentifier) -> bool:
+        return table.catalog == "hive_metastore" and self.src_schema == table.schema and self.src_table == table.table
 
     @property
     def as_uc_table_key(self):
@@ -75,10 +83,17 @@ class TableMapping:
     FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, sql_backend: SqlBackend):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        recon_tolerance_percent: int = 0,
+    ):
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
+        self._recon_tolerance_percent = recon_tolerance_percent
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
         tables_snapshot = tables.snapshot()
@@ -86,7 +101,7 @@ class TableMapping:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
             raise ValueError(msg)
         for table in tables_snapshot:
-            yield Rule.initial(workspace_name, catalog_name, table)
+            yield Rule.initial(workspace_name, catalog_name, table, self._recon_tolerance_percent)
 
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()

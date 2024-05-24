@@ -21,6 +21,6 @@ def row_count_row_factory():
 def data_comp_row_factory():
     yield MockBackend.rows(
         "total_mismatches",
-        "num_missing_records_in_target",
-        "num_missing_records_in_source",
+        "target_missing_count",
+        "source_missing_count",
     )

@@ -25,11 +25,11 @@ class StandardDataComparator(DataComparator):
             CASE 
                 WHEN target.hash_value IS NULL THEN 1
                 ELSE 0
-            END AS num_missing_records_in_target,
+            END AS target_missing_count,
             CASE 
                 WHEN source.hash_value IS NULL THEN 1
                 ELSE 0
-            END AS num_missing_records_in_source
+            END AS source_missing_count
         FROM (
             SELECT {source_hash_expr} AS hash_value
             FROM {source_table_fqn}
@@ -42,8 +42,8 @@ class StandardDataComparator(DataComparator):
     )
     SELECT 
         COUNT(*) AS total_mismatches,
-        COALESCE(SUM(num_missing_records_in_target), 0) AS num_missing_records_in_target,
-        COALESCE(SUM(num_missing_records_in_source), 0) AS num_missing_records_in_source
+        COALESCE(SUM(target_missing_count), 0) AS target_missing_count,
+        COALESCE(SUM(source_missing_count), 0) AS source_missing_count
     FROM compare_results
     WHERE is_match IS FALSE;
     """
@@ -52,7 +52,12 @@ class StandardDataComparator(DataComparator):
         self._sql_backend = sql_backend
         self._data_profiler = data_profiler
 
-    def compare_data(self, source: TableIdentifier, target: TableIdentifier) -> DataComparisonResult:
+    def compare_data(
+        self,
+        source: TableIdentifier,
+        target: TableIdentifier,
+        compare_rows: bool = False,
+    ) -> DataComparisonResult:
         """
         This method compares the data of two tables. It takes two TableIdentifier objects as input, which represent
         the source and target tables for which the data are to be compared.
@@ -63,19 +68,24 @@ class StandardDataComparator(DataComparator):
         """
         source_data_profile = self._data_profiler.profile_data(source)
         target_data_profile = self._data_profiler.profile_data(target)
+        if not compare_rows:
+            return DataComparisonResult(
+                source_row_count=source_data_profile.row_count,
+                target_row_count=target_data_profile.row_count,
+            )
         comparison_query = StandardDataComparator.build_data_comparison_query(
             source_data_profile,
             target_data_profile,
         )
         query_result: Iterator[Row] = self._sql_backend.fetch(comparison_query)
         count_row = next(query_result)
-        num_missing_records_in_target = int(count_row["num_missing_records_in_target"])
-        num_missing_records_in_source = int(count_row["num_missing_records_in_source"])
+        target_missing_count = int(count_row["target_missing_count"])
+        source_missing_count = int(count_row["source_missing_count"])
         return DataComparisonResult(
             source_row_count=source_data_profile.row_count,
             target_row_count=target_data_profile.row_count,
-            num_missing_records_in_target=num_missing_records_in_target,
-            num_missing_records_in_source=num_missing_records_in_source,
+            target_missing_count=target_missing_count,
+            source_missing_count=source_missing_count,
         )
 
     @classmethod
