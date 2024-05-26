@@ -216,7 +216,9 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
         include_databases = self._select_databases()
-        upload_dependencies = self.prompts.confirm("Does given workspace block Internet access?")
+        upload_dependencies = self.prompts.confirm(
+            f"Does given workspace {self.workspace_client.get_workspace_id()} " f"block Internet access?"
+        )
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         recon_tolerance_percent = int(
             self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)

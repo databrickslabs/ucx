@@ -1906,7 +1906,7 @@ def test_upload_dependencies(ws, mock_installation):
             r".*": "",
             r"Choose how to map the workspace groups.*": "0",
             r".*PRO or SERVERLESS SQL warehouse.*": "1",
-            r".*Does given workspace block Internet access.*": "Yes",
+            r".*Does given workspace.* block Internet access.*": "Yes",
         }
     )
     wheels = create_autospec(WheelsV2)
