@@ -403,14 +403,14 @@ class WorkflowsDeployment(InstallationMixin):
         super().__init__(config, installation, ws)
 
     def create_jobs(self):
-        remote_wheel = self._upload_wheel()
+        remote_wheels = self._upload_wheel()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
-            wheel_runner = self._upload_wheel_runner(remote_wheel)
+            wheel_runner = self._upload_wheel_runner(remote_wheels)
         for workflow_name in desired_workflows:
-            settings = self._job_settings(workflow_name, remote_wheel)
+            settings = self._job_settings(workflow_name, remote_wheels)
             if self._config.override_clusters:
                 settings = self._apply_cluster_overrides(
                     workflow_name,
@@ -430,7 +430,7 @@ class WorkflowsDeployment(InstallationMixin):
                     continue
 
         self._install_state.save()
-        self._create_debug(remote_wheel)
+        self._create_debug(remote_wheels)
         return self._create_readme()
 
     @property
@@ -534,12 +534,13 @@ class WorkflowsDeployment(InstallationMixin):
         with self._wheels:
             if self._config.upload_dependencies:
                 wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot"])
+                wheel_paths = [f"/Workspace{wheel_path}" for wheel_path in wheel_paths]
             wheel_paths.append(f"/Workspace{self._wheels.upload_to_wsfs()}")
             return wheel_paths
 
     def _upload_wheel_runner(self, remote_wheels: list[str]):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        remote_wheels_str = " \n".join(list(remote_wheels))
+        remote_wheels_str = " ".join(list(remote_wheels))
         code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
         return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
@@ -727,14 +728,14 @@ class WorkflowsDeployment(InstallationMixin):
         )
         return self._job_wheel_task(jobs_task, workflow, remote_wheels)
 
-    def _create_debug(self, remote_wheel: str):
+    def _create_debug(self, remote_wheels: list[str]):
         readme_link = self._installation.workspace_link('README')
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._install_state.jobs.items()
         )
         content = DEBUG_NOTEBOOK.format(
-            remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            remote_wheel=remote_wheels, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 
