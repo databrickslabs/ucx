@@ -125,7 +125,6 @@ class DeployedWorkflows:
         if job_initial_run.run_id:
             try:
                 self._ws.jobs.wait_get_run_job_terminated_or_skipped(run_id=job_initial_run.run_id)
-                raise OperationFailed()
             except OperationFailed as err:
                 logger.info('---------- REMOTE LOGS --------------')
                 self._relay_logs(step, job_initial_run.run_id)
@@ -738,8 +737,6 @@ class MaxedStreamHandler(logging.StreamHandler):
             if installed:
                 return
             # any handler to override ?
-            for h in logger_.handlers:
-                logger.info(f"Log handler {repr(h)}")
             handler = next((h for h in logger_.handlers if isinstance(h, logging.StreamHandler)), None)
             if handler:
                 to_install = MaxedStreamHandler(handler)
