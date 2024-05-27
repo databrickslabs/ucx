@@ -75,7 +75,7 @@ def test_prepare_data_comparison_query():
     )
 
     actual_query = (
-        StandardDataComparator.build_data_comparison_query(
+        StandardDataComparator._build_data_comparison_query(
             source_data_profile,
             target_data_profile,
         )
@@ -95,7 +95,7 @@ def test_prepare_data_comparison_query():
     ]
 
     expected_query = (
-        StandardDataComparator.DATA_COMPARISON_QUERY_TEMPLATE.format(
+        StandardDataComparator._DATA_COMPARISON_QUERY_TEMPLATE.format(
             source_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(source_hash_columns)}), 256)",
             target_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(target_hash_columns)}), 256)",
             source_table_fqn="`hive_metastore`.`db1`.`table1`",

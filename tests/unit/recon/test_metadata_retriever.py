@@ -63,14 +63,14 @@ def test_unity_table_metadata_retrieval(metadata_row_factory):
 
 def test_hms_metadata_query():
     table_identifier = TableIdentifier("hive_metastore", "db1", "table1")
-    actual_query = DatabricksTableMetadataRetriever.build_metadata_query(table_identifier).strip().lower()
+    actual_query = DatabricksTableMetadataRetriever._build_metadata_query(table_identifier).strip().lower()
     expected_query = "DESCRIBE TABLE `hive_metastore`.`db1`.`table1`".lower()
     assert re.sub(r'\s+', ' ', actual_query) == expected_query
 
 
 def test_unity_metadata_query():
     table_identifier = TableIdentifier("catalog1", "db1", "table1")
-    actual_query = DatabricksTableMetadataRetriever.build_metadata_query(table_identifier).strip().lower()
+    actual_query = DatabricksTableMetadataRetriever._build_metadata_query(table_identifier).strip().lower()
     expected_query = """
         SELECT 
             LOWER(column_name) AS col_name, 
