@@ -182,11 +182,15 @@ class WorkflowLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         tasks = []
-        for job in self._ws.jobs.list():
+        all_jobs = list(self._ws.jobs.list())
+        logger.info(f"Preparing {len(all_jobs)} linting jobs...")
+        for job in all_jobs:
             tasks.append(functools.partial(self.lint_job, job.job_id))
         problems: list[JobProblem] = []
+        logger.info(f"Running {tasks} linting tasks in parallel...")
         for batch in Threads.strict('linting workflows', tasks):
             problems.extend(batch)
+        logger.info(f"Saving {len(problems)} linting problems...")
         sql_backend.save_table(f'{inventory_database}.workflow_problems', problems, JobProblem, mode='overwrite')
 
     def lint_job(self, job_id: int) -> list[JobProblem]:
