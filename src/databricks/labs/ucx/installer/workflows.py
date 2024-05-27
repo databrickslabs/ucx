@@ -69,7 +69,7 @@ DEBUG_NOTEBOOK = """# Databricks notebook source
 
 # COMMAND ----------
 
-# MAGIC %pip install /Workspace{remote_wheel}
+# MAGIC %pip install {remote_wheel}
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -92,7 +92,7 @@ print(__version__)
 """
 
 TEST_RUNNER_NOTEBOOK = """# Databricks notebook source
-# MAGIC %pip install /Workspace{remote_wheel}
+# MAGIC %pip install {remote_wheel}
 dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -403,14 +403,14 @@ class WorkflowsDeployment(InstallationMixin):
         super().__init__(config, installation, ws)
 
     def create_jobs(self):
-        remote_wheel = self._upload_wheel()
+        remote_wheels = self._upload_wheel()
         desired_workflows = {t.workflow for t in self._tasks if t.cloud_compatible(self._ws.config)}
         wheel_runner = None
 
         if self._config.override_clusters:
-            wheel_runner = self._upload_wheel_runner(remote_wheel)
+            wheel_runner = self._upload_wheel_runner(remote_wheels)
         for workflow_name in desired_workflows:
-            settings = self._job_settings(workflow_name, remote_wheel)
+            settings = self._job_settings(workflow_name, remote_wheels)
             if self._config.override_clusters:
                 settings = self._apply_cluster_overrides(
                     workflow_name,
@@ -430,7 +430,7 @@ class WorkflowsDeployment(InstallationMixin):
                     continue
 
         self._install_state.save()
-        self._create_debug(remote_wheel)
+        self._create_debug(remote_wheels)
         return self._create_readme()
 
     @property
@@ -529,13 +529,30 @@ class WorkflowsDeployment(InstallationMixin):
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
 
-    def _upload_wheel(self):
-        with self._wheels:
-            return self._wheels.upload_to_wsfs()
+    @staticmethod
+    def _library_dep_order(library: str):
+        match library:
+            case library if 'sdk' in library:
+                return 0
+            case library if 'blueprint' in library:
+                return 1
+            case _:
+                return 2
 
-    def _upload_wheel_runner(self, remote_wheel: str):
+    def _upload_wheel(self):
+        wheel_paths = []
+        with self._wheels:
+            if self._config.upload_dependencies:
+                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot"])
+            wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
+            wheel_paths.append(self._wheels.upload_to_wsfs())
+            wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]
+            return wheel_paths
+
+    def _upload_wheel_runner(self, remote_wheels: list[str]):
         # TODO: we have to be doing this workaround until ES-897453 is solved in the platform
-        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheel, config_file=self._config_file).encode("utf8")
+        remote_wheels_str = " ".join(remote_wheels)
+        code = TEST_RUNNER_NOTEBOOK.format(remote_wheel=remote_wheels_str, config_file=self._config_file).encode("utf8")
         return self._installation.upload(f"wheels/wheel-test-runner-{self._product_info.version()}.py", code)
 
     @staticmethod
@@ -559,8 +576,7 @@ class WorkflowsDeployment(InstallationMixin):
                 job_task.notebook_task = jobs.NotebookTask(notebook_path=wheel_runner, base_parameters=widget_values)
         return settings
 
-    def _job_settings(self, step_name: str, remote_wheel: str):
-
+    def _job_settings(self, step_name: str, remote_wheels: list[str]) -> dict[str, Any]:
         email_notifications = None
         if not self._config.override_clusters and "@" in self._my_username:
             # set email notifications only if we're running the real
@@ -577,8 +593,8 @@ class WorkflowsDeployment(InstallationMixin):
             if self._skip_dashboards and task.dashboard:
                 continue
             job_clusters.add(task.job_cluster)
-            job_tasks.append(self._job_task(task, remote_wheel))
-        job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheel))
+            job_tasks.append(self._job_task(task, remote_wheels))
+        job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheels))
         version = self._product_info.version()
         version = version if not self._ws.config.is_gcp else version.replace("+", "-")
         tags = {"version": f"v{version}"}
@@ -594,7 +610,7 @@ class WorkflowsDeployment(InstallationMixin):
             "tasks": job_tasks,
         }
 
-    def _job_task(self, task: Task, remote_wheel: str) -> jobs.Task:
+    def _job_task(self, task: Task, remote_wheels: list[str]) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key=task.name,
             job_cluster_key=task.job_cluster,
@@ -607,7 +623,7 @@ class WorkflowsDeployment(InstallationMixin):
             return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
-        return self._job_wheel_task(jobs_task, task.workflow, remote_wheel)
+        return self._job_wheel_task(jobs_task, task.workflow, remote_wheels)
 
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
@@ -639,8 +655,10 @@ class WorkflowsDeployment(InstallationMixin):
             ),
         )
 
-    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheel: str) -> jobs.Task:
-        libraries = [compute.Library(whl=f"/Workspace{remote_wheel}")]
+    def _job_wheel_task(self, jobs_task: jobs.Task, workflow: str, remote_wheels: list[str]) -> jobs.Task:
+        libraries = []
+        for wheel in remote_wheels:
+            libraries.append(compute.Library(whl=wheel))
         named_parameters = {
             "config": f"/Workspace{self._config_file}",
             "workflow": workflow,
@@ -701,7 +719,7 @@ class WorkflowsDeployment(InstallationMixin):
             )
         return clusters
 
-    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheel: str) -> jobs.Task:
+    def _job_parse_logs_task(self, job_tasks: list[jobs.Task], workflow: str, remote_wheels: list[str]) -> jobs.Task:
         jobs_task = jobs.Task(
             task_key="parse_logs",
             job_cluster_key=Task.job_cluster,
@@ -709,16 +727,16 @@ class WorkflowsDeployment(InstallationMixin):
             depends_on=[jobs.TaskDependency(task_key=task.task_key) for task in job_tasks],
             run_if=jobs.RunIf.ALL_DONE,
         )
-        return self._job_wheel_task(jobs_task, workflow, remote_wheel)
+        return self._job_wheel_task(jobs_task, workflow, remote_wheels)
 
-    def _create_debug(self, remote_wheel: str):
+    def _create_debug(self, remote_wheels: list[str]):
         readme_link = self._installation.workspace_link('README')
         job_links = ", ".join(
             f"[{self._name(step_name)}]({self._ws.config.host}#job/{job_id})"
             for step_name, job_id in self._install_state.jobs.items()
         )
         content = DEBUG_NOTEBOOK.format(
-            remote_wheel=remote_wheel, readme_link=readme_link, job_links=job_links, config_file=self._config_file
+            remote_wheel=remote_wheels, readme_link=readme_link, job_links=job_links, config_file=self._config_file
         ).encode("utf8")
         self._installation.upload('DEBUG.py', content)
 

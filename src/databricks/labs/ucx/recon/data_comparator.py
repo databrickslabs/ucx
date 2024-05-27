@@ -13,7 +13,7 @@ from .base import (
 
 
 class StandardDataComparator(DataComparator):
-    DATA_COMPARISON_QUERY_TEMPLATE = """
+    _DATA_COMPARISON_QUERY_TEMPLATE = """
     WITH compare_results AS (
         SELECT 
             CASE 
@@ -73,7 +73,7 @@ class StandardDataComparator(DataComparator):
                 source_row_count=source_data_profile.row_count,
                 target_row_count=target_data_profile.row_count,
             )
-        comparison_query = StandardDataComparator.build_data_comparison_query(
+        comparison_query = self._build_data_comparison_query(
             source_data_profile,
             target_data_profile,
         )
@@ -89,7 +89,7 @@ class StandardDataComparator(DataComparator):
         )
 
     @classmethod
-    def build_data_comparison_query(
+    def _build_data_comparison_query(
         cls,
         source_data_profile: DataProfilingResult,
         target_data_profile: DataProfilingResult,
@@ -98,7 +98,7 @@ class StandardDataComparator(DataComparator):
         target_table = target_data_profile.table_metadata.identifier
         source_hash_inputs = _build_data_comparison_hash_inputs(source_data_profile)
         target_hash_inputs = _build_data_comparison_hash_inputs(target_data_profile)
-        comparison_query = StandardDataComparator.DATA_COMPARISON_QUERY_TEMPLATE.format(
+        comparison_query = cls._DATA_COMPARISON_QUERY_TEMPLATE.format(
             source_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(source_hash_inputs)}), 256)",
             target_hash_expr=f"SHA2(CONCAT_WS('|', {', '.join(target_hash_inputs)}), 256)",
             source_table_fqn=source_table.fqn_escaped,

@@ -155,7 +155,7 @@ def test_job_cluster_policy(ws, installation_ctx):
 
     assert cluster_policy.name == f"Unity Catalog Migration ({installation_ctx.inventory_database}) ({user_name})"
 
-    spark_version = ws.clusters.select_spark_version(latest=True, long_term_support=True)
+    spark_version = ws.clusters.select_spark_version(latest=True)
     assert policy_definition["spark_version"]["value"] == spark_version
     assert policy_definition["node_type_id"]["value"] == ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
     if ws.config.is_azure:
@@ -471,3 +471,15 @@ def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
     config = installation_ctx.installation.load(WorkspaceConfig)
     workspace_id = installation_ctx.workspace_installer.workspace_client.get_workspace_id()
     assert config.installed_workspace_ids == [workspace_id]
+
+
+def test_installation_with_dependency_upload(ws, installation_ctx, mocker):
+    config = dataclasses.replace(installation_ctx.config, upload_dependencies=True)
+    installation_ctx = installation_ctx.replace(config=config)
+    mocker.patch("webbrowser.open")
+    installation_ctx.workspace_installation.run()
+    with pytest.raises(ManyError):
+        installation_ctx.deployed_workflows.run_workflow("failing")
+
+    installation_ctx.deployed_workflows.repair_run("failing")
+    assert installation_ctx.deployed_workflows.validate_step("failing")

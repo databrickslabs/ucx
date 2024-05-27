@@ -216,6 +216,9 @@ class WorkspaceInstaller(WorkspaceContext):
         configure_groups = ConfigureGroups(self.prompts)
         configure_groups.run()
         include_databases = self._select_databases()
+        upload_dependencies = self.prompts.confirm(
+            f"Does given workspace {self.workspace_client.get_workspace_id()} " f"block Internet access?"
+        )
         trigger_job = self.prompts.confirm("Do you want to trigger assessment job after installation?")
         recon_tolerance_percent = int(
             self.prompts.question("Reconciliation threshold, in percentage", default="5", valid_number=True)
@@ -233,6 +236,7 @@ class WorkspaceInstaller(WorkspaceContext):
             include_databases=include_databases,
             trigger_job=trigger_job,
             recon_tolerance_percent=recon_tolerance_percent,
+            upload_dependencies=upload_dependencies,
         )
 
     def _compare_remote_local_versions(self):
