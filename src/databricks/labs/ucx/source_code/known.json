@@ -154,6 +154,11 @@
     "pkg_resources": [],
     "setuptools": []
   },
+  "s3fs": {
+    "s3fs": [
+      "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials. Please rewrite the code."
+    ]
+  },
   "six": {
     "six": []
   },

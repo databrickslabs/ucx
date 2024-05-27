@@ -111,8 +111,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     sample = tmp_path / "test_detect_s3fs_import.py"
     sample.write_text(source)
     mock_path_lookup.append_path(tmp_path)
-    yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
-    whitelist = Whitelist.parse(yml.read_text(), use_defaults=True)
+    whitelist = Whitelist()
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
