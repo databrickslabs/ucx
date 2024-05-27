@@ -104,29 +104,73 @@ class NotebookLinter:
         return "notebook-linter"
 
 
+SUPPORTED_EXTENSION_LANGUAGES = {
+    '.py': Language.PYTHON,
+    '.sql': Language.SQL,
+}
+
+
 class FileLinter:
-    _EXT = {
-        '.py': Language.PYTHON,
-        '.sql': Language.SQL,
+    _NOT_YET_SUPPORTED_SUFFIXES = {
+        '.scala',
+        '.sh',
+        '.r',
+    }
+    _IGNORED_SUFFIXES = {
+        '.json',
+        '.md',
+        '.txt',
+        '.xml',
+        '.yml',
+        '.toml',
+        '.cfg',
+        '.bmp',
+        '.gif',
+        '.png',
+        '.tif',
+        '.tiff',
+        '.svg',
+        '.jpg',
+        '.jpeg',
+        '.pyc',
+        '.whl',
+        '.egg',
+        '.class',
+        '.iml',
+        '.gz',
+    }
+    _IGNORED_NAMES = {
+        '.ds_store',
+        '.gitignore',
+        '.coverage',
+        'license',
+        'codeowners',
+        'makefile',
+        'pkg-info',
+        'metadata',
+        'wheel',
+        'record',
+        'notice',
+        'zip-safe',
     }
 
-    def __init__(self, langs: Languages, path: Path):
+    def __init__(self, langs: Languages, path: Path, content: str | None = None):
         self._languages: Languages = langs
         self._path: Path = path
+        self._content = content
 
     @cached_property
-    def _content(self) -> str:
-        return self._path.read_text()
+    def _source_code(self) -> str:
+        return self._path.read_text() if self._content is None else self._content
 
     def _file_language(self):
-        return self._EXT.get(self._path.suffix)
+        return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
 
     def _is_notebook(self):
         language = self._file_language()
         if not language:
             return False
-        cell_language = CellLanguage.of_language(language)
-        return self._content.startswith(cell_language.file_magic_header)
+        return self._source_code.startswith(CellLanguage.of_language(language).file_magic_header)
 
     def lint(self) -> Iterable[Advice]:
         if self._is_notebook():
@@ -137,14 +181,23 @@ class FileLinter:
     def _lint_file(self):
         language = self._file_language()
         if not language:
-            yield Failure("unsupported-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
-        try:
-            linter = self._languages.linter(language)
-            yield from linter.lint(self._content)
-        except ValueError as err:
-            yield Failure("unsupported-language", str(err), 0, 0, 1, 1)
+            suffix = self._path.suffix.lower()
+            if suffix in self._IGNORED_SUFFIXES or self._path.name.lower() in self._IGNORED_NAMES:
+                yield from []
+            elif suffix in self._NOT_YET_SUPPORTED_SUFFIXES:
+                yield Failure("unsupported-language", f"Language not supported yet for {self._path}", 0, 0, 1, 1)
+            else:
+                yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
+        else:
+            try:
+                linter = self._languages.linter(language)
+                yield from linter.lint(self._source_code)
+            except ValueError as err:
+                yield Failure(
+                    "unsupported-content", f"Error while parsing content of {self._path.as_posix()}: {err}", 0, 0, 1, 1
+                )
 
     def _lint_notebook(self):
-        notebook = Notebook.parse(self._path, self._content, self._file_language())
+        notebook = Notebook.parse(self._path, self._source_code, self._file_language())
         notebook_linter = NotebookLinter(self._languages, notebook)
         yield from notebook_linter.lint()

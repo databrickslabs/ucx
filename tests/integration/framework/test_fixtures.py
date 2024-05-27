@@ -139,3 +139,23 @@ def test_remove_after_tag_instance_pool(ws, make_instance_pool):
     assert "RemoveAfter" in created_instance_pool.custom_tags
     purge_time = datetime.strptime(created_instance_pool.custom_tags.get("RemoveAfter"), "%Y%m%d%H")
     assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+
+
+def test_remove_after_property_table(ws, make_table, sql_backend):
+    new_table = make_table()
+    # TODO: tables.get is currently failing with
+    #   databricks.sdk.errors.platform.NotFound: Catalog 'hive_metastore' does not exist.
+    sql_response = list(sql_backend.fetch(f"DESCRIBE TABLE EXTENDED {new_table.full_name}"))
+    for row in sql_response:
+        if row.col_name == "Table Properties":
+            assert "RemoveAfter" in row[1]
+
+
+def test_remove_after_property_schema(ws, make_schema, sql_backend):
+    new_schema = make_schema()
+    # TODO: schemas.get is currently failing with
+    #   databricks.sdk.errors.platform.NotFound: Catalog 'hive_metastore' does not exist.
+    sql_response = list(sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {new_schema.full_name}"))
+    for row in sql_response:
+        if row.database_description_item == "Properties":
+            assert "RemoveAfter" in row[1]

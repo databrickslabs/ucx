@@ -974,7 +974,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
         if name is None:
             name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
-        sql_backend.execute(f"CREATE SCHEMA {full_name}")
+        sql_backend.execute(f"CREATE SCHEMA {full_name} WITH DBPROPERTIES (RemoveAfter={get_test_purge_time()})")
         schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
         logger.info(
             f"Schema {schema_info.full_name}: "
@@ -1063,7 +1063,19 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
-            str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            tbl_properties.update({"RemoveAfter": get_test_purge_time()})
+        else:
+            tbl_properties = {"RemoveAfter": get_test_purge_time()}
+
+        str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+
+        # table properties fails with CTAS statements
+        alter_table_tbl_properties = ""
+        if ctas or non_delta:
+            alter_table_tbl_properties = (
+                f'ALTER {"VIEW" if view else "TABLE"} {full_name} SET TBLPROPERTIES ({str_properties})'
+            )
+        else:
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
         if hiveserde_ddl:
@@ -1073,6 +1085,11 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             storage_location = storage_override
 
         sql_backend.execute(ddl)
+
+        # CTAS AND NON_DELTA does not support TBLPROPERTIES
+        if ctas or non_delta:
+            sql_backend.execute(alter_table_tbl_properties)
+
         table_info = TableInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,

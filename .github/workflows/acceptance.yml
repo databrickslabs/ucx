@@ -40,7 +40,8 @@ jobs:
         run: pip install hatch==1.9.4
 
       - name: Run integration tests
-        uses: databrickslabs/sandbox/acceptance@acceptance/v0.2.1
+        # ...
+        uses: databrickslabs/sandbox/acceptance@acceptance/v0.2.2
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
           timeout: 45m

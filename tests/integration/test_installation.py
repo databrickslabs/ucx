@@ -115,8 +115,16 @@ def test_experimental_permissions_migration_for_group_with_same_name(
     )
     new_schema_grants = installation_ctx.grants_crawler.for_schema_info(schema_a)
 
-    assert {"USAGE", "OWN"} == new_schema_grants[migrated_group.name_in_account]
-    assert object_permissions[migrated_group.name_in_account] == PermissionLevel.CAN_USE
+    if {"USAGE", "OWN"} != new_schema_grants[migrated_group.name_in_account] or object_permissions[
+        migrated_group.name_in_account
+    ] != PermissionLevel.CAN_USE:
+        installation_ctx.deployed_workflows.relay_logs("migrate-groups-experimental")
+    assert {"USAGE", "OWN"} == new_schema_grants[
+        migrated_group.name_in_account
+    ], "Incorrect schema grants for migrated group"
+    assert (
+        object_permissions[migrated_group.name_in_account] == PermissionLevel.CAN_USE
+    ), "Incorrect permissions for migrated group"
 
 
 @retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
