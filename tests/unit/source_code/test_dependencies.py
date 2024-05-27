@@ -16,8 +16,6 @@ from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from tests.unit import (
     locate_site_packages,
-    _samples_path,
-    _load_sources,
 )
 from tests.unit.conftest import MockPathLookup
 

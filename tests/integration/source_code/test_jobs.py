@@ -18,7 +18,6 @@ from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import Whitelist
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -114,7 +113,6 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     entrypoint.mkdir()
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist(use_defaults=False),  # pytest is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
     )
 
@@ -162,7 +160,6 @@ def test_workflow_linter_lints_job_with_requirements_dependency(
     expected_problem_message = "Could not locate import: yaml"
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist(use_defaults=False),  # yaml is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the yaml locally
     )
 

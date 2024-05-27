@@ -11,9 +11,11 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, No
 from databricks.labs.ucx.source_code.known import Whitelist
 
 
-S3FS_DEPRECATION_MESSAGE = 'S3fs library assumes AWS IAM Instance Profile to work with '\
-                           'S3, which is not compatible with Databricks Unity Catalog, '\
-                           'that routes access through Storage Credentials.'
+S3FS_DEPRECATION_MESSAGE = (
+    'S3fs library assumes AWS IAM Instance Profile to work with '
+    'S3, which is not compatible with Databricks Unity Catalog, '
+    'that routes access through Storage Credentials.'
+)
 
 
 @pytest.mark.parametrize(
@@ -130,8 +132,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
             DependencyProblem(
                 code='direct-filesystem-access',
                 message='S3fs library assumes AWS IAM Instance Profile to work with '
-                     'S3, which is not compatible with Databricks Unity Catalog, '
-                     'that routes access through Storage Credentials.',
+                'S3, which is not compatible with Databricks Unity Catalog, '
+                'that routes access through Storage Credentials.',
                 source_path=Path('leaf9.py'),
                 start_line=1,
                 start_col=0,

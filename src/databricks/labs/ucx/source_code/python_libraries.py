@@ -140,4 +140,3 @@ class DistInfoContainer(SourceContainer):
 
     def __repr__(self):
         return f"<DistInfoContainer {self._package}>"
-

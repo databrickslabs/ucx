@@ -6,7 +6,6 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
-from enum import Enum
 from functools import cached_property
 from pathlib import Path
 
@@ -28,15 +27,15 @@ class Compatibility:
 
 
 UNKNOWN = Compatibility(False, [])
+_KNOWN_JSON = Path(__file__).parent / "known.json"
+_DEFAULT_ENCODING = sys.getdefaultencoding()
 
 
 class Whitelist:
     def __init__(self):
         self._module_problems = collections.OrderedDict()
         self._module_distributions = {}
-        known_json = Path(__file__).parent / "known.json"
-        with known_json.open() as f:
-            known = json.load(f)
+        known = self._get_known()
         for distribution_name, modules in known.items():
             specific_modules_first = sorted(modules.items(), key=lambda x: x[0], reverse=True)
             for module_ref, problems in specific_modules_first:
@@ -45,6 +44,11 @@ class Whitelist:
         for name in sys.stdlib_module_names:
             self._module_problems[name] = []
             self._module_distributions[name] = "python"
+
+    @staticmethod
+    def _get_known():
+        with _KNOWN_JSON.open() as f:
+            return json.load(f)
 
     def compatibility(self, name: str) -> Compatibility:
         if not name:
@@ -65,6 +69,47 @@ class Whitelist:
             return Compatibility(True, problems)
         return UNKNOWN
 
+    @classmethod
+    def rebuild(cls, root: Path):
+        path_lookup = PathLookup.from_sys_path(root)
+        known_distributions = cls._get_known()
+        for library_root in path_lookup.library_roots:
+            for dist_info_folder in library_root.glob("*.dist-info"):
+                cls._analyze_dist_info(dist_info_folder, known_distributions, library_root)
+        with _KNOWN_JSON.open('w') as f:
+            json.dump(dict(sorted(known_distributions.items())), f, indent=2)
+
+    @classmethod
+    def _analyze_dist_info(cls, dist_info_folder, known_distributions, library_root):
+        dist_info = DistInfo(dist_info_folder)
+        if dist_info.name in known_distributions:
+            logger.debug(f"Skipping distribution: {dist_info.name}")
+            return
+        logger.info(f"Processing distribution: {dist_info.name}")
+        known_distributions[dist_info.name] = collections.OrderedDict()
+        for module_path in dist_info.module_paths:
+            if not module_path.is_file():
+                continue
+            if module_path.name in {'__main__.py', '__version__.py', '__about__.py'}:
+                continue
+            cls._analyze_file(known_distributions, library_root, dist_info, module_path)
+
+    @classmethod
+    def _analyze_file(cls, known_distributions, library_root, dist_info, module_path):
+        empty_index = MigrationIndex([])
+        relative_path = module_path.relative_to(library_root)
+        module_ref = relative_path.as_posix().replace('/', '.')
+        for suffix in ('.py', '.__init__'):
+            if module_ref.endswith(suffix):
+                module_ref = module_ref[: -len(suffix)]
+        logger.info(f"Processing module: {module_ref}")
+        languages = Languages(empty_index)
+        linter = FileLinter(languages, module_path)
+        problems = []
+        for problem in linter.lint():
+            problems.append({'code': problem.code, 'message': problem.message})
+        known_distributions[dist_info.name][module_ref] = problems
+
     def __repr__(self):
         modules = len(self._module_problems)
         libraries = len(self._module_distributions)
@@ -72,7 +117,7 @@ class Whitelist:
 
 
 class DistInfo:
-    """ represents installed library in dist-info format
+    """represents installed library in dist-info format
     see https://packaging.python.org/en/latest/specifications/binary-distribution-format/
     """
 
@@ -82,7 +127,7 @@ class DistInfo:
     @cached_property
     def module_paths(self) -> list[Path]:
         files = []
-        with Path(self._path, "RECORD").open() as f:
+        with Path(self._path, "RECORD").open(encoding=_DEFAULT_ENCODING) as f:
             for line in f.readlines():
                 filename = line.split(',')[0]
                 if not filename.endswith(".py"):
@@ -92,7 +137,7 @@ class DistInfo:
 
     @cached_property
     def _metadata(self):
-        with Path(self._path, "METADATA").open() as f:
+        with Path(self._path, "METADATA").open(encoding=_DEFAULT_ENCODING) as f:
             return email.message_from_file(f)
 
     @property
@@ -122,36 +167,4 @@ class DistInfo:
 
 if __name__ == "__main__":
     logger = get_logger(__file__)  # this only works for __main__
-    root = Path.cwd()
-    empty_index = MigrationIndex([])
-    path_lookup = PathLookup.from_sys_path(root)
-    known_json = Path(__file__).parent / 'known.json'
-    with known_json.open('r') as f:
-        known_distributions = json.load(f)
-    for library_root in path_lookup.library_roots:
-        for dist_info_folder in library_root.glob("*.dist-info"):
-            dist_info = DistInfo(dist_info_folder)
-            if dist_info.name in known_distributions:
-                logger.debug(f"Skipping distribution: {dist_info.name}")
-                continue
-            logger.info(f"Processing distribution: {dist_info.name}")
-            known_distributions[dist_info.name] = collections.OrderedDict()
-            for module_path in dist_info.module_paths:
-                if not module_path.is_file():
-                    continue
-                if module_path.name in {'__main__.py', '__version__.py', '__about__.py'}:
-                    continue
-                relative_path = module_path.relative_to(library_root)
-                module_ref = relative_path.as_posix().replace('/', '.')
-                for suffix in ('.py', '.__init__'):
-                    if module_ref.endswith(suffix):
-                        module_ref = module_ref[:-len(suffix)]
-                logger.info(f"Processing module: {module_ref}")
-                languages = Languages(empty_index)
-                linter = FileLinter(languages, module_path)
-                problems = []
-                for problem in linter.lint():
-                    problems.append({'code': problem.code, 'message': problem.message})
-                known_distributions[dist_info.name][module_ref] = problems
-    with known_json.open('w') as f:
-        json.dump(dict(sorted(known_distributions.items())), f, indent=2)
+    Whitelist.rebuild(Path.cwd())

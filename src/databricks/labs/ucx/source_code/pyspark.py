@@ -47,9 +47,9 @@ class Matcher(ABC):
             return None
         if not node.keywords:
             return None
-        for kw in node.keywords:
-            if kw.arg == self.table_arg_name:
-                return kw.value
+        for keyword in node.keywords:
+            if keyword.arg == self.table_arg_name:
+                return keyword.value
         return None
 
     def _check_call_context(self, node: ast.Call) -> bool:
