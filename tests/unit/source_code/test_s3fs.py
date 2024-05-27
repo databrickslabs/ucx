@@ -11,7 +11,9 @@ from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, No
 from databricks.labs.ucx.source_code.known import Whitelist
 
 
-S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
+S3FS_DEPRECATION_MESSAGE = 'S3fs library assumes AWS IAM Instance Profile to work with '\
+                           'S3, which is not compatible with Databricks Unity Catalog, '\
+                           'that routes access through Storage Credentials.'
 
 
 @pytest.mark.parametrize(
@@ -21,7 +23,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "import s3fs",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=1,
@@ -35,7 +37,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "from s3fs import something",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=1,
@@ -51,7 +53,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "import s3fs, leeds",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=1,
@@ -66,7 +68,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "def func():\n    import s3fs",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=2,
@@ -80,7 +82,7 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "import s3fs as s",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=1,
@@ -94,8 +96,8 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "from s3fs.subpackage import something",
             [
                 DependencyProblem(
-                    code='dependency-check',
-                    message='Use of dependency s3fs.subpackage is deprecated',
+                    code='direct-filesystem-access',
+                    message=S3FS_DEPRECATION_MESSAGE,
                     source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
@@ -126,8 +128,10 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     (
         [
             DependencyProblem(
-                code='dependency-check',
-                message='Use of dependency s3fs is deprecated',
+                code='direct-filesystem-access',
+                message='S3fs library assumes AWS IAM Instance Profile to work with '
+                     'S3, which is not compatible with Databricks Unity Catalog, '
+                     'that routes access through Storage Credentials.',
                 source_path=Path('leaf9.py'),
                 start_line=1,
                 start_col=0,
@@ -140,9 +144,8 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
 def test_detect_s3fs_import_in_dependencies(
     empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
 ):
-    yml = mock_path_lookup.cwd / "s3fs-python-compatibility-catalog.yml"
     file_loader = FileLoader()
-    whitelist = Whitelist.parse(yml.read_text(), use_defaults=True)
+    whitelist = Whitelist()
     import_resolver = ImportFileResolver(file_loader, whitelist)
     dependency_resolver = DependencyResolver([], mock_notebook_resolver, import_resolver, mock_path_lookup)
     sample = mock_path_lookup.cwd / "root9.py"

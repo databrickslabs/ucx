@@ -156,7 +156,10 @@
   },
   "s3fs": {
     "s3fs": [
-      "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials. Please rewrite the code."
+      {
+        "code": "direct-filesystem-access",
+        "message": "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
     ]
   },
   "six": {

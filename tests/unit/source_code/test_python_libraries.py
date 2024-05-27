@@ -4,8 +4,8 @@ from unittest.mock import create_autospec
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python_libraries import DistInfoPackage, PipResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.known import Whitelist, DistInfo
 from tests.unit import locate_site_packages
 
 
@@ -37,23 +37,6 @@ def test_pip_resolver_locates_dist_info_without_parent():
     assert len(maybe.problems) == 1
     assert maybe.problems[0] == DependencyProblem("no-dist-info", "No dist-info found for library")
     mock_path_lookup.resolve.assert_called_once()
-
-
-def test_dist_info_package_parses_installed_package_with_toplevel():
-    site_packages_path = locate_site_packages()
-    astroid_path = Path(site_packages_path, "astroid-3.1.0.dist-info")
-    package = DistInfoPackage.parse(astroid_path)
-    assert "astroid" in package.top_levels
-    assert Path(site_packages_path, "astroid", "constraint.py") in package.module_paths
-    assert "typing-extensions" in package.library_names
-
-
-def test_dist_info_package_parses_installed_package_without_toplevel():
-    site_packages_path = locate_site_packages()
-    astroid_path = Path(site_packages_path, "ruff-0.3.7.dist-info")
-    package = DistInfoPackage.parse(astroid_path)
-    assert "ruff" in package.top_levels
-    assert Path(site_packages_path, "ruff", "__init__.py") in package.module_paths
 
 
 def test_pip_resolver_does_not_resolve_already_installed_library_without_dist_info():

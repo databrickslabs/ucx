@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import collections
-import email
-import json
 import os
 import subprocess
 import tempfile
-from functools import cached_property
 from pathlib import Path
 from subprocess import CalledProcessError
 
-from databricks.labs.blueprint.entrypoint import get_logger
-
-from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     BaseLibraryResolver,
@@ -23,10 +16,8 @@ from databricks.labs.ucx.source_code.graph import (
     Dependency,
     WrappingLoader,
 )
-from databricks.labs.ucx.source_code.languages import Languages
-from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist, DistInfo
 
 
 class PipResolver(BaseLibraryResolver):
@@ -107,7 +98,7 @@ class PipResolver(BaseLibraryResolver):
         return self._create_dependency(library, dist_info_path)
 
     def _create_dependency(self, library: Path, dist_info_path: Path):
-        package = DistInfoPackage.parse(dist_info_path)
+        package = DistInfo(dist_info_path)
         container = DistInfoContainer(self._file_loader, self._white_list, package)
         dependency = Dependency(WrappingLoader(container), library)
         return MaybeDependency(dependency, [])
@@ -124,8 +115,9 @@ class PipResolver(BaseLibraryResolver):
 
 
 class DistInfoContainer(SourceContainer):
+    # TODO: remove this class, as we don't need it anymore
 
-    def __init__(self, file_loader: FileLoader, white_list: Whitelist, package: DistInfoPackage):
+    def __init__(self, file_loader: FileLoader, white_list: Whitelist, package: DistInfo):
         self._file_loader = file_loader
         self._white_list = white_list
         self._package = package
@@ -138,8 +130,9 @@ class DistInfoContainer(SourceContainer):
                 problems.extend(maybe.problems)
         for library_name in self._package.library_names:
             compatibility = self._white_list.distribution_compatibility(library_name)
-            if compatibility is not None:
+            if compatibility.known:
                 # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+                problems.extend(compatibility.problems)
                 continue
             more_problems = parent.register_library(library_name)
             problems.extend(more_problems)
@@ -148,113 +141,3 @@ class DistInfoContainer(SourceContainer):
     def __repr__(self):
         return f"<DistInfoContainer {self._package}>"
 
-
-REQUIRES_DIST_PREFIX = "Requires-Dist: "
-
-
-class DistInfoPackage:
-    """
-    represents a wheel package installable via pip
-    see https://packaging.python.org/en/latest/specifications/binary-distribution-format/
-    """
-
-    @classmethod
-    def parse(cls, path: Path):
-        # not using importlib.metadata because it only works on accessible packages
-        # which we can't guarantee since we have our own emulated sys.paths
-        with open(Path(path, "METADATA"), encoding="utf-8") as metadata_file:
-            lines = metadata_file.readlines()
-            requirements = filter(lambda line: line.startswith(REQUIRES_DIST_PREFIX), lines)
-            library_names = [
-                cls._extract_library_name_from_requires_dist(requirement[len(REQUIRES_DIST_PREFIX) :])
-                for requirement in requirements
-            ]
-        with open(Path(path, "RECORD"), encoding="utf-8") as record_file:
-            lines = record_file.readlines()
-            files = [line.split(',')[0] for line in lines]
-            modules = list(filter(lambda line: line.endswith(".py"), files))
-        top_levels_path = Path(path, "top_level.txt")
-        if top_levels_path.exists():
-            with open(top_levels_path, encoding="utf-8") as top_levels_file:
-                top_levels = [line.strip() for line in top_levels_file.readlines()]
-        else:
-            dir_name = path.name
-            # strip extension
-            dir_name = dir_name[: dir_name.rindex('.')]
-            # strip version
-            dir_name = dir_name[: dir_name.rindex('-')]
-            top_levels = [dir_name]
-        return DistInfoPackage(path, top_levels, [Path(module) for module in modules], list(library_names))
-
-    @classmethod
-    def _extract_library_name_from_requires_dist(cls, requirement: str) -> str:
-        delimiters = {' ', '@', '<', '>', ';'}
-        for i, char in enumerate(requirement):
-            if char in delimiters:
-                return requirement[:i]
-        return requirement
-
-    def __init__(self, dist_info_path: Path, top_levels: list[str], module_paths: list[Path], library_names: list[str]):
-        self._dist_info_path = dist_info_path
-        self._top_levels = top_levels
-        self._module_paths = module_paths
-        self._library_names = library_names
-
-    @cached_property
-    def name(self):
-        with Path(self._dist_info_path, "METADATA").open() as f:
-            message = email.message_from_file(f)
-            name = message.get('Name', 'unknown')
-            return name.lower()
-
-    @property
-    def top_levels(self) -> list[str]:
-        return self._top_levels
-
-    @property
-    def module_paths(self) -> list[Path]:
-        return [Path(self._dist_info_path.parent, path) for path in self._module_paths]
-
-    @property
-    def library_names(self) -> list[str]:
-        return self._library_names
-
-    def __repr__(self):
-        return f"<DistInfoPackage {self._dist_info_path}>"
-
-
-if __name__ == "__main__":
-    logger = get_logger(__file__)  # this only works for __main__
-    root = Path.cwd()
-    empty_index = MigrationIndex([])
-    path_lookup = PathLookup.from_sys_path(root)
-    known_json = Path(__file__).parent / 'known.json'
-    with known_json.open('r') as f:
-        known_distributions = json.load(f)
-    for library_root in path_lookup.library_roots:
-        for dist_info_folder in library_root.glob("*.dist-info"):
-            dist_info = DistInfoPackage.parse(dist_info_folder)
-            if dist_info.name in known_distributions:
-                logger.debug(f"Skipping distribution: {dist_info.name}")
-                continue
-            logger.info(f"Processing distribution: {dist_info.name}")
-            known_distributions[dist_info.name] = collections.OrderedDict()
-            for module_path in dist_info.module_paths:
-                if not module_path.is_file():
-                    continue
-                if module_path.name in {'__main__.py', '__version__.py', '__about__.py'}:
-                    continue
-                relative_path = module_path.relative_to(library_root)
-                module_ref = relative_path.as_posix().replace('/', '.')
-                for suffix in ('.py', '.__init__'):
-                    if module_ref.endswith(suffix):
-                        module_ref = module_ref[:-len(suffix)]
-                logger.info(f"Processing module: {module_ref}")
-                languages = Languages(empty_index)
-                linter = FileLinter(languages, module_path)
-                problems = []
-                for problem in linter.lint():
-                    problems.append(f'line {problem.start_line}: {problem.message}')
-                known_distributions[dist_info.name][module_ref] = problems
-    with known_json.open('w') as f:
-        json.dump(dict(sorted(known_distributions.items())), f, indent=2)
