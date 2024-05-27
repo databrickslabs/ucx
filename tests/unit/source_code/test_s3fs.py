@@ -49,10 +49,10 @@ S3FS_DEPRECATION_MESSAGE = (
                 )
             ],
         ),
-        ("import leeds", []),
-        ("from leeds import path", []),
+        ("import certifi", []),
+        ("from certifi import core", []),
         (
-            "import s3fs, leeds",
+            "import s3fs, certifi",
             [
                 DependencyProblem(
                     code='direct-filesystem-access',
@@ -61,11 +61,11 @@ S3FS_DEPRECATION_MESSAGE = (
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=18,
+                    end_col=20,
                 )
             ],
         ),
-        ("from leeds import path, s3fs", []),
+        ("from certifi import core, s3fs", []),
         (
             "def func():\n    import s3fs",
             [
