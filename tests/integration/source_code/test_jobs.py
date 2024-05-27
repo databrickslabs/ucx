@@ -44,11 +44,12 @@ def simple_ctx(installation_ctx, sql_backend, ws):
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_linter_from_context(simple_ctx, make_job):
+def test_linter_from_context(simple_ctx, make_job, make_notebook):
     # This code is essentially the same as in test_running_real_workflow_linter_job,
     # but it's executed on the caller side and is easier to debug.
-    # ensure we have at least 1 job
-    make_job()
+    # ensure we have at least 1 job that fails
+    notebook_path = make_notebook(content=io.BytesIO(b"import xyz"))
+    make_job(notebook_path=notebook_path)
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
     cursor = simple_ctx.sql_backend.fetch(
