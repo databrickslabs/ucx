@@ -1898,3 +1898,30 @@ def test_save_config_ext_hms(ws, mock_installation):
             'recon_tolerance_percent': 5,
         },
     )
+
+
+def test_upload_dependencies(ws, mock_installation):
+    prompts = MockPrompts(
+        {
+            r".*": "",
+            r"Choose how to map the workspace groups.*": "0",
+            r".*PRO or SERVERLESS SQL warehouse.*": "1",
+            r".*Does given workspace.* block Internet access.*": "Yes",
+        }
+    )
+    wheels = create_autospec(WheelsV2)
+    wheels.upload_wheel_dependencies.return_value = [
+        'databricks_labs_blueprint-0.6.2-py3-none-any.whl',
+        'databricks_sdk-0.28.0-py3-none-any.whl',
+        'databricks_labs_ucx-0.23.2+4920240527095658-py3-none-any.whl',
+    ]
+    workspace_installation = WorkspaceInstaller(ws).replace(
+        prompts=prompts,
+        installation=mock_installation,
+        product_info=PRODUCT_INFO,
+        sql_backend=MockBackend(),
+        wheels=wheels,
+    )
+    workspace_installation.run()
+    wheels.upload_wheel_dependencies.assert_called_once()
+    wheels.upload_to_wsfs.assert_called_once()
