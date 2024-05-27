@@ -1910,6 +1910,11 @@ def test_upload_dependencies(ws, mock_installation):
         }
     )
     wheels = create_autospec(WheelsV2)
+    wheels.upload_wheel_dependencies.return_value = [
+        'databricks_labs_blueprint-0.6.2-py3-none-any.whl',
+        'databricks_sdk-0.28.0-py3-none-any.whl',
+        'databricks_labs_ucx-0.23.2+4920240527095658-py3-none-any.whl',
+    ]
     workspace_installation = WorkspaceInstaller(ws).replace(
         prompts=prompts,
         installation=mock_installation,

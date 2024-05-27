@@ -528,12 +528,13 @@ class WorkflowsDeployment(InstallationMixin):
         assert new_job.job_id is not None
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
+
     @staticmethod
     def _library_dep_order(library: str):
         match library:
-            case x if 'sdk' in x:
+            case library if 'sdk' in library:
                 return 0
-            case x if 'blueprint' in x:
+            case library if 'blueprint' in library:
                 return 1
             case _:
                 return 2
