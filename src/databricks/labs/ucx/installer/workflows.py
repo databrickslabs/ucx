@@ -528,12 +528,22 @@ class WorkflowsDeployment(InstallationMixin):
         assert new_job.job_id is not None
         self._install_state.jobs[step_name] = str(new_job.job_id)
         return None
+    @staticmethod
+    def _library_dep_order(library: str):
+        match library:
+            case x if 'sdk' in x:
+                return 0
+            case x if 'blueprint' in x:
+                return 1
+            case _:
+                return 2
 
     def _upload_wheel(self):
         wheel_paths = []
         with self._wheels:
             if self._config.upload_dependencies:
-                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot", "google"])
+                wheel_paths = self._wheels.upload_wheel_dependencies(["databricks", "sqlglot"])
+            wheel_paths.sort(key=WorkflowsDeployment._library_dep_order)
             wheel_paths.append(self._wheels.upload_to_wsfs())
             wheel_paths = [f"/Workspace{wheel}" for wheel in wheel_paths]
             return wheel_paths
