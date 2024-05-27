@@ -1,10 +1,13 @@
 import io
 import logging
 from dataclasses import replace
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 
 import pytest
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
 from databricks.sdk.service.workspace import ImportFormat
 
@@ -18,6 +21,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.whitelist import Whitelist
 
 
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_running_real_workflow_linter_job(installation_ctx):
     ctx = installation_ctx
     ctx.workspace_installation.run()
@@ -39,9 +43,12 @@ def simple_ctx(installation_ctx, sql_backend, ws):
     )
 
 
-def test_linter_from_context(simple_ctx):
+@retried(on=[NotFound], timeout=timedelta(minutes=2))
+def test_linter_from_context(simple_ctx, make_job):
     # This code is essentially the same as in test_running_real_workflow_linter_job,
     # but it's executed on the caller side and is easier to debug.
+    # ensure we have at least 1 job
+    make_job()
     simple_ctx.workflow_linter.refresh_report(simple_ctx.sql_backend, simple_ctx.inventory_database)
 
     cursor = simple_ctx.sql_backend.fetch(
