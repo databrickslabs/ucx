@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from databricks.labs.ucx.source_code.known import Whitelist
 
 
@@ -27,3 +29,8 @@ def test_checks_library_compatibility():
     s3fs = known.distribution_compatibility("s3fs")
     assert s3fs.known
     assert len(s3fs.problems) == 1
+
+
+def test_loads_known_json():
+    cwd = Path.cwd()
+    Whitelist.rebuild(cwd)
