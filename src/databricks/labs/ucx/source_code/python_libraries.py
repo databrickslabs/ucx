@@ -8,7 +8,7 @@ from subprocess import CalledProcessError
 
 from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
-    BaseLibraryResolver,
+    LibraryResolver,
     DependencyProblem,
     MaybeDependency,
     SourceContainer,
@@ -20,20 +20,14 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import Whitelist, DistInfo
 
 
-class PipResolver(BaseLibraryResolver):
+class PipResolver(LibraryResolver):
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(
-        self, file_loader: FileLoader, white_list: Whitelist, next_resolver: BaseLibraryResolver | None = None
-    ) -> None:
-        super().__init__(next_resolver)
+    def __init__(self, file_loader: FileLoader, white_list: Whitelist) -> None:
         self._file_loader = file_loader
         self._white_list = white_list
         self._lib_install_folder = ""
-
-    def with_next_resolver(self, resolver: BaseLibraryResolver) -> PipResolver:
-        return PipResolver(self._file_loader, self._white_list, resolver)
 
     def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
         library_path = self._locate_library(path_lookup, library)

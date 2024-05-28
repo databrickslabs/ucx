@@ -31,7 +31,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
     whitelist = Whitelist()
     resolver = DependencyResolver(
-        [PipResolver(file_loader, whitelist)],
+        PipResolver(file_loader, whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,

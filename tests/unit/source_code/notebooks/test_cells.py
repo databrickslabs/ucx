@@ -60,9 +60,8 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(
-        [PipResolver(FileLoader(), Whitelist())], notebook_resolver, [], mock_path_lookup
-    )
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install unknown-library-name"
@@ -79,9 +78,8 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver(
-        [PipResolver(FileLoader(), Whitelist())], notebook_resolver, [], mock_path_lookup
-    )
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install demo-egg"  # installs pkgdir

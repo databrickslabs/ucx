@@ -94,8 +94,9 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
     whitelist = Whitelist()
+    pip_resolver = PipResolver(file_loader, whitelist)
     resolver = DependencyResolver(
-        [PipResolver(file_loader, whitelist)],
+        pip_resolver,
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
@@ -149,8 +150,7 @@ def test_known_issues(path: Path, migration_index):
     whitelist = Whitelist()
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    resolver = DependencyResolver(
-        [PipResolver(file_loader, whitelist)], notebook_resolver, import_resolver, path_lookup
-    )
+    pip_resolver = PipResolver(file_loader, whitelist)
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: Languages(migration_index))
     linter.lint(MockPrompts({}), path)
