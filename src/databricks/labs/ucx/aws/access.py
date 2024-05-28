@@ -1,6 +1,5 @@
 import json
 import re
-import time
 import typing
 from collections.abc import Iterable
 from functools import partial
@@ -84,7 +83,6 @@ class AWSResourcePermissions:
                     self._kms_key,
                 )
                 roles_created.append(role)
-        time.sleep(15)
         # We need to create a buffer between the role creation and the role update, Otherwise the update fails.
         for created_role in roles_created:
             self._aws_resources.update_uc_role(
@@ -93,7 +91,7 @@ class AWSResourcePermissions:
         return roles_created
 
     def update_uc_role_trust_policy(self, role_name, external_id="0000"):
-        return self._aws_resources.update_uc_trust_role(role_name, external_id)
+        return self._aws_resources.update_uc_role(role_name, external_id)
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())

@@ -10,7 +10,6 @@ from databricks.sdk.service.catalog import (
     Privilege,
     StorageCredentialInfo,
     ValidationResultResult,
-    AwsIamRoleResponse,
 )
 
 from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate, AWSCredentialCandidate
@@ -53,18 +52,12 @@ class CredentialManager:
         logger.info(f"Found {len(iam_roles)} distinct IAM roles already used in UC storage credentials")
         return iam_roles
 
-    def create(self, storage_credential: StorageCredentialInfo) -> StorageCredentialInfo:
-        if (
-            not storage_credential.aws_iam_role
-            or not storage_credential.aws_iam_role.role_arn
-            or not storage_credential.name
-        ):
-            raise ValueError("Storage credential must have a Name, an AWS IAM Role and the role must have an ARN.")
+    def create(self, name: str, role_arn: str, read_only: bool) -> StorageCredentialInfo:
         return self._ws.storage_credentials.create(
-            storage_credential.name,
-            aws_iam_role=AwsIamRoleRequest(storage_credential.aws_iam_role.role_arn),
-            comment=f"Created by UCX during migration to UC using AWS IAM Role: {storage_credential.name}",
-            read_only=storage_credential.read_only,
+            name,
+            aws_iam_role=AwsIamRoleRequest(role_arn),
+            comment=f"Created by UCX during migration to UC using AWS IAM Role: {name}",
+            read_only=read_only,
         )
 
     def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
@@ -169,12 +162,11 @@ class IamRoleMigration:
 
         execution_result = []
         for iam in iam_list:
-            credential = StorageCredentialInfo(
+            storage_credential = self._storage_credential_manager.create(
                 name=iam.role_name,
-                aws_iam_role=AwsIamRoleResponse(role_arn=iam.role_arn),
+                role_arn=iam.role_arn,
                 read_only=iam.privilege == Privilege.READ_FILES.value,
             )
-            storage_credential = self._storage_credential_manager.create(credential)
             if storage_credential.aws_iam_role is None:
                 logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
                 continue

@@ -6,8 +6,10 @@ import subprocess
 import typing
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from functools import lru_cache
+from datetime import timedelta
 
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
 
 logger = logging.getLogger(__name__)
@@ -80,7 +82,6 @@ class AWSCredentialCandidate:
         return role_match.group(1)
 
 
-@lru_cache(maxsize=1024)
 def run_command(command):
     logger.info(f"Invoking Command {command}")
     with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
@@ -247,7 +248,7 @@ class AWSResources:
                             )
                         },
                         "Action": "sts:AssumeRole",
-                        "Condition": self._databricks_trust_statement(external_id),
+                        "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
                     }
                 ],
             }
@@ -332,6 +333,7 @@ class AWSResources:
         """
         return self._create_role(role_name, self._aws_role_trust_doc())
 
+    @retried(on=[NotFound], timeout=timedelta(seconds=30))
     def update_uc_role(self, role_name: str, role_arn: str) -> str | None:
         """
         Create an IAM role for Unity Catalog to access the S3 buckets.
@@ -339,47 +341,9 @@ class AWSResources:
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
         result = self._update_role(role_name, self._aws_role_trust_doc(role_arn))
+        if not result:
+            raise NotFound("Assume role policy not updated.")
         return result
-
-    def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> str | None:
-        """
-        Modify an existing IAM role for Unity Catalog to access the S3 buckets with the external ID
-        captured from the UC credential.
-        https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
-        """
-        role_document = self._run_json_command(f"iam get-role --role-name {role_name}")
-        if role_document is None:
-            logger.error(f"Role {role_name} doesn't exist")
-            return None
-        role = role_document.get("Role")
-        arn = role.get("Arn")
-        policy_document = role.get("AssumeRolePolicyDocument")
-        if policy_document and policy_document.get("Statement"):
-            for idx, statement in enumerate(policy_document["Statement"]):
-                effect = statement.get("Effect")
-                action = statement.get("Action")
-                principal = statement.get("Principal")
-                if not (effect and action and principal):
-                    continue
-                if effect != "Allow":
-                    continue
-                if action != "sts:AssumeRole":
-                    continue
-                principal = principal.get("AWS")
-                if not principal:
-                    continue
-                if not self._is_uc_principal(principal):
-                    continue
-                policy_document["Statement"][idx]["Condition"] = self._databricks_trust_statement(external_id)
-            policy_document_json = self._get_json_for_cli(policy_document)
-        else:
-            policy_document_json = self._aws_role_trust_doc(arn, external_id)
-        update_role = self._run_json_command(
-            f"iam update-assume-role-policy --role-name {role_name} --policy-document {policy_document_json}"
-        )
-        if not update_role:
-            return None
-        return update_role["Role"]["Arn"]
 
     def put_role_policy(
         self,

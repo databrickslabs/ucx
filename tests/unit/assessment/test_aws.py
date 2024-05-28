@@ -573,7 +573,7 @@ def test_update_uc_trust_role_append(mocker):
                     },
                     "Action":"sts:AssumeRole",
                     "Condition":{"StringEquals":{"sts:ExternalId":"00000"}}
-                } 
+                }
             ]
         },
         "Description": "",
@@ -588,7 +588,7 @@ def test_update_uc_trust_role_append(mocker):
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.update_uc_trust_role("test_role", "1234")
+    aws.update_uc_role("test_role", "1234")
     assert (
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
@@ -631,7 +631,7 @@ def test_update_uc_trust_role(mocker):
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.update_uc_trust_role("test_role", "1234")
+    aws.update_uc_role("test_role", "1234")
     assert (
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
@@ -794,7 +794,7 @@ def test_update_uc_role_append(mocker):
                     },
                     "Action":"sts:AssumeRole",
                     "Condition":{"StringEquals":{"sts:ExternalId":"00000"}}
-                } 
+                }
             ]
         },
         "Description": "",
