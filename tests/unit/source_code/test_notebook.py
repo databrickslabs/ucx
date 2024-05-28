@@ -5,12 +5,15 @@ import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
 from databricks.labs.ucx.source_code.base import Advisory
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
+from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.labs.ucx.source_code.python_linter import PythonLinter
 from tests.unit import _load_sources
 
@@ -128,7 +131,8 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -146,7 +150,8 @@ def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
     paths = ["root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -159,7 +164,8 @@ def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
     paths = ["root2.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -172,7 +178,8 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
     paths = ["root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
@@ -186,7 +193,8 @@ def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
     paths = ["cyclical1.run.py", "cyclical2.run.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    dependency_resolver = DependencyResolver([], notebook_resolver, [], mock_path_lookup)
+    pip_resolver = PipResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
