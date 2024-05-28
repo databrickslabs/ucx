@@ -92,7 +92,7 @@ fmt         = ["black . --extend-exclude 'tests/unit/source_code/samples/*'",
                "mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples/*'",
-               "ruff .",
+               "ruff check .",
                "mypy --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
