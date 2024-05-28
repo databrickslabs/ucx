@@ -90,8 +90,8 @@ class AWSResourcePermissions:
             )
         return roles_created
 
-    def update_uc_role(self, role_name, external_id="0000"):
-        return self._aws_resources.update_uc_role(role_name, external_id)
+    def update_uc_role(self, role_name, role_arn, external_id="0000"):
+        return self._aws_resources.update_uc_role(role_name, role_arn, external_id)
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())

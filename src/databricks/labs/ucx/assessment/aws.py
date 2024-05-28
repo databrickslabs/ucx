@@ -83,7 +83,7 @@ class AWSCredentialCandidate:
 
 
 def run_command(command):
-    logger.info(f"Invoking Command {command}")
+    logger.debug(f"Invoking Command {command}")
     with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
         output, error = process.communicate()
         return process.returncode, output.decode("utf-8"), error.decode("utf-8")
@@ -321,9 +321,7 @@ class AWSResources:
         update_role = self._run_json_command(
             f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
         )
-        if not update_role:
-            return None
-        return update_role["Role"]["Arn"]
+        return update_role
 
     def create_uc_role(self, role_name: str) -> str | None:
         """
@@ -334,14 +332,15 @@ class AWSResources:
         return self._create_role(role_name, self._aws_role_trust_doc())
 
     @retried(on=[NotFound], timeout=timedelta(seconds=30))
-    def update_uc_role(self, role_name: str, role_arn: str) -> str | None:
+    def update_uc_role(self, role_name: str, role_arn: str, external_id: str = "0000") -> str | None:
         """
         Create an IAM role for Unity Catalog to access the S3 buckets.
         the AssumeRole condition will be modified later with the external ID captured from the UC credential.
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
-        result = self._update_role(role_name, self._aws_role_trust_doc(role_arn))
-        if not result:
+        result = self._update_role(role_name, self._aws_role_trust_doc(role_arn, external_id))
+        logger.debug(f"Updated role {role_name} with {result}")
+        if result is None:
             raise NotFound("Assume role policy not updated.")
         return result
 
