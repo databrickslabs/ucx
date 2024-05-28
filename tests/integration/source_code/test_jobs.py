@@ -12,7 +12,6 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.assessment import jobs
 from databricks.labs.ucx.source_code.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -71,8 +70,7 @@ def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make
             notebook_path=str(
                 make_notebook(
                     path=notebook,
-                    content=b"""import doesnotexist
-import greenlet""",
+                    content=b"import doesnotexist;import greenlet",
                 )
             )
         ),

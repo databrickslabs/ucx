@@ -26,7 +26,6 @@ def test_job_problem_as_message():
     assert problem.as_message() == expected_message
 
 
-
 @pytest.fixture
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
