@@ -16,7 +16,7 @@ def test_linter_returns_list_of_dbutils_notebook_run_calls():
     code = """
 dbutils.notebook.run("stuff")
 for i in z:
-    ww =   dbutils.notebook.run("toto")  
+    ww =   dbutils.notebook.run("toto")
 """
     linter = ASTLinter.parse(code)
     calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
@@ -228,3 +228,19 @@ def test_is_none(migration_index, param):
     val = get_statement_node(param["stmt"]).value
     act = ASTLinter(val).is_none()
     assert param["expected"] == act
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        ( """
+name = "xyz"
+dbutils.notebook.run(name)
+""", "xyz")
+    ],
+)
+def test_infers_string_variable_value(code, expected):
+    linter = ASTLinter.parse(code)
+    calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
+    actual = list([ call.get_constant_path() for call in calls ])
+    assert [ expected ] == actual
