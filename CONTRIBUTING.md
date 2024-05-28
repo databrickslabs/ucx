@@ -2,28 +2,40 @@
 
 ## First Principles
 
-We must use the [Databricks SDK for Python](https://databricks-sdk-py.readthedocs.io/) in this project. It is a toolkit for our project. 
+We must use the [Databricks SDK for Python](https://databricks-sdk-py.readthedocs.io/) in this project. It is a toolkit for our project.
 If something doesn't naturally belong to the `WorkspaceClient`, it must go through a "mixin" process before it can be used with the SDK.
 Imagine the `WorkspaceClient` as the main control center and the "mixin" process as a way to adapt other things to work with it.
-You can find an example of how mixins are used with `StatementExecutionExt`. There's a specific example of how to make something 
+You can find an example of how mixins are used with `StatementExecutionExt`. There's a specific example of how to make something
 work with the WorkspaceClient using `StatementExecutionExt`. This example can help you understand how mixins work in practice.
 
-Favoring standard libraries over external dependencies, especially in specific contexts like Databricks, is a best practice in software 
-development. 
+Favoring standard libraries over external dependencies, especially in specific contexts like Databricks, is a best practice in software
+development.
 
 There are several reasons why this approach is encouraged:
-- Standard libraries are typically well-vetted, thoroughly tested, and maintained by the official maintainers of the programming language or platform. This ensures a higher level of stability and reliability. 
-- External dependencies, especially lesser-known or unmaintained ones, can introduce bugs, security vulnerabilities, or compatibility issues  that can be challenging to resolve. Adding external dependencies increases the complexity of your codebase. 
-- Each dependency may have its own set of dependencies, potentially leading to a complex web of dependencies that can be difficult to manage. This complexity can lead to maintenance challenges, increased risk, and longer build times. 
-- External dependencies can pose security risks. If a library or package has known security vulnerabilities and is widely used, it becomes an attractive target for attackers. Minimizing external dependencies reduces the potential attack surface and makes it easier to keep your code secure. 
-- Relying on standard libraries enhances code portability. It ensures your code can run on different platforms and environments without being tightly coupled to specific external dependencies. This is particularly important in settings like Databricks, where you may need to run your code on different clusters or setups. 
-- External dependencies may have their versioning schemes and compatibility issues. When using standard libraries, you have more control over versioning and can avoid conflicts between different dependencies in your project. 
-- Fewer external dependencies mean faster build and deployment times. Downloading, installing, and managing external packages can slow down these processes, especially in large-scale projects or distributed computing environments like Databricks. 
-- External dependencies can be abandoned or go unmaintained over time. This can lead to situations where your project relies on outdated or unsupported code. When you depend on standard libraries, you have confidence that the core functionality you rely on will continue to be maintained and improved. 
+- Standard libraries are typically well-vetted, thoroughly tested, and maintained by the official maintainers of the programming language or platform. This ensures a higher level of stability and reliability.
+- External dependencies, especially lesser-known or unmaintained ones, can introduce bugs, security vulnerabilities, or compatibility issues  that can be challenging to resolve. Adding external dependencies increases the complexity of your codebase.
+- Each dependency may have its own set of dependencies, potentially leading to a complex web of dependencies that can be difficult to manage. This complexity can lead to maintenance challenges, increased risk, and longer build times.
+- External dependencies can pose security risks. If a library or package has known security vulnerabilities and is widely used, it becomes an attractive target for attackers. Minimizing external dependencies reduces the potential attack surface and makes it easier to keep your code secure.
+- Relying on standard libraries enhances code portability. It ensures your code can run on different platforms and environments without being tightly coupled to specific external dependencies. This is particularly important in settings like Databricks, where you may need to run your code on different clusters or setups.
+- External dependencies may have their versioning schemes and compatibility issues. When using standard libraries, you have more control over versioning and can avoid conflicts between different dependencies in your project.
+- Fewer external dependencies mean faster build and deployment times. Downloading, installing, and managing external packages can slow down these processes, especially in large-scale projects or distributed computing environments like Databricks.
+- External dependencies can be abandoned or go unmaintained over time. This can lead to situations where your project relies on outdated or unsupported code. When you depend on standard libraries, you have confidence that the core functionality you rely on will continue to be maintained and improved.
 
-While minimizing external dependencies is essential, exceptions can be made case-by-case. There are situations where external dependencies are 
-justified, such as when a well-established and actively maintained library provides significant benefits, like time savings, performance improvements, 
+While minimizing external dependencies is essential, exceptions can be made case-by-case. There are situations where external dependencies are
+justified, such as when a well-established and actively maintained library provides significant benefits, like time savings, performance improvements,
 or specialized functionality unavailable in standard libraries.
+
+## Adding entries to `known.json` file
+
+When adding a new entry to the `known.json` file, ensure that the entry is unique and follows the correct format. The `known.json` file is used to
+store information about known (in)compatibilities with Unity Catalog. The file is used to speed up static code analysis and prevent false positives
+in large third-party libraries. To add a new entry, follow these steps:
+
+1. load into virtual environment
+2. run `make known` to update the file
+3. review the changes and fold the imported packages
+4. remove any false positives and add any missing entries
+5. commit the changes
 
 ## Change management
 
@@ -40,14 +52,14 @@ _Keep API components simple._ In the components responsible for API interactions
 Refrain from overloading them with complex logic; instead, focus on making API calls and handling the data from those calls.
 
 _Inject Business Logic._ If you need to use business logic in your API-calling components, don't build it directly there.
-Instead, inject (or pass in) the business logic components into your API components. This way, you can keep your API components 
+Instead, inject (or pass in) the business logic components into your API components. This way, you can keep your API components
 clean and flexible, while the business logic remains separate and reusable.
 
-_Test your Business Logic._ It's essential to test your business logic to ensure it works correctly and thoroughly. When writing 
-unit tests, avoid making actual API calls - unit tests are executed for every pull request, and **_take seconds to complete_**. 
-For calling any external services, including Databricks Connect, Databricks Platform, or even Apache Spark, unit tests have 
-to use "mocks" or fake versions of the APIs to simulate their behavior. This makes testing your code more manageable and catching any 
-issues without relying on external systems. Focus on testing the edge cases of the logic, especially the scenarios where 
+_Test your Business Logic._ It's essential to test your business logic to ensure it works correctly and thoroughly. When writing
+unit tests, avoid making actual API calls - unit tests are executed for every pull request, and **_take seconds to complete_**.
+For calling any external services, including Databricks Connect, Databricks Platform, or even Apache Spark, unit tests have
+to use "mocks" or fake versions of the APIs to simulate their behavior. This makes testing your code more manageable and catching any
+issues without relying on external systems. Focus on testing the edge cases of the logic, especially the scenarios where
 things may fail. See [this example](https://github.com/databricks/databricks-sdk-py/pull/295) as a reference of an extensive
 unit test coverage suite and the clear difference between _unit tests_ and _integration tests_.
 
@@ -83,9 +95,9 @@ Add `.as_posix()` to convert Path to str
 
 ###  Argument 2 to "get" of "dict" has incompatible type "None"; expected ...
 
-Add a valid default value for the dictionary return. 
+Add a valid default value for the dictionary return.
 
-Example: 
+Example:
 ```python
 def viz_type(self) -> str:
     return self.viz.get("type", None)
@@ -93,7 +105,7 @@ def viz_type(self) -> str:
 
 after:
 
-Example: 
+Example:
 ```python
 def viz_type(self) -> str:
     return self.viz.get("type", "UNKNOWN")
@@ -101,30 +113,30 @@ def viz_type(self) -> str:
 
 ## Integration Testing Infrastructure
 
-Integration tests must accompany all new code additions. Integration tests help us validate that various parts of 
-our application work correctly when they interact with each other or external systems. This practice ensures that our 
+Integration tests must accompany all new code additions. Integration tests help us validate that various parts of
+our application work correctly when they interact with each other or external systems. This practice ensures that our
 software _**functions as a cohesive whole**_. Integration tests run every night and take approximately 15 minutes
 for the entire test suite to complete.
 
-We encourage using predefined test infrastructure provided through environment variables for integration tests. 
-These fixtures are set up in advance to simulate specific scenarios, making it easier to test different use cases. These 
+We encourage using predefined test infrastructure provided through environment variables for integration tests.
+These fixtures are set up in advance to simulate specific scenarios, making it easier to test different use cases. These
 predefined fixtures enhance test consistency and reliability and point to the real infrastructure used by integration
 testing. See [Unified Authentication Documentation](https://databricks-sdk-py.readthedocs.io/en/latest/authentication.html)
 for the latest reference of environment variables related to authentication.
 
-- `CLOUD_ENV`: This environment variable specifies the cloud environment where Databricks is hosted. The values typically 
+- `CLOUD_ENV`: This environment variable specifies the cloud environment where Databricks is hosted. The values typically
   indicate the cloud provider being used, such as "aws" for Amazon Web Services and "azure" for Microsoft Azure.
 - `DATABRICKS_ACCOUNT_ID`: This variable stores the unique identifier for your Databricks account.
-- `DATABRICKS_HOST`: This variable contains the URL of your Databricks workspace. It is the web address you use to access 
+- `DATABRICKS_HOST`: This variable contains the URL of your Databricks workspace. It is the web address you use to access
   your Databricks environment and typically looks like "https://dbc-....cloud.databricks.com."
-- `TEST_DEFAULT_CLUSTER_ID`: This variable holds the identifier for the default cluster used in testing. The value 
+- `TEST_DEFAULT_CLUSTER_ID`: This variable holds the identifier for the default cluster used in testing. The value
   resembles a unique cluster ID, like "0824-163015-tdtagl1h."
-- `TEST_DEFAULT_WAREHOUSE_DATASOURCE_ID`: This environment variable stores the identifier for the default warehouse data 
+- `TEST_DEFAULT_WAREHOUSE_DATASOURCE_ID`: This environment variable stores the identifier for the default warehouse data
   source used in testing. The value is a unique identifier for the data source, such as "3c0fef12-ff6c-...".
-- `TEST_DEFAULT_WAREHOUSE_ID`: This variable contains the identifier for the default warehouse used in testing. The value 
+- `TEST_DEFAULT_WAREHOUSE_ID`: This variable contains the identifier for the default warehouse used in testing. The value
   resembles a unique warehouse ID, like "49134b80d2...".
-- `TEST_INSTANCE_POOL_ID`: This environment variable stores the identifier for the instance pool used in testing. 
-  You must utilise existing instance pools as much as possible for cluster startup time and cost reduction. 
+- `TEST_INSTANCE_POOL_ID`: This environment variable stores the identifier for the instance pool used in testing.
+  You must utilise existing instance pools as much as possible for cluster startup time and cost reduction.
   The value is a unique instance pool ID, like "0824-113319-...".
 - `TEST_LEGACY_TABLE_ACL_CLUSTER_ID`: This variable holds the identifier for the cluster used in testing legacy table
   access control. The value is a unique cluster ID, like "0824-161440-...".
@@ -164,9 +176,9 @@ make integration
 ```
 
 ### Fixtures
-We'd like to encourage you to leverage the extensive set of [pytest fixtures](https://docs.pytest.org/en/latest/explanation/fixtures.html#about-fixtures). 
-These fixtures follow a consistent naming pattern, starting with "make_". These functions can be called multiple 
-times to _create and clean up objects as needed_ for your tests. Reusing these fixtures helps maintain clean and consistent 
+We'd like to encourage you to leverage the extensive set of [pytest fixtures](https://docs.pytest.org/en/latest/explanation/fixtures.html#about-fixtures).
+These fixtures follow a consistent naming pattern, starting with "make_". These functions can be called multiple
+times to _create and clean up objects as needed_ for your tests. Reusing these fixtures helps maintain clean and consistent
 test setups across the codebase. In cases where your tests require unique fixture setups, keeping the wall
 clock time of fixture initialization under one second is crucial. Fast fixture initialization ensures that tests run quickly, reducing
 development cycle times and allowing for more immediate feedback during development.
@@ -180,7 +192,7 @@ def test_secret_scope_acl(make_secret_scope, make_secret_scope_acl, make_group):
     make_secret_scope_acl(scope=scope_name, principal=make_group().display_name, permission=AclPermission.WRITE)
 ```
 
-If the fixture requires no argument and special cleanup, you can simplify the fixture from 
+If the fixture requires no argument and special cleanup, you can simplify the fixture from
 ```python
 @pytest.fixture
 def make_thing(...):
@@ -198,17 +210,17 @@ def thing(...):
 ```
 
 ### Debugging
-Each integration test _must be debuggable_ within the free [IntelliJ IDEA (Community Edition)](https://www.jetbrains.com/idea/download) 
-with the [Python plugin (Community Edition)](https://plugins.jetbrains.com/plugin/7322-python-community-edition). If it works within 
-IntelliJ CE, then it would work in PyCharm. Debugging capabilities are essential for troubleshooting and diagnosing issues during 
+Each integration test _must be debuggable_ within the free [IntelliJ IDEA (Community Edition)](https://www.jetbrains.com/idea/download)
+with the [Python plugin (Community Edition)](https://plugins.jetbrains.com/plugin/7322-python-community-edition). If it works within
+IntelliJ CE, then it would work in PyCharm. Debugging capabilities are essential for troubleshooting and diagnosing issues during
 development. Please make sure that your test setup allows for easy debugging by following best practices.
 
 ![debugging tests](docs/debugging-tests.gif)
 
-Adhering to these guidelines ensures that our integration tests are robust, efficient, and easily maintainable. This, 
+Adhering to these guidelines ensures that our integration tests are robust, efficient, and easily maintainable. This,
 in turn, contributes to the overall reliability and quality of our software.
 
-Currently, VSCode IDE is not supported, as it does not offer interactive debugging single integration tests. 
+Currently, VSCode IDE is not supported, as it does not offer interactive debugging single integration tests.
 However, it's possible that this limitation may be addressed in the future.
 
 ### Flaky tests
@@ -250,7 +262,7 @@ Configure your IDE to use `.venv/bin/python` from the virtual environment when d
 ![IDE Setup](docs/hatch-intellij.gif)
 
 
-Verify installation with 
+Verify installation with
 ```shell
 make test
 ```
@@ -277,10 +289,10 @@ Here are the example steps to submit your first contribution:
 10. ... fix if any
 11. `git commit -a`. Make sure to enter a meaningful commit message title.
 12. `git push origin FEATURENAME`
-13. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed). 
+13. Go to GitHub UI and create PR. Alternatively, `gh pr create` (if you have [GitHub CLI](https://cli.github.com/) installed).
     Use a meaningful pull request title because it'll appear in the release notes. Use `Resolves #NUMBER` in pull
     request description to [automatically link it](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests#linking-a-pull-request-to-an-issue)
-    to an existing issue. 
+    to an existing issue.
 14. Announce PR for the review.
 
 ## Troubleshooting
@@ -301,7 +313,7 @@ The easiest fix is to remove the environment and have the re-run recreate it:
 
 ```sh
 $ hatch env show
-                                 Standalone                                 
+                                 Standalone
 ┏━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
 ┃ Name        ┃ Type    ┃ Dependencies                   ┃ Scripts         ┃
 ┡━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
@@ -327,7 +339,7 @@ cachedir: .pytest_cache
 rootdir: /Users/lars.george/projects/work/databricks/ucx
 configfile: pyproject.toml
 plugins: cov-4.1.0, mock-3.11.1
-collected 103 items                                                                                                                                                                                      
+collected 103 items
 
 tests/unit/test_config.py::test_initialization PASSED
 tests/unit/test_config.py::test_reader PASSED
@@ -339,7 +351,7 @@ tests/unit/test_tables.py::test_uc_sql[table2-CREATE TABLE IF NOT EXISTS new_cat
 Coverage HTML written to dir htmlcov
 
 ========================================================================================== 103 passed in 12.61s ==========================================================================================
-$ 
+$
 ```
 
 Sometimes, when multiple Python versions are installed in the workstation used for UCX development, one might encounter the following:

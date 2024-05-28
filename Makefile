@@ -25,4 +25,7 @@ integration:
 coverage:
 	hatch run coverage && open htmlcov/index.html
 
-.PHONY: all clean dev lint fmt test integration coverage
+known:
+	hatch run python src/databricks/labs/ucx/source_code/known.py
+
+.PHONY: all clean dev lint fmt test integration coverage known

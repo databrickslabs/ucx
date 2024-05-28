@@ -8,6 +8,23 @@
     "blackd": [],
     "blib2to3": []
   },
+  "boto3": {
+    "boto3": [],
+    "boto3.s3": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "AWS IAM Instance Profiles are not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
+  "botocore": {
+    "botocore": [
+      {
+        "code": "aws-cloud-access",
+        "message": "AWS IAM Instance Profiles are not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
   "cachetools": {
     "cachetools": []
   },
@@ -60,6 +77,9 @@
   },
   "isort": {
     "isort": []
+  },
+  "jmespath": {
+    "jmespath": []
   },
   "joblib": {
     "joblib": []
@@ -143,6 +163,22 @@
   "ruff": {
     "ruff": []
   },
+  "s3fs": {
+    "s3fs": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
+  "s3transfer": {
+    "s3transfer": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "S3Transfer library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
   "scikit-learn": {
     "sklearn": []
   },
@@ -153,14 +189,6 @@
     "_distutils_hack": [],
     "pkg_resources": [],
     "setuptools": []
-  },
-  "s3fs": {
-    "s3fs": [
-      {
-        "code": "direct-filesystem-access",
-        "message": "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
-      }
-    ]
   },
   "six": {
     "six": []
