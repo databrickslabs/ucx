@@ -170,7 +170,7 @@ class IamRoleMigration:
             if storage_credential.aws_iam_role is None:
                 logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
                 continue
-            self._resource_permissions.update_uc_role_trust_policy(
+            self._resource_permissions.update_uc_role(
                 iam.role_name, storage_credential.aws_iam_role.external_id
             )
             for path in iam.paths:
