@@ -60,22 +60,17 @@ def test_list_storage_credentials(credential_manager):
 
 
 def test_create_storage_credentials(credential_manager):
-    first_iam = StorageCredentialInfo(
-        name="example-role-name",
-        aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/example-role-name"),
-        read_only=False,
+    storage_credential = credential_manager.create(
+        name="example-role-name", role_arn="arn:aws:iam::123456789012:role/example-role-name", read_only=False
     )
-    second_iam = StorageCredentialInfo(
+    assert storage_credential.name == "example-role-name"
+
+    storage_credential = credential_manager.create(
         name="another-role-name",
-        aws_iam_role=AwsIamRoleResponse(role_arn="arn:aws:iam::123456789012:role/another-role-name"),
+        role_arn="arn:aws:iam::123456789012:role/another-role-name",
         read_only=True,
     )
-
-    storage_credential = credential_manager.create(first_iam)
-    assert first_iam.name == storage_credential.name
-
-    storage_credential = credential_manager.create(second_iam)
-    assert second_iam.name == storage_credential.name
+    assert storage_credential.name == "another-role-name"
 
 
 @pytest.fixture

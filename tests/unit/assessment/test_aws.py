@@ -588,16 +588,14 @@ def test_update_uc_trust_role_append(mocker):
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.update_uc_role("test_role", "1234")
+    aws.update_uc_role("test_role", "arn:aws:iam::123456789012:role/Test-Role", "1234")
     assert (
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
         '{"Version":"2012-10-17",'
-        '"Statement":['
-        '{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::0123456789:root"},'
-        '"Action":"sts:AssumeRole"},'
-        '{"Effect":"Allow",'
-        '"Principal":{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},'
+        '"Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":["arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",'
+        '"arn:aws:iam::123456789012:role/Test-Role"]},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
         '--profile Fake_Profile --output json'
     ) in command_calls
@@ -631,7 +629,7 @@ def test_update_uc_trust_role(mocker):
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.update_uc_role("test_role", "1234")
+    aws.update_uc_role("test_role", "arn:aws:iam::123456789012:role/Test-Role", "1234")
     assert (
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
@@ -640,7 +638,7 @@ def test_update_uc_trust_role(mocker):
         '{"Effect":"Allow",'
         '"Principal":{"AWS":'
         '["arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",'
-        '"arn:aws:iam::0123456789:role/Test-Role"]},'
+        '"arn:aws:iam::123456789012:role/Test-Role"]},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
         '--profile Fake_Profile --output json'
     ) in command_calls
