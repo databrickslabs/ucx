@@ -1,7 +1,7 @@
 import logging
 import re
 import typing
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import partial
@@ -28,6 +28,7 @@ class What(Enum):
     DBFS_ROOT_DELTA = auto()
     DBFS_ROOT_NON_DELTA = auto()
     VIEW = auto()
+    TABLE_IN_MOUNT = auto()
     DB_DATASET = auto()
     UNKNOWN = auto()
 
@@ -87,6 +88,8 @@ class Table:
 
     @property
     def key(self) -> str:
+        if self.is_table_in_mount:
+            return f"{self.catalog}.{self.database}.{self.location}".lower()
         return f"{self.catalog}.{self.database}.{self.name}".lower()
 
     @property
@@ -102,16 +105,6 @@ class Table:
     @property
     def kind(self) -> str:
         return "VIEW" if self.view_text is not None else "TABLE"
-
-    def sql_alter_to(self, target_table_key):
-        return f"ALTER {self.kind} {escape_sql_identifier(self.key)} SET TBLPROPERTIES ('upgraded_to' = '{target_table_key}');"
-
-    def sql_alter_from(self, target_table_key, ws_id):
-        return (
-            f"ALTER {self.kind} {escape_sql_identifier(target_table_key)} SET TBLPROPERTIES "
-            f"('upgraded_from' = '{self.key}'"
-            f" , '{self.UPGRADED_FROM_WS_PARAM}' = '{ws_id}');"
-        )
 
     def sql_unset_upgraded_to(self):
         return f"ALTER {self.kind} {escape_sql_identifier(self.key)} UNSET TBLPROPERTIES IF EXISTS('upgraded_to');"
@@ -148,14 +141,6 @@ class Table:
         return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "ORC", "TEXT", "AVRO"}
 
     @property
-    def is_format_supported_for_create_like(self) -> bool:
-        # Based on documentation
-        # https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-table-like.html
-        if self.table_format is None:
-            return False
-        return self.table_format.upper() in {"DELTA", "PARQUET", "CSV", "JSON", "TEXT"}
-
-    @property
     def is_databricks_dataset(self) -> bool:
         if not self.location:
             return False
@@ -165,9 +150,15 @@ class Table:
         return False
 
     @property
+    def is_table_in_mount(self) -> bool:
+        return self.database.startswith("mounted_") and self.is_delta
+
+    @property
     def what(self) -> What:
         if self.is_databricks_dataset:
             return What.DB_DATASET
+        if self.is_table_in_mount:
+            return What.TABLE_IN_MOUNT
         if self.is_dbfs_root and self.table_format == "DELTA":
             return What.DBFS_ROOT_DELTA
         if self.is_dbfs_root:
@@ -306,6 +297,29 @@ class Table:
 
     def sql_migrate_view(self, target_table_key):
         return f"CREATE VIEW IF NOT EXISTS {escape_sql_identifier(target_table_key)} AS {self.view_text};"
+
+    def sql_migrate_table_in_mount(self, target_table_key: str, table_schema: Iterator[typing.Any]):
+        fields = []
+        partitioned_fields = []
+        next_fileds_are_partitioned = False
+        for key, value, _ in table_schema:
+            if key == "# Partition Information":
+                continue
+            if key == "# col_name":
+                next_fileds_are_partitioned = True
+                continue
+            if next_fileds_are_partitioned:
+                partitioned_fields.append(f"{key}")
+            else:
+                fields.append(f"{key} {value}")
+
+        partitioned_str = ""
+        if partitioned_fields:
+            partitioning_columns = ", ".join(partitioned_fields)
+            partitioned_str = f"PARTITIONED BY ({partitioning_columns})"
+        schema = ", ".join(fields)
+
+        return f"CREATE TABLE IF NOT EXISTS {escape_sql_identifier(target_table_key)} ({schema}) {partitioned_str} LOCATION '{self.location}';"
 
 
 @dataclass

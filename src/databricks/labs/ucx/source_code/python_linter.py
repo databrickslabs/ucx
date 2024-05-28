@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import ast
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Callable
 from typing import TypeVar, Generic, cast
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
@@ -270,6 +270,9 @@ class NotebookRunCall(NodeBase):
         return None
 
 
+P = TypeVar("P", bound=Callable)
+
+
 class PythonLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
@@ -312,21 +315,33 @@ class PythonLinter(Linter):
         return [NotebookRunCall(call) for call in calls]
 
     @staticmethod
-    def list_import_sources(linter: ASTLinter) -> list[ImportSource]:
-        # TODO: make this code more robust, because it fails detecting imports on UCX codebase
+    def list_import_sources(linter: ASTLinter, problem_type: P) -> tuple[list[ImportSource], list[P]]:
+        problems: list[P] = []
         try:  # pylint: disable=too-many-try-statements
             nodes = linter.locate(ast.Import, [])
             sources = [ImportSource(node, alias.name) for node in nodes for alias in node.names]
             nodes = linter.locate(ast.ImportFrom, [])
             sources.extend(ImportSource(node, node.module) for node in nodes)
             nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
-            sources.extend(ImportSource(node, node.args[0].value) for node in nodes)
-            nodes = linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)])
-            sources.extend(ImportSource(node, node.args[0].value) for node in nodes)
-            return sources
+            nodes.extend(linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)]))
+            for node in nodes:
+                if isinstance(node.args[0], ast.Constant):
+                    sources.append(ImportSource(node, node.args[0].value))
+                    continue
+                problem = problem_type(
+                    'dependency-not-constant',
+                    "Can't check dependency not provided as a constant",
+                    start_line=node.lineno,
+                    start_col=node.col_offset,
+                    end_line=node.end_lineno or 0,
+                    end_col=node.end_col_offset or 0,
+                )
+                problems.append(problem)
+            return sources, problems
         except Exception as e:  # pylint: disable=broad-except
-            logger.warning(f"{linter} imports: {e}")
-            return []
+            problem = problem_type('internal-error', f"While linter {linter} was checking imports: {e}")
+            problems.append(problem)
+            return [], problems
 
     @staticmethod
     def list_sys_path_changes(linter: ASTLinter) -> list[SysPathChange]:

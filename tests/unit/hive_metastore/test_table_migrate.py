@@ -2,7 +2,6 @@ import datetime
 import logging
 from itertools import cycle
 from unittest.mock import create_autospec
-
 import pytest
 from databricks.labs.lsql.backends import MockBackend, SqlBackend
 from databricks.sdk import WorkspaceClient
@@ -34,7 +33,8 @@ from databricks.labs.ucx.hive_metastore.tables import (
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
-from .. import GROUPS, table_mapping_mock, workspace_client_mock
+from .. import GROUPS, mock_table_mapping, mock_workspace_client
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def test_migrate_dbfs_root_tables_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other"])
+    table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -104,7 +104,7 @@ def test_dbfs_non_delta_tables_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["dbfs_parquet"])
+    table_mapping = mock_table_mapping(["dbfs_parquet"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -145,7 +145,7 @@ def test_migrate_dbfs_root_tables_should_be_skipped_when_upgrading_external(ws):
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs"])
+    table_mapping = mock_table_mapping(["managed_dbfs"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -174,7 +174,7 @@ def test_migrate_external_tables_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["external_src"])
+    table_mapping = mock_table_mapping(["external_src"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -210,7 +210,7 @@ def test_migrate_external_table_failed_sync(ws, caplog):
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["external_src"])
+    table_mapping = mock_table_mapping(["external_src"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -313,7 +313,7 @@ def test_migrate_external_hiveserde_table_in_place(
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["external_hiveserde"])
+    table_mapping = mock_table_mapping(["external_hiveserde"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -369,7 +369,7 @@ def test_migrate_external_tables_ctas_should_produce_proper_queries(ws, what, te
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock([test_table])
+    table_mapping = mock_table_mapping([test_table])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -447,7 +447,7 @@ def test_migrate_unsupported_format_table_should_produce_no_queries(ws):
     table_crawler = TablesCrawler(crawler_backend, "inventory_database")
     udf_crawler = UdfsCrawler(crawler_backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["external_src_unsupported"])
+    table_mapping = mock_table_mapping(["external_src_unsupported"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -475,7 +475,7 @@ def test_migrate_view_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs", "view"])
+    table_mapping = mock_table_mapping(["managed_dbfs", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
@@ -520,7 +520,7 @@ def test_migrate_view_with_columns(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs", "view"])
+    table_mapping = mock_table_mapping(["managed_dbfs", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
@@ -554,7 +554,7 @@ def test_migrate_view_with_columns(ws):
 def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)  # pylint: disable=mock-no-usage
-    client = workspace_client_mock()
+    client = mock_workspace_client()
     client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     client.schemas.list.return_value = [
         SchemaInfo(catalog_name="cat1", name="test_schema1"),
@@ -638,7 +638,7 @@ def get_table_migrator(backend: SqlBackend) -> TablesMigrator:
     ]
     table_crawler.snapshot.return_value = test_tables
     group_manager = GroupManager(backend, client, "inventory_database")
-    table_mapping = table_mapping_mock()
+    table_mapping = mock_table_mapping()
     migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)  # pylint: disable=mock-no-usage
     table_migrate = TablesMigrator(
@@ -753,7 +753,7 @@ def test_empty_revert_report(ws):
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)
     ws.tables.list.side_effect = []
-    table_mapping = table_mapping_mock()
+    table_mapping = mock_table_mapping()
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -786,7 +786,7 @@ def test_is_upgraded(ws):
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)
-    table_mapping = table_mapping_mock()
+    table_mapping = mock_table_mapping()
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -849,7 +849,7 @@ def test_table_status():
             upgraded_to="cat1.schema1.table3",
         ),
     ]
-    client = workspace_client_mock()
+    client = mock_workspace_client()
     client.catalogs.list.return_value = [CatalogInfo(name="cat1")]
     client.schemas.list.return_value = [
         SchemaInfo(catalog_name="cat1", name="schema1"),
@@ -1006,7 +1006,7 @@ def test_migrate_acls_should_produce_proper_queries(ws, caplog):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
+    table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
 
@@ -1066,7 +1066,7 @@ def test_migrate_principal_acls_should_produce_proper_queries(ws):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs", "managed_mnt", "managed_other", "view"])
+    table_mapping = mock_table_mapping(["managed_dbfs", "managed_mnt", "managed_other", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)
@@ -1108,7 +1108,7 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     backend = MockBackend(fails_on_first=errors, rows=rows)
     table_crawler = create_autospec(TablesCrawler)
     grant_crawler = create_autospec(GrantsCrawler)
-    table_mapping = table_mapping_mock()
+    table_mapping = mock_table_mapping()
     table_mapping.get_tables_to_migrate.return_value = [
         TableToMigrate(
             Table("hive_metastore", "db1_src", "v1_src", "EXTERNAL", "VIEW", None, "select * from db1_src.v3_src"),
@@ -1167,6 +1167,99 @@ def test_migrate_views_should_be_properly_sequenced(ws):
     assert next((key for key in table_keys if key == "hive_metastore.db1_src.t1_src"), None) is None
 
 
+def test_table_in_mount_mapping_with_table_owner():
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
+                ("col1", "string", None),
+                ("col2", "decimal", None),
+            ],
+        }
+    )
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "mounted_datalake", "test", "EXTERNAL", "DELTA", "abfss://bucket@msft/path/test"),
+            Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
+        )
+    ]
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    udf_crawler = UdfsCrawler(backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    group_manager = GroupManager(backend, client, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        client,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
+    assert (
+        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal)  LOCATION 'abfss://bucket@msft/path/test';"
+        in backend.queries
+    )
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+
+
+def test_table_in_mount_mapping_with_partition_information():
+    client = create_autospec(WorkspaceClient)
+    client.tables.get.side_effect = NotFound()
+    backend = MockBackend(
+        rows={
+            'hive_metastore.test.tables': [
+                ("hms", "mounted_datalake", "name", "object_type", "table_format", "abfss://bucket@msft/path/test")
+            ],
+            'DESCRIBE TABLE delta.`abfss://bucket@msft/path/test`;': [
+                ("col1", "string", None),
+                ("col2", "decimal", None),
+                ("# Partition Information", None, None),
+                ("# col_name", None, None),
+                ("col1", None, None),
+            ],
+        }
+    )
+    table_mapping = create_autospec(TableMapping)
+    table_mapping.get_tables_to_migrate.return_value = [
+        TableToMigrate(
+            Table("hive_metastore", "mounted_datalake", "test", "EXTERNAL", "DELTA", "abfss://bucket@msft/path/test"),
+            Rule("prod", "tgt_catalog", "mounted_datalake", "tgt_db", "abfss://bucket@msft/path/test", "test"),
+        )
+    ]
+    table_crawler = TablesCrawler(backend, "inventory_database")
+    udf_crawler = UdfsCrawler(backend, "inventory_database")
+    grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
+    group_manager = GroupManager(backend, client, "inventory_database")
+    migration_status_refresher = MigrationStatusRefresher(client, backend, "inventory_database", table_crawler)
+    principal_grants = create_autospec(PrincipalACL)
+    table_migrate = TablesMigrator(
+        table_crawler,
+        grant_crawler,
+        client,
+        backend,
+        table_mapping,
+        group_manager,
+        migration_status_refresher,
+        principal_grants,
+    )
+    table_migrate.migrate_tables(what=What.TABLE_IN_MOUNT)
+    assert (
+        "CREATE TABLE IF NOT EXISTS tgt_catalog.tgt_db.test (col1 string, col2 decimal) PARTITIONED BY (col1) LOCATION 'abfss://bucket@msft/path/test';"
+        in backend.queries
+    )
+    principal_grants.get_interactive_cluster_grants.assert_not_called()
+
+
 def test_migrate_view_failed(ws, caplog):
     errors = {"CREATE OR REPLACE VIEW": "error"}
     create = "CREATE OR REPLACE VIEW hive_metastore.db1_src.view_src (a,b) AS SELECT * FROM db1_src.managed_dbfs"
@@ -1175,7 +1268,7 @@ def test_migrate_view_failed(ws, caplog):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs", "view"])
+    table_mapping = mock_table_mapping(["managed_dbfs", "view"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = create_autospec(MigrationStatusRefresher)
     migration_status_refresher.get_seen_tables.return_value = {
@@ -1213,7 +1306,7 @@ def test_migrate_dbfs_root_tables_failed(ws, caplog):
     table_crawler = TablesCrawler(backend, "inventory_database")
     udf_crawler = UdfsCrawler(backend, "inventory_database")
     grant_crawler = GrantsCrawler(table_crawler, udf_crawler)
-    table_mapping = table_mapping_mock(["managed_dbfs"])
+    table_mapping = mock_table_mapping(["managed_dbfs"])
     group_manager = GroupManager(backend, ws, "inventory_database")
     migration_status_refresher = MigrationStatusRefresher(ws, backend, "inventory_database", table_crawler)
     principal_grants = create_autospec(PrincipalACL)

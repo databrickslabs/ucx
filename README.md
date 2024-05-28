@@ -38,7 +38,9 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Table Migration Workflow](#table-migration-workflow)
     * [Dependency CLI commands](#dependency-cli-commands)
     * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
+    * [Post Migration Data Reconciliation Task](#post-migration-data-reconciliation-task)
     * [Other considerations](#other-considerations)
+  * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
   * [`ensure-assessment-run` command](#ensure-assessment-run-command)
@@ -66,6 +68,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`move` command](#move-command)
   * [`alias` command](#alias-command)
 * [Code migration commands](#code-migration-commands)
+  * [`lint-local-code` command](#lint-local-code-command)
   * [`migrate-local-code` command](#migrate-local-code-command)
   * [`migrate-dbsql-dashboards` command](#migrate-dbsql-dashboards-command)
   * [`revert-dbsql-dashboards` command](#revert-dbsql-dashboards-command)
@@ -84,6 +87,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
 - Databricks CLI v0.213 or later. See [instructions](#authenticate-databricks-cli). 
 - Python 3.10 or later. See [Windows](https://www.python.org/downloads/windows/) instructions.
+- Databricks Premium or Enterprise workspace.
 - Network access to your Databricks Workspace used for the [installation process](#install-ucx).
 - Network access to the Internet for [pypi.org](https://pypi.org) and [github.com](https://github.com) from machine running the installation.
 - Databricks Workspace Administrator privileges for the user, that runs the installation. Running UCX as a Service Principal is not supported.
@@ -458,6 +462,21 @@ There are 3 main table migration workflows, targeting different table types. All
   - Migrate tables using CTAS 
   - Experimentally migrate Delta and Parquet data found in dbfs mount but not registered as Hive Metastore table into UC tables.
 
+### Post Migration Data Reconciliation Task
+UCX also provides `migrate-data-reconciliation` workflow to validate the integrity of the migrated tables:
+- Compare the schema of the source and target tables. The result is `schema_matches`, and column by column comparison
+is stored as `column_comparison` struct.
+- Compare the row counts of the source and target tables. If the row count is within the reconciliation threshold
+(defaults to 5%), `data_matches` is True.
+- Compare the content of individual row between source and target tables to identify any discrepancies (when `compare_rows` 
+flag is enabled). This is done using hash comparison, and number of missing rows are stored as `source_missing_count`
+and `target_missing_count`
+
+Once the workflow completes, the output will be stored in `$inventory_database.reconciliation_results` view, and displayed
+in the Migration dashboard.
+
+![reconciliation results](docs/recon_results.png)
+
 ### Other considerations
 - You may need to run the workflow multiple times to ensure all the tables are migrated successfully in phases.
 - If your Delta tables in DBFS root have a large number of files, consider:
@@ -465,6 +484,40 @@ There are 3 main table migration workflows, targeting different table types. All
   - Setting higher `Parallelism for migrating DBFS root Delta tables with deep clone` (default 200) when being asked during the UCX installation. This controls the number of Spark tasks/partitions to be created for deep clone.
 - Consider creating an instance pool, and setting its id when prompted during the UCX installation. This instance pool will be specified in the cluster policy used by all UCX workflows job clusters.
 - You may also manually edit the job cluster configration per job or per task after the workflows are deployed.
+
+### [EXPERIMENTAL] Scan tables in mounts Workflow
+#### <b>Always run this workflow AFTER the assessment has finished</b>
+- This experimental workflow attemps to find all Tables inside mount points that are present on your workspace.
+- If you do not run this workflow, then `migrate-tables-in-mounts-experimental` won't do anything.
+- It writes all results to `hive_metastore.<inventory_database>.tables`, you can query those tables found by filtering on database values that starts with `mounted_`
+- This command is incremental, meaning that each time you run it, it will overwrite the previous tables in mounts found.
+- Current format are supported:
+  - DELTA - PARQUET - CSV - JSON
+  - Also detects partitioned DELTA and PARQUET
+- You can configure these workflows with the following options available on conf.yml:
+  - include_mounts : A list of mount points to scans, by default the workflow scans for all mount points
+  - exclude_paths_in_mount : A list of paths to exclude in all mount points
+  - include_paths_in_mount : A list of paths to include in all mount points 
+
+### [EXPERIMENTAL] Migrate tables in mounts Workflow
+- An experimental workflow that migrates tables in mount points using a `CREATE TABLE` command, optinally sets a default tables owner if provided in `default_table_owner` conf parameter. 
+- You must do the following in order to make this work: 
+  - run the Assessment [workflow](#assessment-workflow)
+  - run the scan tables in mounts [workflow](#EXPERIMENTAL-scan-tables-in-mounts-workflow)
+  - run the [`create-table-mapping` command](#create-table-mapping-command)
+    - or manually create a `mapping.csv` file in Workspace -> Applications -> ucx
+
+
+[[back to top](#databricks-labs-ucx)]
+
+## Jobs Static Code Analysis Workflow
+
+> Please note that this is an experimental workflow.
+
+The `experimental-workflow-linter` workflow lints accessible code belonging to all workflows/jobs present in the
+workspace. The linting emits problems indicating what to resolve for making the code Unity Catalog compatible.
+
+![code compatibility problems](docs/code_compatibility_problems.png)
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -918,6 +971,25 @@ After you're done with the [table migration](#table-migration-workflow), you can
 
 Once you're done with the code migration, you can run the [`cluster-remap` command](#cluster-remap-command) to remap the
 clusters to be UC compatible.
+
+[[back to top](#databricks-labs-ucx)]
+
+## `lint-local-code` command
+
+```text
+databricks labs ucx lint-local-code
+```
+
+At any time, you can run this command to assess all migrations required in a local directory or a file. It only takes seconds to run and it
+gives you an initial overview of what needs to be migrated without actually performing any migration. A great way to start a migration!
+
+This command detects all dependencies, and analyzes them. It is still experimental and at the moment only supports Python and SQL files.
+We expect this command to run within a minute on code bases up to 50.000 lines of code.
+Future versions of `ucx` will add support for more source types, and more migration details.
+
+When run from an IDE terminal, this command generates output as follows:
+![img.png](docs/lint-local-code-output.png)
+With modern IDEs, clicking on the file link opens the file at the problematic line
 
 [[back to top](#databricks-labs-ucx)]
 

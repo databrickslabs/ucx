@@ -98,7 +98,7 @@ class ClusterPolicyInstaller:
             return None
 
     def _definition(self, conf: dict, instance_profile: str | None, instance_pool_id: str | None) -> str:
-        latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True, long_term_support=True)
+        latest_lts_dbr = self._ws.clusters.select_spark_version(latest=True)
         node_type_id = self._ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
         policy_definition = {
             "spark_version": self._policy_config(latest_lts_dbr),
@@ -113,6 +113,7 @@ class ClusterPolicyInstaller:
             policy_definition["aws_attributes.availability"] = self._policy_config(
                 compute.AwsAvailability.ON_DEMAND.value
             )
+            policy_definition["aws_attributes.zone_id"] = self._policy_config("auto")
         elif self._ws.config.is_azure:
             policy_definition["azure_attributes.availability"] = self._policy_config(
                 compute.AzureAvailability.ON_DEMAND_AZURE.value
@@ -127,6 +128,8 @@ class ClusterPolicyInstaller:
             policy_definition.pop("node_type_id")
             # 'availability' cannot be supplied when an instance pool ID is provided
             policy_definition.pop("aws_attributes.availability", "")
+            # 'zone_id' cannot be supplied when an instance pool ID is provided
+            policy_definition.pop("aws_attributes.zone_id", "")
             policy_definition.pop("azure_attributes.availability", "")
             policy_definition.pop("gcp_attributes.availability", "")
         return json.dumps(policy_definition)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
@@ -47,11 +48,11 @@ class Cell(ABC):
     @property
     @abstractmethod
     def language(self) -> CellLanguage:
-        raise NotImplementedError()
+        """returns the language of this cell"""
 
     @abstractmethod
     def is_runnable(self) -> bool:
-        raise NotImplementedError()
+        """whether of not this cell can be run"""
 
     def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
         return []
@@ -182,9 +183,16 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
-        # TODO: https://github.com/databrickslabs/ucx/issues/1642
-        return []
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        # TODO: this is very basic code, we need to improve it
+        splits = re.split(r" |\n", self.original_code)
+        if len(splits) < 3:
+            return [DependencyProblem("library-install-failed", f"Missing arguments in '{self.original_code}'")]
+        if splits[1] != "install":
+            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {splits[1]}")]
+        # TODO: we need to support different formats of the library name and etc
+        library = splits[2]
+        return graph.register_library(library)
 
 
 class CellLanguage(Enum):

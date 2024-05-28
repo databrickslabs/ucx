@@ -1,0 +1,222 @@
+{
+  "astroid": {
+    "astroid": []
+  },
+  "black": {
+    "_black_version": [],
+    "black": [],
+    "blackd": [],
+    "blib2to3": []
+  },
+  "boto3": {
+    "boto3": [],
+    "boto3.s3": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "AWS IAM Instance Profiles are not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
+  "botocore": {
+    "botocore": [
+      {
+        "code": "aws-cloud-access",
+        "message": "AWS IAM Instance Profiles are not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
+  "cachetools": {
+    "cachetools": []
+  },
+  "certifi": {
+    "certifi": []
+  },
+  "charset-normalizer": {
+    "charset_normalizer": []
+  },
+  "click": {
+    "click": []
+  },
+  "coverage": {
+    "coverage": []
+  },
+  "databricks-labs-blueprint": {
+    "databricks.labs.blueprint": []
+  },
+  "databricks-labs-lsql": {
+    "databricks.labs.lsql": []
+  },
+  "databricks-labs-pylint": {
+    "databricks.labs.pylint": []
+  },
+  "databricks-labs-ucx": {},
+  "databricks-sdk": {
+    "databricks.sdk": []
+  },
+  "dill": {
+    "dill": []
+  },
+  "eradicate": {
+    "eradicate": []
+  },
+  "exceptiongroup": {
+    "exceptiongroup": []
+  },
+  "execnet": {
+    "execnet": []
+  },
+  "google-auth": {
+    "google.auth": [],
+    "google.oauth2": []
+  },
+  "idna": {
+    "idna": []
+  },
+  "iniconfig": {
+    "iniconfig": []
+  },
+  "isort": {
+    "isort": []
+  },
+  "jmespath": {
+    "jmespath": []
+  },
+  "joblib": {
+    "joblib": []
+  },
+  "mccabe": {
+    "mccabe": []
+  },
+  "mypy": {
+    "mypy": [],
+    "mypyc": []
+  },
+  "mypy-extensions": {
+    "mypy_extensions": []
+  },
+  "numpy": {
+    "numpy": []
+  },
+  "packaging": {
+    "packaging": []
+  },
+  "pandas": {
+    "pandas": []
+  },
+  "pathspec": {
+    "pathspec": []
+  },
+  "pip": {
+    "pip": []
+  },
+  "platformdirs": {
+    "platformdirs": []
+  },
+  "pluggy": {
+    "pluggy": []
+  },
+  "pyasn1": {
+    "pyasn1": []
+  },
+  "pyasn1_modules": {
+    "pyasn1_modules": []
+  },
+  "pylint": {
+    "pylint": []
+  },
+  "pylint-pytest": {
+    "pylint_pytest": []
+  },
+  "pytest": {
+    "_pytest": [],
+    "py": [],
+    "pytest": []
+  },
+  "pytest-cov": {
+    "pytest_cov": []
+  },
+  "pytest-mock": {
+    "pytest_mock": []
+  },
+  "pytest-timeout": {
+    "pytest_timeout": []
+  },
+  "pytest-xdist": {
+    "xdist": []
+  },
+  "python-dateutil": {
+    "dateutil": []
+  },
+  "pytz": {
+    "pytz": []
+  },
+  "pyyaml": {
+    "_yaml": [],
+    "yaml": []
+  },
+  "requests": {
+    "requests": []
+  },
+  "rsa": {
+    "rsa": []
+  },
+  "ruff": {
+    "ruff": []
+  },
+  "s3fs": {
+    "s3fs": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "S3fs library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
+  "s3transfer": {
+    "s3transfer": [
+      {
+        "code": "direct-filesystem-access",
+        "message": "S3Transfer library assumes AWS IAM Instance Profile to work with S3, which is not compatible with Databricks Unity Catalog, that routes access through Storage Credentials."
+      }
+    ]
+  },
+  "scikit-learn": {
+    "sklearn": []
+  },
+  "scipy": {
+    "scipy": []
+  },
+  "setuptools": {
+    "_distutils_hack": [],
+    "pkg_resources": [],
+    "setuptools": []
+  },
+  "six": {
+    "six": []
+  },
+  "sqlglot": {
+    "sqlglot": []
+  },
+  "threadpoolctl": {
+    "threadpoolctl": []
+  },
+  "tomli": {
+    "tomli": []
+  },
+  "tomlkit": {
+    "tomlkit": []
+  },
+  "types-pyyaml": {},
+  "types-requests": {},
+  "typing_extensions": {
+    "typing_extensions": []
+  },
+  "tzdata": {
+    "tzdata": []
+  },
+  "urllib3": {
+    "urllib3": []
+  },
+  "wheel": {
+    "wheel": []
+  }
+}

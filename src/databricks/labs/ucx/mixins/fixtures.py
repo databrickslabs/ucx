@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 from collections.abc import Callable, Generator, MutableMapping
-from datetime import timedelta
+from datetime import timedelta, datetime
 from pathlib import Path
 from typing import BinaryIO
 
@@ -46,6 +46,8 @@ from databricks.sdk.service.sql import (
     Dashboard,
     WidgetOptions,
     WidgetPosition,
+    EndpointTagPair,
+    EndpointTags,
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
@@ -55,6 +57,7 @@ from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 # pylint: disable=redefined-outer-name,too-many-try-statements,import-outside-toplevel,unnecessary-lambda,too-complex,invalid-name
 
 logger = logging.getLogger(__name__)
+TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)  # 15 minutes grace for jobs starting at the end of the hour
 
 
 def factory(name, create, remove):
@@ -720,6 +723,10 @@ def make_cluster(ws, make_random):
         if "instance_pool_id" not in kwargs:
             kwargs["node_type_id"] = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
 
+        if "custom_tags" not in kwargs:
+            kwargs["custom_tags"] = {"RemoveAfter": get_test_purge_time()}
+        else:
+            kwargs["custom_tags"]["RemoveAfter"] = get_test_purge_time()
         return ws.clusters.create(
             cluster_name=cluster_name,
             spark_version=spark_version,
@@ -760,7 +767,9 @@ def make_instance_pool(ws, make_random):
             instance_pool_name = f"sdk-{make_random(4)}"
         if node_type_id is None:
             node_type_id = ws.clusters.select_node_type(local_disk=True, min_memory_gb=16)
-        return ws.instance_pools.create(instance_pool_name, node_type_id, **kwargs)
+        return ws.instance_pools.create(
+            instance_pool_name, node_type_id, custom_tags={"RemoveAfter": get_test_purge_time()}, **kwargs
+        )
 
     yield from factory("instance pool", create, lambda item: ws.instance_pools.delete(item.instance_pool_id))
 
@@ -774,6 +783,9 @@ def make_job(ws, make_random, make_notebook):
         if "spark_conf" in kwargs:
             task_spark_conf = kwargs["spark_conf"]
             kwargs.pop("spark_conf")
+        libraries = None
+        if "libraries" in kwargs:
+            libraries = kwargs.pop("libraries")
         if isinstance(notebook_path, pathlib.Path):
             notebook_path = str(notebook_path)
         if not notebook_path:
@@ -791,9 +803,20 @@ def make_job(ws, make_random, make_notebook):
                         spark_conf=task_spark_conf,
                     ),
                     notebook_task=jobs.NotebookTask(notebook_path=str(notebook_path)),
+                    libraries=libraries,
                     timeout_seconds=0,
                 )
             ]
+
+        # add RemoveAfter tag for test job cleanup
+        date_to_remove = get_test_purge_time()
+        remove_after_tag = {"key": "RemoveAfter", "value": date_to_remove}
+
+        if 'tags' not in kwargs:
+            kwargs["tags"] = [remove_after_tag]
+        else:
+            kwargs["tags"].append(remove_after_tag)
+
         job = ws.jobs.create(**kwargs)
         logger.info(f"Job: {ws.config.host}#job/{job.job_id}")
         return job
@@ -859,12 +882,14 @@ def make_warehouse(ws, make_random):
         if cluster_size is None:
             cluster_size = "2X-Small"
 
+        remove_after_tags = EndpointTags(custom_tags=[EndpointTagPair(key="RemoveAfter", value=get_test_purge_time())])
         return ws.warehouses.create(
             name=warehouse_name,
             cluster_size=cluster_size,
             warehouse_type=warehouse_type,
             max_num_clusters=max_num_clusters,
             enable_serverless_compute=enable_serverless_compute,
+            tags=remove_after_tags,
             **kwargs,
         )
 
@@ -949,7 +974,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
         if name is None:
             name = f"ucx_S{make_random(4)}".lower()
         full_name = f"{catalog_name}.{name}".lower()
-        sql_backend.execute(f"CREATE SCHEMA {full_name}")
+        sql_backend.execute(f"CREATE SCHEMA {full_name} WITH DBPROPERTIES (RemoveAfter={get_test_purge_time()})")
         schema_info = SchemaInfo(catalog_name=catalog_name, name=name, full_name=full_name)
         logger.info(
             f"Schema {schema_info.full_name}: "
@@ -972,7 +997,7 @@ def make_schema(ws, sql_backend, make_random) -> Generator[Callable[..., SchemaI
 @pytest.fixture
 # pylint: disable-next=too-many-statements
 def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[..., TableInfo], None, None]:
-    def create(  # pylint: disable=too-many-locals,too-many-arguments
+    def create(  # pylint: disable=too-many-locals,too-many-arguments,too-many-statements
         *,
         catalog_name="hive_metastore",
         schema_name: str | None = None,
@@ -981,6 +1006,7 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
         non_delta: bool = False,
         external: bool = False,
         external_csv: str | None = None,
+        external_delta: str | None = None,
         view: bool = False,
         tbl_properties: dict[str, str] | None = None,
         hiveserde_ddl: str | None = None,
@@ -1018,6 +1044,11 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             data_source_format = DataSourceFormat.CSV
             storage_location = external_csv
             ddl = f"{ddl} USING CSV OPTIONS (header=true) LOCATION '{storage_location}'"
+        elif external_delta is not None:
+            table_type = TableType.EXTERNAL
+            data_source_format = DataSourceFormat.DELTA
+            storage_location = external_delta
+            ddl = f"{ddl} (id string) LOCATION '{storage_location}'"
         elif external:
             # external table
             table_type = TableType.EXTERNAL
@@ -1032,7 +1063,19 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             storage_location = f"dbfs:/user/hive/warehouse/{schema_name}/{name}"
             ddl = f"{ddl} (id INT, value STRING)"
         if tbl_properties:
-            str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+            tbl_properties.update({"RemoveAfter": get_test_purge_time()})
+        else:
+            tbl_properties = {"RemoveAfter": get_test_purge_time()}
+
+        str_properties = ",".join([f" '{k}' = '{v}' " for k, v in tbl_properties.items()])
+
+        # table properties fails with CTAS statements
+        alter_table_tbl_properties = ""
+        if ctas or non_delta:
+            alter_table_tbl_properties = (
+                f'ALTER {"VIEW" if view else "TABLE"} {full_name} SET TBLPROPERTIES ({str_properties})'
+            )
+        else:
             ddl = f"{ddl} TBLPROPERTIES ({str_properties})"
 
         if hiveserde_ddl:
@@ -1042,6 +1085,11 @@ def make_table(ws, sql_backend, make_schema, make_random) -> Generator[Callable[
             storage_location = storage_override
 
         sql_backend.execute(ddl)
+
+        # CTAS AND NON_DELTA does not support TBLPROPERTIES
+        if ctas or non_delta:
+            sql_backend.execute(alter_table_tbl_properties)
+
         table_info = TableInfo(
             catalog_name=catalog_name,
             schema_name=schema_name,
@@ -1322,3 +1370,7 @@ def make_dashboard(ws, make_random, make_query):
             logger.info(f"Can't delete dashboard {e}")
 
     yield from factory("dashboard", create, remove)
+
+
+def get_test_purge_time() -> str:
+    return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")

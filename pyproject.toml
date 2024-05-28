@@ -44,11 +44,11 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-dependencies = ["databricks-sdk~=0.27.0",
+dependencies = ["databricks-sdk>=0.27,<0.29",
                 "databricks-labs-lsql~=0.4.0",
-                "databricks-labs-blueprint>=0.4.3,<0.6.0",
+                "databricks-labs-blueprint>=0.6.0",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=23.9,<23.16"]
+                "sqlglot>=23.9,<24.1"]
 
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
@@ -87,12 +87,12 @@ path = ".venv"
 test        = "pytest -n 4 --cov src --cov-report=xml --timeout 30 tests/unit --durations 20"
 coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=html --durations 20"
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
-fmt         = ["black .",
+fmt         = ["black . --extend-exclude 'tests/unit/source_code/samples/*'",
                "ruff check . --fix",
                "mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
-verify      = ["black --check .",
-               "ruff .",
+verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples/*'",
+               "ruff check .",
                "mypy --exclude 'tests/unit/source_code/samples/*' .",
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]

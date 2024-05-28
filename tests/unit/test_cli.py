@@ -1,6 +1,7 @@
 import io
 import json
 import time
+from pathlib import Path
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -32,6 +33,7 @@ from databricks.labs.ucx.cli import (
     manual_workspace_info,
     migrate_credentials,
     migrate_dbsql_dashboards,
+    migrate_local_code,
     migrate_locations,
     migrate_tables,
     move,
@@ -52,6 +54,7 @@ from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.source_code.files import LocalFileMigrator
 
 
 @pytest.fixture
@@ -270,6 +273,13 @@ def test_move(ws):
     ws.tables.list.assert_called_once()
 
 
+def test_move_aborted_via_prompt(ws):
+    prompts = MockPrompts({'.*tables will be dropped and recreated.*': 'no'})
+    move(ws, prompts, "SrcC", "SrcS", "*", "TgtC", "ToS")
+
+    ws.tables.list.assert_not_called()
+
+
 def test_alias_no_catalog(ws, caplog):
     alias(ws, "", "", "", "", "")
 
@@ -388,7 +398,23 @@ def test_migrate_locations_azure(ws):
 
 
 def test_migrate_locations_aws(ws, caplog):
-    ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+    successful_return = """
+    {
+        "UserId": "uu@mail.com",
+        "Account": "1234",
+        "Arn": "arn:aws:sts::1234:assumed-role/AWSVIEW/uu@mail.com"
+    }
+    """
+
+    def successful_call(_):
+        return 0, successful_return, ""
+
+    ctx = WorkspaceContext(ws).replace(
+        is_aws=True,
+        is_azure=False,
+        aws_profile="profile",
+        aws_cli_run_command=successful_call,
+    )
     migrate_locations(ws, ctx=ctx)
     ws.external_locations.list.assert_called()
 
@@ -453,6 +479,22 @@ def test_relay_logs(ws, caplog):
     ]
     logs(ws)
     assert 'Something is logged' in caplog.messages
+
+
+def test_migrate_local_code(ws):
+    prompts = MockPrompts({'.*': 'yes'})
+    with patch.object(LocalFileMigrator, 'apply') as mock_apply:
+        migrate_local_code(ws, prompts)
+
+        mock_apply.assert_called_once_with(Path.cwd())
+
+
+def test_migrate_local_code_aborted_via_prompt(ws):
+    prompts = MockPrompts({'.*apply UC migration to all files.*': 'no'})
+    with patch.object(LocalFileMigrator, 'apply') as mock_apply:
+        migrate_local_code(ws, prompts)
+
+        mock_apply.assert_not_called()
 
 
 def test_show_all_metastores(acc_client, caplog):
@@ -542,3 +584,10 @@ def test_migrate_dbsql_dashboards(ws, caplog):
 def test_revert_dbsql_dashboards(ws, caplog):
     revert_dbsql_dashboards(ws)
     ws.dashboards.list.assert_called_once()
+
+
+def test_cli_missing_awscli(ws, mocker, caplog):
+    mocker.patch("shutil.which", side_effect=ValueError("Couldn't find AWS CLI in path"))
+    with pytest.raises(ValueError):
+        ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
+        migrate_locations(ws, ctx)

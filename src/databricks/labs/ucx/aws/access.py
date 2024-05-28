@@ -33,14 +33,13 @@ class AWSResourcePermissions:
         ws: WorkspaceClient,
         aws_resources: AWSResources,
         external_locations: ExternalLocations,
-        aws_account_id=None,
         kms_key=None,
     ):
         self._installation = installation
         self._aws_resources = aws_resources
         self._ws = ws
         self._locations = external_locations
-        self._aws_account_id = aws_account_id
+        self._aws_account_id = aws_resources.validate_connection().get("Account")
         self._kms_key = kms_key
 
     def list_uc_roles(self, *, single_role=True, role_name="UC_ROLE", policy_name="UC_POLICY"):
@@ -111,13 +110,12 @@ class AWSResourcePermissions:
         instance_profiles = self._ws.instance_profiles.list()
         result_instance_profiles = []
         for instance_profile in instance_profiles:
-            if not instance_profile.iam_role_arn:
-                instance_profile.iam_role_arn = instance_profile.instance_profile_arn.replace(
-                    "instance-profile", "role"
-                )
-            result_instance_profiles.append(
-                AWSInstanceProfile(instance_profile.instance_profile_arn, instance_profile.iam_role_arn)
-            )
+            iam_role_arn = instance_profile.iam_role_arn
+            role_match = re.match(AWSResources.ROLE_NAME_REGEX, instance_profile.instance_profile_arn)
+            if role_match is not None:
+                instance_profile_name = role_match.group(1)
+                iam_role_arn = self._aws_resources.get_instance_profile_role_arn(instance_profile_name)
+            result_instance_profiles.append(AWSInstanceProfile(instance_profile.instance_profile_arn, iam_role_arn))
 
         return result_instance_profiles
 
@@ -230,7 +228,7 @@ class AWSResourcePermissions:
         )
 
     def get_instance_profile(self, instance_profile_name: str) -> AWSInstanceProfile | None:
-        instance_profile_arn = self._aws_resources.get_instance_profile(instance_profile_name)
+        instance_profile_arn = self._aws_resources.get_instance_profile_arn(instance_profile_name)
 
         if not instance_profile_arn:
             return None

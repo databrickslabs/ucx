@@ -7,11 +7,11 @@ from pathlib import Path
 from databricks.sdk.errors import NotFound
 
 from databricks.labs.ucx.source_code.graph import (
-    BaseDependencyResolver,
+    BaseNotebookResolver,
     Dependency,
     DependencyLoader,
-    SourceContainer,
     MaybeDependency,
+    SourceContainer,
 )
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
@@ -20,19 +20,16 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 logger = logging.getLogger(__name__)
 
 
-class NotebookResolver(BaseDependencyResolver):
+class NotebookResolver(BaseNotebookResolver):
 
-    def __init__(self, notebook_loader: NotebookLoader, next_resolver: BaseDependencyResolver | None = None):
-        super().__init__(next_resolver)
+    def __init__(self, notebook_loader: NotebookLoader):
+        super().__init__()
         self._notebook_loader = notebook_loader
-
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        return NotebookResolver(self._notebook_loader, resolver)
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
         absolute_path = self._notebook_loader.resolve(path_lookup, path)
         if not absolute_path:
-            return super().resolve_notebook(path_lookup, path)
+            return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
         dependency = Dependency(self._notebook_loader, absolute_path)
         return MaybeDependency(dependency, [])
 

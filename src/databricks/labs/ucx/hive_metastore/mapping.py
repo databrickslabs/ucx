@@ -15,6 +15,7 @@ from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.framework.utils import escape_sql_identifier
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
+from databricks.labs.ucx.recon.base import TableIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,11 @@ class Rule:
     dst_schema: str
     src_table: str
     dst_table: str
+    recon_tolerance_percent: int = 0  # threshold for row count comparison
+    compare_rows: bool = False  # whether to compare row by row
 
     @classmethod
-    def initial(cls, workspace_name: str, catalog_name: str, table: Table) -> "Rule":
+    def initial(cls, workspace_name: str, catalog_name: str, table: Table, recon_tolerance_percent: int) -> "Rule":
         return cls(
             workspace_name=workspace_name,
             catalog_name=catalog_name,
@@ -37,6 +40,7 @@ class Rule:
             dst_schema=table.database,
             src_table=table.name,
             dst_table=table.name,
+            recon_tolerance_percent=recon_tolerance_percent,
         )
 
     @classmethod
@@ -48,7 +52,11 @@ class Rule:
             dst_schema=str(dst_schema.name or ""),
             src_table=str(src_table.name or ""),
             dst_table=str(src_table.name or ""),
+            recon_tolerance_percent=0,
         )
+
+    def match(self, table: TableIdentifier) -> bool:
+        return table.catalog == "hive_metastore" and self.src_schema == table.schema and self.src_table == table.table
 
     @property
     def as_uc_table_key(self):
@@ -75,10 +83,17 @@ class TableMapping:
     FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
 
-    def __init__(self, installation: Installation, ws: WorkspaceClient, sql_backend: SqlBackend):
+    def __init__(
+        self,
+        installation: Installation,
+        ws: WorkspaceClient,
+        sql_backend: SqlBackend,
+        recon_tolerance_percent: int = 0,
+    ):
         self._installation = installation
         self._ws = ws
         self._sql_backend = sql_backend
+        self._recon_tolerance_percent = recon_tolerance_percent
 
     def current_tables(self, tables: TablesCrawler, workspace_name: str, catalog_name: str):
         tables_snapshot = tables.snapshot()
@@ -86,7 +101,7 @@ class TableMapping:
             msg = "No tables found. Please run: databricks labs ucx ensure-assessment-run"
             raise ValueError(msg)
         for table in tables_snapshot:
-            yield Rule.initial(workspace_name, catalog_name, table)
+            yield Rule.initial(workspace_name, catalog_name, table, self._recon_tolerance_percent)
 
     def save(self, tables: TablesCrawler, workspace_info: WorkspaceInfo) -> str:
         workspace_name = workspace_info.current()
@@ -158,6 +173,8 @@ class TableMapping:
         return Threads.strict("checking databases for skip property", tasks)
 
     def _get_database_in_scope_task(self, database: str) -> str | None:
+        if database.startswith("mounted_"):
+            return database
         describe = {}
         try:
             for value in self._sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {escape_sql_identifier(database)}"):
@@ -182,14 +199,11 @@ class TableMapping:
         if self.exists_in_uc(table, rule.as_uc_table_key):
             logger.info(f"The intended target for {table.key}, {rule.as_uc_table_key}, already exists.")
             return None
-        try:
-            result = self._sql_backend.fetch(
-                f"SHOW TBLPROPERTIES {escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
-            )
-        except DatabricksError as err:
-            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+        properties = self._get_table_properties(table)
+        if not properties:
             return None
-        for value in result:
+
+        for value in properties:
             if value["key"] == self.UCX_SKIP_PROPERTY:
                 logger.info(f"{table.key} is marked to be skipped")
                 return None
@@ -210,20 +224,45 @@ class TableMapping:
 
         return table_to_migrate
 
+    def _get_table_properties(self, table: Table):
+        table_identifier = f"{escape_sql_identifier(table.database)}.{escape_sql_identifier(table.name)}"
+        if table.is_table_in_mount:
+            table_identifier = f"delta.`{table.location}`"
+
+        try:
+            return self._sql_backend.fetch(f"SHOW TBLPROPERTIES {table_identifier}")
+        except DatabricksError as err:
+            logger.warning(f"Failed to get properties for Table {table.key}: {err}")
+            return None
+
     def exists_in_uc(self, src_table: Table, target_key: str):
         # Attempts to get the target table info from UC returns True if it exists.
-        try:
-            table_info = self._ws.tables.get(target_key)
-            if not table_info.properties:
-                return True
-            upgraded_from = table_info.properties.get("upgraded_from")
-            if upgraded_from and upgraded_from != src_table.key:
-                raise ResourceConflict(
-                    f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
-                    "You can skip this error using the CLI command: "
-                    "databricks labs ucx skip "
-                    f"--schema {src_table.database} --table {src_table.name}"
-                )
-            return True
-        except NotFound:
+        table_info = self._try_get_table_in_uc(target_key)
+        if not table_info:
             return False
+        # Corner case for tables in mounts where the table exists in UC, but the location is not the same
+        # from the one provided in the mapping
+        if src_table.is_table_in_mount and table_info.storage_location != src_table.location:
+            raise ResourceConflict(
+                f"Expected to be migrated from {src_table.key}, but got {table_info.storage_location}. "
+                "You can skip this error using the CLI command: "
+                "databricks labs ucx skip "
+                f"--schema {src_table.database} --table {src_table.name}"
+            )
+        if not table_info.properties:
+            return True
+        upgraded_from = table_info.properties.get("upgraded_from")
+        if upgraded_from and upgraded_from != src_table.key and not src_table.is_table_in_mount:
+            raise ResourceConflict(
+                f"Expected to be migrated from {src_table.key}, but got {upgraded_from}. "
+                "You can skip this error using the CLI command: "
+                "databricks labs ucx skip "
+                f"--schema {src_table.database} --table {src_table.name}"
+            )
+        return True
+
+    def _try_get_table_in_uc(self, target_key: str):
+        try:
+            return self._ws.tables.get(target_key)
+        except NotFound:
+            return None

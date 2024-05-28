@@ -6,15 +6,16 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     DependencyProblem,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
-from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from tests.unit import (
-    MockPathLookup,
+from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
+
+S3FS_DEPRECATION_MESSAGE = (
+    'S3fs library assumes AWS IAM Instance Profile to work with '
+    'S3, which is not compatible with Databricks Unity Catalog, '
+    'that routes access through Storage Credentials.'
 )
-
-
-S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
 
 
 @pytest.mark.parametrize(
@@ -24,9 +25,9 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "import s3fs",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -38,9 +39,9 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "from s3fs import something",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -48,30 +49,30 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
                 )
             ],
         ),
-        ("import leeds", []),
-        ("from leeds import path", []),
+        ("import certifi", []),
+        ("from certifi import core", []),
         (
-            "import s3fs, leeds",
+            "import s3fs, certifi",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
-                    end_col=18,
+                    end_col=20,
                 )
             ],
         ),
-        ("from leeds import path, s3fs", []),
+        ("from certifi import core, s3fs", []),
         (
             "def func():\n    import s3fs",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=2,
                     start_col=4,
                     end_line=2,
@@ -83,9 +84,9 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "import s3fs as s",
             [
                 DependencyProblem(
-                    code='dependency-check',
+                    code='direct-filesystem-access',
                     message=S3FS_DEPRECATION_MESSAGE,
-                    source_path=Path('path.py.txt'),
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -97,9 +98,9 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
             "from s3fs.subpackage import something",
             [
                 DependencyProblem(
-                    code='dependency-check',
-                    message='Use of dependency s3fs.subpackage is deprecated',
-                    source_path=Path('path.py.txt'),
+                    code='direct-filesystem-access',
+                    message=S3FS_DEPRECATION_MESSAGE,
+                    source_path=Path('path.py'),
                     start_line=1,
                     start_col=0,
                     end_line=1,
@@ -110,16 +111,17 @@ S3FS_DEPRECATION_MESSAGE = "Use of dependency s3fs is deprecated"
         ("", []),
     ],
 )
-def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyProblem], tmp_path):
+def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyProblem], tmp_path, mock_path_lookup):
     sample = tmp_path / "test_detect_s3fs_import.py"
     sample.write_text(source)
-    lookup = MockPathLookup(sys_paths=[tmp_path])
-    yml = lookup.cwd / "s3fs-python-compatibility-catalog.yml"
-    whitelist = Whitelist.parse(yml.read_text())
+    mock_path_lookup.append_path(tmp_path)
+    whitelist = Whitelist()
     notebook_loader = NotebookLoader()
     file_loader = FileLoader()
-    resolvers = [NotebookResolver(notebook_loader), LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolver = ImportFileResolver(file_loader, whitelist)
+    pip_resolver = PipResolver(file_loader, whitelist)
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
 
@@ -129,9 +131,11 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     (
         [
             DependencyProblem(
-                code='dependency-check',
-                message='Use of dependency s3fs is deprecated',
-                source_path=Path('leaf9.py.txt'),
+                code='direct-filesystem-access',
+                message='S3fs library assumes AWS IAM Instance Profile to work with '
+                'S3, which is not compatible with Databricks Unity Catalog, '
+                'that routes access through Storage Credentials.',
+                source_path=Path('leaf9.py'),
                 start_line=1,
                 start_col=0,
                 end_line=1,
@@ -140,13 +144,14 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
         ],
     ),
 )
-def test_detect_s3fs_import_in_dependencies(empty_index, expected: list[DependencyProblem]):
-    lookup = MockPathLookup()
-    yml = lookup.cwd / "s3fs-python-compatibility-catalog.yml"
+def test_detect_s3fs_import_in_dependencies(
+    empty_index, expected: list[DependencyProblem], mock_path_lookup, mock_notebook_resolver
+):
     file_loader = FileLoader()
-    whitelist = Whitelist.parse(yml.read_text())
-    resolvers = [LocalFileResolver(file_loader), WhitelistResolver(whitelist)]
-    dependency_resolver = DependencyResolver(resolvers, lookup)
-    sample = lookup.cwd / "root9.py.txt"
+    whitelist = Whitelist()
+    import_resolver = ImportFileResolver(file_loader, whitelist)
+    pip_resolver = PipResolver(file_loader, whitelist)
+    dependency_resolver = DependencyResolver(pip_resolver, mock_notebook_resolver, import_resolver, mock_path_lookup)
+    sample = mock_path_lookup.cwd / "root9.py"
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == expected

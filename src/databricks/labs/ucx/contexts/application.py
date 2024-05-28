@@ -9,7 +9,15 @@ from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
+
+from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
+from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
+from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
+from databricks.labs.ucx.recon.migration_recon import MigrationRecon
+from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
+from databricks.labs.ucx.source_code.python_libraries import PipResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
+from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -39,11 +47,10 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, LocalFileResolver
+from databricks.labs.ucx.source_code.files import FileLoader, FolderLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
-from databricks.labs.ucx.source_code.whitelist import WhitelistResolver, Whitelist
-from databricks.labs.ucx.source_code.site_packages import SitePackageResolver, SitePackages
+from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -53,7 +60,7 @@ from databricks.labs.ucx.workspace_access.scim import ScimSupport
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 
-# "Service Factories" would always have a lot of pulic methods.
+# "Service Factories" would always have a lot of public methods.
 # This is because they are responsible for creating objects that are
 # used throughout the application. That being said, we'll do best
 # effort of splitting the instances between Global, Runtime,
@@ -280,12 +287,15 @@ class GlobalContext(abc.ABC):
     @cached_property
     def principal_locations(self):
         eligible_locations = {}
-        if self.is_azure:
-            eligible_locations = self.azure_acl.get_eligible_locations_principals()
-        if self.is_aws:
-            eligible_locations = self.aws_acl.get_eligible_locations_principals()
-        if self.is_gcp:
-            raise NotImplementedError("Not implemented for GCP.")
+        try:
+            if self.is_azure:
+                eligible_locations = self.azure_acl.get_eligible_locations_principals()
+            if self.is_aws:
+                eligible_locations = self.aws_acl.get_eligible_locations_principals()
+            if self.is_gcp:
+                raise NotImplementedError("Not implemented for GCP.")
+        except ResourceDoesNotExist:
+            pass
         return eligible_locations
 
     @cached_property
@@ -351,6 +361,10 @@ class GlobalContext(abc.ABC):
         return VerifyHasMetastore(self.workspace_client)
 
     @cached_property
+    def pip_resolver(self):
+        return PipResolver(self.file_loader, self.whitelist)
+
+    @cached_property
     def notebook_loader(self) -> NotebookLoader:
         return NotebookLoader()
 
@@ -359,9 +373,9 @@ class GlobalContext(abc.ABC):
         return NotebookResolver(self.notebook_loader)
 
     @cached_property
-    def site_packages(self):
-        # TODO: actually load the site packages
-        return SitePackages([])
+    def site_packages_path(self):
+        lookup = self.path_lookup
+        return next(path for path in lookup.library_roots if "site-packages" in path.as_posix())
 
     @cached_property
     def path_lookup(self):
@@ -373,27 +387,20 @@ class GlobalContext(abc.ABC):
         return FileLoader()
 
     @cached_property
-    def site_packages_resolver(self):
-        return SitePackageResolver(self.site_packages, self.file_loader, self.path_lookup)
+    def folder_loader(self):
+        return FolderLoader(self.file_loader)
 
     @cached_property
     def whitelist(self):
-        # TODO: fill in the whitelist
         return Whitelist()
 
     @cached_property
-    def whitelist_resolver(self):
-        return WhitelistResolver(self.whitelist)
-
-    @cached_property
     def file_resolver(self):
-        return LocalFileResolver(self.file_loader)
+        return ImportFileResolver(self.file_loader, self.whitelist)
 
     @cached_property
     def dependency_resolver(self):
-        # TODO: link back self.site_packages_resolver
-        resolvers = [self.notebook_resolver, self.file_resolver, self.whitelist_resolver]
-        return DependencyResolver(resolvers, self.path_lookup)
+        return DependencyResolver(self.pip_resolver, self.notebook_resolver, self.file_resolver, self.path_lookup)
 
     @cached_property
     def workflow_linter(self):
@@ -410,6 +417,34 @@ class GlobalContext(abc.ABC):
             self.migration_status_refresher.index(),
             self.workspace_client,
             self.installation,
+        )
+
+    @cached_property
+    def metadata_retriever(self):
+        return DatabricksTableMetadataRetriever(self.sql_backend)
+
+    @cached_property
+    def schema_comparator(self):
+        return StandardSchemaComparator(self.metadata_retriever)
+
+    @cached_property
+    def data_profiler(self):
+        return StandardDataProfiler(self.sql_backend, self.metadata_retriever)
+
+    @cached_property
+    def data_comparator(self):
+        return StandardDataComparator(self.sql_backend, self.data_profiler)
+
+    @cached_property
+    def migration_recon(self):
+        return MigrationRecon(
+            self.sql_backend,
+            self.inventory_database,
+            self.migration_status_refresher,
+            self.table_mapping,
+            self.schema_comparator,
+            self.data_comparator,
+            self.config.recon_tolerance_percent,
         )
 
 

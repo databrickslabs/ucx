@@ -10,7 +10,7 @@ from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import AccountInstaller
-from . import workspace_client_mock
+from . import mock_workspace_client
 
 PRODUCT_INFO = ProductInfo.from_class(WorkspaceConfig)
 
@@ -55,7 +55,7 @@ def test_join_collection_no_sync_called():
 
 
 def test_join_collection_join_collection_no_installation_id():
-    ws = workspace_client_mock()
+    ws = mock_workspace_client()
     download_yaml = yaml.dump(
         {
             'version': 1,
@@ -94,7 +94,7 @@ def test_join_collection_join_collection_no_installation_id():
 
 
 def test_join_collection_join_collection():
-    ws = workspace_client_mock()
+    ws = mock_workspace_client()
     account_client = create_autospec(AccountClient)
     account_client.workspaces.list.return_value = [
         Workspace(workspace_id=123, deployment_name="test"),

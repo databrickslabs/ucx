@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import abc
+import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
+from typing import cast
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.python_linter import (
@@ -44,12 +46,14 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_library(self, name: str) -> MaybeGraph:
-        # TODO: use DistInfoResolver to load wheel/egg/pypi dependencies
-        # TODO: https://github.com/databrickslabs/ucx/issues/1642
+    def register_library(self, library: str) -> list[DependencyProblem]:
         # TODO: https://github.com/databrickslabs/ucx/issues/1643
         # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        return MaybeGraph(None, [DependencyProblem('not-yet-implemented', f'Library dependency: {name}')])
+        maybe = self._resolver.resolve_library(self.path_lookup, library)
+        if not maybe.dependency:
+            return maybe.problems
+        maybe_graph = self.register_dependency(maybe.dependency)
+        return maybe_graph.problems
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -69,8 +73,8 @@ class DependencyGraph:
 
     def register_dependency(self, dependency: Dependency) -> MaybeGraph:
         # TODO: this has to be a private method, because we don't want to allow free-form dependencies.
-        # the only case we have for this method to be used outside of this class is for SitePackages (or DistInfo)
-        # See databricks.labs.ucx.source_code.site_packages.SitePackageContainer.build_dependency_graph for reference
+        # the only case we have for this method to be used outside of this class is for DistInfoPackage
+        # See databricks.labs.ucx.source_code.python_libraries.DistInfoContainer.build_dependency_graph for reference
         maybe = self.locate_dependency(dependency.path)
         if maybe.graph is not None:
             self._dependencies[dependency] = maybe.graph
@@ -79,6 +83,7 @@ class DependencyGraph:
         child_graph = DependencyGraph(dependency, self, self._resolver, self._path_lookup)
         self._dependencies[dependency] = child_graph
         container = dependency.load(self.path_lookup)
+        # TODO: Return either (child) graph OR problems
         if not container:
             problem = DependencyProblem('dependency-register-failed', 'Failed to register dependency', dependency.path)
             return MaybeGraph(child_graph, [problem])
@@ -96,16 +101,9 @@ class DependencyGraph:
     def locate_dependency(self, path: Path) -> MaybeGraph:
         # need a list since unlike JS, Python won't let you assign closure variables
         found: list[DependencyGraph] = []
-        # TODO https://github.com/databrickslabs/ucx/issues/1287
-        posix_path = path.as_posix()
-        posix_path = posix_path[2:] if posix_path.startswith('./') else posix_path
 
         def check_registered_dependency(graph):
-            # TODO https://github.com/databrickslabs/ucx/issues/1287
-            graph_posix_path = graph.path.as_posix()
-            if graph_posix_path.startswith('./'):
-                graph_posix_path = graph_posix_path[2:]
-            if graph_posix_path == posix_path:
+            if graph.path == path:
                 found.append(graph)
                 return True
             return False
@@ -164,7 +162,8 @@ class DependencyGraph:
         linter = ASTLinter.parse(python_code)
         syspath_changes = PythonLinter.list_sys_path_changes(linter)
         run_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources = PythonLinter.list_import_sources(linter)
+        import_sources, import_problems = PythonLinter.list_import_sources(linter, DependencyProblem)
+        problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
         for base_node in sorted(nodes, key=lambda node: node.node.lineno * 10000 + node.node.col_offset):
@@ -188,7 +187,9 @@ class DependencyGraph:
             else:
                 yield from self.register_notebook(Path(strpath))
         if isinstance(base_node, ImportSource):
-            yield from self.register_import(base_node.name)
+            prefix = ("." * base_node.node.level) if isinstance(base_node.node, ast.ImportFrom) else ""
+            name = base_node.name or ""
+            yield from self.register_import(prefix + name)
 
     def _mutate_path_lookup(self, change: SysPathChange):
         path = Path(change.path)
@@ -230,13 +231,13 @@ class SourceContainer(abc.ABC):
 
     @abc.abstractmethod
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        raise NotImplementedError()
+        """builds a dependency graph from the contents of this container"""
 
 
 class DependencyLoader(abc.ABC):
     @abc.abstractmethod
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        raise NotImplementedError()
+        """loads a dependency"""
 
 
 class WrappingLoader(DependencyLoader):
@@ -251,54 +252,35 @@ class WrappingLoader(DependencyLoader):
         return f"<WrappingLoader source_container={self._source_container}>"
 
 
-class BaseDependencyResolver(abc.ABC):
+class LibraryResolver(abc.ABC):
+    @abc.abstractmethod
+    def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
+        pass
 
-    def __init__(self, next_resolver: BaseDependencyResolver | None):
-        self._next_resolver = next_resolver
+
+class BaseNotebookResolver(abc.ABC):
 
     @abc.abstractmethod
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        raise NotImplementedError()
-
-    @property
-    def next_resolver(self):
-        return self._next_resolver
-
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        # TODO: remove StubResolver and return MaybeDependency(None, [...])
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_notebook(path_lookup, path)
-
-    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_local_file(path_lookup, path)
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        # TODO: remove StubResolver and return MaybeDependency(None, [...])
-        assert self._next_resolver is not None
-        return self._next_resolver.resolve_import(path_lookup, name)
-
-
-class StubResolver(BaseDependencyResolver):
-
-    def __init__(self):
-        super().__init__(None)
-
-    def with_next_resolver(self, resolver: BaseDependencyResolver) -> BaseDependencyResolver:
-        raise NotImplementedError("Should never happen!")
-
-    def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._fail('notebook-not-found', f"Notebook not found: {path.as_posix()}")
-
-    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._fail('file-not-found', f"File not found: {path.as_posix()}")
-
-    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        return self._fail('import-not-found', f"Could not locate import: {name}")
+        """locates a notebook"""
 
     @staticmethod
-    def _fail(code: str, message: str):
+    def _fail(code: str, message: str) -> MaybeDependency:
         return MaybeDependency(None, [DependencyProblem(code, message)])
+
+
+class BaseImportResolver(abc.ABC):
+
+    @abc.abstractmethod
+    def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
+        """resolve a simple or composite import name"""
+
+
+class BaseFileResolver(abc.ABC):
+
+    @abc.abstractmethod
+    def resolve_local_file(self, path_lookup, path: Path) -> MaybeDependency:
+        """locates a file"""
 
 
 @dataclass
@@ -308,50 +290,75 @@ class MaybeDependency:
 
 
 class DependencyResolver:
-    def __init__(self, resolvers: list[BaseDependencyResolver], path_lookup: PathLookup):
-        previous: BaseDependencyResolver = StubResolver()
-        for resolver in resolvers:
-            resolver = resolver.with_next_resolver(previous)
-            previous = resolver
-        self._resolver: BaseDependencyResolver = previous
+    """the DependencyResolver is responsible for locating "stuff", mimicking the Databricks runtime behavior.
+    There are specific resolution algorithms for import and for Notebooks (executed via %run or dbutils.notebook.run)
+    so we're using 2 distinct resolvers for notebooks (instance) and imports (linked list of specialized sub-resolvers)
+    resolving imports is affected by cwd and sys.paths, the latter being itself influenced by Python code
+    we therefore need a PathLookup to convey these during import resolution
+    """
+
+    def __init__(
+        self,
+        library_resolver: LibraryResolver,
+        notebook_resolver: BaseNotebookResolver,
+        import_resolver: BaseImportResolver,
+        path_lookup: PathLookup,
+    ):
+        self._library_resolver = library_resolver
+        self._notebook_resolver = notebook_resolver
+        self._import_resolver = import_resolver
         self._path_lookup = path_lookup
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._resolver.resolve_notebook(path_lookup, path)
-
-    def resolve_local_file(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
-        return self._resolver.resolve_local_file(path_lookup, path)
+        return self._notebook_resolver.resolve_notebook(path_lookup, path)
 
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
-        return self._resolver.resolve_import(path_lookup, name)
+        return self._import_resolver.resolve_import(path_lookup, name)
+
+    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
+        return self._library_resolver.resolve_library(path_lookup, Path(library))
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._resolver.resolve_local_file(self._path_lookup, path)
+        resolver = self._local_file_resolver
+        if not resolver:
+            problem = DependencyProblem("missing-file-resolver", "Missing resolver for local files")
+            return MaybeGraph(None, [problem])
+        maybe = resolver.resolve_local_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
-        if container is not None:
-            problems = container.build_dependency_graph(graph)
-            if problems:
-                return MaybeGraph(None, self._make_relative_paths(problems, path))
-        return MaybeGraph(graph, [])
+        if container is None:
+            problem = DependencyProblem('cannot-load-file', f"Could not load file {path}")
+            return MaybeGraph(None, [problem])
+        problems = container.build_dependency_graph(graph)
+        if problems:
+            problems = self._make_relative_paths(problems, path)
+        return MaybeGraph(graph, problems)
+
+    @property
+    def _local_file_resolver(self) -> BaseFileResolver | None:
+        if isinstance(self._import_resolver, BaseFileResolver):
+            return self._import_resolver
+        return None
 
     def build_notebook_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._resolver.resolve_notebook(self._path_lookup, path)
+        maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
         container = maybe.dependency.load(graph.path_lookup)
-        if container is not None:
-            problems = container.build_dependency_graph(graph)
-            if problems:
-                return MaybeGraph(None, self._make_relative_paths(problems, path))
-        return MaybeGraph(graph, [])
+        if container is None:
+            problem = DependencyProblem('cannot-load-notebook', f"Could not load notebook {path}")
+            return MaybeGraph(None, [problem])
+        problems = container.build_dependency_graph(graph)
+        if problems:
+            problems = self._make_relative_paths(problems, path)
+        return MaybeGraph(graph, problems)
 
     def _make_relative_paths(self, problems: list[DependencyProblem], path: Path) -> list[DependencyProblem]:
         adjusted_problems = []
@@ -362,8 +369,24 @@ class DependencyResolver:
             adjusted_problems.append(problem.replace(source_path=out_path))
         return adjusted_problems
 
+    def build_library_dependency_graph(self, path: Path):
+        """Builds a dependency graph starting from a library. This method is mainly intended for testing purposes.
+        In case of problems, the paths in the problems will be relative to the starting path lookup."""
+        maybe = self._library_resolver.resolve_library(self._path_lookup, path)
+        if not maybe.dependency:
+            return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
+        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
+        container = maybe.dependency.load(graph.path_lookup)
+        if container is None:
+            problem = DependencyProblem('cannot-load-library', f"Could not load library {path}")
+            return MaybeGraph(None, [problem])
+        problems = container.build_dependency_graph(graph)
+        if problems:
+            problems = self._make_relative_paths(problems, path)
+        return MaybeGraph(graph, problems)
+
     def __repr__(self):
-        return f"<DependencyResolver {self._resolver} {self._path_lookup}>"
+        return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._path_lookup}>"
 
 
 MISSING_SOURCE_PATH = "<MISSING_SOURCE_PATH>"

@@ -164,6 +164,8 @@ def test_save_external_location_mapping_missing_location():
                 ("s3://test_location/test1/table1", ""),
                 ("gcs://test_location2/test2/table2", ""),
                 ("abfss://cont1@storagetest1.dfs.core.windows.net/test2/table3", ""),
+                ("s3a://test_location_2/test1/table1", ""),
+                ("s3n://test_location_3/test1/table1", ""),
             ],
         }
     )
@@ -189,6 +191,16 @@ def test_save_external_location_mapping_missing_location():
             'resource "databricks_external_location" "cont1_storagetest1_test2" { \n'
             '    name = "cont1_storagetest1_test2"\n'
             '    url  = "abfss://cont1@storagetest1.dfs.core.windows.net/test2"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "test_location_2_test1" { \n'
+            '    name = "test_location_2_test1"\n'
+            '    url  = "s3a://test_location_2/test1"\n'
+            "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
+            "}\n\n"
+            'resource "databricks_external_location" "test_location_3_test1" { \n'
+            '    name = "test_location_3_test1"\n'
+            '    url  = "s3n://test_location_3/test1"\n'
             "    credential_name = databricks_storage_credential.<storage_credential_reference>.id\n"
             "}\n"
         ).encode("utf8"),

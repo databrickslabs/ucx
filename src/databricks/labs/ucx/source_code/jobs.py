@@ -9,18 +9,19 @@ from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
+from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.files import LocalFile
 from databricks.labs.ucx.source_code.graph import (
-    DependencyGraph,
-    SourceContainer,
-    DependencyProblem,
     Dependency,
-    WrappingLoader,
+    DependencyGraph,
+    DependencyProblem,
     DependencyResolver,
+    SourceContainer,
+    WrappingLoader,
 )
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
@@ -41,6 +42,10 @@ class JobProblem:
     start_col: int
     end_line: int
     end_col: int
+
+    def as_message(self) -> str:
+        message = f"{self.path}:{self.start_line} [{self.code}] {self.message}"
+        return message
 
 
 class WorkflowTask(Dependency):
@@ -76,42 +81,46 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
-    def _register_libraries(self, graph: DependencyGraph):
+    def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
             return
         for library in self._task.libraries:
-            yield from self._lint_library(library, graph)
+            yield from self._register_library(graph, library)
 
-    def _lint_library(self, library: compute.Library, graph: DependencyGraph) -> Iterable[DependencyProblem]:
+    def _register_library(self, graph: DependencyGraph, library: compute.Library) -> Iterable[DependencyProblem]:
         if library.pypi:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1642
-            maybe = graph.register_library(library.pypi.package)
-            if maybe.problems:
-                yield from maybe.problems
-        if library.jar:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1641
-            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
+            problems = graph.register_library(library.pypi.package)
+            if problems:
+                yield from problems
         if library.egg:
             # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            maybe = graph.register_library(library.egg)
-            if maybe.problems:
-                yield from maybe.problems
+            yield DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
         if library.whl:
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            maybe = graph.register_library(library.whl)
-            if maybe.problems:
-                yield from maybe.problems
-        if library.requirements:
-            # TODO: download and add every entry via graph.register_library
-            # TODO: https://github.com/databrickslabs/ucx/issues/1644
-            yield DependencyProblem('not-yet-implemented', 'Requirements library is not yet implemented')
+            yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
+        if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
+            logger.info(f"Registering libraries from {library.requirements}")
+            with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
+                contents = remote_file.read().decode()
+                for requirement in contents.splitlines():
+                    clean_requirement = requirement.replace(" ", "")  # requirements.txt may contain spaces
+                    if clean_requirement.startswith("-r"):
+                        logger.warning(f"References to other requirements file is not supported: {requirement}")
+                        continue
+                    if clean_requirement.startswith("-c"):
+                        logger.warning(f"References to constrains file is not supported: {requirement}")
+                        continue
+                    yield from graph.register_library(clean_requirement)
+        if library.jar:
+            # TODO: https://github.com/databrickslabs/ucx/issues/1641
+            yield DependencyProblem('not-yet-implemented', 'Jar library is not yet implemented')
 
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
             return []
         notebook_path = self._task.notebook_task.notebook_path
-        logger.info(f'Disovering {self._task.task_key} entrypoint: {notebook_path}')
+        logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
@@ -173,20 +182,29 @@ class WorkflowLinter:
 
     def refresh_report(self, sql_backend: SqlBackend, inventory_database: str):
         tasks = []
-        for job in self._ws.jobs.list():
+        all_jobs = list(self._ws.jobs.list())
+        logger.info(f"Preparing {len(all_jobs)} linting jobs...")
+        for job in all_jobs:
             tasks.append(functools.partial(self.lint_job, job.job_id))
         problems: list[JobProblem] = []
+        logger.info(f"Running {tasks} linting tasks in parallel...")
         for batch in Threads.strict('linting workflows', tasks):
             problems.extend(batch)
+        logger.info(f"Saving {len(problems)} linting problems...")
         sql_backend.save_table(f'{inventory_database}.workflow_problems', problems, JobProblem, mode='overwrite')
 
     def lint_job(self, job_id: int) -> list[JobProblem]:
         try:
             job = self._ws.jobs.get(job_id)
-            return list(self._lint_job(job))
         except NotFound:
             logger.warning(f'Could not find job: {job_id}')
             return []
+
+        problems = self._lint_job(job)
+        if len(problems) > 0:
+            problem_messages = "\n".join([problem.as_message() for problem in problems])
+            logger.warning(f"Found job problems:\n{problem_messages}")
+        return problems
 
     _UNKNOWN = Path('<UNKNOWN>')
 

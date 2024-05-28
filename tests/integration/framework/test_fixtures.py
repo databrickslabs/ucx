@@ -1,5 +1,5 @@
 import logging
-
+from datetime import timedelta, datetime
 import pytest
 
 # pylint: disable-next=import-private-name
@@ -10,6 +10,9 @@ from databricks.sdk.service.workspace import AclPermission
 from databricks.labs.ucx.mixins.fixtures import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
+_SPARK_CONF = {
+    "spark.databricks.cluster.profile": "singleNode",
+}
 
 
 @pytest.fixture  # type: ignore[no-redef]
@@ -102,3 +105,57 @@ def test_table_fixture(make_table):
 
 def test_dbfs_fixture(make_mounted_location):
     logger.info(f"Created new dbfs data copy:{make_mounted_location}")
+
+
+def test_remove_after_tag_jobs(ws, env_or_skip, make_job):
+    new_job = make_job(spark_conf=_SPARK_CONF)
+    created_job = ws.jobs.get(new_job.job_id)
+    assert "RemoveAfter" in created_job.settings.tags
+
+    purge_time = datetime.strptime(created_job.settings.tags.get("RemoveAfter"), "%Y%m%d%H")
+    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+
+
+def test_remove_after_tag_clusters(ws, env_or_skip, make_cluster):
+    new_cluster = make_cluster(single_node=True, instance_pool_id=env_or_skip('TEST_INSTANCE_POOL_ID'))
+    created_cluster = ws.clusters.get(new_cluster.cluster_id)
+    assert "RemoveAfter" in created_cluster.custom_tags
+    purge_time = datetime.strptime(created_cluster.custom_tags.get("RemoveAfter"), "%Y%m%d%H")
+    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+
+
+def test_remove_after_tag_warehouse(ws, env_or_skip, make_warehouse):
+    new_warehouse = make_warehouse()
+    created_warehouse = ws.warehouses.get(new_warehouse.response.id)
+    custom_tags = created_warehouse.tags.as_dict()
+    assert 'RemoveAfter' in custom_tags.get("custom_tags")[0]["key"]
+    purge_time = datetime.strptime(custom_tags.get("custom_tags")[0]["value"], "%Y%m%d%H")
+    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+
+
+def test_remove_after_tag_instance_pool(ws, make_instance_pool):
+    new_instance_pool = make_instance_pool()
+    created_instance_pool = ws.instance_pools.get(new_instance_pool.instance_pool_id)
+    assert "RemoveAfter" in created_instance_pool.custom_tags
+    purge_time = datetime.strptime(created_instance_pool.custom_tags.get("RemoveAfter"), "%Y%m%d%H")
+    assert purge_time - datetime.utcnow() < timedelta(hours=1, minutes=15)
+
+
+def test_remove_after_property_table(ws, make_table, sql_backend):
+    new_table = make_table()
+    # TODO: tables.get is currently failing with
+    #   databricks.sdk.errors.platform.NotFound: Catalog 'hive_metastore' does not exist.
+    sql_response = list(sql_backend.fetch(f"DESCRIBE TABLE EXTENDED {new_table.full_name}"))
+    for row in sql_response:
+        if row.col_name == "Table Properties":
+            assert "RemoveAfter" in row[1]
+
+
+def test_remove_after_property_schema(ws, make_schema, sql_backend):
+    new_schema = make_schema()
+    # TODO: schemas.get is currently failing with
+    #   databricks.sdk.errors.platform.NotFound: Catalog 'hive_metastore' does not exist.
+    sql_response = list(sql_backend.fetch(f"DESCRIBE SCHEMA EXTENDED {new_schema.full_name}"))
+    for row in sql_response:
+        if row.database_description_item == "Properties":
+            assert "RemoveAfter" in row[1]

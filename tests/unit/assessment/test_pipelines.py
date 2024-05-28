@@ -4,11 +4,11 @@ from databricks.labs.lsql.backends import MockBackend
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalCrawler
 from databricks.labs.ucx.assessment.pipelines import PipelinesCrawler
 
-from .. import workspace_client_mock
+from .. import mock_workspace_client
 
 
 def test_pipeline_assessment_with_config():
-    ws = workspace_client_mock(pipeline_ids=['spec-with-spn'])
+    ws = mock_workspace_client(pipeline_ids=['spec-with-spn'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
 
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
@@ -19,7 +19,7 @@ def test_pipeline_assessment_with_config():
 
 
 def test_pipeline_assessment_without_config():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'])
+    ws = mock_workspace_client(pipeline_ids=['empty-spec'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx").snapshot()
     result_set = list(crawler)
@@ -29,7 +29,7 @@ def test_pipeline_assessment_without_config():
 
 
 def test_pipeline_snapshot_with_config():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'])
+    ws = mock_workspace_client(pipeline_ids=['empty-spec'])
     crawler = PipelinesCrawler(ws, MockBackend(), "ucx")
     result_set = crawler.snapshot()
 
@@ -38,14 +38,14 @@ def test_pipeline_snapshot_with_config():
 
 
 def test_pipeline_list_with_no_config():
-    mock_ws = workspace_client_mock(pipeline_ids=['empty-spec'])
+    mock_ws = mock_workspace_client(pipeline_ids=['empty-spec'])
     crawler = AzureServicePrincipalCrawler(mock_ws, MockBackend(), "ucx").snapshot()
 
     assert len(crawler) == 0
 
 
 def test_pipeline_without_owners_should_have_empty_creator_name():
-    ws = workspace_client_mock(pipeline_ids=['empty-spec'])
+    ws = mock_workspace_client(pipeline_ids=['empty-spec'])
     ws.dbfs.read().data = "JXNoCmVjaG8gIj0="
     mockbackend = MockBackend()
     PipelinesCrawler(ws, mockbackend, "ucx").snapshot()

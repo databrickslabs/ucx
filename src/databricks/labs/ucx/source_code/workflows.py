@@ -11,3 +11,8 @@ class ExperimentalWorkflowLinter(Workflow):
         """[EXPERIMENTAL] Analyses all jobs for source code compatibility problems. This is an experimental feature,
         that is not yet fully supported."""
         ctx.workflow_linter.refresh_report(ctx.sql_backend, ctx.inventory_database)
+
+    @job_task(dashboard="migration_main", depends_on=[lint_all_workflows])
+    def migration_report(self, ctx: RuntimeContext):
+        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
+        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
