@@ -30,7 +30,7 @@ class PathLookup:
         if path.is_absolute() and path.exists():
             # eliminate “..” components
             return path.resolve()
-        for parent in self.paths:
+        for parent in self.library_roots:
             absolute_path = parent / path
             try:
                 if absolute_path.exists():
@@ -56,7 +56,7 @@ class PathLookup:
         del self._sys_paths[index]
 
     @property
-    def paths(self) -> list[Path]:
+    def library_roots(self) -> list[Path]:
         return [self.cwd] + self._sys_paths
 
     @property

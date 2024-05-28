@@ -13,12 +13,11 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 from tests.unit import (
     locate_site_packages,
-    _samples_path,
-    _load_sources,
 )
+from tests.unit.conftest import MockPathLookup
 
 
 def test_dependency_resolver_repr(mock_notebook_resolver, mock_path_lookup):
@@ -193,9 +192,9 @@ def test_dependency_resolver_ignores_known_dependencies(mock_path_lookup):
     assert not maybe_graph.graph
 
 
-def test_dependency_resolver_visits_site_packages(empty_index, mock_notebook_resolver):
+def test_dependency_resolver_terminates_at_known_libraries(empty_index, mock_notebook_resolver):
+    lookup = MockPathLookup()
     site_packages_path = locate_site_packages()
-    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
     lookup.append_path(site_packages_path)
     file_loader = FileLoader()
     import_resolver = ImportFileResolver(file_loader, Whitelist())
@@ -204,27 +203,8 @@ def test_dependency_resolver_visits_site_packages(empty_index, mock_notebook_res
     assert not maybe.failed
     graph = maybe.graph
     maybe = graph.locate_dependency(Path(site_packages_path, "certifi", "core.py"))
-    assert not maybe.failed
-    maybe = graph.locate_dependency(Path("core.py"))
+    # we terminate graph resolution for known packages to save on CPU cycles
     assert maybe.failed
-
-
-def test_dependency_resolver_resolves_sub_site_package():
-    # need a custom whitelist to avoid filtering out databricks
-    datas = _load_sources(SourceContainer, "minimal-compatibility-catalog.yml")
-    whitelist = Whitelist.parse(datas[0], False)
-    site_packages_path = locate_site_packages()
-    lookup = PathLookup.from_pathlike_string(Path.cwd(), _samples_path(SourceContainer))
-    lookup.append_path(site_packages_path)
-    file_loader = FileLoader()
-    notebook_loader = NotebookLoader()
-    notebook_resolver = NotebookResolver(notebook_loader)
-    import_resolver = ImportFileResolver(file_loader, whitelist)
-    dependency_resolver = DependencyResolver([], notebook_resolver, import_resolver, lookup)
-    maybe = dependency_resolver.build_local_file_dependency_graph(Path("import-sub-site-package.py"))
-    assert maybe.graph
-    maybe = maybe.graph.locate_dependency(Path(site_packages_path, "databricks", "labs", "lsql", "core.py"))
-    assert maybe.graph
 
 
 def test_dependency_resolver_raises_problem_with_unfound_root_file(mock_path_lookup, mock_notebook_resolver):

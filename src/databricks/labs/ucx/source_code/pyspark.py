@@ -40,12 +40,17 @@ class Matcher(ABC):
         """applies recommendations"""
 
     def _get_table_arg(self, node: ast.Call):
-        if len(node.args) > 0:
-            return node.args[self.table_arg_index] if self.min_args <= len(node.args) <= self.max_args else None
-        if not self.table_arg_name or not node.keywords:
+        node_argc = len(node.args)
+        if self.min_args <= node_argc <= self.max_args and self.table_arg_index < node_argc:
+            return node.args[self.table_arg_index]
+        if not self.table_arg_name:
             return None
-        arg = next(kw for kw in node.keywords if kw.arg == self.table_arg_name)
-        return arg.value if arg is not None else None
+        if not node.keywords:
+            return None
+        for keyword in node.keywords:
+            if keyword.arg == self.table_arg_name:
+                return keyword.value
+        return None
 
     def _check_call_context(self, node: ast.Call) -> bool:
         assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
@@ -187,10 +192,12 @@ class DirectFilesystemAccessMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-
         if not isinstance(table_arg, ast.Constant):
             return
-
+        if not table_arg.value:
+            return
+        if not isinstance(table_arg.value, str):
+            return
         if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
             yield Deprecation(
                 code='direct-filesystem-access',
@@ -201,7 +208,6 @@ class DirectFilesystemAccessMatcher(Matcher):
                 end_col=node.end_col_offset or 0,
             )
             return
-
         if table_arg.value.startswith("/") and self._check_call_context(node):
             yield Deprecation(
                 code='direct-filesystem-access',
@@ -236,7 +242,7 @@ class SparkMatchers:
             TableNameMatcher("recoverPartitions", 1, 1, 0),
             TableNameMatcher("refreshTable", 1, 1, 0),
             TableNameMatcher("uncacheTable", 1, 1, 0),
-            ReturnValueMatcher("listTables", 0, 2, -1),
+            ReturnValueMatcher("listTables", 0, 2, 0),
         ]
 
         # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.html
@@ -286,8 +292,8 @@ class SparkMatchers:
             DirectFilesystemAccessMatcher("json", 1, 1000, 0),
             DirectFilesystemAccessMatcher("orc", 1, 1000, 0),
             DirectFilesystemAccessMatcher("parquet", 1, 1000, 0),
-            DirectFilesystemAccessMatcher("save", 0, 1000, -1, "path"),
-            DirectFilesystemAccessMatcher("load", 0, 1000, -1, "path"),
+            DirectFilesystemAccessMatcher("save", 0, 1000, 0, "path"),
+            DirectFilesystemAccessMatcher("load", 0, 1000, 0, "path"),
             DirectFilesystemAccessMatcher("option", 1, 1000, 1),  # Only .option("path", "xxx://bucket/path") will hit
             DirectFilesystemAccessMatcher("addFile", 1, 3, 0),
             DirectFilesystemAccessMatcher("binaryFiles", 1, 2, 0),

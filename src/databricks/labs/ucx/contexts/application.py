@@ -50,7 +50,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 from databricks.labs.ucx.source_code.files import FileLoader, FolderLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
@@ -375,7 +375,7 @@ class GlobalContext(abc.ABC):
     @cached_property
     def site_packages_path(self):
         lookup = self.path_lookup
-        return next(path for path in lookup.paths if "site-packages" in path.as_posix())
+        return next(path for path in lookup.library_roots if "site-packages" in path.as_posix())
 
     @cached_property
     def path_lookup(self):
@@ -392,7 +392,6 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def whitelist(self):
-        # TODO: fill in the whitelist
         return Whitelist()
 
     @cached_property

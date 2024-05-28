@@ -5,7 +5,7 @@ from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.workspace import ExportFormat

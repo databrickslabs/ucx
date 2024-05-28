@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     WrappingLoader,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.whitelist import Whitelist
+from databricks.labs.ucx.source_code.known import Whitelist, DistInfo
 
 
 class PipResolver(BaseLibraryResolver):
@@ -98,7 +98,7 @@ class PipResolver(BaseLibraryResolver):
         return self._create_dependency(library, dist_info_path)
 
     def _create_dependency(self, library: Path, dist_info_path: Path):
-        package = DistInfoPackage.parse(dist_info_path)
+        package = DistInfo(dist_info_path)
         container = DistInfoContainer(self._file_loader, self._white_list, package)
         dependency = Dependency(WrappingLoader(container), library)
         return MaybeDependency(dependency, [])
@@ -115,8 +115,9 @@ class PipResolver(BaseLibraryResolver):
 
 
 class DistInfoContainer(SourceContainer):
+    # TODO: remove this class, as we don't need it anymore
 
-    def __init__(self, file_loader: FileLoader, white_list: Whitelist, package: DistInfoPackage):
+    def __init__(self, file_loader: FileLoader, white_list: Whitelist, package: DistInfo):
         self._file_loader = file_loader
         self._white_list = white_list
         self._package = package
@@ -128,9 +129,10 @@ class DistInfoContainer(SourceContainer):
             if maybe.problems:
                 problems.extend(maybe.problems)
         for library_name in self._package.library_names:
-            compatibility = self._white_list.compatibility(library_name)
-            if compatibility is not None:
+            compatibility = self._white_list.distribution_compatibility(library_name)
+            if compatibility.known:
                 # TODO attach compatibility to dependency, see https://github.com/databrickslabs/ucx/issues/1382
+                problems.extend(compatibility.problems)
                 continue
             more_problems = parent.register_library(library_name)
             problems.extend(more_problems)
@@ -138,70 +140,3 @@ class DistInfoContainer(SourceContainer):
 
     def __repr__(self):
         return f"<DistInfoContainer {self._package}>"
-
-
-REQUIRES_DIST_PREFIX = "Requires-Dist: "
-
-
-class DistInfoPackage:
-    """
-    represents a wheel package installable via pip
-    see https://packaging.python.org/en/latest/specifications/binary-distribution-format/
-    """
-
-    @classmethod
-    def parse(cls, path: Path):
-        # not using importlib.metadata because it only works on accessible packages
-        # which we can't guarantee since we have our own emulated sys.paths
-        with open(Path(path, "METADATA"), encoding="utf-8") as metadata_file:
-            lines = metadata_file.readlines()
-            requirements = filter(lambda line: line.startswith(REQUIRES_DIST_PREFIX), lines)
-            library_names = [
-                cls._extract_library_name_from_requires_dist(requirement[len(REQUIRES_DIST_PREFIX) :])
-                for requirement in requirements
-            ]
-        with open(Path(path, "RECORD"), encoding="utf-8") as record_file:
-            lines = record_file.readlines()
-            files = [line.split(',')[0] for line in lines]
-            modules = list(filter(lambda line: line.endswith(".py"), files))
-        top_levels_path = Path(path, "top_level.txt")
-        if top_levels_path.exists():
-            with open(top_levels_path, encoding="utf-8") as top_levels_file:
-                top_levels = [line.strip() for line in top_levels_file.readlines()]
-        else:
-            dir_name = path.name
-            # strip extension
-            dir_name = dir_name[: dir_name.rindex('.')]
-            # strip version
-            dir_name = dir_name[: dir_name.rindex('-')]
-            top_levels = [dir_name]
-        return DistInfoPackage(path, top_levels, [Path(module) for module in modules], list(library_names))
-
-    @classmethod
-    def _extract_library_name_from_requires_dist(cls, requirement: str) -> str:
-        delimiters = {' ', '@', '<', '>', ';'}
-        for i, char in enumerate(requirement):
-            if char in delimiters:
-                return requirement[:i]
-        return requirement
-
-    def __init__(self, dist_info_path: Path, top_levels: list[str], module_paths: list[Path], library_names: list[str]):
-        self._dist_info_path = dist_info_path
-        self._top_levels = top_levels
-        self._module_paths = module_paths
-        self._library_names = library_names
-
-    @property
-    def top_levels(self) -> list[str]:
-        return self._top_levels
-
-    @property
-    def module_paths(self) -> list[Path]:
-        return [Path(self._dist_info_path.parent, path) for path in self._module_paths]
-
-    @property
-    def library_names(self) -> list[str]:
-        return self._library_names
-
-    def __repr__(self):
-        return f"<DistInfoPackage {self._dist_info_path}>"
