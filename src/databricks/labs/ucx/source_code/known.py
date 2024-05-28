@@ -4,6 +4,7 @@ import collections
 import email
 import json
 import logging
+import pkgutil
 import sys
 from dataclasses import dataclass
 from functools import cached_property
@@ -27,7 +28,6 @@ class Compatibility:
 
 
 UNKNOWN = Compatibility(False, [])
-_KNOWN_JSON = Path(__file__).parent / "known.json"
 _DEFAULT_ENCODING = sys.getdefaultencoding()
 
 
@@ -47,10 +47,14 @@ class Whitelist:
 
     @staticmethod
     def _get_known():
-        with _KNOWN_JSON.open() as f:
-            return json.load(f)
+        module = __name__
+        if __name__ == "__main__":  # code path for UCX developers invoking `make known`
+            module = "databricks.labs.ucx.source_code.known"
+        # load known.json from package data, because we may want to use zipapp packaging
+        data = pkgutil.get_data(module, "known.json")
+        return json.loads(data)
 
-    def compatibility(self, name: str) -> Compatibility:
+    def module_compatibility(self, name: str) -> Compatibility:
         if not name:
             return UNKNOWN
         for module, problems in self._module_problems.items():
@@ -62,6 +66,7 @@ class Whitelist:
     def distribution_compatibility(self, name: str) -> Compatibility:
         if not name:
             return UNKNOWN
+        # many packages can belong to a distribution, so we use a loop for matching
         for module, distribution_name in self._module_distributions.items():
             if distribution_name != name:
                 continue
@@ -71,12 +76,14 @@ class Whitelist:
 
     @classmethod
     def rebuild(cls, root: Path):
+        """rebuild the known.json file by analyzing the source code of installed libraries. Invoked by `make known`."""
         path_lookup = PathLookup.from_sys_path(root)
         known_distributions = cls._get_known()
         for library_root in path_lookup.library_roots:
             for dist_info_folder in library_root.glob("*.dist-info"):
                 cls._analyze_dist_info(dist_info_folder, known_distributions, library_root)
-        with _KNOWN_JSON.open('w') as f:
+        known_json = Path(__file__).parent / "known.json"
+        with known_json.open('w') as f:
             json.dump(dict(sorted(known_distributions.items())), f, indent=2)
 
     @classmethod

@@ -27,9 +27,8 @@ or specialized functionality unavailable in standard libraries.
 
 ## Adding entries to `known.json` file
 
-When adding a new entry to the `known.json` file, ensure that the entry is unique and follows the correct format. The `known.json` file is used to
-store information about known (in)compatibilities with Unity Catalog. The file is used to speed up static code analysis and prevent false positives
-in large third-party libraries. To add a new entry, follow these steps:
+When adding a new entry to the [`known.json` file](src/databricks/labs/ucx/source_code/known.json), ensure that the entry is unique and follows the correct format. The `known.json` file
+stores information about known (in)compatibilities with Unity Catalog. The file speeds up static code analysis and prevents false positives.
 
 1. load into virtual environment
 2. run `make known` to update the file

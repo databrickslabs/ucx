@@ -259,7 +259,7 @@ class ImportFileResolver(BaseImportResolver, BaseFileResolver):
         return self._fail('import-not-found', f"Could not locate import: {name}")
 
     def _resolve_whitelist(self, name: str) -> MaybeDependency | None:
-        compatibility = self._whitelist.compatibility(name)
+        compatibility = self._whitelist.module_compatibility(name)
         if not compatibility.known:
             logger.debug(f"Resolving unknown import: {name}")
             return None

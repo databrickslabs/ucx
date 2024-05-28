@@ -5,16 +5,16 @@ from databricks.labs.ucx.source_code.known import Whitelist
 
 def test_checks_compatibility():
     known = Whitelist()
-    spark_sql = known.compatibility("spark.sql")
+    spark_sql = known.module_compatibility("spark.sql")
     assert not spark_sql.known
 
-    sdk_compute = known.compatibility("databricks.sdk.service.compute")
+    sdk_compute = known.module_compatibility("databricks.sdk.service.compute")
     assert sdk_compute.known
     assert not sdk_compute.problems
 
-    assert known.compatibility("sys").known
+    assert known.module_compatibility("sys").known
 
-    os_path = known.compatibility("os.path")
+    os_path = known.module_compatibility("os.path")
     assert os_path.known
     assert not os_path.problems
 
