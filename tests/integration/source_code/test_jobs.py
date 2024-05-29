@@ -57,7 +57,9 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
     assert len(problems) == 0
 
 
-def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory):
+def test_job_task_linter_no_problems(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
     created_cluster = make_cluster(single_node=True)
     entrypoint = make_directory()
 
@@ -70,7 +72,6 @@ def test_job_task_linter_no_problems(simple_ctx, ws, make_job, make_random, make
         notebook_task=jobs.NotebookTask(
             notebook_path=str(notebook),
         ),
-        timeout_seconds=0,
     )
     j = make_job(tasks=[task])
 
