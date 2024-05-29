@@ -223,8 +223,8 @@ def test_workflow_linter_lints_job_with_egg_dependency(
     make_notebook,
     make_directory,
 ):
-    expected_problem_message = "Could not locate import: empty"
-    egg_file = Path(__file__).parent / "dependencies" / "empty-0.0.0-py3.11.egg"
+    expected_problem_message = "Could not locate import: databricks.labs.empty"
+    egg_file = Path(__file__).parent / "dependencies" / "databricks_labs_empty-0.0.0-py3.11.egg"
 
     entrypoint = make_directory()
 
@@ -233,7 +233,7 @@ def test_workflow_linter_lints_job_with_egg_dependency(
         ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
     library = compute.Library(egg=remote_egg_file)
 
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import empty")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import databricks.labs.empty")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
