@@ -47,8 +47,16 @@ class PipResolver(LibraryResolver):
         """Pip install library and augment path look-up to resolve the library at import"""
         venv = self._temporary_virtual_environment
         path_lookup.append_path(venv)
-        return_code, _, stderr = self._runner(f"pip install {library} -t {venv}")
+        # resolve relative pip installs from notebooks: %pip install ../../foo.whl
+        maybe_library = path_lookup.resolve(library)
+        if maybe_library is not None:
+            library = maybe_library
+        return_code, stdout, stderr = self._runner(f"pip install {library} -t {venv}")
+        logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {stderr}")
             return [problem]
         return []
+
+    def __str__(self) -> str:
+        return f"PipResolver(whitelist={self._whitelist})"

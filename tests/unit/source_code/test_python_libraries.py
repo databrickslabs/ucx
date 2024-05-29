@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import create_autospec
+from unittest.mock import create_autospec, call
 
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -8,44 +8,48 @@ from databricks.labs.ucx.source_code.known import Whitelist
 
 
 def test_pip_resolver_resolves_library(mock_path_lookup):
-    pip_resolver = PipResolver(Whitelist())
-    maybe = pip_resolver.register_library(mock_path_lookup, Path("demo-egg"))  # installs pkgdir
+    def mock_pip_install(command):
+        assert command.startswith("pip install anything -t")
+        return 0, "", ""
 
-    assert len(maybe.problems) == 0
-    assert mock_path_lookup.resolve(Path("pkgdir")).exists()
+    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    problems = pip_resolver.register_library(mock_path_lookup, Path("anything"))
 
-
-def test_pip_resolver_does_not_resolve_unknown_library(mock_path_lookup):
-    pip_resolver = PipResolver(Whitelist())
-    maybe = pip_resolver.register_library(mock_path_lookup, Path("unknown-library-name"))
-
-    assert len(maybe.problems) == 1
-    assert maybe.problems[0].code == "library-install-failed"
-    assert maybe.problems[0].message.startswith("Failed to install unknown-library-name")
-    assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
+    assert len(problems) == 0
 
 
-def test_pip_resolver_locates_dist_info_without_parent():
-    mock_path_lookup = create_autospec(PathLookup)
-    mock_path_lookup.resolve.return_value = Path("/non/existing/path/")
+def test_pip_resolver_failing(mock_path_lookup):
+    def mock_pip_install(_):
+        return 1, "", "nope"
 
-    pip_resolver = PipResolver(Whitelist())
-    maybe = pip_resolver.register_library(mock_path_lookup, Path("library"))
+    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    problems = pip_resolver.register_library(mock_path_lookup, Path("anything"))
 
-    assert len(maybe.problems) == 1
-    assert maybe.problems[0] == DependencyProblem("no-dist-info", "No dist-info found for library")
-    mock_path_lookup.resolve.assert_called_once()
+    assert problems == [DependencyProblem("library-install-failed", "Failed to install anything: nope")]
 
 
-def test_pip_resolver_does_not_resolve_already_installed_library_without_dist_info():
-    path_lookup = PathLookup.from_sys_path(Path.cwd())
-    pip_resolver = PipResolver(Whitelist())
-    maybe = pip_resolver.register_library(path_lookup, Path("xdist"))
-    assert maybe.dependency is None
+def test_pip_resolver_adds_to_path_lookup_only_once():
+    def mock_pip_install(_):
+        return 0, "", ""
+
+    path_lookup = create_autospec(PathLookup)
+    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+
+    problems = pip_resolver.register_library(path_lookup, Path("library"))
+    assert len(problems) == 0
+    problems = pip_resolver.register_library(path_lookup, Path("library2"))
+    assert len(problems) == 0
+
+    venv = pip_resolver._temporary_virtual_environment  # pylint: disable=protected-access
+    path_lookup.append_path.assert_has_calls([call(venv), call(venv)])
 
 
-def test_pip_resolver_resolves_library_with_hyphen():
-    path_lookup = PathLookup.from_sys_path(Path.cwd())
-    pip_resolver = PipResolver(Whitelist())
-    maybe = pip_resolver.register_library(path_lookup, Path("pyasn1-modules"))
-    assert maybe.dependency is not None
+def test_pip_resolver_resolves_library_with_known_problems(mock_path_lookup):
+    def mock_pip_install(_):
+        return 0, "", ""
+
+    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    problems = pip_resolver.register_library(mock_path_lookup, Path("boto3==1.17.0"))
+
+    assert len(problems) == 1
+    assert problems[0].code == "direct-filesystem-access"

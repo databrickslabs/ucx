@@ -139,7 +139,17 @@ class DependencyGraph:
 
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
-        return {d.path.relative_to(self._path_lookup.cwd).as_posix() for d in self.all_dependencies}
+        all_names = set[str]()
+        dependencies = self.all_dependencies
+        for library_root in self._path_lookup.library_roots:
+            for dependency in dependencies:
+                if not dependency.path.is_relative_to(library_root):
+                    continue
+                relative_path = dependency.path.relative_to(library_root).as_posix()
+                if relative_path == ".":
+                    continue
+                all_names.add(relative_path)
+        return all_names
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:

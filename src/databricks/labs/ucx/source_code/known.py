@@ -35,16 +35,16 @@ _DEFAULT_ENCODING = sys.getdefaultencoding()
 class Whitelist:
     def __init__(self):
         self._module_problems = collections.OrderedDict()
-        self._module_distributions = {}
+        self._library_problems = collections.defaultdict(list)
         known = self._get_known()
         for distribution_name, modules in known.items():
             specific_modules_first = sorted(modules.items(), key=lambda x: x[0], reverse=True)
             for module_ref, problems in specific_modules_first:
-                self._module_problems[module_ref] = [DependencyProblem(**_) for _ in problems]
-                self._module_distributions[module_ref] = distribution_name
+                module_problems = [DependencyProblem(**_) for _ in problems]
+                self._module_problems[module_ref] = module_problems
+                self._library_problems[distribution_name].extend(module_problems)
         for name in sys.stdlib_module_names:
             self._module_problems[name] = []
-            self._module_distributions[name] = "python"
 
     @staticmethod
     def _get_known():
@@ -68,13 +68,10 @@ class Whitelist:
         if not name:
             return UNKNOWN
         name = self._cleanup_name(name)
-        # many packages can belong to a distribution, so we use a loop for matching
-        for module, distribution_name in self._module_distributions.items():
-            if distribution_name != name:
-                continue
-            problems = self._module_problems[module]
-            return Compatibility(True, problems)
-        return UNKNOWN
+        problems = self._library_problems.get(name, None)
+        if problems is None:
+            return UNKNOWN
+        return Compatibility(True, problems)
 
     @staticmethod
     def _cleanup_name(name):
@@ -85,7 +82,7 @@ class Whitelist:
         """
         _requirement_specifier_re = re.compile(r"([a-zA-Z0-9-]+)(?:[<>=].*)?")
         _wheel_name_re = re.compile(r"^([a-zA-Z0-9_]+)-.*\.whl$", re.MULTILINE)
-        for matcher in (_requirement_specifier_re, _wheel_name_re):
+        for matcher in (_wheel_name_re, _requirement_specifier_re):
             maybe_match = matcher.match(name)
             if not maybe_match:
                 continue
@@ -138,7 +135,7 @@ class Whitelist:
 
     def __repr__(self):
         modules = len(self._module_problems)
-        libraries = len(self._module_distributions)
+        libraries = len(self._library_problems)
         return f"<{self.__class__.__name__}: {modules} modules, {libraries} libraries>"
 
 
