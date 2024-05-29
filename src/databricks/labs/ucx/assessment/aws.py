@@ -254,9 +254,6 @@ class AWSResources:
             }
         )
 
-    @staticmethod
-    def _databricks_trust_statement(external_id="0000"):
-        return {"StringEquals": {"sts:ExternalId": external_id}}
 
     def _aws_s3_policy(self, s3_prefixes, account_id, role_name, kms_key=None):
         """
