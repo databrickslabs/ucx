@@ -77,19 +77,14 @@ class PipResolver(LibraryResolver):
             python_path = os.environ.get("PYTHONPATH", "")
             if venv not in python_path:
                 os.environ["PYTHONPATH"] = f"{python_path}:{venv}"
+
             easy_install_arguments = ["easy_install", "--verbose", "--always-unzip", "--install-dir", venv]
             try:
-                setup(
-                    script_args=easy_install_arguments + [library.as_posix()],
-                    script_name="easy_install",
-                )
+                setup(script_args=easy_install_arguments + [library.as_posix()])
             except SystemExit as e:
                 if "Could not find suitable distribution for" in e.code:
                     try:
-                        setup(
-                            script_args=easy_install_arguments + ["--no-deps", library.as_posix()],
-                            script_name="easy_install",
-                        )
+                        setup(script_args=easy_install_arguments + ["--no-deps", library.as_posix()])
                     except SystemExit as e:
                         problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
                         return MaybeDependency(None, [problem])
