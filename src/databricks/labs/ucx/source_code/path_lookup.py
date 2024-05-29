@@ -30,23 +30,23 @@ class PathLookup:
         if path.is_absolute() and path.exists():
             # eliminate “..” components
             return path.resolve()
+
         for library_root in self.library_roots:
             try:
                 if not library_root.exists():
                     continue
-            except PermissionError:
-                logger.warning(f"Permission denied to access library root {library_root}")
-                continue
 
-            absolute_path = library_root / path
-            if absolute_path.exists():
-                return absolute_path.resolve()  # eliminate “..” components
-
-            egg_subfolders = library_root.glob("*.egg")
-            for egg_subfolder in egg_subfolders:
-                absolute_path = egg_subfolder / path
+                absolute_path = library_root / path
                 if absolute_path.exists():
                     return absolute_path.resolve()  # eliminate “..” components
+
+                egg_subfolders = library_root.glob("*.egg")
+                for egg_subfolder in egg_subfolders:
+                    absolute_path = egg_subfolder / path
+                    if absolute_path.exists():
+                        return absolute_path.resolve()  # eliminate “..” components
+            except PermissionError:
+                logger.warning(f"Permission denied to access (subfolders of) {library_root}")
 
         return None
 
