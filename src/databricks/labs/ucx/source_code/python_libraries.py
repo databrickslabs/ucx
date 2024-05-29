@@ -4,6 +4,9 @@ import logging
 import tempfile
 import zipfile
 from pathlib import Path
+from subprocess import CalledProcessError
+from setuptools import setup
+from setuptools.dist import Distribution
 
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.source_code.graph import (
@@ -67,8 +70,11 @@ class PipResolver(LibraryResolver):
         venv = self._temporary_virtual_environment(path_lookup).as_posix()
         existing_packages = os.listdir(venv)
         if library.suffix == ".egg":
-            with zipfile.ZipFile(library, "r") as zip_ref:
-                zip_ref.extractall(venv)  # There is a risk of overwritting existing files here!
+            setup(
+                script_args=["-q", "easy_install", "-v", "-d", venv, library.as_posix()],
+                script_name="easy_install",
+                distclass=Distribution,
+            )
         else:
             pip_install_arguments = ["pip", "install", library.name, "-t", venv]
             try:
