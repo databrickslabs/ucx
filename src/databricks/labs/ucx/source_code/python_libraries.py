@@ -80,7 +80,7 @@ class PipResolver(LibraryResolver):
             python_path = os.environ.get("PYTHONPATH", "")
             if venv not in python_path:
                 os.environ["PYTHONPATH"] = f"{python_path}:{venv}"
-            easy_install_arguments = ["-q", "easy_install", "-v", "--always-unzip", "-d", venv]
+            easy_install_arguments = ["easy_install", "--verbose", "--always-unzip", "--install-dir", venv]
             try:
                 setup(
                     script_args=easy_install_arguments + [library.as_posix()],
