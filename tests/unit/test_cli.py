@@ -596,6 +596,7 @@ def test_cli_missing_awscli(ws, mocker, caplog):
 def test_join_collection():
     a = create_autospec(AccountClient)
     w = create_autospec(WorkspaceClient)
+    a.get_workspace_client.return_value = w
     w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
     join_collection(a, w, 123)
     w.workspace.download.assert_called()
