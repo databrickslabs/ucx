@@ -45,7 +45,7 @@ commands:
 
   - name: report-account-compatibility
     is_account_level: true
-    description: aggregation of UCX output of multiple workspaces in the account. 
+    description: aggregation of UCX output of multiple workspaces in the account.
       If --workspace-ids is not provided, it will use all workspaces present in the account.
     flags:
       - name: workspace-ids
@@ -95,7 +95,7 @@ commands:
 
   - name: alias
     description: |
-      alias tables across schema/catalog withing a UC metastore 
+      alias tables across schema/catalog withing a UC metastore
       create a view pointing to the "from" table
       if a view is aliased, recreates the same view in the target schema/catalog
     flags:
@@ -111,9 +111,9 @@ commands:
         description: target schema to migrate tables to
 
   - name: principal-prefix-access
-    description: For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its 
-      permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and 
-      its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets. 
+    description: For azure cloud, identifies all storage account used by tables in the workspace, identify spn and its
+      permission on each storage accounts. For aws, identifies all the Instance Profiles configured in the workspace and
+      its access to all the S3 buckets, along with AWS roles that are set with UC access and its access to S3 buckets.
       The output is stored in the workspace install folder.
     flags:
       - name: subscription-id
@@ -122,8 +122,8 @@ commands:
         description: AWS Profile to use for authentication
 
   - name: create-missing-principals
-    description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and 
-      creates them. It accepts a number of optional parameters, i.e. KMS Key, Role Name, Policy Name, and whether to 
+    description: For AWS, this command identifies all the S3 locations that are missing a UC compatible role and
+      creates them. It accepts a number of optional parameters, i.e. KMS Key, Role Name, Policy Name, and whether to
       create a single role for all the S3 locations.
     flags:
       - name: aws-profile
@@ -138,7 +138,7 @@ commands:
         description: (Optional) Create a single role for all S3 locations. (default:False)
 
   - name: create-uber-principal
-    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account 
+    description: For azure cloud, creates a service principal and gives STORAGE BLOB READER access on all the storage account
       used by tables in the workspace and stores the spn info in the UCX cluster policy. For aws,
       it identifies all s3 buckets used by the Instance Profiles configured in the workspace.
     flags:
@@ -215,7 +215,7 @@ commands:
 
   - name: migrate-tables
     description: |
-      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental 
+      Trigger the migrate-tables workflow and, optionally, migrate-external-hiveserde-tables-in-place-experimental
       workflow and migrate-external-tables-ctas workflow.
 
   - name: migrate-dbsql-dashboards
@@ -229,3 +229,9 @@ commands:
     flags:
       - name: dashboard-id
         description: (Optional) DBSQL dashboard ID to revert. If no dashboard ID is provided, all migrated DBSQL dashboards in the workspace will be reverted.
+
+  - name: join-collection
+    description: Joins an existing ucx installation to a collection.
+    flags:
+      - name: workspace-id
+        description: workspace_id to join as a collection. If the workspace_id has no collection then a new collection will be created
