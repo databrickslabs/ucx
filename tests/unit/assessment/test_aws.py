@@ -764,6 +764,7 @@ def test_update_uc_role_append(mocker):
     mocker.patch("shutil.which", return_value="/path/aws")
 
     def command_call(cmd: str):
+        command_calls.append(cmd)
         if "iam get-role" in cmd:
             return (
                 0,
@@ -803,7 +804,7 @@ def test_update_uc_role_append(mocker):
             """,
                 "",
             )
-        command_calls.append(cmd)
+
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
