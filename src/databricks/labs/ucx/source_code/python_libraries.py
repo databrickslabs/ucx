@@ -7,7 +7,6 @@ import tempfile
 from pathlib import Path
 from subprocess import CalledProcessError
 from setuptools import setup
-from setuptools.dist import Distribution
 
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.source_code.graph import (
@@ -83,7 +82,6 @@ class PipResolver(LibraryResolver):
                 setup(
                     script_args=easy_install_arguments + [library.as_posix()],
                     script_name="easy_install",
-                    distclass=Distribution,
                 )
             except SystemExit as e:
                 if "Could not find suitable distribution for" in e.code:
@@ -91,7 +89,6 @@ class PipResolver(LibraryResolver):
                         setup(
                             script_args=easy_install_arguments + ["--no-deps", library.as_posix()],
                             script_name="easy_install",
-                            distclass=Distribution,
                         )
                     except SystemExit as e:
                         problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
