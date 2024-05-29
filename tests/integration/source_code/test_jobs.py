@@ -225,6 +225,7 @@ def test_workflow_linter_lints_job_with_egg_dependency(
 ):
     expected_problem_message = "Could not locate import: empty"
     egg_file = Path(__file__).parent / "dependencies" / "empty-0.0.0-py3.11.egg"
+
     entrypoint = make_directory()
 
     remote_egg_file = f"{entrypoint}/{egg_file.name}"
