@@ -573,7 +573,7 @@ def test_update_uc_trust_role_append(mocker):
                     },
                     "Action":"sts:AssumeRole",
                     "Condition":{"StringEquals":{"sts:ExternalId":"00000"}}
-                } 
+                }
             ]
         },
         "Description": "",
@@ -588,16 +588,14 @@ def test_update_uc_trust_role_append(mocker):
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.update_uc_trust_role("test_role", "1234")
+    aws.update_uc_role("test_role", "arn:aws:iam::123456789012:role/Test-Role", "1234")
     assert (
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
         '{"Version":"2012-10-17",'
-        '"Statement":['
-        '{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::0123456789:root"},'
-        '"Action":"sts:AssumeRole"},'
-        '{"Effect":"Allow",'
-        '"Principal":{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},'
+        '"Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":["arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",'
+        '"arn:aws:iam::123456789012:role/Test-Role"]},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
         '--profile Fake_Profile --output json'
     ) in command_calls
@@ -631,14 +629,16 @@ def test_update_uc_trust_role(mocker):
         return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
 
     aws = AWSResources("Fake_Profile", command_call)
-    aws.update_uc_trust_role("test_role", "1234")
+    aws.update_uc_role("test_role", "arn:aws:iam::123456789012:role/Test-Role", "1234")
     assert (
         '/path/aws iam update-assume-role-policy --role-name test_role '
         '--policy-document '
         '{"Version":"2012-10-17",'
         '"Statement":['
         '{"Effect":"Allow",'
-        '"Principal":{"AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},'
+        '"Principal":{"AWS":'
+        '["arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",'
+        '"arn:aws:iam::123456789012:role/Test-Role"]},'
         '"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"1234"}}}]} '
         '--profile Fake_Profile --output json'
     ) in command_calls
@@ -658,7 +658,8 @@ def test_create_uc_role_policy_no_kms(mocker):
     assert (
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy --policy-document '
-        '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:DeleteObject",'
+        '{"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject","s3:PutObjectAcl",'
+        '"s3:DeleteObject",'
         '"s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
@@ -681,6 +682,7 @@ def test_create_uc_role_kms(mocker):
         '/path/aws iam put-role-policy --role-name test_role '
         '--policy-name test_policy '
         '--policy-document {"Version":"2012-10-17","Statement":[{"Action":["s3:GetObject","s3:PutObject",'
+        '"s3:PutObjectAcl",'
         '"s3:DeleteObject","s3:ListBucket","s3:GetBucketLocation"],"Resource":["arn:aws:s3:::BUCKET1/FOLDER1",'
         '"arn:aws:s3:::BUCKET1/FOLDER1/*","arn:aws:s3:::BUCKET2/FOLDER2","arn:aws:s3:::BUCKET2/FOLDER2/*"],'
         '"Effect":"Allow"},{"Action":["sts:AssumeRole"],"Resource":["arn:aws:iam::1234:role/test_role"],'
@@ -751,3 +753,66 @@ def test_role_exists(mocker):
     aws = AWSResources("Fake_Profile", exists_call)
     assert aws.role_exists("test_profile") is True
     assert '/path/aws iam list-roles --profile Fake_Profile --output json' in command_calls
+
+
+def test_update_uc_role_append(mocker):
+    """
+    Test that the update_uc_role method appends the required self assume role.
+
+    """
+    command_calls = []
+    mocker.patch("shutil.which", return_value="/path/aws")
+
+    def command_call(cmd: str):
+        command_calls.append(cmd)
+        if "iam get-role" in cmd:
+            return (
+                0,
+                """
+{
+    "Role": {
+        "Path": "/",
+        "RoleName": "Test-Role",
+        "RoleId": "ABCD",
+        "Arn": "arn:aws:iam::0123456789:role/Test-Role",
+        "CreateDate": "2024-01-01T12:00:00+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "AWS": "arn:aws:iam::0123456789:root"
+                    },
+                    "Action": "sts:AssumeRole"
+                },
+                {
+                    "Effect":"Allow",
+                    "Principal": {
+                        "AWS":"arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                    },
+                    "Action":"sts:AssumeRole",
+                    "Condition":{"StringEquals":{"sts:ExternalId":"00000"}}
+                }
+            ]
+        },
+        "Description": "",
+        "MaxSessionDuration": 3600,
+        "RoleLastUsed": {}
+    }
+}
+            """,
+                "",
+            )
+
+        return 0, '{"Role": {"Arn": "arn:aws:iam::123456789012:role/Test-Role"}}', ""
+
+    aws = AWSResources("Fake_Profile", command_call)
+    aws.update_uc_role("test_role", "arn:aws:iam::0123456789:role/Test-Role")
+    assert (
+        '/path/aws iam update-assume-role-policy --role-name test_role --policy-document '
+        '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":'
+        '{"AWS":["arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",'
+        '"arn:aws:iam::0123456789:role/Test-Role"]},"Action":"sts:AssumeRole",'
+        '"Condition":{"StringEquals":{"sts:ExternalId":"0000"}}}]} --profile Fake_Profile --output json'
+    ) in command_calls

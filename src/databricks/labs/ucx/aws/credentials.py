@@ -12,7 +12,7 @@ from databricks.sdk.service.catalog import (
     ValidationResultResult,
 )
 
-from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, AWSUCRoleCandidate, AWSCredentialCandidate
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 
 logger = logging.getLogger(__name__)
@@ -52,12 +52,12 @@ class CredentialManager:
         logger.info(f"Found {len(iam_roles)} distinct IAM roles already used in UC storage credentials")
         return iam_roles
 
-    def create(self, role_action: AWSRoleAction) -> StorageCredentialInfo:
+    def create(self, name: str, role_arn: str, read_only: bool) -> StorageCredentialInfo:
         return self._ws.storage_credentials.create(
-            role_action.role_name,
-            aws_iam_role=AwsIamRoleRequest(role_action.role_arn),
-            comment=f"Created by UCX during migration to UC using AWS IAM Role: {role_action.role_name}",
-            read_only=role_action.privilege == Privilege.READ_FILES.value,
+            name,
+            aws_iam_role=AwsIamRoleRequest(role_arn),
+            comment=f"Created by UCX during migration to UC using AWS IAM Role: {name}",
+            read_only=read_only,
         )
 
     def validate(self, role_action: AWSRoleAction) -> CredentialValidationResult:
@@ -122,17 +122,18 @@ class IamRoleMigration:
         self._storage_credential_manager = storage_credential_manager
 
     @staticmethod
-    def _print_action_plan(iam_list: list[AWSRoleAction]):
+    def _print_action_plan(iam_list: list[AWSCredentialCandidate]):
         # print action plan to console for customer to review.
         for iam in iam_list:
-            logger.info(f"{iam.role_arn}: {iam.privilege} on {iam.resource_path}")
+            logger.info(f"Credential {iam.role_name} --> {iam.role_arn}: {iam.privilege}")
 
-    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSRoleAction]:
+    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[AWSCredentialCandidate]:
         """
-        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm
+        Create the list of IAM roles that need to be migrated, output an action plan as a csv file for users to confirm.
+        It returns a list of ARNs
         """
         # load IAM role list
-        iam_list = self._resource_permissions.load_uc_compatible_roles()
+        iam_list = self._resource_permissions.get_roles_to_migrate()
         # list existing storage credentials
         sc_set = self._storage_credential_manager.list(include_names)
         # check if the iam is already used in UC storage credential
@@ -161,16 +162,20 @@ class IamRoleMigration:
 
         execution_result = []
         for iam in iam_list:
-            storage_credential = self._storage_credential_manager.create(iam)
+            storage_credential = self._storage_credential_manager.create(
+                name=iam.role_name,
+                role_arn=iam.role_arn,
+                read_only=iam.privilege == Privilege.READ_FILES.value,
+            )
             if storage_credential.aws_iam_role is None:
                 logger.error(f"Failed to create storage credential for IAM role: {iam.role_arn}")
                 continue
-
-            self._resource_permissions.update_uc_role_trust_policy(
-                iam.role_name, storage_credential.aws_iam_role.external_id
+            self._resource_permissions.update_uc_role(
+                iam.role_name, iam.role_arn, storage_credential.aws_iam_role.external_id
             )
-
-            execution_result.append(self._storage_credential_manager.validate(iam))
+            for path in iam.paths:
+                role_action = AWSRoleAction(iam.role_arn, "s3", path, iam.privilege)
+                execution_result.append(self._storage_credential_manager.validate(role_action))
 
         if execution_result:
             results_file = self.save(execution_result)
@@ -224,3 +229,4 @@ class IamRoleCreation:
             return
 
         self._resource_permissions.create_uc_roles(iam_list)
+        self._resource_permissions.save_uc_compatible_roles()

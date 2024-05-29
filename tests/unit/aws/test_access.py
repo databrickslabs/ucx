@@ -20,6 +20,7 @@ from databricks.labs.ucx.aws.credentials import IamRoleCreation
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.grants import PrincipalACL
+from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
 from tests.unit import DEFAULT_CONFIG
 
 
@@ -318,7 +319,7 @@ def test_create_uc_role_single(mock_ws, installation_single_role, backend, locat
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=True)
     assert aws.create_uc_role.assert_called
     assert (
-        call('UC_ROLE', 'UC_POLICY', {'s3://BUCKET1/FOLDER1', 's3://BUCKET2/FOLDER2'}, None, None)
+        call('UC_ROLE', 'UC_POLICY', {'s3://BUCKET1', 's3://BUCKET1/*', 's3://BUCKET2', 's3://BUCKET2/*'}, None, None)
         in aws.put_role_policy.call_args_list
     )
 
@@ -332,8 +333,14 @@ def test_create_uc_role_multiple(mock_ws, installation_single_role, backend, loc
     role_creation.run(MockPrompts({"Above *": "yes"}), single_role=False)
     assert call('UC_ROLE_1') in aws.create_uc_role.call_args_list
     assert call('UC_ROLE_2') in aws.create_uc_role.call_args_list
-    assert call('UC_ROLE_1', 'UC_POLICY', {'s3://BUCKET1/FOLDER1'}, None, None) in aws.put_role_policy.call_args_list
-    assert call('UC_ROLE_2', 'UC_POLICY', {'s3://BUCKET2/FOLDER2'}, None, None) in aws.put_role_policy.call_args_list
+    assert (
+        call('UC_ROLE_1', 'UC_POLICY', {'s3://BUCKET1/*', 's3://BUCKET1'}, None, None)
+        in aws.put_role_policy.call_args_list
+    )
+    assert (
+        call('UC_ROLE_2', 'UC_POLICY', {'s3://BUCKET2/*', 's3://BUCKET2'}, None, None)
+        in aws.put_role_policy.call_args_list
+    )
 
 
 def test_create_uc_no_roles(installation_no_roles, mock_ws, caplog):
@@ -744,3 +751,21 @@ def test_instance_profile_malformed_lookup():
 
     aws = AWSResources("profile", instance_lookup)
     assert aws.get_instance_profile_role_arn("instance_profile_1") is None
+
+
+def test_instance_profile_roles_to_migrate(mock_ws, installation_multiple_roles):
+    def command_call(_: str):
+        return 0, '{"account":"1234"}', ""
+
+    aws = AWSResources("profile", command_call)
+
+    external_locations = create_autospec(ExternalLocations)
+    external_locations.snapshot.return_value = [
+        ExternalLocation("s3://BUCKET1", 1),
+        ExternalLocation("s3://BUCKET2/Folder1", 1),
+    ]
+    resource_permissions = AWSResourcePermissions(installation_multiple_roles, mock_ws, aws, external_locations)
+    roles = resource_permissions.get_roles_to_migrate()
+    assert len(roles) == 1
+    assert len(roles[0].paths) == 2
+    external_locations.snapshot.assert_called_once()

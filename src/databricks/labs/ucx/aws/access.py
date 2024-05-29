@@ -10,6 +10,7 @@ from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound, ResourceDoesNotExist
+from databricks.sdk.service.catalog import Privilege
 from databricks.sdk.service.compute import Policy
 
 from databricks.labs.ucx.assessment.aws import (
@@ -18,6 +19,7 @@ from databricks.labs.ucx.assessment.aws import (
     AWSRoleAction,
     logger,
     AWSUCRoleCandidate,
+    AWSCredentialCandidate,
 )
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.hive_metastore import ExternalLocations
@@ -52,34 +54,44 @@ class AWSResourcePermissions:
         """
         roles: list[AWSUCRoleCandidate] = []
         missing_paths = self._identify_missing_paths()
-        s3_prefixes = set()
+        s3_buckets = set()
         for missing_path in missing_paths:
-            match = re.match(AWSResources.S3_PATH_REGEX, missing_path)
+            match = re.match(AWSResources.S3_BUCKET, missing_path)
             if match:
-                s3_prefixes.add(missing_path)
+                s3_buckets.add(match.group(1))
         if single_role:
-            roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_prefixes)))
+            roles.append(AWSUCRoleCandidate(role_name, policy_name, list(s3_buckets)))
         else:
-            for idx, s3_prefix in enumerate(sorted(list(s3_prefixes))):
+            for idx, s3_prefix in enumerate(sorted(list(s3_buckets))):
                 roles.append(AWSUCRoleCandidate(f"{role_name}_{idx+1}", policy_name, [s3_prefix]))
         return roles
 
     def create_uc_roles(self, roles: list[AWSUCRoleCandidate]):
         roles_created = []
         for role in roles:
-            if self._aws_resources.create_uc_role(role.role_name):
+            expanded_paths = set()
+            for path in role.resource_paths:
+                expanded_paths.add(path)
+                expanded_paths.add(f"{path}/*")
+            role_arn = self._aws_resources.create_uc_role(role.role_name)
+            if role_arn:
                 self._aws_resources.put_role_policy(
                     role.role_name,
                     role.policy_name,
-                    set(role.resource_paths),
+                    expanded_paths,
                     self._aws_account_id,
                     self._kms_key,
                 )
                 roles_created.append(role)
+        # We need to create a buffer between the role creation and the role update, Otherwise the update fails.
+        for created_role in roles_created:
+            self._aws_resources.update_uc_role(
+                created_role.role_name, f"arn:aws:iam::{self._aws_account_id}:role/{created_role.role_name}"
+            )
         return roles_created
 
-    def update_uc_role_trust_policy(self, role_name, external_id="0000"):
-        return self._aws_resources.update_uc_trust_role(role_name, external_id)
+    def update_uc_role(self, role_name, role_arn, external_id="0000"):
+        return self._aws_resources.update_uc_role(role_name, role_arn, external_id)
 
     def save_uc_compatible_roles(self):
         uc_role_access = list(self._get_role_access())
@@ -137,6 +149,9 @@ class AWSResourcePermissions:
         # Aggregating the outputs from all the tasks
         return sum(Threads.strict("Scanning Roles", tasks), [])
 
+    def _get_role_arn(self, role_name: str):
+        return f"arn:aws:iam::{self._aws_account_id}:role/" + role_name
+
     def _get_role_access_task(self, arn: str, role_name: str):
         policy_actions = []
         policies = list(self._aws_resources.list_role_policies(role_name))
@@ -180,6 +195,29 @@ class AWSResourcePermissions:
                 continue
             missing_paths.add(external_location.location)
         return missing_paths
+
+    def get_roles_to_migrate(self) -> list[AWSCredentialCandidate]:
+        """
+        Identify the roles that need to be migrated to UC from the UC compatible roles list.
+        """
+        external_locations = self._locations.snapshot()
+        compatible_roles = self.load_uc_compatible_roles()
+        roles: dict[str, AWSCredentialCandidate] = {}
+        for external_location in external_locations:
+            path = PurePath(external_location.location)
+            for role in compatible_roles:
+                if not (path.match(role.resource_path) or path.match(role.resource_path + "/*")):
+                    continue
+                if role.role_arn not in roles:
+                    roles[role.role_arn] = AWSCredentialCandidate(
+                        role_arn=role.role_arn, privilege=role.privilege, paths=set([external_location.location])
+                    )
+                    continue
+                roles[role.role_arn].paths.add(external_location.location)
+                if role.privilege == Privilege.WRITE_FILES.value:
+                    roles[role.role_arn].privilege = Privilege.WRITE_FILES.value
+
+        return list(roles.values())
 
     def _get_cluster_policy(self, policy_id: str | None) -> Policy:
         if not policy_id:
