@@ -3,9 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-import sys
 import tempfile
-import zipfile
 from pathlib import Path
 from subprocess import CalledProcessError
 from setuptools import setup
