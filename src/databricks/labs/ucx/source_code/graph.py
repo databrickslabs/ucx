@@ -49,11 +49,7 @@ class DependencyGraph:
     def register_library(self, library: str) -> list[DependencyProblem]:
         # TODO: https://github.com/databrickslabs/ucx/issues/1643
         # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        maybe = self._resolver.resolve_library(self.path_lookup, library)
-        if not maybe.dependency:
-            return maybe.problems
-        maybe_graph = self.register_dependency(maybe.dependency)
-        return maybe_graph.problems
+        return self._resolver.register_library(self.path_lookup, library)
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -143,7 +139,17 @@ class DependencyGraph:
 
     def all_relative_names(self) -> set[str]:
         """This method is intended to simplify testing"""
-        return {d.path.relative_to(self._path_lookup.cwd).as_posix() for d in self.all_dependencies}
+        all_names = set[str]()
+        dependencies = self.all_dependencies
+        for library_root in self._path_lookup.library_roots:
+            for dependency in dependencies:
+                if not dependency.path.is_relative_to(library_root):
+                    continue
+                relative_path = dependency.path.relative_to(library_root).as_posix()
+                if relative_path == ".":
+                    continue
+                all_names.add(relative_path)
+        return all_names
 
     # when visit_node returns True it interrupts the visit
     def visit(self, visit_node: Callable[[DependencyGraph], bool | None], visited: set[Path]) -> bool:
@@ -254,7 +260,7 @@ class WrappingLoader(DependencyLoader):
 
 class LibraryResolver(abc.ABC):
     @abc.abstractmethod
-    def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
+    def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
         pass
 
 
@@ -315,8 +321,8 @@ class DependencyResolver:
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
 
-    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
-        return self._library_resolver.resolve_library(path_lookup, Path(library))
+    def register_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+        return self._library_resolver.register_library(path_lookup, Path(library))
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
@@ -368,22 +374,6 @@ class DependencyResolver:
                 out_path = out_path.relative_to(self._path_lookup.cwd)
             adjusted_problems.append(problem.replace(source_path=out_path))
         return adjusted_problems
-
-    def build_library_dependency_graph(self, path: Path):
-        """Builds a dependency graph starting from a library. This method is mainly intended for testing purposes.
-        In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._library_resolver.resolve_library(self._path_lookup, path)
-        if not maybe.dependency:
-            return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
-        container = maybe.dependency.load(graph.path_lookup)
-        if container is None:
-            problem = DependencyProblem('cannot-load-library', f"Could not load library {path}")
-            return MaybeGraph(None, [problem])
-        problems = container.build_dependency_graph(graph)
-        if problems:
-            problems = self._make_relative_paths(problems, path)
-        return MaybeGraph(graph, problems)
 
     def __repr__(self):
         return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._path_lookup}>"

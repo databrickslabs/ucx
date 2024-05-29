@@ -2,7 +2,6 @@ import json
 import logging
 import re
 import shutil
-import subprocess
 import typing
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -11,6 +10,8 @@ from datetime import timedelta
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
+
+from databricks.labs.ucx.framework.utils import run_command
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +81,6 @@ class AWSCredentialCandidate:
     def role_name(self):
         role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
         return role_match.group(1)
-
-
-def run_command(command):
-    logger.debug(f"Invoking Command {command}")
-    with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-        output, error = process.communicate()
-        return process.returncode, output.decode("utf-8"), error.decode("utf-8")
 
 
 class AWSResources:

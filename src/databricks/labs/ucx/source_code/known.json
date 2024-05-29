@@ -49,7 +49,9 @@
   "databricks-labs-pylint": {
     "databricks.labs.pylint": []
   },
-  "databricks-labs-ucx": {},
+  "databricks-labs-ucx": {
+    "databricks.labs.ucx": []
+  },
   "databricks-sdk": {
     "databricks.sdk": []
   },
