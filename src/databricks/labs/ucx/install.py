@@ -663,7 +663,8 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
-    def _get_workspace(self, workspace_id: int, ids_to_workspace: dict[int, Workspace]) -> Workspace:
+    @staticmethod
+    def _get_workspace(workspace_id: int, ids_to_workspace: dict[int, Workspace]) -> Workspace:
         try:
             workspace = ids_to_workspace[workspace_id]
             return workspace
@@ -702,7 +703,7 @@ class AccountInstaller(AccountContext):
         if collection_workspace_id is None:
             logger.info("Skipping joining collection...")
             return None
-        collection_workspace = self._get_workspace(collection_workspace_id, ids_to_workspace)
+        collection_workspace = AccountInstaller._get_workspace(collection_workspace_id, ids_to_workspace)
         if not self.account_workspaces.can_administer(collection_workspace):
             logger.error(
                 f"User doesnt have admin access on the workspace {collection_workspace_id}, " f"cant join collection."
@@ -728,7 +729,7 @@ class AccountInstaller(AccountContext):
         installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []
         for workspace_id in installed_workspace_ids:
-            workspace = self._get_workspace(workspace_id, ids_to_workspace)
+            workspace = AccountInstaller._get_workspace(workspace_id, ids_to_workspace)
             installed_workspaces.append(workspace)
             if not self.account_workspaces.can_administer(workspace):
                 logger.error(

@@ -476,9 +476,8 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 def join_collection(a: AccountClient, w: WorkspaceClient, workspace_id: int):
     """joins the workspace to an existing collection"""
     account_installer = AccountInstaller(a)
-    if workspace_id is None:
-        logger.error("Please enter a valid workspace_id")
-    account_installer.join_collection(w.get_workspace_id(), WorkspaceContext(w).workspace_info.load_workspace_info())
+    ctx = WorkspaceContext(w)
+    account_installer.join_collection(w.get_workspace_id(), ctx.workspace_info.load_workspace_info(), workspace_id)
 
 
 @ucx.command
