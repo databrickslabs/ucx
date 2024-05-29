@@ -26,6 +26,9 @@ class PipResolver(LibraryResolver):
         self._runner = runner
 
     def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
+        """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
+        This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
+        bother about parsing cross-version dependencies in our code."""
         compatibility = self._whitelist.distribution_compatibility(library.name)
         if compatibility.known:
             return compatibility.problems

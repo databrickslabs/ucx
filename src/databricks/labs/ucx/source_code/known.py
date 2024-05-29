@@ -5,6 +5,7 @@ import email
 import json
 import logging
 import pkgutil
+import re
 import sys
 from dataclasses import dataclass
 from functools import cached_property
@@ -64,10 +65,9 @@ class Whitelist:
         return UNKNOWN
 
     def distribution_compatibility(self, name: str) -> Compatibility:
-        # TODO: parse the name to extract the library name, e.g. "numpy==1.21.0" -> "numpy",
-        # "dist/databricks_labs_ucx-0.24.0-py3-none-any.whl" -> "databricks-labs-ucx"
         if not name:
             return UNKNOWN
+        name = self._cleanup_name(name)
         # many packages can belong to a distribution, so we use a loop for matching
         for module, distribution_name in self._module_distributions.items():
             if distribution_name != name:
@@ -75,6 +75,23 @@ class Whitelist:
             problems = self._module_problems[module]
             return Compatibility(True, problems)
         return UNKNOWN
+
+    @staticmethod
+    def _cleanup_name(name):
+        """parses the name to extract the library name, e.g. "numpy==1.21.0" -> "numpy",
+        and "dist/databricks_labs_ucx-0.24.0-py3-none-any.whl" -> "databricks-labs-ucx"
+
+        See https://pip.pypa.io/en/stable/reference/requirement-specifiers/#requirement-specifiers
+        """
+        _requirement_specifier_re = re.compile(r"([a-zA-Z0-9-]+)(?:[<>=].*)?")
+        _wheel_name_re = re.compile(r"^([a-zA-Z0-9_]+)-.*\.whl$", re.MULTILINE)
+        for matcher in (_requirement_specifier_re, _wheel_name_re):
+            maybe_match = matcher.match(name)
+            if not maybe_match:
+                continue
+            raw = maybe_match.group(1)
+            return raw.replace('_', '-').lower()
+        return name
 
     @classmethod
     def rebuild(cls, root: Path):
