@@ -365,22 +365,6 @@ class DependencyResolver:
             adjusted_problems.append(problem.replace(source_path=out_path))
         return adjusted_problems
 
-    def build_library_dependency_graph(self, path: Path):
-        """Builds a dependency graph starting from a library. This method is mainly intended for testing purposes.
-        In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._library_resolver.register_library(self._path_lookup, path)
-        if not maybe.dependency:
-            return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)
-        container = maybe.dependency.load(graph.path_lookup)
-        if container is None:
-            problem = DependencyProblem('cannot-load-library', f"Could not load library {path}")
-            return MaybeGraph(None, [problem])
-        problems = container.build_dependency_graph(graph)
-        if problems:
-            problems = self._make_relative_paths(problems, path)
-        return MaybeGraph(graph, problems)
-
     def __repr__(self):
         return f"<DependencyResolver {self._notebook_resolver} {self._import_resolver} {self._path_lookup}>"
 
