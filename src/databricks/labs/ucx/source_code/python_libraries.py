@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import logging
+import os
+import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -79,6 +81,8 @@ class PipResolver(LibraryResolver):
                 script_name="easy_install",
                 distclass=Distribution,
             )
+            # Setup installs the egg in a subdirectory
+            path_lookup.append_path(f"{venv}/{library.name}")
         else:
             pip_install_arguments = ["pip", "install", library.name, "-t", venv]
             try:
