@@ -1,8 +1,9 @@
+import logging
 import string
 import subprocess
 from functools import lru_cache
 
-from databricks.labs.ucx.assessment.aws import logger
+logger = logging.getLogger(__name__)
 
 _allowed_object_chars = set(string.ascii_letters + string.digits + '_')
 
