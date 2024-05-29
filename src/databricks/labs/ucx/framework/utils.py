@@ -1,4 +1,8 @@
 import string
+import subprocess
+from functools import lru_cache
+
+from databricks.labs.ucx.assessment.aws import logger
 
 _allowed_object_chars = set(string.ascii_letters + string.digits + '_')
 
@@ -23,3 +27,11 @@ def escape_sql_identifier(path: str, optional: bool | None = True) -> str:
                 part = f"`{part}`"
         escaped.append(part)
     return ".".join(escaped)
+
+
+@lru_cache(maxsize=1024)
+def run_command(command):
+    logger.info(f"Invoking command: {command}")
+    with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        output, error = process.communicate()
+        return process.returncode, output.decode("utf-8"), error.decode("utf-8")

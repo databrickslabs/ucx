@@ -49,11 +49,7 @@ class DependencyGraph:
     def register_library(self, library: str) -> list[DependencyProblem]:
         # TODO: https://github.com/databrickslabs/ucx/issues/1643
         # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        maybe = self._resolver.resolve_library(self.path_lookup, library)
-        if not maybe.dependency:
-            return maybe.problems
-        maybe_graph = self.register_dependency(maybe.dependency)
-        return maybe_graph.problems
+        return self._resolver.register_library(self.path_lookup, library)
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -254,7 +250,7 @@ class WrappingLoader(DependencyLoader):
 
 class LibraryResolver(abc.ABC):
     @abc.abstractmethod
-    def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
+    def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
         pass
 
 
@@ -315,8 +311,8 @@ class DependencyResolver:
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
 
-    def resolve_library(self, path_lookup: PathLookup, library: str) -> MaybeDependency:
-        return self._library_resolver.resolve_library(path_lookup, Path(library))
+    def register_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
+        return self._library_resolver.register_library(path_lookup, Path(library))
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
@@ -372,7 +368,7 @@ class DependencyResolver:
     def build_library_dependency_graph(self, path: Path):
         """Builds a dependency graph starting from a library. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
-        maybe = self._library_resolver.resolve_library(self._path_lookup, path)
+        maybe = self._library_resolver.register_library(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
         graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup)

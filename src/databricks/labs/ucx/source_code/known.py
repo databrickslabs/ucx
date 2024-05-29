@@ -64,6 +64,8 @@ class Whitelist:
         return UNKNOWN
 
     def distribution_compatibility(self, name: str) -> Compatibility:
+        # TODO: parse the name to extract the library name, e.g. "numpy==1.21.0" -> "numpy",
+        # "dist/databricks_labs_ucx-0.24.0-py3-none-any.whl" -> "databricks-labs-ucx"
         if not name:
             return UNKNOWN
         # many packages can belong to a distribution, so we use a loop for matching

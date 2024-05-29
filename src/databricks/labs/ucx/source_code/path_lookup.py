@@ -50,6 +50,8 @@ class PathLookup:
         self._sys_paths.insert(index, path)
 
     def append_path(self, path: Path):
+        if path in self._sys_paths:
+            return
         self._sys_paths.append(path)
 
     def remove_path(self, index: int):

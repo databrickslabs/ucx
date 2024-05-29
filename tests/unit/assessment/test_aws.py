@@ -7,8 +7,8 @@ from databricks.labs.ucx.assessment.aws import (
     AWSPolicyAction,
     AWSResources,
     AWSRole,
-    run_command,
 )
+from databricks.labs.ucx.framework.utils import run_command
 
 logger = logging.getLogger(__name__)
 
