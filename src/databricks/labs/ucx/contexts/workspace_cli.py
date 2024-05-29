@@ -178,7 +178,7 @@ class LocalCheckoutContext(WorkspaceContext):
 
     @cached_property
     def local_file_migrator(self):
-        return LocalFileMigrator(self.languages)
+        return LocalFileMigrator(lambda: self.languages)
 
     @cached_property
     def local_code_linter(self):
