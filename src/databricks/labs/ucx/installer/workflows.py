@@ -536,8 +536,10 @@ class WorkflowsDeployment(InstallationMixin):
                 return 0
             case library if 'blueprint' in library:
                 return 1
-            case _:
+            case library if 'sqlglot' in library:
                 return 2
+            case _:
+                return 3
 
     def _upload_wheel(self):
         wheel_paths = []

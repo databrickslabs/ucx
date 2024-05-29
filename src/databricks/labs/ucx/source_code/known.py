@@ -5,6 +5,7 @@ import email
 import json
 import logging
 import pkgutil
+import re
 import sys
 from dataclasses import dataclass
 from functools import cached_property
@@ -34,16 +35,16 @@ _DEFAULT_ENCODING = sys.getdefaultencoding()
 class Whitelist:
     def __init__(self):
         self._module_problems = collections.OrderedDict()
-        self._module_distributions = {}
+        self._library_problems = collections.defaultdict(list)
         known = self._get_known()
         for distribution_name, modules in known.items():
             specific_modules_first = sorted(modules.items(), key=lambda x: x[0], reverse=True)
             for module_ref, problems in specific_modules_first:
-                self._module_problems[module_ref] = [DependencyProblem(**_) for _ in problems]
-                self._module_distributions[module_ref] = distribution_name
+                module_problems = [DependencyProblem(**_) for _ in problems]
+                self._module_problems[module_ref] = module_problems
+                self._library_problems[distribution_name].extend(module_problems)
         for name in sys.stdlib_module_names:
             self._module_problems[name] = []
-            self._module_distributions[name] = "python"
 
     @staticmethod
     def _get_known():
@@ -66,13 +67,28 @@ class Whitelist:
     def distribution_compatibility(self, name: str) -> Compatibility:
         if not name:
             return UNKNOWN
-        # many packages can belong to a distribution, so we use a loop for matching
-        for module, distribution_name in self._module_distributions.items():
-            if distribution_name != name:
+        name = self._cleanup_name(name)
+        problems = self._library_problems.get(name, None)
+        if problems is None:
+            return UNKNOWN
+        return Compatibility(True, problems)
+
+    @staticmethod
+    def _cleanup_name(name):
+        """parses the name to extract the library name, e.g. "numpy==1.21.0" -> "numpy",
+        and "dist/databricks_labs_ucx-0.24.0-py3-none-any.whl" -> "databricks-labs-ucx"
+
+        See https://pip.pypa.io/en/stable/reference/requirement-specifiers/#requirement-specifiers
+        """
+        _requirement_specifier_re = re.compile(r"([a-zA-Z0-9-]+)(?:[<>=].*)?")
+        _wheel_name_re = re.compile(r"^([a-zA-Z0-9_]+)-.*\.whl$", re.MULTILINE)
+        for matcher in (_wheel_name_re, _requirement_specifier_re):
+            maybe_match = matcher.match(name)
+            if not maybe_match:
                 continue
-            problems = self._module_problems[module]
-            return Compatibility(True, problems)
-        return UNKNOWN
+            raw = maybe_match.group(1)
+            return raw.replace('_', '-').lower()
+        return name
 
     @classmethod
     def rebuild(cls, root: Path):
@@ -119,7 +135,7 @@ class Whitelist:
 
     def __repr__(self):
         modules = len(self._module_problems)
-        libraries = len(self._module_distributions)
+        libraries = len(self._library_problems)
         return f"<{self.__class__.__name__}: {modules} modules, {libraries} libraries>"
 
 

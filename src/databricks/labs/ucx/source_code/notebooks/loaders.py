@@ -47,7 +47,6 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         return None
 
     def load_dependency(self, path_lookup: PathLookup, dependency: Dependency) -> SourceContainer | None:
-        # TODO: catch exceptions, and create MaybeContainer to follow the pattern - OSError and NotFound are common
         absolute_path = self.resolve(path_lookup, dependency.path)
         if not absolute_path:
             return None

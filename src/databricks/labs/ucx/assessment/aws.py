@@ -2,13 +2,16 @@ import json
 import logging
 import re
 import shutil
-import subprocess
 import typing
 from collections.abc import Callable
-from dataclasses import dataclass
-from functools import lru_cache
+from dataclasses import dataclass, field
+from datetime import timedelta
 
+from databricks.sdk.errors import NotFound
+from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege
+
+from databricks.labs.ucx.framework.utils import run_command
 
 logger = logging.getLogger(__name__)
 
@@ -68,18 +71,23 @@ class AWSInstanceProfile:
         return role_match.group(1)
 
 
-@lru_cache(maxsize=1024)
-def run_command(command):
-    logger.info(f"Invoking Command {command}")
-    with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-        output, error = process.communicate()
-        return process.returncode, output.decode("utf-8"), error.decode("utf-8")
+@dataclass()
+class AWSCredentialCandidate:
+    role_arn: str
+    privilege: str
+    paths: set[str] = field(default_factory=set)
+
+    @property
+    def role_name(self):
+        role_match = re.match(AWSResources.ROLE_NAME_REGEX, self.role_arn)
+        return role_match.group(1)
 
 
 class AWSResources:
     S3_ACTIONS: typing.ClassVar[set[str]] = {"s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:PutObjectAcl"}
     S3_READONLY: typing.ClassVar[str] = "s3:GetObject"
     S3_REGEX: typing.ClassVar[str] = r"arn:aws:s3:::([a-zA-Z0-9\/+=,.@_-]*)\/\*$"
+    S3_BUCKET: typing.ClassVar[str] = r"((s3:\/\/|s3a:\/\/)([a-zA-Z0-9+=,.@_-]*))\/.*$"
     S3_PREFIX: typing.ClassVar[str] = "arn:aws:s3:::"
     S3_PATH_REGEX: typing.ClassVar[str] = r"((s3:\/\/)|(s3a:\/\/))(.*)"
     UC_MASTER_ROLES_ARN: typing.ClassVar[list[str]] = [
@@ -216,22 +224,29 @@ class AWSResources:
             s3_actions = [actions]
         return s3_actions
 
-    def _aws_role_trust_doc(self, external_id="0000"):
+    def _aws_role_trust_doc(self, self_assume_arn: str | None = None, external_id="0000"):
         return self._get_json_for_cli(
             {
                 "Version": "2012-10-17",
-                "Statement": [self._databricks_trust_statement(external_id)],
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": (
+                                [
+                                    "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL",
+                                    self_assume_arn,
+                                ]
+                                if self_assume_arn
+                                else "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"
+                            )
+                        },
+                        "Action": "sts:AssumeRole",
+                        "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
+                    }
+                ],
             }
         )
-
-    @staticmethod
-    def _databricks_trust_statement(external_id="0000"):
-        return {
-            "Effect": "Allow",
-            "Principal": {"AWS": "arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL"},
-            "Action": "sts:AssumeRole",
-            "Condition": {"StringEquals": {"sts:ExternalId": external_id}},
-        }
 
     def _aws_s3_policy(self, s3_prefixes, account_id, role_name, kms_key=None):
         """
@@ -246,7 +261,14 @@ class AWSResources:
         s3_prefixes_enriched = sorted([self.S3_PREFIX + s3_prefix for s3_prefix in s3_prefixes_strip])
         statement = [
             {
-                "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"],
+                "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:PutObjectAcl",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation",
+                ],
                 "Resource": s3_prefixes_enriched,
                 "Effect": "Allow",
             },
@@ -282,6 +304,15 @@ class AWSResources:
             return None
         return add_role["Role"]["Arn"]
 
+    def _update_role(self, role_name: str, assume_role_json: str) -> str | None:
+        """
+        Create an AWS role with the given name and assume role policy document.
+        """
+        update_role = self._run_json_command(
+            f"iam update-assume-role-policy --role-name {role_name} --policy-document {assume_role_json}"
+        )
+        return update_role
+
     def create_uc_role(self, role_name: str) -> str | None:
         """
         Create an IAM role for Unity Catalog to access the S3 buckets.
@@ -290,44 +321,18 @@ class AWSResources:
         """
         return self._create_role(role_name, self._aws_role_trust_doc())
 
-    def update_uc_trust_role(self, role_name: str, external_id: str = "0000") -> str | None:
+    @retried(on=[NotFound], timeout=timedelta(seconds=30))
+    def update_uc_role(self, role_name: str, role_arn: str, external_id: str = "0000") -> str | None:
         """
-        Modify an existing IAM role for Unity Catalog to access the S3 buckets with the external ID
-        captured from the UC credential.
+        Create an IAM role for Unity Catalog to access the S3 buckets.
+        the AssumeRole condition will be modified later with the external ID captured from the UC credential.
         https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html
         """
-        role_document = self._run_json_command(f"iam get-role --role-name {role_name}")
-        if role_document is None:
-            logger.error(f"Role {role_name} doesn't exist")
-            return None
-        role = role_document.get("Role")
-        policy_document = role.get("AssumeRolePolicyDocument")
-        if policy_document and policy_document.get("Statement"):
-            for idx, statement in enumerate(policy_document["Statement"]):
-                effect = statement.get("Effect")
-                action = statement.get("Action")
-                principal = statement.get("Principal")
-                if not (effect and action and principal):
-                    continue
-                if effect != "Allow":
-                    continue
-                if action != "sts:AssumeRole":
-                    continue
-                principal = principal.get("AWS")
-                if not principal:
-                    continue
-                if not self._is_uc_principal(principal):
-                    continue
-                policy_document["Statement"][idx] = self._databricks_trust_statement(external_id)
-            policy_document_json = self._get_json_for_cli(policy_document)
-        else:
-            policy_document_json = self._aws_role_trust_doc(external_id)
-        update_role = self._run_json_command(
-            f"iam update-assume-role-policy --role-name {role_name} --policy-document {policy_document_json}"
-        )
-        if not update_role:
-            return None
-        return update_role["Role"]["Arn"]
+        result = self._update_role(role_name, self._aws_role_trust_doc(role_arn, external_id))
+        logger.debug(f"Updated role {role_name} with {result}")
+        if result is None:
+            raise NotFound("Assume role policy not updated.")
+        return result
 
     def put_role_policy(
         self,

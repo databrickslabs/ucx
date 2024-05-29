@@ -11,27 +11,16 @@ from databricks.labs.ucx.assessment.aws import AWSInstanceProfile, AWSResources
 from databricks.labs.ucx.aws.access import AWSResourcePermissions
 from databricks.labs.ucx.aws.locations import AWSExternalLocationsMigration
 from databricks.labs.ucx.config import WorkspaceConfig
-from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import ExternalLocations
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation
-
-
-def test_get_uc_compatible_roles(ws, env_or_skip, make_random):
-    installation = Installation(ws, make_random(4))
-    ctx = WorkspaceContext(ws).replace(
-        aws_profile=env_or_skip("AWS_DEFAULT_PROFILE"),
-        installation=installation,
-    )
-    compat_roles = ctx.aws_resource_permissions.load_uc_compatible_roles()
-    print(compat_roles)
-    assert compat_roles
 
 
 def test_create_external_location(ws, env_or_skip, make_random, inventory_schema, sql_backend, aws_cli_ctx):
     profile = env_or_skip("AWS_DEFAULT_PROFILE")
     rand = make_random(5).lower()
     sql_backend.save_table(
-        f"{inventory_schema}.external_locations", [ExternalLocation(f"s3://bucket{rand}/FOLDER1", 1)], ExternalLocation
+        f"{inventory_schema}.external_locations",
+        [ExternalLocation(f"s3://bucket{rand}/FOLDER1", 1), ExternalLocation(f"s3://bucket{rand}/FOLDER2", 1)],
     )
     aws = AWSResources(profile)
     role_name = f"UCX_ROLE_{rand}"

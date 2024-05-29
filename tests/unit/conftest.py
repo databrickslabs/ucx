@@ -92,17 +92,8 @@ class MockPathLookup(PathLookup):
     def change_directory(self, new_working_directory: Path) -> 'MockPathLookup':
         return MockPathLookup(new_working_directory, self._sys_paths)
 
-    def resolve(self, path: Path) -> Path | None:
-        candidates = [path]
-        for candidate in candidates:
-            absolute_path = super().resolve(candidate)
-            if not absolute_path:
-                continue
-            return absolute_path
-        return None
-
     def __repr__(self):
-        return f"<MockPathLookup {self._cwd}>"
+        return f"<MockPathLookup {self._cwd}, sys.path: {self._sys_paths}>"
 
 
 @pytest.fixture

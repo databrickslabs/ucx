@@ -120,7 +120,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     file_loader = FileLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(file_loader, whitelist)
+    pip_resolver = PipResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
     assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
@@ -150,7 +150,7 @@ def test_detect_s3fs_import_in_dependencies(
     file_loader = FileLoader()
     whitelist = Whitelist()
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(file_loader, whitelist)
+    pip_resolver = PipResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, mock_notebook_resolver, import_resolver, mock_path_lookup)
     sample = mock_path_lookup.cwd / "root9.py"
     maybe = dependency_resolver.build_local_file_dependency_graph(sample)
