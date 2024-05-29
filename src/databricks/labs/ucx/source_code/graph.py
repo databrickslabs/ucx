@@ -48,7 +48,6 @@ class DependencyGraph:
 
     def register_library(self, library: str) -> list[DependencyProblem]:
         # TODO: https://github.com/databrickslabs/ucx/issues/1643
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
         return self._resolver.register_library(self.path_lookup, library)
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:

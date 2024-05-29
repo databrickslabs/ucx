@@ -85,7 +85,7 @@ class RCell(Cell):
         return CellLanguage.R
 
     def is_runnable(self) -> bool:
-        return True  # TODO
+        return True
 
 
 class ScalaCell(Cell):
@@ -95,7 +95,7 @@ class ScalaCell(Cell):
         return CellLanguage.SCALA
 
     def is_runnable(self) -> bool:
-        return True  # TODO
+        return True
 
 
 class SQLCell(Cell):
