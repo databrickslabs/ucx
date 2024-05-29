@@ -13,6 +13,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
+from databricks.labs.ucx.install import AccountInstaller
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -470,10 +471,14 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
     ctx = WorkspaceContext(w)
     ctx.redash.revert_dashboards(dashboard_id)
 
-@ucx.command(is_account=True)
-def join_collection(a: AccountClient, workspace_id: str | None = None):
-    """Show all metastores in the account"""
-    #TODO
+
+@ucx.command()
+def join_collection(a: AccountClient, w: WorkspaceClient, workspace_id: int):
+    """joins the workspace to an existing collection"""
+    account_installer = AccountInstaller(a)
+    if workspace_id is None:
+        logger.error("Please enter a valid workspace_id")
+    account_installer.join_collection(w.get_workspace_id(), WorkspaceContext(w).workspace_info.load_workspace_info())
 
 
 @ucx.command
