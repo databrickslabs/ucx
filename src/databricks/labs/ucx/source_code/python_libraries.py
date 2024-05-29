@@ -25,14 +25,15 @@ class PipResolver(LibraryResolver):
         self._whitelist = whitelist
         self._runner = runner
 
-    def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
-        """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
-        This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
-        bother about parsing cross-version dependencies in our code."""
-        compatibility = self._whitelist.distribution_compatibility(library.name)
-        if compatibility.known:
-            return compatibility.problems
-        return self._install_library(path_lookup, library)
+    def resolve_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
+        library_path = self._locate_library(path_lookup, library)
+        if library_path is None or library_path.suffix == ".egg":  # not installed yet
+            return self._install_library(path_lookup, library)
+        dist_info_path = self._locate_dist_info(library_path, library)
+        if dist_info_path is None:  # old package style
+            problem = DependencyProblem('no-dist-info', f"No dist-info found for {library.name}")
+            return MaybeDependency(None, [problem])
+        return self._create_dependency(library, dist_info_path)
 
     @cached_property
     def _temporary_virtual_environment(self):
