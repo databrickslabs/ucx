@@ -228,7 +228,6 @@ class DashboardFromFiles:
                     self._ws.dashboard_widgets.delete(widget.id)
                 except TypeError:
                     pass
-                    # TODO: Tracking bug in ES-1061370. Remove after fix
             return
         dashboard = self._ws.dashboards.create(dashboard_name, run_as_role=RunAsRole.VIEWER, parent=parent_folder_id)
         assert dashboard.id is not None
