@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
@@ -17,6 +18,9 @@ from databricks.labs.ucx.source_code.graph import (
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import Whitelist
+
+logger = logging.getLogger(__name__)
+
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +80,28 @@ class PipResolver(LibraryResolver):
             python_path = os.environ.get("PYTHONPATH", "")
             if venv not in python_path:
                 os.environ["PYTHONPATH"] = f"{python_path}:{venv}"
-            setup(
-                script_args=["-q", "easy_install", "-v", "--no-deps", "--always-unzip", "-d", venv, library.as_posix()],
-                script_name="easy_install",
-                distclass=Distribution,
-            )
+            easy_install_arguments = ["-q", "easy_install", "-v", "--always-unzip", "-d", venv]
+            try:
+                setup(
+                    script_args=easy_install_arguments + [library.as_posix()],
+                    script_name="easy_install",
+                    distclass=Distribution,
+                )
+            except SystemExit as e:
+                if "Could not find suitable distribution for" in e.code:
+                    try:
+                        setup(
+                            script_args=easy_install_arguments + ["--no-deps", library.as_posix()],
+                            script_name="easy_install",
+                            distclass=Distribution,
+                        )
+                    except SystemExit as e:
+                        problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+                        return MaybeDependency(None, [problem])
+                    logger.warning(f"Could not install library dependencies for {library}")
+                else:
+                    problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+                    return MaybeDependency(None, [problem])
             # Setup installs the egg in a subdirectory
             path_lookup.append_path(f"{venv}/{library.name}")
         else:
