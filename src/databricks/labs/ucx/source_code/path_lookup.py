@@ -38,6 +38,22 @@ class PathLookup:
                     return absolute_path.resolve()
             except PermissionError:
                 logger.warning(f"Permission denied to access {absolute_path}")
+
+            try:
+                egg_subfolders = parent.glob("*.egg")
+            except PermissionError:
+                logger.warning(f"Permission denied to access {parent}")
+                continue
+
+            for egg_subfolder in egg_subfolders:
+                absolute_path = egg_subfolder / path
+                try:
+                    if absolute_path.exists():
+                        # eliminate “..” components
+                        return absolute_path.resolve()
+                except PermissionError:
+                    logger.warning(f"Permission denied to access {absolute_path}")
+
         return None
 
     def has_path(self, path: Path):
