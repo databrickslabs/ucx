@@ -230,8 +230,8 @@ def test_workflow_linter_lints_job_with_egg_dependency(
     remote_egg_file = f"{entrypoint}/{egg_file.name}"
     with egg_file.open("rb") as f:
         ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
+    library = compute.Library(egg=remote_egg_file)
 
-    library = compute.Library(egg=egg_file.as_posix())
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import empty")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
