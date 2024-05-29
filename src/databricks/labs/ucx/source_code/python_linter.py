@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-import ast
+import astroid
 import logging
 from collections.abc import Iterable, Callable
 from typing import TypeVar, Generic, cast
@@ -11,10 +11,10 @@ from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
 logger = logging.getLogger(__name__)
 
 
-class MatchingVisitor(ast.NodeVisitor):
+class MatchingVisitor(astroid.NodeVisitor):
 
     def __init__(self, node_type: type, match_nodes: list[tuple[str, type]]):
-        self._matched_nodes: list[ast.AST] = []
+        self._matched_nodes: list[astroid.NodeNG] = []
         self._node_type = node_type
         self._match_nodes = match_nodes
 
@@ -22,8 +22,8 @@ class MatchingVisitor(ast.NodeVisitor):
     def matched_nodes(self):
         return self._matched_nodes
 
-    def visit_Call(self, node: ast.Call):
-        if self._node_type is not ast.Call:
+    def visit_Call(self, node: astroid.Call):
+        if self._node_type is not astroid.Call:
             return
         try:
             if self._matches(node.func, 0):
@@ -31,28 +31,28 @@ class MatchingVisitor(ast.NodeVisitor):
         except NotImplementedError as e:
             logger.warning(f"Missing implementation: {e.args[0]}")
 
-    def visit_Import(self, node: ast.Import):
-        if self._node_type is not ast.Import:
+    def visit_Import(self, node: astroid.Import):
+        if self._node_type is not astroid.Import:
             return
         self._matched_nodes.append(node)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom):
-        if self._node_type is not ast.ImportFrom:
+    def visit_ImportFrom(self, node: astroid.ImportFrom):
+        if self._node_type is not astroid.ImportFrom:
             return
         self._matched_nodes.append(node)
 
-    def _matches(self, node: ast.AST, depth: int):
+    def _matches(self, node: astroid.NodeNG, depth: int):
         if depth >= len(self._match_nodes):
             return False
         pair = self._match_nodes[depth]
         if not isinstance(node, pair[1]):
             return False
-        next_node: ast.AST | None = None
-        if isinstance(node, ast.Attribute):
+        next_node: astroid.NodeNG | None = None
+        if isinstance(node, astroid.Attribute):
             if node.attr != pair[0]:
                 return False
             next_node = node.value
-        elif isinstance(node, ast.Name):
+        elif isinstance(node, astroid.Name):
             if node.id != pair[0]:
                 return False
         else:
@@ -65,7 +65,7 @@ class MatchingVisitor(ast.NodeVisitor):
 
 class NodeBase(abc.ABC):
 
-    def __init__(self, node: ast.AST):
+    def __init__(self, node: astroid.NodeNG):
         self._node = node
 
     @property
@@ -73,12 +73,12 @@ class NodeBase(abc.ABC):
         return self._node
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: {ast.unparse(self._node)}>"
+        return f"<{self.__class__.__name__}: {repr(self._node)}>"
 
 
 class SysPathChange(NodeBase, abc.ABC):
 
-    def __init__(self, node: ast.AST, path: str, is_append: bool):
+    def __init__(self, node: astroid.NodeNG, path: str, is_append: bool):
         super().__init__(node)
         self._path = path
         self._is_append = is_append
@@ -106,7 +106,7 @@ class RelativePath(SysPathChange):
     pass
 
 
-class SysPathVisitor(ast.NodeVisitor):
+class SysPathVisitor(astroid.NodeVisitor):
 
     def __init__(self):
         self._aliases: dict[str, str] = {}
@@ -116,12 +116,12 @@ class SysPathVisitor(ast.NodeVisitor):
     def syspath_changes(self):
         return self._syspath_changes
 
-    def visit_Import(self, node: ast.Import):
+    def visit_Import(self, node: astroid.Import):
         for alias in node.names:
             if alias.name in {"sys", "os"}:
                 self._aliases[alias.name] = alias.asname or alias.name
 
-    def visit_ImportFrom(self, node: ast.ImportFrom):
+    def visit_ImportFrom(self, node: astroid.ImportFrom):
         interesting_aliases = [("sys", "path"), ("os", "path"), ("os.path", "abspath")]
         interesting_alias = next((t for t in interesting_aliases if t[0] == node.module), None)
         if interesting_alias is None:
@@ -131,8 +131,8 @@ class SysPathVisitor(ast.NodeVisitor):
                 self._aliases[f"{node.module}.{interesting_alias[1]}"] = alias.asname or alias.name
                 break
 
-    def visit_Call(self, node: ast.Call):
-        func = cast(ast.Attribute, node.func)
+    def visit_Call(self, node: astroid.Call):
+        func = cast(astroid.Attribute, node.func)
         # check for 'sys.path.append'
         if not (
             self._match_aliases(func, ["sys", "path", "append"]) or self._match_aliases(func, ["sys", "path", "insert"])
@@ -140,34 +140,34 @@ class SysPathVisitor(ast.NodeVisitor):
             return
         is_append = func.attr == "append"
         changed = node.args[0] if is_append else node.args[1]
-        if isinstance(changed, ast.Constant):
+        if isinstance(changed, astroid.Constant):
             self._syspath_changes.append(AbsolutePath(node, changed.value, is_append))
-        elif isinstance(changed, ast.Call):
+        elif isinstance(changed, astroid.Call):
             self._visit_relative_path(changed, is_append)
 
-    def _match_aliases(self, node: ast.AST, names: list[str]):
-        if isinstance(node, ast.Attribute):
+    def _match_aliases(self, node: astroid.NodeNG, names: list[str]):
+        if isinstance(node, astroid.Attribute):
             if node.attr != names[-1]:
                 return False
             if len(names) == 1:
                 return True
             return self._match_aliases(node.value, names[0 : len(names) - 1])
-        if isinstance(node, ast.Name):
+        if isinstance(node, astroid.Name):
             full_name = ".".join(names)
             alias = self._aliases.get(full_name, full_name)
             return node.id == alias
         return False
 
-    def _visit_relative_path(self, node: ast.Call, is_append: bool):
+    def _visit_relative_path(self, node: astroid.NodeNG, is_append: bool):
         # check for 'os.path.abspath'
         if not self._match_aliases(node.func, ["os", "path", "abspath"]):
             return
         changed = node.args[0]
-        if isinstance(changed, ast.Constant):
+        if isinstance(changed, astroid.Constant):
             self._syspath_changes.append(RelativePath(changed, changed.value, is_append))
 
 
-T = TypeVar("T", bound=ast.AST)
+T = TypeVar("T", bound=astroid.NodeNG)
 
 
 # disclaimer this class is NOT thread-safe
@@ -175,11 +175,11 @@ class ASTLinter(Generic[T]):
 
     @staticmethod
     def parse(code: str):
-        root = ast.parse(code)
+        root = astroid.parse(code)
         return ASTLinter(root)
 
-    def __init__(self, root: ast.AST):
-        self._root: ast.AST = root
+    def __init__(self, root: astroid.Module):
+        self._root: astroid.Module = root
 
     def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
@@ -191,43 +191,43 @@ class ASTLinter(Generic[T]):
         visitor.visit(self._root)
         return visitor.syspath_changes
 
-    def extract_callchain(self) -> ast.Call | None:
+    def extract_callchain(self) -> astroid.Call | None:
         """If 'node' is an assignment or expression, extract its full call-chain (if it has one)"""
         call = None
-        if isinstance(self._root, ast.Assign):
+        if isinstance(self._root, astroid.Assign):
             call = self._root.value
-        elif isinstance(self._root, ast.Expr):
+        elif isinstance(self._root, astroid.Expr):
             call = self._root.value
-        if not isinstance(call, ast.Call):
+        if not isinstance(call, astroid.Call):
             call = None
         return call
 
-    def extract_call_by_name(self, name: str) -> ast.Call | None:
+    def extract_call_by_name(self, name: str) -> astroid.Call | None:
         """Given a call-chain, extract its sub-call by method name (if it has one)"""
-        assert isinstance(self._root, ast.Call)
+        assert isinstance(self._root, astroid.Call)
         node = self._root
         while True:
             func = node.func
-            if not isinstance(func, ast.Attribute):
+            if not isinstance(func, astroid.Attribute):
                 return None
             if func.attr == name:
                 return node
-            if not isinstance(func.value, ast.Call):
+            if not isinstance(func.value, astroid.Call):
                 return None
             node = func.value
 
     def args_count(self) -> int:
         """Count the number of arguments (positionals + keywords)"""
-        assert isinstance(self._root, ast.Call)
+        assert isinstance(self._root, astroid.Call)
         return len(self._root.args) + len(self._root.keywords)
 
     def get_arg(
         self,
         arg_index: int | None,
         arg_name: str | None,
-    ) -> ast.expr | None:
+    ) -> astroid.expr | None:
         """Extract the call argument identified by an optional position or name (if it has one)"""
-        assert isinstance(self._root, ast.Call)
+        assert isinstance(self._root, astroid.Call)
         if arg_index is not None and len(self._root.args) > arg_index:
             return self._root.args[arg_index]
         if arg_name is not None:
@@ -238,14 +238,14 @@ class ASTLinter(Generic[T]):
 
     def is_none(self) -> bool:
         """Check if the given AST expression is the None constant"""
-        assert isinstance(self._root, ast.expr)
-        if not isinstance(self._root, ast.Constant):
+        assert isinstance(self._root, astroid.expr)
+        if not isinstance(self._root, astroid.Constant):
             return False
         return self._root.value is None
 
     def __repr__(self):
         truncate_after = 32
-        code = ast.unparse(self._root)
+        code = repr(self._root)
         if len(code) > truncate_after:
             code = code[0:truncate_after] + "..."
         return f"<ASTLinter: {code}>"
@@ -253,19 +253,19 @@ class ASTLinter(Generic[T]):
 
 class ImportSource(NodeBase):
 
-    def __init__(self, node: ast.AST, name: str):
+    def __init__(self, node: astroid.NodeNG, name: str):
         super().__init__(node)
         self.name = name
 
 
 class NotebookRunCall(NodeBase):
 
-    def __init__(self, node: ast.Call):
+    def __init__(self, node: astroid.Call):
         super().__init__(node)
 
     def get_constant_path(self) -> str | None:
-        path = PythonLinter.get_dbutils_notebook_run_path_arg(cast(ast.Call, self.node))
-        if isinstance(path, ast.Constant):
+        path = PythonLinter.get_dbutils_notebook_run_path_arg(cast(astroid.Call, self.node))
+        if isinstance(path, astroid.Constant):
             return path.value.strip().strip("'").strip('"')
         return None
 
@@ -281,10 +281,10 @@ class PythonLinter(Linter):
         return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
 
     @classmethod
-    def _convert_dbutils_notebook_run_to_advice(cls, node: ast.AST) -> Advisory:
-        assert isinstance(node, ast.Call)
+    def _convert_dbutils_notebook_run_to_advice(cls, node: astroid.NodeNG) -> Advisory:
+        assert isinstance(node, astroid.Call)
         path = cls.get_dbutils_notebook_run_path_arg(node)
-        if isinstance(path, ast.Constant):
+        if isinstance(path, astroid.Constant):
             return Advisory(
                 'dbutils-notebook-run-literal',
                 "Call to 'dbutils.notebook.run' will be migrated automatically",
@@ -303,7 +303,7 @@ class PythonLinter(Linter):
         )
 
     @staticmethod
-    def get_dbutils_notebook_run_path_arg(node: ast.Call):
+    def get_dbutils_notebook_run_path_arg(node: astroid.Call):
         if len(node.args) > 0:
             return node.args[0]
         arg = next(kw for kw in node.keywords if kw.arg == "path")
@@ -311,21 +311,21 @@ class PythonLinter(Linter):
 
     @staticmethod
     def list_dbutils_notebook_run_calls(linter: ASTLinter) -> list[NotebookRunCall]:
-        calls = linter.locate(ast.Call, [("run", ast.Attribute), ("notebook", ast.Attribute), ("dbutils", ast.Name)])
+        calls = linter.locate(astroid.Call, [("run", astroid.Attribute), ("notebook", astroid.Attribute), ("dbutils", astroid.Name)])
         return [NotebookRunCall(call) for call in calls]
 
     @staticmethod
     def list_import_sources(linter: ASTLinter, problem_type: P) -> tuple[list[ImportSource], list[P]]:
         problems: list[P] = []
         try:  # pylint: disable=too-many-try-statements
-            nodes = linter.locate(ast.Import, [])
+            nodes = linter.locate(astroid.Import, [])
             sources = [ImportSource(node, alias.name) for node in nodes for alias in node.names]
-            nodes = linter.locate(ast.ImportFrom, [])
+            nodes = linter.locate(astroid.ImportFrom, [])
             sources.extend(ImportSource(node, node.module) for node in nodes)
-            nodes = linter.locate(ast.Call, [("import_module", ast.Attribute), ("importlib", ast.Name)])
-            nodes.extend(linter.locate(ast.Call, [("__import__", ast.Attribute), ("importlib", ast.Name)]))
+            nodes = linter.locate(astroid.Call, [("import_module", astroid.Attribute), ("importlib", astroid.Name)])
+            nodes.extend(linter.locate(astroid.Call, [("__import__", astroid.Attribute), ("importlib", astroid.Name)]))
             for node in nodes:
-                if isinstance(node.args[0], ast.Constant):
+                if isinstance(node.args[0], astroid.Constant):
                     sources.append(ImportSource(node, node.args[0].value))
                     continue
                 problem = problem_type(
