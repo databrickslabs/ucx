@@ -75,7 +75,7 @@ class PipResolver(LibraryResolver):
             if venv not in python_path:
                 os.environ["PYTHONPATH"] = f"{python_path}:{venv}"
             setup(
-                script_args=["-q", "easy_install", "-v", "-d", venv, library.as_posix()],
+                script_args=["-q", "easy_install", "-v", "--no-deps", "--always-unzip", "-d", venv, library.as_posix()],
                 script_name="easy_install",
                 distclass=Distribution,
             )
