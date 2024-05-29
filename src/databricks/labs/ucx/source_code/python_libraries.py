@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
-from collections.abc import Callable
-from functools import cached_property
+import zipfile
 from pathlib import Path
 
 from databricks.labs.ucx.framework.utils import run_command
@@ -35,8 +34,69 @@ class PipResolver(LibraryResolver):
             return MaybeDependency(None, [problem])
         return self._create_dependency(library, dist_info_path)
 
-    @cached_property
-    def _temporary_virtual_environment(self):
+    def _locate_library(self, path_lookup: PathLookup, library: Path) -> Path | None:
+        # start the quick way
+        full_path = path_lookup.resolve(library)
+        if full_path is not None:
+            return full_path
+        # maybe the name needs tweaking
+        if "-" in library.name:
+            name = library.name.replace("-", "_")
+            return self._locate_library(path_lookup, Path(name))
+        return None
+
+    def _locate_dist_info(self, library_path: Path, library: Path) -> Path | None:
+        if not library_path.parent.exists():
+            return None
+        dist_info_dir = None
+        for package in library_path.parent.iterdir():
+            if package.name.startswith(library.name) and package.name.endswith(".dist-info"):
+                dist_info_dir = package
+                break  # TODO: Matching multiple .dist-info's, https://github.com/databrickslabs/ucx/issues/1751
+        if dist_info_dir is not None:
+            return dist_info_dir
+        # maybe the name needs tweaking
+        if "-" in library.name:
+            name = library.name.replace("-", "_")
+            return self._locate_dist_info(library_path, Path(name))
+        return None
+
+    def _install_library(self, path_lookup: PathLookup, library: Path) -> MaybeDependency:
+        """Pip install library and augment path look-up to resolve the library at import"""
+        # invoke pip install via subprocess to install this library into self._lib_install_folder
+        venv = self._temporary_virtual_environment(path_lookup).as_posix()
+        existing_packages = os.listdir(venv)
+        if library.suffix == ".egg":
+            with zipfile.ZipFile(library, "r") as zip_ref:
+                zip_ref.extractall(venv)  # There is a risk of overwritting existing files here!
+        else:
+            pip_install_arguments = ["pip", "install", library.name, "-t", venv]
+            try:
+                subprocess.run(pip_install_arguments, check=True)
+            except CalledProcessError as e:
+                problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+                return MaybeDependency(None, [problem])
+        added_packages = set(os.listdir(venv)).difference(existing_packages)
+        dist_info_dirs = list(filter(lambda package: package.endswith(".dist-info"), added_packages))
+        dist_info_dir = next((dir for dir in dist_info_dirs if dir.startswith(library.name)), None)
+        if dist_info_dir is None and "-" in library.name:
+            name = library.name.replace("-", "_")
+            dist_info_dir = next((dir for dir in dist_info_dirs if dir.startswith(name)), None)
+        if dist_info_dir is None:
+            # TODO handle other distribution types
+            problem = DependencyProblem('no-dist-info', f"No dist-info found for {library.name}")
+            return MaybeDependency(None, [problem])
+        dist_info_path = path_lookup.resolve(Path(dist_info_dir))
+        assert dist_info_path is not None
+        return self._create_dependency(library, dist_info_path)
+
+    def _create_dependency(self, library: Path, dist_info_path: Path):
+        package = DistInfo(dist_info_path)
+        container = DistInfoContainer(self._file_loader, self._white_list, package)
+        dependency = Dependency(WrappingLoader(container), library)
+        return MaybeDependency(dependency, [])
+
+    def _temporary_virtual_environment(self, path_lookup: PathLookup) -> Path:
         # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
         # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
         # environment. If we don't have a virtual environment, create a temporary one.
