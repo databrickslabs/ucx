@@ -81,8 +81,8 @@ class PipResolver(LibraryResolver):
             easy_install_arguments = ["easy_install", "--verbose", "--always-unzip", "--install-dir", venv]
             try:
                 setup(script_args=easy_install_arguments + [library.as_posix()])
-            except SystemExit as e:
-                if "Could not find suitable distribution for" in e.code:
+            except SystemExit as first_try:
+                if isinstance(first_try.code, str) and "Could not find suitable distribution for" in first_try.code:
                     try:
                         setup(script_args=easy_install_arguments + ["--no-deps", library.as_posix()])
                     except SystemExit as e:
@@ -90,10 +90,10 @@ class PipResolver(LibraryResolver):
                         return MaybeDependency(None, [problem])
                     logger.warning(f"Could not install library dependencies for {library}")
                 else:
-                    problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+                    problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {first_try}")
                     return MaybeDependency(None, [problem])
             # Setup installs the egg in a subdirectory
-            path_lookup.append_path(f"{venv}/{library.name}")
+            path_lookup.append_path(Path(venv, library.name))
         else:
             try:
                 subprocess.run(["pip", "install", library.name, "-t", venv], check=True)
