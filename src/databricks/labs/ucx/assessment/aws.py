@@ -254,7 +254,6 @@ class AWSResources:
             }
         )
 
-
     def _aws_s3_policy(self, s3_prefixes, account_id, role_name, kms_key=None):
         """
         Create the UC IAM policy for the given S3 prefixes, account ID, role name, and KMS key.
