@@ -6,7 +6,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 from subprocess import CalledProcessError
-from setuptools import setup
+
+# mypy can not analyze setuptools
+from setuptools import setup  # type: ignore
 
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.source_code.graph import (
