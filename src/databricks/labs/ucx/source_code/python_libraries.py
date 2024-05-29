@@ -95,9 +95,8 @@ class PipResolver(LibraryResolver):
             # Setup installs the egg in a subdirectory
             path_lookup.append_path(f"{venv}/{library.name}")
         else:
-            pip_install_arguments = ["pip", "install", library.name, "-t", venv]
             try:
-                subprocess.run(pip_install_arguments, check=True)
+                subprocess.run(["pip", "install", library.name, "-t", venv], check=True)
             except CalledProcessError as e:
                 problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
                 return MaybeDependency(None, [problem])
