@@ -23,6 +23,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatusRefresher,
     MigrationIndex,
     MigrationStatus,
+    TableView,
 )
 from databricks.labs.ucx.hive_metastore.tables import (
     AclMigrationWhat,
@@ -31,6 +32,7 @@ from databricks.labs.ucx.hive_metastore.tables import (
     What,
 )
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+from databricks.labs.ucx.hive_metastore.view_migrate import ViewToMigrate
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
 from .. import GROUPS, mock_table_mapping, mock_workspace_client
@@ -510,6 +512,16 @@ def test_migrate_view_should_produce_proper_queries(ws):
     dst = f"ALTER VIEW ucx_default.db1_dst.view_dst SET TBLPROPERTIES ('upgraded_from' = 'hive_metastore.db1_src.view_src' , '{Table.UPGRADED_FROM_WS_PARAM}' = '12345');"
     assert dst in backend.queries
     principal_grants.get_interactive_cluster_grants.assert_not_called()
+
+
+def test_migrate_view_with_local_dataset_should_be_skipped(ws):
+    ddl = "CREATE VIEW v AS WITH t(a) AS (SELECT 1) SELECT * FROM t;"
+    to_migrate = ViewToMigrate(
+        Table("hive_metastore", "database", "", "EXTERNAL", "VIEW", None, ddl),
+        Rule("workspace", "catalog", "", "", "", ""),
+    )
+    dependencies = to_migrate.dependencies
+    assert dependencies == [TableView(catalog="hive_metastore", schema="database", name="v")]
 
 
 def test_migrate_view_with_columns(ws):
