@@ -144,6 +144,14 @@
   "pluggy": {
     "pluggy": []
   },
+  "py4j": {
+    "py4j": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ]
+  },
   "pyasn1": {
     "pyasn1": []
   },
@@ -155,6 +163,841 @@
   },
   "pylint-pytest": {
     "pylint_pytest": []
+  },
+  "pyspark": {
+    "pyspark": [],
+    "pyspark._globals": [],
+    "pyspark.accumulators": [],
+    "pyspark.broadcast": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.cloudpickle": [],
+    "pyspark.cloudpickle.cloudpickle": [],
+    "pyspark.cloudpickle.compat": [],
+    "pyspark.conf": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.context": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot set Spark log level directly from code on UC Shared Clusters. Remove the call and set the cluster spark conf 'spark.log.level' instead"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'register' because its table name argument is not a constant"
+      }
+    ],
+    "pyspark.daemon": [],
+    "pyspark.errors": [],
+    "pyspark.errors.error_classes": [],
+    "pyspark.errors.exceptions": [],
+    "pyspark.errors.exceptions.base": [],
+    "pyspark.errors.exceptions.captured": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.errors.exceptions.connect": [],
+    "pyspark.errors.utils": [],
+    "pyspark.files": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.find_spark_home": [],
+    "pyspark.install": [],
+    "pyspark.instrumentation_utils": [],
+    "pyspark.java_gateway": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.join": [],
+    "pyspark.ml": [],
+    "pyspark.ml.base": [],
+    "pyspark.ml.classification": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.ml.clustering": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.ml.common": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.ml.connect": [],
+    "pyspark.ml.connect.base": [],
+    "pyspark.ml.connect.classification": [],
+    "pyspark.ml.connect.evaluation": [],
+    "pyspark.ml.connect.feature": [],
+    "pyspark.ml.connect.functions": [],
+    "pyspark.ml.connect.io_utils": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.ml.connect.pipeline": [],
+    "pyspark.ml.connect.summarizer": [],
+    "pyspark.ml.connect.tuning": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.ml.connect.util": [],
+    "pyspark.ml.deepspeed": [],
+    "pyspark.ml.deepspeed.deepspeed_distributor": [],
+    "pyspark.ml.dl_util": [],
+    "pyspark.ml.evaluation": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.ml.feature": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.ml.fpm": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.ml.functions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.ml.image": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.ml.linalg": [],
+    "pyspark.ml.model_cache": [],
+    "pyspark.ml.param": [],
+    "pyspark.ml.param._shared_params_code_gen": [],
+    "pyspark.ml.param.shared": [],
+    "pyspark.ml.pipeline": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.ml.recommendation": [],
+    "pyspark.ml.regression": [],
+    "pyspark.ml.stat": [],
+    "pyspark.ml.torch": [],
+    "pyspark.ml.torch.data": [],
+    "pyspark.ml.torch.distributor": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.ml.torch.log_communication": [],
+    "pyspark.ml.torch.torch_run_process_wrapper": [],
+    "pyspark.ml.tree": [],
+    "pyspark.ml.tuning": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.ml.util": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.ml.wrapper": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib": [],
+    "pyspark.mllib.classification": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.clustering": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.common": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.evaluation": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.feature": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.fpm": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.linalg": [],
+    "pyspark.mllib.linalg.distributed": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.mllib.random": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.recommendation": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.mllib.regression": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.mllib.stat.KernelDensity": [],
+    "pyspark.mllib.stat": [],
+    "pyspark.mllib.stat._statistics": [],
+    "pyspark.mllib.stat.distribution": [],
+    "pyspark.mllib.stat.test": [],
+    "pyspark.mllib.tree": [],
+    "pyspark.mllib.util": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.pandas": [],
+    "pyspark.pandas._typing": [],
+    "pyspark.pandas.accessors": [],
+    "pyspark.pandas.base": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.pandas.categorical": [],
+    "pyspark.pandas.config": [],
+    "pyspark.pandas.correlation": [],
+    "pyspark.pandas.data_type_ops": [],
+    "pyspark.pandas.data_type_ops.base": [],
+    "pyspark.pandas.data_type_ops.binary_ops": [],
+    "pyspark.pandas.data_type_ops.boolean_ops": [],
+    "pyspark.pandas.data_type_ops.categorical_ops": [],
+    "pyspark.pandas.data_type_ops.complex_ops": [],
+    "pyspark.pandas.data_type_ops.date_ops": [],
+    "pyspark.pandas.data_type_ops.datetime_ops": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.pandas.data_type_ops.null_ops": [],
+    "pyspark.pandas.data_type_ops.num_ops": [],
+    "pyspark.pandas.data_type_ops.string_ops": [],
+    "pyspark.pandas.data_type_ops.timedelta_ops": [],
+    "pyspark.pandas.data_type_ops.udt_ops": [],
+    "pyspark.pandas.datetimes": [],
+    "pyspark.pandas.exceptions": [],
+    "pyspark.pandas.extensions": [],
+    "pyspark.pandas.generic": [],
+    "pyspark.pandas.groupby": [],
+    "pyspark.pandas.indexes": [],
+    "pyspark.pandas.indexes.base": [],
+    "pyspark.pandas.indexes.category": [],
+    "pyspark.pandas.indexes.datetimes": [],
+    "pyspark.pandas.indexes.multi": [],
+    "pyspark.pandas.indexes.numeric": [],
+    "pyspark.pandas.indexes.timedelta": [],
+    "pyspark.pandas.indexing": [],
+    "pyspark.pandas.internal": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.pandas.missing": [],
+    "pyspark.pandas.missing.common": [],
+    "pyspark.pandas.missing.frame": [],
+    "pyspark.pandas.missing.general_functions": [],
+    "pyspark.pandas.missing.groupby": [],
+    "pyspark.pandas.missing.indexes": [],
+    "pyspark.pandas.missing.resample": [],
+    "pyspark.pandas.missing.scalars": [],
+    "pyspark.pandas.missing.series": [],
+    "pyspark.pandas.missing.window": [],
+    "pyspark.pandas.mlflow": [],
+    "pyspark.pandas.numpy_compat": [],
+    "pyspark.pandas.plot": [],
+    "pyspark.pandas.plot.core": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.pandas.plot.matplotlib": [],
+    "pyspark.pandas.plot.plotly": [],
+    "pyspark.pandas.resample": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.pandas.series": [],
+    "pyspark.pandas.spark": [],
+    "pyspark.pandas.spark.functions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.pandas.spark.utils": [],
+    "pyspark.pandas.strings": [],
+    "pyspark.pandas.supported_api_gen": [],
+    "pyspark.pandas.typedef": [],
+    "pyspark.pandas.typedef.typehints": [],
+    "pyspark.pandas.usage_logging": [],
+    "pyspark.pandas.usage_logging.usage_logger": [],
+    "pyspark.pandas.utils": [],
+    "pyspark.pandas.window": [],
+    "pyspark.python.pyspark.shell": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.rdd": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "pyspark.rddsampler": [],
+    "pyspark.resource": [],
+    "pyspark.resource.information": [],
+    "pyspark.resource.profile": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.resource.requests": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.resultiterable": [],
+    "pyspark.serializers": [],
+    "pyspark.shell": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.shuffle": [],
+    "pyspark.sql": [],
+    "pyspark.sql.avro": [],
+    "pyspark.sql.avro.functions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.catalog": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.column": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.conf": [],
+    "pyspark.sql.connect": [],
+    "pyspark.sql.connect._typing": [],
+    "pyspark.sql.connect.avro": [],
+    "pyspark.sql.connect.avro.functions": [],
+    "pyspark.sql.connect.catalog": [],
+    "pyspark.sql.connect.client": [],
+    "pyspark.sql.connect.client.artifact": [],
+    "pyspark.sql.connect.client.core": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.connect.client.reattach": [],
+    "pyspark.sql.connect.column": [],
+    "pyspark.sql.connect.conf": [],
+    "pyspark.sql.connect.conversion": [],
+    "pyspark.sql.connect.dataframe": [],
+    "pyspark.sql.connect.expressions": [],
+    "pyspark.sql.connect.functions": [],
+    "pyspark.sql.connect.group": [],
+    "pyspark.sql.connect.plan": [],
+    "pyspark.sql.connect.proto": [],
+    "pyspark.sql.connect.proto.base_pb2": [],
+    "pyspark.sql.connect.proto.base_pb2_grpc": [],
+    "pyspark.sql.connect.proto.catalog_pb2": [],
+    "pyspark.sql.connect.proto.commands_pb2": [],
+    "pyspark.sql.connect.proto.common_pb2": [],
+    "pyspark.sql.connect.proto.example_plugins_pb2": [],
+    "pyspark.sql.connect.proto.expressions_pb2": [],
+    "pyspark.sql.connect.proto.relations_pb2": [],
+    "pyspark.sql.connect.proto.types_pb2": [],
+    "pyspark.sql.connect.readwriter": [],
+    "pyspark.sql.connect.session": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.connect.streaming": [],
+    "pyspark.sql.connect.streaming.query": [],
+    "pyspark.sql.connect.streaming.readwriter": [],
+    "pyspark.sql.connect.streaming.worker": [],
+    "pyspark.sql.connect.streaming.worker.foreach_batch_worker": [],
+    "pyspark.sql.connect.streaming.worker.listener_worker": [],
+    "pyspark.sql.connect.types": [],
+    "pyspark.sql.connect.udf": [],
+    "pyspark.sql.connect.udtf": [],
+    "pyspark.sql.connect.utils": [],
+    "pyspark.sql.connect.window": [],
+    "pyspark.sql.context": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.sql.dataframe": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.sql.functions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.group": [],
+    "pyspark.sql.observation": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.pandas": [],
+    "pyspark.sql.pandas.conversion": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.pandas.functions": [],
+    "pyspark.sql.pandas.group_ops": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.pandas.map_ops": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.pandas.serializers": [],
+    "pyspark.sql.pandas.typehints": [],
+    "pyspark.sql.pandas.types": [],
+    "pyspark.sql.pandas.utils": [],
+    "pyspark.sql.protobuf": [],
+    "pyspark.sql.protobuf.functions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.readwriter": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "pyspark.sql.session": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.sql.sql_formatter": [],
+    "pyspark.sql.streaming": [],
+    "pyspark.sql.streaming.listener": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.streaming.query": [],
+    "pyspark.sql.streaming.readwriter": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "pyspark.sql.streaming.state": [],
+    "pyspark.sql.types": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.udf": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc and _conf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.udtf": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.sql.window": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.statcounter": [],
+    "pyspark.status": [],
+    "pyspark.storagelevel": [],
+    "pyspark.streaming": [],
+    "pyspark.streaming.context": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.streaming.dstream": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "pyspark.streaming.kinesis": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "pyspark.streaming.listener": [],
+    "pyspark.streaming.util": [],
+    "pyspark.taskcontext": [],
+    "pyspark.testing": [],
+    "pyspark.testing.connectutils": [],
+    "pyspark.testing.mllibutils": [],
+    "pyspark.testing.mlutils": [],
+    "pyspark.testing.pandasutils": [],
+    "pyspark.testing.streamingutils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "pyspark.testing.utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
+      }
+    ],
+    "pyspark.traceback_utils": [],
+    "pyspark.util": [],
+    "pyspark.version": [],
+    "pyspark.worker": [],
+    "pyspark.worker_util": []
   },
   "pytest": {
     "_pytest": [],
