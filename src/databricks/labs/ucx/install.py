@@ -691,7 +691,10 @@ class AccountInstaller(AccountContext):
                 try:
                     # if user is account admin list and show available workspaces to select from
                     accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
-                    collection_workspace_id = self._get_collection_workspace(accessible_workspaces, account_client)
+                    collection_workspace_id = self._get_collection_workspace(
+                        accessible_workspaces,
+                        account_client,
+                    )
 
                 except PermissionDenied:
                     # if the user is not account admin, allow user to enter the workspace_id to join as collection.
@@ -712,7 +715,10 @@ class AccountInstaller(AccountContext):
             return None
         # below code is executed if either joining an existing collection (through the cli)
         # or selecting one while installing
-        collection_workspace = AccountInstaller._get_workspace(collection_workspace_id, ids_to_workspace)
+        collection_workspace = AccountInstaller._get_workspace(
+            collection_workspace_id,
+            ids_to_workspace,
+        )
         if not self.account_workspaces.can_administer(collection_workspace):
             # if user is not workspace admin on the workspace to join as collection then exit
             logger.error(
@@ -720,13 +726,20 @@ class AccountInstaller(AccountContext):
             )
             return None
         if collection_workspace is not None:
-            installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id, ids_to_workspace)
+            installed_workspaces = self._sync_collection(
+                collection_workspace,
+                current_workspace_id,
+                ids_to_workspace,
+            )
         if installed_workspaces is not None:
             ctx.account_workspaces.sync_workspace_info(installed_workspaces)
         return None
 
     def _sync_collection(
-        self, collection_workspace: Workspace, current_workspace_id: int, ids_to_workspace: dict[int, Workspace]
+        self,
+        collection_workspace: Workspace,
+        current_workspace_id: int,
+        ids_to_workspace: dict[int, Workspace],
     ) -> list[Workspace] | None:
         # gets the list of existing collection of workspace from the config
         # checks if user is workspace admin on all the workspace id, if yes
@@ -742,7 +755,10 @@ class AccountInstaller(AccountContext):
         installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []
         for workspace_id in installed_workspace_ids:
-            workspace = AccountInstaller._get_workspace(workspace_id, ids_to_workspace)
+            workspace = AccountInstaller._get_workspace(
+                workspace_id,
+                ids_to_workspace,
+            )
             installed_workspaces.append(workspace)
             if not self.account_workspaces.can_administer(workspace):
                 logger.error(
@@ -766,7 +782,10 @@ class AccountInstaller(AccountContext):
         installed_workspaces = []
         for workspace in accessible_workspaces:
             workspace_client = account_client.get_workspace_client(workspace)
-            workspace_installation = Installation.existing(workspace_client, self.product_info.product_name())
+            workspace_installation = Installation.existing(
+                workspace_client,
+                self.product_info.product_name(),
+            )
             if len(workspace_installation) > 0:
                 installed_workspaces.append(workspace)
 
