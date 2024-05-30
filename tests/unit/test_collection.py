@@ -6,7 +6,6 @@ import yaml
 
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service import iam
-from databricks.sdk.service.workspace import ObjectInfo
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -180,13 +179,11 @@ def test_join_collection_join_collection_not_account_admin_workspace_id_not_coll
 
 
 def test_join_collection_join_collection_not_account_admin_workspace_id_not_installed_workspace_admin():
-    ws = mock_workspace_client()
     ws = create_autospec(WorkspaceClient)
-    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
-    download_yaml = yaml.dump(
+    download = yaml.dump(
         {
             'version': 1,
-            'inventory_database': 'ucx_exists',
+            'inventory_database': 'ucx',
             'connect': {
                 'host': '...',
                 'token': '...',
@@ -194,7 +191,7 @@ def test_join_collection_join_collection_not_account_admin_workspace_id_not_inst
             'installed_workspace_ids': [123, 456],
         }
     )
-    ws.workspace.download.return_value = io.StringIO(download_yaml)
+    ws.workspace.download.return_value = io.StringIO(download)
 
     account_client = create_autospec(AccountClient)
     ws.current_user.me.side_effect = [
