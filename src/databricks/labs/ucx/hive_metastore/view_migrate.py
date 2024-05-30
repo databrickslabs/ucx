@@ -32,7 +32,10 @@ class ViewToMigrate(TableToMigrate):
         if len(statements) != 1 or statements[0] is None:
             raise ValueError(f"Could not analyze view SQL: {self.src.view_text}")
         statement = statements[0]
+        aliases = self._read_aliases(statement)
         for old_table in statement.find_all(expressions.Table):
+            if old_table.name in aliases:
+                continue
             if old_table.catalog and old_table.catalog != 'hive_metastore':
                 continue
             src_db = old_table.db if old_table.db else self.src.database
@@ -40,6 +43,14 @@ class ViewToMigrate(TableToMigrate):
                 logger.error(f"Could not determine schema for table {old_table.name}")
                 continue
             yield TableView("hive_metastore", src_db, old_table.name)
+
+    def _read_aliases(self, statement: expressions.Expression):
+        aliases = set()
+        for with_clause in statement.find_all(expressions.With):
+            for expression in with_clause.expressions:
+                if isinstance(expression, expressions.CTE):
+                    aliases.add(expression.alias_or_name)
+        return aliases
 
     def sql_migrate_view(self, index: MigrationIndex) -> str:
         from_table = FromTable(index, CurrentSessionState(self.src.database))
