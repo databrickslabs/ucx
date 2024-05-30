@@ -28,6 +28,15 @@ class Compatibility:
     problems: list[DependencyProblem]
 
 
+@dataclass(unsafe_hash=True, frozen=True, eq=True, order=True)
+class KnownProblem:
+    code: str
+    message: str
+
+    def as_dict(self):
+        return {'code': self.code, 'message': self.message}
+
+
 UNKNOWN = Compatibility(False, [])
 _DEFAULT_ENCODING = sys.getdefaultencoding()
 
@@ -128,9 +137,10 @@ class Whitelist:
         logger.info(f"Processing module: {module_ref}")
         ctx = LinterContext(empty_index)
         linter = FileLinter(ctx, module_path)
-        problems = []
+        known_problems = set()
         for problem in linter.lint():
-            problems.append({'code': problem.code, 'message': problem.message})
+            known_problems.add(KnownProblem(problem.code, problem.message))
+        problems = [_.as_dict() for _ in sorted(known_problems)]
         known_distributions[dist_info.name][module_ref] = problems
 
     def __repr__(self):
