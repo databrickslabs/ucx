@@ -7,17 +7,21 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest  # pylint: disable=wrong-import-order
+from databricks.labs.ucx.__about__ import __version__
+
 from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.installer import RawState
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
+from databricks.sdk import AccountClient
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
 )
+
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
@@ -453,8 +457,15 @@ def test_compare_remote_local_install_versions(ws, installation_ctx):
 
 
 def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
-    installation_ctx.workspace_installation.run()
+    host = ws.config.environment.deployment_url("accounts")
+    acc_client = AccountClient(
+        host=host, account_id=env_or_skip("DATABRICKS_ACCOUNT_ID"), product='ucx', product_version=__version__
+    )
+    workspace = acc_client.workspaces.get(ws.get_workspace_id())
+    installation_ctx.with_workspace_info([workspace])
+    installation_ctx.workspace_installer.run()
     workspace_id = installation_ctx.workspace_installer.workspace_client.get_workspace_id()
+    id_to_workspace = installation_ctx.workspace_info.load_workspace_info()
     acc_installer = installation_ctx.account_installer
     prompts = MockPrompts(
         {
@@ -467,7 +478,7 @@ def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
         prompts=prompts,
         product_info=installation_ctx.product_info,
     )
-    acc_installer.join_collection(workspace_id)
+    acc_installer.join_collection(workspace_id, id_to_workspace)
     config = installation_ctx.installation.load(WorkspaceConfig)
     workspace_id = installation_ctx.workspace_installer.workspace_client.get_workspace_id()
     assert config.installed_workspace_ids == [workspace_id]

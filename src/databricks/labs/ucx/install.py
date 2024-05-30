@@ -719,7 +719,7 @@ class AccountInstaller(AccountContext):
             collection_workspace_id,
             ids_to_workspace,
         )
-        if not self.account_workspaces.can_administer(collection_workspace):
+        if not ctx.account_workspaces.can_administer(collection_workspace):
             # if user is not workspace admin on the workspace to join as collection then exit
             logger.error(
                 f"User doesnt have admin access on the workspace {collection_workspace_id}, " f"cant join collection."
@@ -760,7 +760,9 @@ class AccountInstaller(AccountContext):
                 ids_to_workspace,
             )
             installed_workspaces.append(workspace)
-            if not self.account_workspaces.can_administer(workspace):
+            ctx = AccountContext(self._get_safe_account_client())
+            if not ctx.account_workspaces.can_administer(workspace):
+
                 logger.error(
                     f"User doesnt have admin access on the workspace {workspace_id} in the collection, "
                     f"cant join collection."

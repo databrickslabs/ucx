@@ -5,10 +5,11 @@ import pytest
 import yaml
 
 from databricks.sdk.service.provisioning import Workspace
-
+from databricks.sdk.service import iam
+from databricks.sdk.service.workspace import ObjectInfo
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
-from databricks.sdk import AccountClient
+from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import PermissionDenied
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
@@ -180,7 +181,28 @@ def test_join_collection_join_collection_not_account_admin_workspace_id_not_coll
 
 def test_join_collection_join_collection_not_account_admin_workspace_id_not_installed_workspace_admin():
     ws = mock_workspace_client()
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.get_status = lambda _: ObjectInfo(object_id=123)
+    download_yaml = yaml.dump(
+        {
+            'version': 1,
+            'inventory_database': 'ucx_exists',
+            'connect': {
+                'host': '...',
+                'token': '...',
+            },
+            'installed_workspace_ids': [123, 456],
+        }
+    )
+    ws.workspace.download.return_value = io.StringIO(download_yaml)
+
     account_client = create_autospec(AccountClient)
+    ws.current_user.me.side_effect = [
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]),
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]),
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]),
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="notadmin")]),
+    ]
     account_client.get_workspace_client.return_value = ws
     account_client.workspaces.list.side_effect = PermissionDenied('access denied')
     account_installer = AccountInstaller(account_client)
@@ -211,6 +233,7 @@ def test_join_collection_join_collection_not_account_admin_workspace_id_not_inst
 
 def test_join_collection_join_existing_collection():
     ws = mock_workspace_client()
+
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
     account_installer = AccountInstaller(account_client)
