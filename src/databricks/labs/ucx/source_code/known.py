@@ -15,7 +15,7 @@ from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.graph import DependencyProblem
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -26,6 +26,15 @@ logger = logging.getLogger(__name__)
 class Compatibility:
     known: bool
     problems: list[DependencyProblem]
+
+
+@dataclass(unsafe_hash=True, frozen=True, eq=True, order=True)
+class KnownProblem:
+    code: str
+    message: str
+
+    def as_dict(self):
+        return {'code': self.code, 'message': self.message}
 
 
 UNKNOWN = Compatibility(False, [])
@@ -126,11 +135,12 @@ class Whitelist:
             if module_ref.endswith(suffix):
                 module_ref = module_ref[: -len(suffix)]
         logger.info(f"Processing module: {module_ref}")
-        languages = Languages(empty_index)
-        linter = FileLinter(languages, module_path)
-        problems = []
+        ctx = LinterContext(empty_index)
+        linter = FileLinter(ctx, module_path)
+        known_problems = set()
         for problem in linter.lint():
-            problems.append({'code': problem.code, 'message': problem.message})
+            known_problems.add(KnownProblem(problem.code, problem.message))
+        problems = [_.as_dict() for _ in sorted(known_problems)]
         known_distributions[dist_info.name][module_ref] = problems
 
     def __repr__(self):

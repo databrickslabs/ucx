@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
@@ -89,14 +89,14 @@ class LocalCodeLinter:
         folder_loader: FolderLoader,
         path_lookup: PathLookup,
         dependency_resolver: DependencyResolver,
-        languages_factory: Callable[[], Languages],
+        languages_factory: Callable[[], LinterContext],
     ) -> None:
         self._file_loader = file_loader
         self._folder_loader = folder_loader
         self._path_lookup = path_lookup
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
-        self._languages_factory = languages_factory
+        self._new_linter_context = languages_factory
 
     def lint(self, prompts: Prompts, path: Path | None, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
         """Lint local code files looking for problems in notebooks and python files."""
@@ -133,15 +133,15 @@ class LocalCodeLinter:
     def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
         if path.is_dir():
             return []
-        languages = self._languages_factory()
-        linter = FileLinter(languages, path)
+        ctx = self._new_linter_context()
+        linter = FileLinter(ctx, path)
         return [advice.for_path(path) for advice in linter.lint()]
 
 
 class LocalFileMigrator:
     """The LocalFileMigrator class is responsible for fixing code files based on their language."""
 
-    def __init__(self, languages_factory: Callable[[], Languages]):
+    def __init__(self, languages_factory: Callable[[], LinterContext]):
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._languages_factory = languages_factory
 
@@ -170,7 +170,11 @@ class LocalFileMigrator:
         linter = languages.linter(language)
         # Open the file and read the code
         with path.open("r") as f:
-            code = f.read()
+            try:
+                code = f.read()
+            except UnicodeDecodeError as e:
+                logger.error(f"Could not decode file {path}: {e}")
+                return False
             applied = False
             # Lint the code and apply fixes
             for advice in linter.lint(code):

@@ -14,7 +14,7 @@ from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.files import LocalFile
+from databricks.labs.ucx.source_code.linters.files import LocalFile
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -23,7 +23,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
 )
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -72,13 +72,13 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._register_libraries(graph)
+        yield from self._register_existing_cluster_id(graph)
         yield from self._register_notebook(graph)
         yield from self._register_spark_python_task(graph)
         yield from self._register_python_wheel_task(graph)
         yield from self._register_spark_jar_task(graph)
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
-        yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -154,12 +154,16 @@ class WorkflowTaskContainer(SourceContainer):
         # TODO: https://github.com/databrickslabs/ucx/issues/1638
         yield DependencyProblem('not-yet-implemented', 'Pipeline task is not yet implemented')
 
-    def _register_existing_cluster_id(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_existing_cluster_id(self, graph: DependencyGraph):
         if not self._task.existing_cluster_id:
             return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1637
+
         # load libraries installed on the referred cluster
-        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
+        library_full_status_list = self._ws.libraries.cluster_status(self._task.existing_cluster_id)
+
+        for library_full_status in library_full_status_list:
+            if library_full_status.library:
+                yield from self._register_library(graph, library_full_status.library)
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
@@ -244,23 +248,23 @@ class WorkflowLinter:
                 yield source_path, problem
             return
         session_state = CurrentSessionState()
-        state = Languages(self._migration_index, session_state)
+        ctx = LinterContext(self._migration_index, session_state)
         for dependency in graph.all_dependencies:
             logger.info(f'Linting {task.task_key} dependency: {dependency}')
             container = dependency.load(graph.path_lookup)
             if not container:
                 continue
             if isinstance(container, Notebook):
-                yield from self._lint_notebook(container, state)
+                yield from self._lint_notebook(container, ctx)
             if isinstance(container, LocalFile):
-                yield from self._lint_file(container, state)
+                yield from self._lint_file(container, ctx)
 
-    def _lint_file(self, file: LocalFile, state: Languages):
-        linter = FileLinter(state, file.path)
+    def _lint_file(self, file: LocalFile, ctx: LinterContext):
+        linter = FileLinter(ctx, file.path)
         for advice in linter.lint():
             yield file.path, advice
 
-    def _lint_notebook(self, notebook: Notebook, state: Languages):
-        linter = NotebookLinter(state, notebook)
+    def _lint_notebook(self, notebook: Notebook, ctx: LinterContext):
+        linter = NotebookLinter(ctx, notebook)
         for advice in linter.lint():
             yield notebook.path, advice

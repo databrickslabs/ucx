@@ -7,16 +7,17 @@ from pathlib import Path
 
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
-from databricks.sdk.service import compute
+from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.mixins.wspath import WorkspacePath
-from databricks.labs.ucx.source_code.files import LocalCodeLinter
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+from databricks.sdk.service import jobs, compute
+from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
@@ -54,6 +55,52 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
 
     assert len(problems) == 0
+
+
+def test_job_task_linter_library_not_installed_cluster(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
+    created_cluster = make_cluster(single_node=True)
+    entrypoint = make_directory()
+
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import greenlet")
+
+    task = jobs.Task(
+        task_key=make_random(4),
+        description=make_random(4),
+        existing_cluster_id=created_cluster.cluster_id,
+        notebook_task=jobs.NotebookTask(
+            notebook_path=str(notebook),
+        ),
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+
+
+def test_job_task_linter_library_installed_cluster(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
+    created_cluster = make_cluster(single_node=True)
+    libraries_api = ws.libraries
+    libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("greenlet"))])
+    entrypoint = make_directory()
+
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import doesnotexist;import greenlet")
+
+    task = jobs.Task(
+        task_key=make_random(4),
+        description=make_random(4),
+        existing_cluster_id=created_cluster.cluster_id,
+        notebook_task=jobs.NotebookTask(
+            notebook_path=str(notebook),
+        ),
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
@@ -107,32 +154,34 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     )
 
     notebook = entrypoint / "notebook.ipynb"
-    make_notebook(path=notebook, content=b"import pytest")
+    make_notebook(path=notebook, content=b"import greenlet")
 
     job_without_pytest_library = make_job(notebook_path=notebook)
     problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) > 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
 
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
 def test_lint_local_code(simple_ctx):
     # no need to connect
-    light_ctx = simple_ctx.replace(languages=Languages(MigrationIndex([])))
+    linter_context = LinterContext(MigrationIndex([]))
+    light_ctx = simple_ctx
     ucx_path = Path(__file__).parent.parent.parent.parent
     path_to_scan = Path(ucx_path, "src")
+    # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
     linter = LocalCodeLinter(
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,
         light_ctx.dependency_resolver,
-        lambda: light_ctx.languages,
+        lambda: linter_context,
     )
     problems = linter.lint(Prompts(), path_to_scan, StringIO())
     assert len(problems) > 0

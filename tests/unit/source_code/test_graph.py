@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver, FolderLoader
+from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver, FolderLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PipResolver
