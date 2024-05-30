@@ -55,7 +55,7 @@ def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(moc
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(problems) == 4
+    assert len(problems) == 3
     assert all(problem.code == "not-yet-implemented" for problem in problems)
     ws.assert_not_called()
 
@@ -173,3 +173,34 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
 
     assert expected_message in caplog.messages
     ws.workspace.download.assert_called_once_with("requirements.txt", format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_pytest_pypi_library(
+    mock_path_lookup, graph
+):
+    ws = create_autospec(WorkspaceClient)
+    libraries = []
+    existing_cluster_id = "TEST_CLUSTER_ID"
+    task = jobs.Task(task_key="test", libraries=libraries, existing_cluster_id=existing_cluster_id)
+    libraries_api = create_autospec(compute.LibrariesAPI)
+    libraries_api.cluster_status.return_value = [
+        compute.LibraryFullStatus(
+            is_library_for_all_clusters=False,
+            library=compute.Library(
+                cran=None,
+                egg=None,
+                jar=None,
+                maven=None,
+                pypi=compute.PythonPyPiLibrary(package='pandas', repo=None),
+                requirements=None,
+                whl=None,
+            ),
+            messages=None,
+            status="<LibraryInstallStatus.PENDING: 'PENDING'>",
+        )
+    ]
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 0
+    ws.assert_not_called()
