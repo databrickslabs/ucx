@@ -68,9 +68,8 @@ class RDDApiMatcher(SharedClusterMatcher):
     ]
 
     def lint(self, node: ast.AST) -> Iterator[Advice]:
-        if not isinstance(node, ast.Call):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
             return
-        assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
         if node.func.attr not in self._SC_METHODS:
             return
         function_name = AstHelper.get_full_function_name(node)
@@ -104,12 +103,53 @@ class SparkSqlContextMatcher(SharedClusterMatcher):
         )
 
 
+class LoggingMatcher(SharedClusterMatcher):
+    def lint(self, node: ast.AST) -> Iterator[Advice]:
+        yield from self._match_sc_set_log_level(node)
+        yield from self._match_jvm_log(node)
+
+    def _match_sc_set_log_level(self, node: ast.AST) -> Iterator[Advice]:
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            return
+        if node.func.attr != 'setLogLevel':
+            return
+        function_name = AstHelper.get_full_function_name(node)
+        if not function_name or not function_name.endswith('sc.setLogLevel'):
+            return
+
+        yield Failure(
+            code='spark-logging-in-shared-clusters',
+            message=f'Cannot set Spark log level directly from code on {self._cluster_type_str()}. '
+            f'Remove the call and set the cluster spark conf \'spark.log.level\' instead',
+            start_line=node.lineno,
+            start_col=node.col_offset,
+            end_line=node.end_lineno or 0,
+            end_col=node.end_col_offset or 0,
+        )
+
+    def _match_jvm_log(self, node: ast.AST) -> Iterator[Advice]:
+        if not isinstance(node, ast.Attribute):
+            return
+        attribute_name = AstHelper.get_full_attribute_name(node)
+        if attribute_name and attribute_name.endswith('org.apache.log4j'):
+            yield Failure(
+                code='spark-logging-in-shared-clusters',
+                message=f'Cannot access Spark Driver JVM logger on {self._cluster_type_str()}. '
+                f'Use logging.getLogger() instead',
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
+
+
 class SparkConnectLinter(Linter):
     def __init__(self, is_serverless: bool = False):
         self._matchers = [
             JvmAccessMatcher(is_serverless=is_serverless),
             RDDApiMatcher(is_serverless=is_serverless),
             SparkSqlContextMatcher(is_serverless=is_serverless),
+            LoggingMatcher(is_serverless=is_serverless),
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
