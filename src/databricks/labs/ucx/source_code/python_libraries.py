@@ -75,11 +75,6 @@ class PipResolver(LibraryResolver):
         venv = self._temporary_virtual_environment(path_lookup).as_posix()
         existing_packages = os.listdir(venv)
         if library.suffix == ".egg":
-            # Setup requires the installation directory to be in the python path
-            python_path = os.environ.get("PYTHONPATH", "")
-            if venv not in python_path:
-                os.environ["PYTHONPATH"] = f"{python_path}:{venv}"
-
             easy_install_arguments = ["easy_install", "-v", "--always-unzip", "--install-dir", venv, library.as_posix()]
             try:
                 setup(script_args=easy_install_arguments)
