@@ -47,34 +47,40 @@ class PipResolver(LibraryResolver):
 
     def _install_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
-        venv = self._temporary_virtual_environment
-        path_lookup.append_path(venv)
-        # resolve relative pip installs from notebooks: %pip install ../../foo.whl
+        path_lookup.append_path(self._temporary_virtual_environment)
+
+        # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
         maybe_library = path_lookup.resolve(library)
         if maybe_library is not None:
             library = maybe_library
 
         if library.suffix == ".egg":
-            verbosity = "--verbose" if is_in_debug() else "--quiet"
-            easy_install_arguments = [
-                "easy_install",
-                verbosity,
-                "--always-unzip",
-                "--install-dir",
-                venv.as_posix(),
-                library.as_posix(),
-            ]
-            try:
-                setup(script_args=easy_install_arguments)
-            except SystemExit as e:
-                problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
-                return [problem]
-        else:
-            return_code, stdout, stderr = self._runner(f"pip install {library} -t {venv}")
-            logger.debug(f"pip output:\n{stdout}\n{stderr}")
-            if return_code != 0:
-                problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {stderr}")
-                return [problem]
+            return self._install_egg(library)
+        return self._install_pip(library)
+
+    def _install_pip(self, library: Path) -> list[DependencyProblem]:
+        return_code, stdout, stderr = self._runner(f"pip install {library} -t {self._temporary_virtual_environment}")
+        logger.debug(f"pip output:\n{stdout}\n{stderr}")
+        if return_code != 0:
+            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {stderr}")
+            return [problem]
+        return []
+
+    def _install_egg(self, library: Path) -> list[DependencyProblem]:
+        verbosity = "--verbose" if is_in_debug() else "--quiet"
+        easy_install_arguments = [
+            "easy_install",
+            verbosity,
+            "--always-unzip",
+            "--install-dir",
+            self._temporary_virtual_environment.as_posix(),
+            library.as_posix(),
+        ]
+        try:
+            setup(script_args=easy_install_arguments)
+        except SystemExit as e:
+            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+            return [problem]
         return []
 
     def __str__(self) -> str:
