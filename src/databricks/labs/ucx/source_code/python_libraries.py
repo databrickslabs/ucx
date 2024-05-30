@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
 from zipimport import ZipImportError
@@ -21,6 +23,16 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import Whitelist
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def current_working_directory(path: Path) -> Iterator[Path]:
+    old_working_directory = os.getcwd()
+    os.chdir(path)
+    try:
+        yield path
+    finally:
+        os.chdir(old_working_directory)
 
 
 class PythonLibraryResolver(LibraryResolver):
@@ -84,11 +96,18 @@ class PythonLibraryResolver(LibraryResolver):
             self._temporary_virtual_environment.as_posix(),
             library.as_posix(),
         ]
-        try:
-            setup(script_args=easy_install_arguments)
-        except (SystemExit, ZipImportError) as e:
-            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
-            return [problem]
+        if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
+            installation_working_directory = self._temporary_virtual_environment
+        else:
+            # setuptools.setup tries to install projects in the current working directory
+            # For example, ucx when developing or the current project when linting local code
+            installation_working_directory = os.getcwd()
+        with current_working_directory(installation_working_directory):
+            try:
+                setup(script_args=easy_install_arguments)
+            except (SystemExit, ZipImportError) as e:
+                problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+                return [problem]
         return []
 
     def __str__(self) -> str:
