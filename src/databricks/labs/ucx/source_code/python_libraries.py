@@ -8,9 +8,6 @@ from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
 
-# Mypy can't analyze setuptools due to missing type hints
-from setuptools import setup  # type: ignore
-
 from databricks.labs.blueprint.entrypoint import is_in_debug
 
 from databricks.labs.ucx.framework.utils import run_command
@@ -97,7 +94,9 @@ class PythonLibraryResolver(LibraryResolver):
         ]
         with current_working_directory(self._temporary_virtual_environment):
             try:
-                from setuptools import setup
+                # Mypy can't analyze setuptools due to missing type hints
+                # Setuptools might not be present
+                from setuptools import setup  # type: ignore
                 setup(script_args=easy_install_arguments)
             except (SystemExit, ImportError) as e:
                 problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
