@@ -154,3 +154,17 @@ def func():
         assert not maybe.problems
         assert maybe.graph is not None
         assert maybe.graph.all_relative_names() == {"some_file.py", "import_file.py"}
+
+
+def test_path_lookup_resolves_egg_package(tmp_path):
+    egg_library = tmp_path / "library.egg"
+    egg_library.mkdir()
+    (egg_library / "EGG-INFO").touch()
+
+    package_path = (egg_library / "package.py")
+    package_path.touch()
+
+    lookup = PathLookup(Path.cwd(), [tmp_path])
+    resolved_path = lookup.resolve(Path("package.py"))
+
+    assert resolved_path == package_path
