@@ -33,7 +33,7 @@ class PathLookup:
 
         for library_root in self.library_roots:
             try:
-                if not library_root.exists():
+                if not library_root.is_dir():
                     continue
 
                 absolute_path = library_root / path
