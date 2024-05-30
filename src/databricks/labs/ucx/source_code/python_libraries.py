@@ -95,14 +95,9 @@ class PythonLibraryResolver(LibraryResolver):
             self._temporary_virtual_environment.as_posix(),
             library.as_posix(),
         ]
-        if "DATABRICKS_RUNTIME_VERSION" not in os.environ:
-            installation_working_directory = self._temporary_virtual_environment
-        else:
-            # setuptools.setup tries to install projects in the current working directory
-            # For example, ucx when developing or the current project when linting local code
-            installation_working_directory = os.getcwd()
-        with current_working_directory(installation_working_directory):
+        with current_working_directory(self._temporary_virtual_environment):
             try:
+                from setuptools import setup
                 setup(script_args=easy_install_arguments)
             except (SystemExit, ImportError) as e:
                 problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
