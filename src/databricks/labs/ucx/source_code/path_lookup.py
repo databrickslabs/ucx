@@ -32,6 +32,15 @@ class PathLookup:
     def change_directory(self, new_working_directory: Path) -> PathLookup:
         return PathLookup(new_working_directory, self._sys_paths)
 
+    @staticmethod
+    def _is_egg_folder(path: Path) -> bool:
+        """Egg folders end with `.egg` and have a 'EGG-INFO' file."""
+        return (
+            path.is_dir() and
+            path.suffix == ".egg" and
+            any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
+        )
+
     def resolve(self, path: Path) -> Path | None:
         if path.is_absolute() and path.exists():
             # eliminate “..” components
@@ -46,9 +55,11 @@ class PathLookup:
                 if absolute_path.exists():
                     return absolute_path.resolve()  # eliminate “..” components
 
-                egg_subfolders = library_root.glob("*.egg")
-                for egg_subfolder in egg_subfolders:
-                    absolute_path = egg_subfolder / path
+                for child in library_root.iterdir():
+                    if not self._is_egg_folder(child):
+                        continue
+
+                    absolute_path = child / path
                     if absolute_path.exists():
                         return absolute_path.resolve()  # eliminate “..” components
             except PermissionError:
