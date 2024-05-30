@@ -42,9 +42,13 @@ class PathLookup:
         )
 
     def resolve(self, path: Path) -> Path | None:
-        if path.is_absolute() and path.exists():
-            # eliminate “..” components
-            return path.resolve()
+        try:
+            if path.is_absolute() and path.exists():
+                # eliminate “..” components
+                return path.resolve()
+        except PermissionError:
+            logger.warning(f"Permission denied to access {path}")
+            return None
 
         for library_root in self.library_roots:
             try:
