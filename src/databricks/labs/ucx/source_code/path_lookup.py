@@ -42,7 +42,7 @@ class PathLookup:
             return None
         for library_root in self.library_roots:
             try:
-                resolved_path = self._resolve_library_root(library_root, path)
+                resolved_path = self._resolve_in_library_root(library_root, path)
             except PermissionError:
                 logger.warning(f"Permission denied to access files or directories in {library_root}")
                 continue
@@ -50,15 +50,15 @@ class PathLookup:
                 return resolved_path
         return None
 
-    def _resolve_library_root(self, library_root: Path, path: Path) -> Path | None:
+    def _resolve_in_library_root(self, library_root: Path, path: Path) -> Path | None:
         if not library_root.is_dir():
             return None
         absolute_path = library_root / path
         if absolute_path.exists():
             return absolute_path.resolve()  # eliminate “..” components
-        return self._resolve_egg_library(library_root, path)
+        return self._resolve_egg_in_library_root(library_root, path)
 
-    def _resolve_egg_library(self, library: Path, path: Path) -> Path | None:
+    def _resolve_egg_in_library_root(self, library: Path, path: Path) -> Path | None:
         for child in library.iterdir():
             if not self._is_egg_folder(child):
                 continue
