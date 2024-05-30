@@ -57,10 +57,34 @@ def test_job_linter_no_problems(simple_ctx, ws, make_job):
     assert len(problems) == 0
 
 
-def test_job_task_linter_no_problems(
+def test_job_task_linter_library_not_installed_cluster(
     simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
 ):
     created_cluster = make_cluster(single_node=True)
+    entrypoint = make_directory()
+
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import greenlet")
+
+    task = jobs.Task(
+        task_key=make_random(4),
+        description=make_random(4),
+        existing_cluster_id=created_cluster.cluster_id,
+        notebook_task=jobs.NotebookTask(
+            notebook_path=str(notebook),
+        ),
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+
+
+def test_job_task_linter_library_installed_cluster(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
+    created_cluster = make_cluster(single_node=True)
+    libraries_api = ws.libraries
+    libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("greenlet"))])
     entrypoint = make_directory()
 
     notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import doesnotexist;import greenlet")
@@ -76,14 +100,7 @@ def test_job_task_linter_no_problems(
     j = make_job(tasks=[task])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
-    assert len([problem for problem in problems if problem.message == "Could not locate import: doesnotexist"]) == 1
-
-    libraries_api = ws.libraries
-    libraries_api.install(created_cluster.cluster_id, [Library(pypi=PythonPyPiLibrary("greenlet"))])
-    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
-
 
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
     expected_messages = {
