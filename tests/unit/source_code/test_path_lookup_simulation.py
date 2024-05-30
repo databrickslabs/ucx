@@ -188,7 +188,7 @@ def test_path_lookup_resolves_egg_package(tmp_path):
     egg_library.mkdir()
     (egg_library / "EGG-INFO").touch()
 
-    package_path = (egg_library / "package.py")
+    package_path = egg_library / "package.py"
     package_path.touch()
 
     lookup = PathLookup(Path.cwd(), [tmp_path])
@@ -202,7 +202,7 @@ def test_path_lookup_does_not_resolve_package_in_corrupt_egg_package(tmp_path):
     egg_library = tmp_path / "library.egg"
     egg_library.mkdir()
 
-    package_path = (egg_library / "package.py")
+    package_path = egg_library / "package.py"
     package_path.touch()
 
     lookup = PathLookup(Path.cwd(), [tmp_path])
