@@ -209,3 +209,17 @@ def test_path_lookup_does_not_resolve_package_in_corrupt_egg_package(tmp_path):
     resolved_path = lookup.resolve(Path("package.py"))
 
     assert resolved_path is None
+
+
+def test_path_lookup_skips_resolving_egg_files(tmp_path):
+    egg_library = tmp_path / "library.egg"
+    egg_library.touch()
+
+    lookup = PathLookup(Path.cwd(), [tmp_path])
+
+    try:
+        lookup.resolve(Path("package.py"))
+    except NotADirectoryError:
+        assert False, "PathLookup should skip resolving egg files"
+    else:
+        assert True
