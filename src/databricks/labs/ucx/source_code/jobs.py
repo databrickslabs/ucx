@@ -72,13 +72,13 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._register_libraries(graph)
+        yield from self._register_existing_cluster_id(graph)
         yield from self._register_notebook(graph)
         yield from self._register_spark_python_task(graph)
         yield from self._register_python_wheel_task(graph)
         yield from self._register_spark_jar_task(graph)
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
-        yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -157,9 +157,13 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_existing_cluster_id(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.existing_cluster_id:
             return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1637
+
         # load libraries installed on the referred cluster
-        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
+        library_full_status_list = self._ws.libraries.cluster_status(self._task.existing_cluster_id)
+
+        for library_full_status in library_full_status_list:
+            if library_full_status.library:
+                yield from self._register_library(graph, library_full_status.library)
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
