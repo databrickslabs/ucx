@@ -229,6 +229,7 @@ def test_join_collection_join_existing_collection():
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 3
 
+
 def test_join_collection_join_existing_collection_sync_not_upto_date():
     ws = mock_workspace_client()
     account_client = create_autospec(AccountClient)
