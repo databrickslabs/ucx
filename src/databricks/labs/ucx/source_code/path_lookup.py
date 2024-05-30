@@ -32,15 +32,6 @@ class PathLookup:
     def change_directory(self, new_working_directory: Path) -> PathLookup:
         return PathLookup(new_working_directory, self._sys_paths)
 
-    @staticmethod
-    def _is_egg_folder(path: Path) -> bool:
-        """Egg folders end with `.egg` and have a 'EGG-INFO' file."""
-        return (
-            path.is_dir()
-            and path.suffix == ".egg"
-            and any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
-        )
-
     def resolve(self, path: Path) -> Path | None:
         try:
             if path.is_absolute() and path.exists():
@@ -49,7 +40,6 @@ class PathLookup:
         except PermissionError:
             logger.warning(f"Permission denied to access {path}")
             return None
-
         for library_root in self.library_roots:
             resolved_path = self._resolve_library_root(library_root, path)
             if resolved_path is not None:
@@ -86,6 +76,15 @@ class PathLookup:
             except PermissionError:
                 logger.warning(f"Permission denied to access {absolute_path}")
         return None
+
+    @staticmethod
+    def _is_egg_folder(path: Path) -> bool:
+        """Egg folders end with `.egg` and have a 'EGG-INFO' file."""
+        return (
+            path.is_dir()
+            and path.suffix == ".egg"
+            and any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
+        )
 
     def has_path(self, path: Path):
         return next(p for p in self._sys_paths if path == p) is not None
