@@ -69,21 +69,22 @@ class PathLookup:
                 return absolute_path.resolve()  # eliminate “..” components
         except PermissionError:
             logger.warning(f"Permission denied to access {absolute_path}")
-        try:
-            resolved_egg_library = self._resolve_egg_library(library_root, path)
-            if resolved_egg_library is not None:
-                return resolved_egg_library
-        except PermissionError:
-            logger.warning(f"Permission denied to access egg libraries in {library_root}")
-        return None
+        return self._resolve_egg_library(library_root, path)
 
     def _resolve_egg_library(self, library: Path, path: Path) -> Path | None:
         for child in library.iterdir():
-            if not self._is_egg_folder(child):
+            try:
+                if not self._is_egg_folder(child):
+                    continue
+            except PermissionError:
+                logger.warning(f"Permission denied to access {child}")
                 continue
             absolute_path = child / path
-            if absolute_path.exists():
-                return absolute_path.resolve()  # eliminate “..” components
+            try:
+                if absolute_path.exists():
+                    return absolute_path.resolve()  # eliminate “..” components
+            except PermissionError:
+                logger.warning(f"Permission denied to access {absolute_path}")
         return None
 
     def has_path(self, path: Path):
