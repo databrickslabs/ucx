@@ -156,6 +156,20 @@ def func():
         assert maybe.graph.all_relative_names() == {"some_file.py", "import_file.py"}
 
 
+def test_path_lookup_skips_resolving_within_file_library(tmp_path):
+    file = tmp_path / "file.py"
+    file.touch()
+
+    lookup = PathLookup(Path.cwd(), [file])
+
+    try:
+        lookup.resolve(Path("package.py"))
+    except NotADirectoryError:
+        assert False, "PathLookup should skip resolving files"
+    else:
+        assert True
+
+
 def test_path_lookup_resolves_egg_package(tmp_path):
     egg_library = tmp_path / "library.egg"
     egg_library.mkdir()
