@@ -204,3 +204,21 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 0
     ws.assert_not_called()
+
+
+def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_library(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"test")
+
+    unknown_library = "/path/to/unknown/library.egg"
+    libraries = [compute.Library(egg=unknown_library)]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith(f"Failed to install")
+    assert mock_path_lookup.resolve(Path(unknown_library)) is None
+    ws.workspace.download.assert_called_once_with(unknown_library, format=ExportFormat.AUTO)

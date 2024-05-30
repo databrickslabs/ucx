@@ -6,6 +6,7 @@ from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
 from setuptools import setup
+from zipimport import ZipImportError
 
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.ucx.framework.utils import run_command
@@ -78,7 +79,7 @@ class PipResolver(LibraryResolver):
         ]
         try:
             setup(script_args=easy_install_arguments)
-        except SystemExit as e:
+        except (SystemExit, ZipImportError) as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return [problem]
         return []
