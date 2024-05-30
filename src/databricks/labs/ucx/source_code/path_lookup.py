@@ -51,24 +51,30 @@ class PathLookup:
             return None
 
         for library_root in self.library_roots:
-            try:
-                if not library_root.is_dir():
-                    continue
-            except PermissionError:
-                logger.warning(f"Permission denied to access (subfolders of) {library_root}")
-            absolute_path = library_root / path
-            try:
-                if absolute_path.exists():
-                    return absolute_path.resolve()  # eliminate “..” components
-            except PermissionError:
-                logger.warning(f"Permission denied to access {absolute_path}")
-            try:
-                resolved_egg_library = self._resolve_egg_library(library_root, path)
-                if resolved_egg_library is not None:
-                    return resolved_egg_library
-            except PermissionError:
-                logger.warning(f"Permission denied to access egg libraries in {library_root}")
+            resolved_path = self._resolve_library_root(library_root, path)
+            if resolved_path is not None:
+                return resolved_path
+        return None
 
+    def _resolve_library_root(self, library_root: Path, path: Path) -> Path | None:
+        try:
+            if not library_root.is_dir():
+                return None
+        except PermissionError:
+            logger.warning(f"Permission denied to access (subfolders of) {library_root}")
+            return None
+        absolute_path = library_root / path
+        try:
+            if absolute_path.exists():
+                return absolute_path.resolve()  # eliminate “..” components
+        except PermissionError:
+            logger.warning(f"Permission denied to access {absolute_path}")
+        try:
+            resolved_egg_library = self._resolve_egg_library(library_root, path)
+            if resolved_egg_library is not None:
+                return resolved_egg_library
+        except PermissionError:
+            logger.warning(f"Permission denied to access egg libraries in {library_root}")
         return None
 
     def _resolve_egg_library(self, library: Path, path: Path) -> Path | None:
