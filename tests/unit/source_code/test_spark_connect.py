@@ -143,6 +143,36 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     ] == list(linter.lint(code))
 
 
+def test_conf_shared():
+    linter = SparkConnectLinter(is_serverless=False)
+    code = """df.sparkContext.getConf().get('spark.my.conf')"""
+    assert [
+        Failure(
+            code='legacy-context-in-shared-clusters',
+            message='sparkContext and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf',
+            start_line=1,
+            start_col=0,
+            end_line=1,
+            end_col=23,
+        ),
+    ] == list(linter.lint(code))
+
+
+def test_conf_serverless():
+    linter = SparkConnectLinter(is_serverless=True)
+    code = """sc._conf().get('spark.my.conf')"""
+    assert [
+        Failure(
+            code='legacy-context-in-shared-clusters',
+            message='sc and _conf are not supported on Serverless Compute. Rewrite it using spark.conf',
+            start_line=1,
+            start_col=0,
+            end_line=1,
+            end_col=8,
+        ),
+    ] == list(linter.lint(code))
+
+
 def test_logging_shared():
     logging_matcher = LoggingMatcher(is_serverless=False)
     code = """

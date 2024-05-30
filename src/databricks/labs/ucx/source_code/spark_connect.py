@@ -87,15 +87,33 @@ class RDDApiMatcher(SharedClusterMatcher):
 
 class SparkSqlContextMatcher(SharedClusterMatcher):
     _ATTRIBUTES = ["sc", "sqlContext", "sparkContext"]
+    _KNOWN_REPLACEMENTS = {"getConf": "conf", "_conf": "conf"}
 
     def lint(self, node: ast.AST) -> Iterator[Advice]:
         if not isinstance(node, ast.Attribute):
             return
-        if not isinstance(node.value, ast.Name) or node.value.id not in SparkSqlContextMatcher._ATTRIBUTES:
-            return
-        yield Failure(
+
+        if isinstance(node.value, ast.Name) and node.value.id in SparkSqlContextMatcher._ATTRIBUTES:
+            yield self._get_advice(node, node.value.id)
+        # sparkContext can be an attribute as in df.sparkContext.getConf()
+        if isinstance(node.value, ast.Attribute) and node.value.attr == 'sparkContext':
+            yield self._get_advice(node, node.value.attr)
+
+    def _get_advice(self, node: ast.Attribute, name: str) -> Advice:
+        if node.attr in SparkSqlContextMatcher._KNOWN_REPLACEMENTS:
+            replacement = SparkSqlContextMatcher._KNOWN_REPLACEMENTS[node.attr]
+            return Failure(
+                code='legacy-context-in-shared-clusters',
+                message=f'{name} and {node.attr} are not supported on {self._cluster_type_str()}. '
+                f'Rewrite it using spark.{replacement}',
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
+        return Failure(
             code='legacy-context-in-shared-clusters',
-            message=f'{node.value.id} is not supported on {self._cluster_type_str()}. Rewrite it using spark',
+            message=f'{name} is not supported on {self._cluster_type_str()}. Rewrite it using spark',
             start_line=node.lineno,
             start_col=node.col_offset,
             end_line=node.end_lineno or 0,
