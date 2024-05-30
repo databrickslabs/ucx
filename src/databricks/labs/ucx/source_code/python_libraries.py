@@ -5,8 +5,10 @@ import tempfile
 from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
-from setuptools import setup
 from zipimport import ZipImportError
+
+# Mypy can't analyze setuptools due to missing type hints
+from setuptools import setup  # type: ignore
 
 from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.ucx.framework.utils import run_command
