@@ -14,8 +14,37 @@
   "appdirs": {
     "appdirs": []
   },
+  "astor": {
+    "astor": [],
+    "astor.code_gen": [],
+    "astor.codegen": [],
+    "astor.file_util": [],
+    "astor.node_util": [],
+    "astor.op_util": [],
+    "astor.rtrip": [],
+    "astor.source_repr": [],
+    "astor.string_repr": [],
+    "astor.tree_walk": []
+  },
   "astroid": {
     "astroid": []
+  },
+  "asttokens": {
+    "asttokens": [],
+    "asttokens.astroid_compat": [],
+    "asttokens.asttokens": [],
+    "asttokens.line_numbers": [],
+    "asttokens.mark_tokens": [],
+    "asttokens.util": [],
+    "asttokens.version": []
+  },
+  "astunparse": {
+    "astunparse": [],
+    "astunparse.printer": [],
+    "astunparse.unparser": []
+  },
+  "async-generator": {
+    "async_generator": []
   },
   "async-timeout": {
     "async_timeout": []
@@ -23,11 +52,158 @@
   "attrs": {
     "attr": []
   },
+  "audioread": {
+    "audioread": [],
+    "audioread.base": [],
+    "audioread.exceptions": [],
+    "audioread.ffdec": [],
+    "audioread.gstdec": [],
+    "audioread.macca": [],
+    "audioread.maddec": [],
+    "audioread.rawread": [],
+    "audioread.version": []
+  },
+  "azure-core": {
+    "azure.core": [],
+    "azure.core._enum_meta": [],
+    "azure.core._match_conditions": [],
+    "azure.core._pipeline_client": [],
+    "azure.core._pipeline_client_async": [],
+    "azure.core._version": [],
+    "azure.core.async_paging": [],
+    "azure.core.configuration": [],
+    "azure.core.credentials": [],
+    "azure.core.credentials_async": [],
+    "azure.core.exceptions": [],
+    "azure.core.messaging": [],
+    "azure.core.paging": [],
+    "azure.core.pipeline": [],
+    "azure.core.pipeline._base": [],
+    "azure.core.pipeline._base_async": [],
+    "azure.core.pipeline._tools": [],
+    "azure.core.pipeline._tools_async": [],
+    "azure.core.pipeline.policies": [],
+    "azure.core.pipeline.policies._authentication": [],
+    "azure.core.pipeline.policies._authentication_async": [],
+    "azure.core.pipeline.policies._base": [],
+    "azure.core.pipeline.policies._base_async": [],
+    "azure.core.pipeline.policies._custom_hook": [],
+    "azure.core.pipeline.policies._distributed_tracing": [],
+    "azure.core.pipeline.policies._redirect": [],
+    "azure.core.pipeline.policies._redirect_async": [],
+    "azure.core.pipeline.policies._retry": [],
+    "azure.core.pipeline.policies._retry_async": [],
+    "azure.core.pipeline.policies._sensitive_header_cleanup_policy": [],
+    "azure.core.pipeline.policies._universal": [],
+    "azure.core.pipeline.policies._utils": [],
+    "azure.core.pipeline.transport": [],
+    "azure.core.pipeline.transport._aiohttp": [],
+    "azure.core.pipeline.transport._base": [],
+    "azure.core.pipeline.transport._base_async": [],
+    "azure.core.pipeline.transport._base_requests_async": [],
+    "azure.core.pipeline.transport._bigger_block_size_http_adapters": [],
+    "azure.core.pipeline.transport._requests_asyncio": [],
+    "azure.core.pipeline.transport._requests_basic": [],
+    "azure.core.pipeline.transport._requests_trio": [],
+    "azure.core.polling": [],
+    "azure.core.polling._async_poller": [],
+    "azure.core.polling._poller": [],
+    "azure.core.polling.async_base_polling": [],
+    "azure.core.polling.base_polling": [],
+    "azure.core.rest": [],
+    "azure.core.rest._aiohttp": [],
+    "azure.core.rest._helpers": [],
+    "azure.core.rest._http_response_impl": [],
+    "azure.core.rest._http_response_impl_async": [],
+    "azure.core.rest._requests_asyncio": [],
+    "azure.core.rest._requests_basic": [],
+    "azure.core.rest._requests_trio": [],
+    "azure.core.rest._rest_py3": [],
+    "azure.core.serialization": [],
+    "azure.core.settings": [],
+    "azure.core.tracing": [],
+    "azure.core.tracing._abstract_span": [],
+    "azure.core.tracing.common": [],
+    "azure.core.tracing.decorator": [],
+    "azure.core.tracing.decorator_async": [],
+    "azure.core.tracing.ext": [],
+    "azure.core.utils": [],
+    "azure.core.utils._connection_string_parser": [],
+    "azure.core.utils._messaging_shared": [],
+    "azure.core.utils._pipeline_transport_rest_shared": [],
+    "azure.core.utils._pipeline_transport_rest_shared_async": [],
+    "azure.core.utils._utils": []
+  },
+  "backcall": {
+    "backcall": [],
+    "backcall._signatures": [],
+    "backcall.backcall": []
+  },
+  "bcrypt": {
+    "bcrypt": []
+  },
+  "beautifulsoup4": {
+    "bs4": [],
+    "bs4.builder": [],
+    "bs4.builder._html5lib": [],
+    "bs4.builder._htmlparser": [],
+    "bs4.builder._lxml": [],
+    "bs4.css": [],
+    "bs4.dammit": [],
+    "bs4.diagnose": [],
+    "bs4.element": [],
+    "bs4.formatter": [],
+    "bs4.tests": [],
+    "bs4.tests.test_builder": [],
+    "bs4.tests.test_builder_registry": [],
+    "bs4.tests.test_css": [],
+    "bs4.tests.test_dammit": [],
+    "bs4.tests.test_docs": [],
+    "bs4.tests.test_element": [],
+    "bs4.tests.test_formatter": [],
+    "bs4.tests.test_fuzz": [],
+    "bs4.tests.test_html5lib": [],
+    "bs4.tests.test_htmlparser": [],
+    "bs4.tests.test_lxml": [],
+    "bs4.tests.test_navigablestring": [],
+    "bs4.tests.test_pageelement": [],
+    "bs4.tests.test_soup": [],
+    "bs4.tests.test_tag": [],
+    "bs4.tests.test_tree": []
+  },
+  "bidict": {
+    "bidict": [],
+    "bidict._abc": [],
+    "bidict._base": [],
+    "bidict._bidict": [],
+    "bidict._dup": [],
+    "bidict._exc": [],
+    "bidict._frozen": [],
+    "bidict._iter": [],
+    "bidict._orderedbase": [],
+    "bidict._orderedbidict": [],
+    "bidict._typing": [],
+    "bidict.metadata": []
+  },
   "black": {
     "_black_version": [],
     "black": [],
     "blackd": [],
     "blib2to3": []
+  },
+  "bleach": {
+    "bleach": [],
+    "bleach.callbacks": [],
+    "bleach.css_sanitizer": [],
+    "bleach.html5lib_shim": [],
+    "bleach.linkifier": [],
+    "bleach.parse_shim": [],
+    "bleach.sanitizer": []
+  },
+  "blinker": {
+    "blinker": [],
+    "blinker._utilities": [],
+    "blinker.base": []
   },
   "boto3": {
     "boto3": [],
@@ -54,6 +230,16 @@
   },
   "charset-normalizer": {
     "charset_normalizer": []
+  },
+  "clang": {
+    "clang": [],
+    "clang.cindex": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'register' because its table name argument is not a constant"
+      }
+    ],
+    "clang.enumerations": []
   },
   "click": {
     "click": []
@@ -97,6 +283,19 @@
   },
   "idna": {
     "idna": []
+  },
+  "importlib_metadata": {
+    "importlib_metadata": [],
+    "importlib_metadata._adapters": [],
+    "importlib_metadata._collections": [],
+    "importlib_metadata._compat": [],
+    "importlib_metadata._functools": [],
+    "importlib_metadata._itertools": [],
+    "importlib_metadata._meta": [],
+    "importlib_metadata._text": [],
+    "importlib_metadata.compat": [],
+    "importlib_metadata.compat.py39": [],
+    "importlib_metadata.diagnose": []
   },
   "iniconfig": {
     "iniconfig": []
@@ -1072,6 +1271,15 @@
     "sniffio._tests.test_sniffio": [],
     "sniffio._version": []
   },
+  "soupsieve": {
+    "soupsieve": [],
+    "soupsieve.__meta__": [],
+    "soupsieve.css_match": [],
+    "soupsieve.css_parser": [],
+    "soupsieve.css_types": [],
+    "soupsieve.pretty": [],
+    "soupsieve.util": []
+  },
   "sqlglot": {
     "sqlglot": []
   },
@@ -1095,10 +1303,95 @@
   "urllib3": {
     "urllib3": []
   },
+  "webencodings": {
+    "webencodings": [],
+    "webencodings.labels": [],
+    "webencodings.mklabels": [],
+    "webencodings.tests": [],
+    "webencodings.x_user_defined": []
+  },
   "wheel": {
     "wheel": []
   },
+  "yapf": {
+    "yapf": [],
+    "yapf.pyparser": [],
+    "yapf.pyparser.pyparser": [],
+    "yapf.pyparser.pyparser_utils": [],
+    "yapf.pyparser.split_penalty_visitor": [],
+    "yapf.pytree": [],
+    "yapf.pytree.blank_line_calculator": [],
+    "yapf.pytree.comment_splicer": [],
+    "yapf.pytree.continuation_splicer": [],
+    "yapf.pytree.pytree_unwrapper": [],
+    "yapf.pytree.pytree_utils": [],
+    "yapf.pytree.pytree_visitor": [],
+    "yapf.pytree.split_penalty": [],
+    "yapf.pytree.subtype_assigner": [],
+    "yapf.yapflib": [],
+    "yapf.yapflib.errors": [],
+    "yapf.yapflib.file_resources": [],
+    "yapf.yapflib.format_decision_state": [],
+    "yapf.yapflib.format_token": [],
+    "yapf.yapflib.identify_container": [],
+    "yapf.yapflib.line_joiner": [],
+    "yapf.yapflib.logical_line": [],
+    "yapf.yapflib.object_state": [],
+    "yapf.yapflib.reformatter": [],
+    "yapf.yapflib.split_penalty": [],
+    "yapf.yapflib.style": [],
+    "yapf.yapflib.subtypes": [],
+    "yapf.yapflib.yapf_api": [],
+    "yapf_third_party": [],
+    "yapf_third_party._ylib2to3": [],
+    "yapf_third_party._ylib2to3.fixer_base": [],
+    "yapf_third_party._ylib2to3.fixer_util": [],
+    "yapf_third_party._ylib2to3.patcomp": [],
+    "yapf_third_party._ylib2to3.pgen2": [],
+    "yapf_third_party._ylib2to3.pgen2.conv": [],
+    "yapf_third_party._ylib2to3.pgen2.driver": [],
+    "yapf_third_party._ylib2to3.pgen2.grammar": [],
+    "yapf_third_party._ylib2to3.pgen2.literals": [],
+    "yapf_third_party._ylib2to3.pgen2.parse": [],
+    "yapf_third_party._ylib2to3.pgen2.pgen": [],
+    "yapf_third_party._ylib2to3.pgen2.token": [],
+    "yapf_third_party._ylib2to3.pgen2.tokenize": [],
+    "yapf_third_party._ylib2to3.pygram": [],
+    "yapf_third_party._ylib2to3.pytree": [],
+    "yapf_third_party.yapf_diff": [],
+    "yapf_third_party.yapf_diff.yapf_diff": [],
+    "yapftests": [],
+    "yapftests.blank_line_calculator_test": [],
+    "yapftests.comment_splicer_test": [],
+    "yapftests.file_resources_test": [],
+    "yapftests.format_decision_state_test": [],
+    "yapftests.format_token_test": [],
+    "yapftests.line_joiner_test": [],
+    "yapftests.logical_line_test": [],
+    "yapftests.main_test": [],
+    "yapftests.pytree_unwrapper_test": [],
+    "yapftests.pytree_utils_test": [],
+    "yapftests.pytree_visitor_test": [],
+    "yapftests.reformatter_basic_test": [],
+    "yapftests.reformatter_buganizer_test": [],
+    "yapftests.reformatter_facebook_test": [],
+    "yapftests.reformatter_pep8_test": [],
+    "yapftests.reformatter_python3_test": [],
+    "yapftests.reformatter_style_config_test": [],
+    "yapftests.split_penalty_test": [],
+    "yapftests.style_test": [],
+    "yapftests.subtype_assigner_test": [],
+    "yapftests.utils": [],
+    "yapftests.yapf_test": [],
+    "yapftests.yapf_test_helper": []
+  },
   "yarl": {
     "yarl": []
+  },
+  "zipp": {
+    "zipp": [],
+    "zipp.compat": [],
+    "zipp.compat.py310": [],
+    "zipp.glob": []
   }
 }
