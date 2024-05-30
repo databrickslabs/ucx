@@ -1,8 +1,10 @@
+# pylint: disable=import-outside-toplevel
 from __future__ import annotations
 
 import logging
 import os
 import tempfile
+import zipfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import cached_property
@@ -92,15 +94,29 @@ class PythonLibraryResolver(LibraryResolver):
             self._temporary_virtual_environment.as_posix(),
             library.as_posix(),
         ]
-        with current_working_directory(self._temporary_virtual_environment):
+        has_setup = True  # setup might not be present
+        try:
+            # Mypy can't analyze setuptools due to missing type hints
+            from setuptools import setup  # type: ignore
+        except ImportError:
             try:
-                # Mypy can't analyze setuptools due to missing type hints
-                # Setuptools might not be present
-                from setuptools import setup  # type: ignore
+                from distutils.core import setup  # pylint: disable=deprecated-module
+            except ImportError:
+                logger.warning("Could not import setup.")
+                has_setup = False
+        if has_setup:
+            try:
                 setup(script_args=easy_install_arguments)
-            except (SystemExit, ImportError) as e:
-                problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
-                return [problem]
+                return []
+            except (SystemExit, ImportError, ValueError):
+                pass
+        try:
+            # Not a "real" install, though, the best effort to still lint eggs without dependencies
+            with zipfile.ZipFile(library, "r") as zip_ref:
+                zip_ref.extractall(self._temporary_virtual_environment)
+        except zipfile.BadZipfile as e:
+            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
+            return [problem]
         return []
 
     def __str__(self) -> str:
