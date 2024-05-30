@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class PathLookup:
+    """
+    Mimic Python's importlib Lookup.
+
+    Sources:
+        See Lookup in importlib.metadata.__init__.py
+    """
 
     @classmethod
     def from_pathlike_string(cls, cwd: Path, syspath: str):
