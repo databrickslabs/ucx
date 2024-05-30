@@ -170,6 +170,19 @@ def test_path_lookup_skips_resolving_within_file_library(tmp_path):
         assert True
 
 
+def test_path_lookup_skips_resolving_non_existing_library(tmp_path):
+    library = tmp_path / "non-existing-library"
+
+    lookup = PathLookup(Path.cwd(), [library])
+
+    try:
+        lookup.resolve(Path("package.py"))
+    except FileNotFoundError:
+        assert False, "PathLookup should skip resolving non-existing libraries"
+    else:
+        assert True
+
+
 def test_path_lookup_resolves_egg_package(tmp_path):
     egg_library = tmp_path / "library.egg"
     egg_library.mkdir()
