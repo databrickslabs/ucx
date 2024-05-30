@@ -154,19 +154,19 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     )
 
     notebook = entrypoint / "notebook.ipynb"
-    make_notebook(path=notebook, content=b"import pytest")
+    make_notebook(path=notebook, content=b"import greenlet")
 
     job_without_pytest_library = make_job(notebook_path=notebook)
     problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) > 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
 
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
 def test_lint_local_code(simple_ctx):
