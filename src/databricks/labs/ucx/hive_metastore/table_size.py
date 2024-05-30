@@ -28,7 +28,7 @@ class TableSizeCrawler(CrawlerBase):
             backend (SqlBackend): The SQL Execution Backend abstraction (either REST API or Spark)
             schema: The schema name for the inventory persistence.
         """
-        # pylint: disable-next=import-error,import-outside-toplevel
+        # pylint: disable-next=import-outside-toplevel
         from pyspark.sql.session import SparkSession  # type: ignore[import-not-found]
 
         self._backend = backend

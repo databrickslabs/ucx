@@ -3,7 +3,7 @@ import ast
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advisory, Deprecation, CurrentSessionState
-from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSql, AstHelper, TableNameMatcher
+from databricks.labs.ucx.source_code.linters.pyspark import SparkMatchers, SparkSql, AstHelper, TableNameMatcher
 from databricks.labs.ucx.source_code.queries import FromTable
 
 

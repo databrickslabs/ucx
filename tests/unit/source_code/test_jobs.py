@@ -10,7 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.workspace import ExportFormat
 
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.jobs import JobProblem, WorkflowLinter, WorkflowTaskContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader

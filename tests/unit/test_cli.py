@@ -54,7 +54,7 @@ from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import Table
-from databricks.labs.ucx.source_code.files import LocalFileMigrator
+from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@ import ast
 from itertools import chain
 
 from databricks.labs.ucx.source_code.base import Failure
-from databricks.labs.ucx.source_code.spark_connect import LoggingMatcher, SparkConnectLinter
+from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 
 
 def test_jvm_access_match_shared():

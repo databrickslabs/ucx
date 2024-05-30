@@ -264,7 +264,7 @@ class NotebookRunCall(NodeBase):
         super().__init__(node)
 
     def get_constant_path(self) -> str | None:
-        path = PythonLinter.get_dbutils_notebook_run_path_arg(cast(ast.Call, self.node))
+        path = DbutilsLinter.get_dbutils_notebook_run_path_arg(cast(ast.Call, self.node))
         if isinstance(path, ast.Constant):
             return path.value.strip().strip("'").strip('"')
         return None
@@ -273,7 +273,7 @@ class NotebookRunCall(NodeBase):
 P = TypeVar("P", bound=Callable)
 
 
-class PythonLinter(Linter):
+class DbutilsLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
         linter = ASTLinter.parse(code)
