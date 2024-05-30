@@ -219,7 +219,7 @@ def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_librar
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith(f"Failed to install")
+    assert problems[0].message.startswith("Failed to install")
     assert graph.path_lookup.resolve(Path(unknown_library)) is None
     ws.workspace.download.assert_called_once_with(unknown_library, format=ExportFormat.AUTO)
 

@@ -36,9 +36,9 @@ class PathLookup:
     def _is_egg_folder(path: Path) -> bool:
         """Egg folders end with `.egg` and have a 'EGG-INFO' file."""
         return (
-            path.is_dir() and
-            path.suffix == ".egg" and
-            any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
+            path.is_dir()
+            and path.suffix == ".egg"
+            and any(subfolder.name.lower() == "egg-info" for subfolder in path.iterdir())
         )
 
     def resolve(self, path: Path) -> Path | None:
