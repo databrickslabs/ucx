@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from databricks.labs.ucx.source_code.base import Advice
-from databricks.labs.ucx.source_code.table_creation import DBRv8d0Linter
+from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
 
 
 METHOD_NAMES = [

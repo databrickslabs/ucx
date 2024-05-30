@@ -22,6 +22,9 @@ class AstHelper:
             return node.value.id + '.' + node.attr
 
         if isinstance(node.value, ast.Attribute):
-            return AstHelper._get_value(node.value) + '.' + node.attr
+            value = AstHelper._get_value(node.value)
+            if not value:
+                return None
+            return value + '.' + node.attr
 
         return None

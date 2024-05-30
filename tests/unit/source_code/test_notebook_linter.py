@@ -1,7 +1,7 @@
 import pytest
+from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code import languages
 from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
 from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 
@@ -13,7 +13,7 @@ index = MigrationIndex([])
     [
         # 2 alerts
         (
-            languages.Language.SQL,
+            Language.SQL,
             """-- Databricks notebook source
 -- MAGIC %md # This is a SQL notebook, that has Python cell embedded
 
@@ -23,7 +23,7 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
 
 
 
-    
+
 
 -- COMMAND ----------
 
@@ -58,7 +58,7 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
             ],
         ),
         (
-            languages.Language.PYTHON,
+            Language.PYTHON,
             # 3 alerts
             """# Databricks notebook source
 # MAGIC %md # This is a Python notebook, that has SQL cell embedded
@@ -76,14 +76,14 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 # MAGIC %md mess around with formatting
 
 
-    
+
 
 # COMMAND ----------
 
 
 # MAGIC %sql
-# MAGIC SELECT * FROM 
-# MAGIC   csv.`dbfs:/mnt/bar/e/f/g` 
+# MAGIC SELECT * FROM
+# MAGIC   csv.`dbfs:/mnt/bar/e/f/g`
 # MAGIC WHERE _c1 > 5
 
 
@@ -125,7 +125,7 @@ display(spark.read.csv('/mnt/things/e/f/g'))
             ],
         ),
         (
-            languages.Language.SQL,
+            Language.SQL,
             """-- Databricks notebook source
 -- MAGIC %md
 -- MAGIC #Test notebook for DBFS discovery in Notebooks
@@ -323,7 +323,7 @@ def test_notebook_linter(lang, source, expected):
 
 def test_notebook_linter_name():
     source = """-- Databricks notebook source"""
-    linter = NotebookLinter.from_source(index, source, languages.Language.SQL)
+    linter = NotebookLinter.from_source(index, source, Language.SQL)
     assert linter.name() == "notebook-linter"
 
 
@@ -331,7 +331,7 @@ def test_notebook_linter_name():
     "lang, source, expected",
     [
         (
-            languages.Language.SQL,
+            Language.SQL,
             """-- Databricks notebook source
 -- MAGIC %md
 -- MAGIC #Test notebook for Use tracking in Notebooks
@@ -389,7 +389,7 @@ USE default
 SELECT * FROM testtable LIMIT 10
 
 -- COMMAND ----------
--- DBTITLE 1,A SQL cell that references tables 
+-- DBTITLE 1,A SQL cell that references tables
 
 MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """,
@@ -445,7 +445,7 @@ MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MA
             ],
         ),
         (
-            languages.Language.PYTHON,
+            Language.PYTHON,
             """# Databricks notebook source
 --- MAGIC %md
 -- MAGIC #Test notebook for Use tracking in Notebooks

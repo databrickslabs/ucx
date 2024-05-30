@@ -15,7 +15,9 @@ from databricks.labs.ucx.azure.credentials import StorageCredentialManager, Serv
 from databricks.labs.ucx.azure.locations import ExternalLocationsMigration
 from databricks.labs.ucx.azure.resources import AzureAPIClient, AzureResources
 from databricks.labs.ucx.contexts.application import CliContext
-from databricks.labs.ucx.source_code.files import LocalFileMigrator, LocalCodeLinter
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.linters.context import LinterContext
+from databricks.labs.ucx.source_code.linters.files import LocalFileMigrator, LocalCodeLinter
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.workspace_access.clusters import ClusterAccess
 
@@ -177,12 +179,21 @@ class LocalCheckoutContext(WorkspaceContext):
     """Local context extends Workspace context to provide extra properties
     for running local operations."""
 
+    def linter_context_factory(self):
+        index = self.tables_migrator.index()
+        session_state = CurrentSessionState()
+        return LinterContext(index, session_state)
+
     @cached_property
     def local_file_migrator(self):
-        return LocalFileMigrator(lambda: self.languages)
+        return LocalFileMigrator(self.linter_context_factory)
 
     @cached_property
     def local_code_linter(self):
         return LocalCodeLinter(
-            self.file_loader, self.folder_loader, self.path_lookup, self.dependency_resolver, lambda: self.languages
+            self.file_loader,
+            self.folder_loader,
+            self.path_lookup,
+            self.dependency_resolver,
+            self.linter_context_factory,
         )

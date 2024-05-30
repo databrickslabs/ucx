@@ -1,7 +1,7 @@
 import pytest
 
 from databricks.labs.ucx.source_code.base import Deprecation, Advisory
-from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter, FromDbfsFolder
+from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsageLinter, FromDbfsFolder
 
 
 class TestDetectDBFS:

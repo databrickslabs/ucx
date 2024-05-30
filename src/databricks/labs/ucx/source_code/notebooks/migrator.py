@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 from databricks.labs.ucx.source_code.graph import Dependency
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import RunCell
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class NotebookMigrator:
-    def __init__(self, languages: Languages):
+    def __init__(self, languages: LinterContext):
         # TODO: move languages to `apply`
         self._languages = languages
 

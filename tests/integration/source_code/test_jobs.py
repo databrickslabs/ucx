@@ -13,8 +13,8 @@ from databricks.sdk.service.workspace import ImportFormat
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.files import LocalCodeLinter
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
@@ -171,15 +171,17 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
 
 def test_lint_local_code(simple_ctx):
     # no need to connect
-    light_ctx = simple_ctx.replace(languages=Languages(MigrationIndex([])))
+    linter_context = LinterContext(MigrationIndex([]))
+    light_ctx = simple_ctx
     ucx_path = Path(__file__).parent.parent.parent.parent
     path_to_scan = Path(ucx_path, "src")
+    # TODO: LocalCheckoutContext has to move into GlobalContext because of this hack
     linter = LocalCodeLinter(
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,
         light_ctx.dependency_resolver,
-        lambda: light_ctx.languages,
+        lambda: linter_context,
     )
     problems = linter.lint(Prompts(), path_to_scan, StringIO())
     assert len(problems) > 0

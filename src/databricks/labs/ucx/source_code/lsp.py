@@ -23,7 +23,7 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     Failure,
 )
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +227,7 @@ class QuickFixResponse:
 
 
 class LspServer:
-    def __init__(self, language_support: Languages):
+    def __init__(self, language_support: LinterContext):
         self._languages = language_support
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
 
@@ -327,7 +327,7 @@ class _RequestHandler(http.server.BaseHTTPRequestHandler):
 if __name__ == '__main__':
     install_logger()
     logging.root.setLevel('DEBUG')
-    languages = Languages(
+    languages = LinterContext(
         MigrationIndex(
             [
                 MigrationStatus(

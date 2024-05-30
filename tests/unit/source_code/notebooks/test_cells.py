@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,

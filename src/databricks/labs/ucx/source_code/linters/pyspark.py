@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.ast_helpers import AstHelper
+from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
 
 
 @dataclass
