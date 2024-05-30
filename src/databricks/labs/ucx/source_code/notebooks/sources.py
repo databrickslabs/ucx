@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import locale
 from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path
@@ -161,7 +162,8 @@ class FileLinter:
 
     @cached_property
     def _source_code(self) -> str:
-        return self._path.read_text() if self._content is None else self._content
+        encoding = locale.getpreferredencoding(False)
+        return self._path.read_text(encoding) if self._content is None else self._content
 
     def _file_language(self):
         return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
@@ -173,7 +175,15 @@ class FileLinter:
         return self._source_code.startswith(CellLanguage.of_language(language).file_magic_header)
 
     def lint(self) -> Iterable[Advice]:
-        if self._is_notebook():
+        encoding = locale.getpreferredencoding(False)
+        try:
+            is_notebook = self._is_notebook()
+        except UnicodeDecodeError:
+            failure_message = f"File without {encoding} encoding is not supported {self._path}"
+            yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
+            return
+
+        if is_notebook:
             yield from self._lint_notebook()
         else:
             yield from self._lint_file()
