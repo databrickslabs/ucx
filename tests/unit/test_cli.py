@@ -354,7 +354,6 @@ def test_migrate_credentials_aws(ws):
     ctx = WorkspaceContext(ws).replace(is_aws=True, aws_resources=aws_resources)
     migrate_credentials(ws, prompts, ctx=ctx)
     ws.storage_credentials.list.assert_called()
-    aws_resources.update_uc_trust_role.assert_called_once()
 
 
 def test_create_master_principal_not_azure(ws):

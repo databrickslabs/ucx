@@ -1,3 +1,4 @@
+import locale
 from pathlib import Path
 
 import pytest
@@ -43,3 +44,15 @@ def test_file_linter_lints_ignorable_language(path, migration_index):
     linter = FileLinter(Languages(migration_index), Path(path), "")
     advices = list(linter.lint())
     assert not advices
+
+
+def test_file_linter_lints_non_ascii_encoded_file(migration_index):
+    preferred_encoding = locale.getpreferredencoding(False)
+    non_ascii_encoded_file = Path(__file__).parent.parent / "samples" / "nonascii.py"
+    linter = FileLinter(Languages(migration_index), non_ascii_encoded_file)
+
+    advices = list(linter.lint())
+
+    assert len(advices) == 1
+    assert advices[0].code == "unsupported-file-encoding"
+    assert advices[0].message == f"File without {preferred_encoding} encoding is not supported {non_ascii_encoded_file}"

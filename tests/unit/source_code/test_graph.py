@@ -12,7 +12,7 @@ def test_dependency_graph_registers_library(mock_path_lookup):
     file_loader = FileLoader()
     whitelist = Whitelist()
     dependency_resolver = DependencyResolver(
-        PipResolver(file_loader, whitelist),
+        PipResolver(whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
@@ -30,7 +30,7 @@ def test_folder_loads_content(mock_path_lookup):
     file_loader = FileLoader()
     whitelist = Whitelist()
     dependency_resolver = DependencyResolver(
-        PipResolver(file_loader, whitelist),
+        PipResolver(whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,

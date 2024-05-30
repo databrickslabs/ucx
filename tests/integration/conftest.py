@@ -19,7 +19,7 @@ from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.assessment.aws import AWSRoleAction
+from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
     AzureServicePrincipalInfo,
@@ -529,7 +529,7 @@ class LocalAwsCliTest(TestWorkspaceContext):
             pytest.skip("Aws only")
         if not shutil.which("aws"):
             pytest.skip("Local test only")
-        return True
+        return run_command
 
     @cached_property
     def aws_profile(self):

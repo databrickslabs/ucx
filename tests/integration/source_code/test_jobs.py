@@ -5,7 +5,6 @@ from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 
-import pytest
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
@@ -31,15 +30,6 @@ def test_running_real_workflow_linter_job(installation_ctx):
     if result['count'] == 0:
         ctx.deployed_workflows.relay_logs("experimental-workflow-linter")
         assert False, "No workflow problems found"
-
-
-@pytest.fixture
-def simple_ctx(installation_ctx, sql_backend, ws):
-    return installation_ctx.replace(
-        sql_backend=sql_backend,
-        workspace_client=ws,
-        connect=ws.config,
-    )
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

@@ -44,7 +44,7 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     notebook_resolver = NotebookResolver(notebook_loader)
     whitelist = Whitelist()
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(file_loader, whitelist)
+    pip_resolver = PipResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
@@ -70,7 +70,7 @@ def test_locates_files(source: list[str], expected: int):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(file_loader, whitelist)
+    pip_resolver = PipResolver(whitelist)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path)
     assert not maybe.problems
@@ -109,7 +109,7 @@ sys.path.append('{child_dir_path.as_posix()}')
         file_loader = FileLoader()
         whitelist = Whitelist()
         import_resolver = ImportFileResolver(file_loader, whitelist)
-        pip_resolver = PipResolver(file_loader, whitelist)
+        pip_resolver = PipResolver(whitelist)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
@@ -148,7 +148,7 @@ def func():
         whitelist = Whitelist()
         file_loader = FileLoader()
         import_resolver = ImportFileResolver(file_loader, whitelist)
-        pip_resolver = PipResolver(file_loader, whitelist)
+        pip_resolver = PipResolver(whitelist)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
