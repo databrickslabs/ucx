@@ -72,13 +72,13 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._register_libraries(graph)
+        yield from self._register_existing_cluster_id(graph)
         yield from self._register_notebook(graph)
         yield from self._register_spark_python_task(graph)
         yield from self._register_python_wheel_task(graph)
         yield from self._register_spark_jar_task(graph)
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
-        yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
