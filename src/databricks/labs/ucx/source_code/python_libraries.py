@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class PythonLibraryResolver(LibraryResolver):
-    # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
     def __init__(self, whitelist: Whitelist, runner: Callable[[str], tuple[int, str, str]] = run_command) -> None:
