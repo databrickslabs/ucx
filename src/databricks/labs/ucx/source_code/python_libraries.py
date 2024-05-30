@@ -10,7 +10,8 @@ from subprocess import CalledProcessError
 # mypy can not analyze setuptools
 from setuptools import setup  # type: ignore
 
-from databricks.labs.ucx.framework.utils import run_command
+from databricks.labs.blueprint.entrypoint import is_in_debug
+from databricks.labs.ucx.source_code.files import FileLoader
 from databricks.labs.ucx.source_code.graph import (
     LibraryResolver,
     DependencyProblem,
@@ -75,7 +76,15 @@ class PipResolver(LibraryResolver):
         venv = self._temporary_virtual_environment(path_lookup).as_posix()
         existing_packages = os.listdir(venv)
         if library.suffix == ".egg":
-            easy_install_arguments = ["easy_install", "-v", "--always-unzip", "--install-dir", venv, library.as_posix()]
+            verbosity = "--verbose" if is_in_debug() else "--quiet"
+            easy_install_arguments = [
+                "easy_install",
+                verbosity,
+                "--always-unzip",
+                "--install-dir",
+                venv,
+                library.as_posix(),
+            ]
             try:
                 setup(script_args=easy_install_arguments)
             except SystemExit as e:
