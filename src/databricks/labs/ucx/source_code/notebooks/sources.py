@@ -11,7 +11,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, Failure
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR, NOTEBOOK_HEADER
 
 
@@ -78,16 +78,16 @@ class NotebookLinter:
     to the code cells according to the language of the cell.
     """
 
-    def __init__(self, langs: Languages, notebook: Notebook):
-        self._languages: Languages = langs
+    def __init__(self, langs: LinterContext, notebook: Notebook):
+        self._languages: LinterContext = langs
         self._notebook: Notebook = notebook
 
     @classmethod
     def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
-        langs = Languages(index)
+        ctx = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
-        return cls(langs, notebook)
+        return cls(ctx, notebook)
 
     def lint(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
@@ -155,8 +155,8 @@ class FileLinter:
         'zip-safe',
     }
 
-    def __init__(self, langs: Languages, path: Path, content: str | None = None):
-        self._languages: Languages = langs
+    def __init__(self, ctx: LinterContext, path: Path, content: str | None = None):
+        self._ctx: LinterContext = ctx
         self._path: Path = path
         self._content = content
 
@@ -200,7 +200,7 @@ class FileLinter:
                 yield Failure("unknown-language", f"Cannot detect language for {self._path}", 0, 0, 1, 1)
         else:
             try:
-                linter = self._languages.linter(language)
+                linter = self._ctx.linter(language)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
                 yield Failure(
@@ -209,5 +209,5 @@ class FileLinter:
 
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
-        notebook_linter = NotebookLinter(self._languages, notebook)
+        notebook_linter = NotebookLinter(self._ctx, notebook)
         yield from notebook_linter.lint()

@@ -5,7 +5,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 
-from databricks.labs.ucx.source_code.python_linter import ASTLinter
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,

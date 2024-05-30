@@ -47,11 +47,10 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, FolderLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
-from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -329,12 +328,6 @@ class GlobalContext(abc.ABC):
     @cached_property
     def catalog_schema(self):
         return CatalogSchema(self.workspace_client, self.table_mapping, self.principal_acl, self.sql_backend)
-
-    @cached_property
-    def languages(self):
-        index = self.tables_migrator.index()
-        # TODO: initialize Languages every time, because it has CurrentSessionState for the cache
-        return Languages(index)
 
     @cached_property
     def verify_timeout(self):
