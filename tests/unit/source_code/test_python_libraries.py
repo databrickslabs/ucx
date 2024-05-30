@@ -3,7 +3,7 @@ from unittest.mock import create_autospec, call
 
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
 
@@ -12,7 +12,7 @@ def test_pip_resolver_resolves_library(mock_path_lookup):
         assert command.startswith("pip install anything -t")
         return 0, "", ""
 
-    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
     problems = pip_resolver.register_library(mock_path_lookup, Path("anything"))
 
     assert len(problems) == 0
@@ -22,7 +22,7 @@ def test_pip_resolver_failing(mock_path_lookup):
     def mock_pip_install(_):
         return 1, "", "nope"
 
-    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
     problems = pip_resolver.register_library(mock_path_lookup, Path("anything"))
 
     assert problems == [DependencyProblem("library-install-failed", "Failed to install anything: nope")]
@@ -33,7 +33,7 @@ def test_pip_resolver_adds_to_path_lookup_only_once():
         return 0, "", ""
 
     path_lookup = create_autospec(PathLookup)
-    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
 
     problems = pip_resolver.register_library(path_lookup, Path("library"))
     assert len(problems) == 0
@@ -48,7 +48,7 @@ def test_pip_resolver_resolves_library_with_known_problems(mock_path_lookup):
     def mock_pip_install(_):
         return 0, "", ""
 
-    pip_resolver = PipResolver(Whitelist(), mock_pip_install)
+    pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
     problems = pip_resolver.register_library(mock_path_lookup, Path("boto3==1.17.0"))
 
     assert len(problems) == 1

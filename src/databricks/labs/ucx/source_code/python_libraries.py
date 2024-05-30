@@ -23,7 +23,7 @@ from databricks.labs.ucx.source_code.known import Whitelist
 logger = logging.getLogger(__name__)
 
 
-class PipResolver(LibraryResolver):
+class PythonLibraryResolver(LibraryResolver):
     # TODO: https://github.com/databrickslabs/ucx/issues/1643
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 

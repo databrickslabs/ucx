@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
@@ -31,7 +31,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
     whitelist = Whitelist()
     resolver = DependencyResolver(
-        PipResolver(whitelist),
+        PythonLibraryResolver(whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,

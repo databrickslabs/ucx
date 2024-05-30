@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.known import Whitelist
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from tests.unit import (
     _samples_path,
 )
@@ -44,7 +44,7 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     notebook_resolver = NotebookResolver(notebook_loader)
     whitelist = Whitelist()
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
@@ -70,7 +70,7 @@ def test_locates_files(source: list[str], expected: int):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path)
     assert not maybe.problems
@@ -109,7 +109,7 @@ sys.path.append('{child_dir_path.as_posix()}')
         file_loader = FileLoader()
         whitelist = Whitelist()
         import_resolver = ImportFileResolver(file_loader, whitelist)
-        pip_resolver = PipResolver(whitelist)
+        pip_resolver = PythonLibraryResolver(whitelist)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
@@ -148,7 +148,7 @@ def func():
         whitelist = Whitelist()
         file_loader = FileLoader()
         import_resolver = ImportFileResolver(file_loader, whitelist)
-        pip_resolver = PipResolver(whitelist)
+        pip_resolver = PythonLibraryResolver(whitelist)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
