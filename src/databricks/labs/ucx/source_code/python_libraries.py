@@ -11,6 +11,7 @@ from zipimport import ZipImportError
 from setuptools import setup  # type: ignore
 
 from databricks.labs.blueprint.entrypoint import is_in_debug
+
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.source_code.graph import (
     LibraryResolver,
