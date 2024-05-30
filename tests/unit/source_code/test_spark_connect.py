@@ -143,6 +143,32 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     ] == list(linter.lint(code))
 
 
+def test_rdd_map_partitions():
+    linter = SparkConnectLinter(is_serverless=False)
+    code = """
+df = spark.createDataFrame([])
+df.rdd.mapPartitions(myUdf)
+    """
+    assert [
+        Failure(
+            code="rdd-in-shared-clusters",
+            message='RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead',
+            start_line=3,
+            start_col=0,
+            end_line=3,
+            end_col=27,
+        ),
+        Failure(
+            code="rdd-in-shared-clusters",
+            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
+            start_line=3,
+            start_col=0,
+            end_line=3,
+            end_col=6,
+        ),
+    ] == list(linter.lint(code))
+
+
 def test_conf_shared():
     linter = SparkConnectLinter(is_serverless=False)
     code = """df.sparkContext.getConf().get('spark.my.conf')"""

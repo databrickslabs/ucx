@@ -68,6 +68,26 @@ class RDDApiMatcher(SharedClusterMatcher):
     ]
 
     def lint(self, node: ast.AST) -> Iterator[Advice]:
+        yield from self._lint_sc(node)
+        yield from self._lint_rdd_use(node)
+
+    def _lint_rdd_use(self, node: ast.AST) -> Iterator[Advice]:
+        if isinstance(node, ast.Attribute):
+            if node.attr == 'rdd':
+                yield self._rdd_failure(node)
+                return
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'mapPartitions':
+            yield Failure(
+                code='rdd-in-shared-clusters',
+                message=f'RDD APIs are not supported on {self._cluster_type_str()}. '
+                f'Use mapInArrow() or Pandas UDFs instead',
+                start_line=node.lineno,
+                start_col=node.col_offset,
+                end_line=node.end_lineno or 0,
+                end_col=node.end_col_offset or 0,
+            )
+
+    def _lint_sc(self, node: ast.AST) -> Iterator[Advice]:
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
             return
         if node.func.attr not in self._SC_METHODS:
@@ -75,7 +95,10 @@ class RDDApiMatcher(SharedClusterMatcher):
         function_name = AstHelper.get_full_function_name(node)
         if not function_name or not function_name.endswith(f"sc.{node.func.attr}"):
             return
-        yield Failure(
+        yield self._rdd_failure(node)
+
+    def _rdd_failure(self, node: ast.AST) -> Advice:
+        return Failure(
             code='rdd-in-shared-clusters',
             message=f'RDD APIs are not supported on {self._cluster_type_str()}. Rewrite it using DataFrame API',
             start_line=node.lineno,
