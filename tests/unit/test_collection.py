@@ -1,6 +1,7 @@
 import io
 from unittest.mock import create_autospec
 
+import pytest
 import yaml
 
 from databricks.sdk.service.provisioning import Workspace
@@ -212,7 +213,6 @@ def test_join_collection_join_existing_collection():
     ws = mock_workspace_client()
     account_client = create_autospec(AccountClient)
     account_client.get_workspace_client.return_value = ws
-    account_client.workspaces.list.side_effect = PermissionDenied('access denied')
     account_installer = AccountInstaller(account_client)
     account_workspace = create_autospec(AccountWorkspaces)
     account_workspace.can_administer.return_value = True
@@ -228,3 +228,18 @@ def test_join_collection_join_existing_collection():
     account_installer.join_collection(789, ids_to_workspace, 123)
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 3
+
+def test_join_collection_join_existing_collection_sync_not_upto_date():
+    ws = mock_workspace_client()
+    account_client = create_autospec(AccountClient)
+    account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
+    account_workspace = create_autospec(AccountWorkspaces)
+    account_workspace.can_administer.return_value = True
+    account_installer.replace(account_workspaces=account_workspace)
+    account_installer.replace(
+        product_info=ProductInfo.for_testing(WorkspaceConfig),
+    )
+
+    with pytest.raises(KeyError):
+        account_installer.join_collection(789, {}, 123)
