@@ -222,3 +222,21 @@ def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_librar
     assert problems[0].message.startswith(f"Failed to install")
     assert mock_path_lookup.resolve(Path(unknown_library)) is None
     ws.workspace.download.assert_called_once_with(unknown_library, format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+
+    egg_file = Path(__file__).parent / "samples" / "library-egg" / "demo_egg-0.0.1-py3.6.egg"
+    with egg_file.open("rb") as f:
+        ws.workspace.download.return_value = io.BytesIO(f.read())
+
+    libraries = [compute.Library(egg=egg_file.as_posix())]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 0
+    assert graph.path_lookup.resolve(Path("pkgdir")) is not None
+    ws.workspace.download.assert_called_once_with(egg_file.as_posix(), format=ExportFormat.AUTO)
