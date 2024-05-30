@@ -50,18 +50,30 @@ class PathLookup:
             try:
                 if not library_root.is_dir():
                     continue
-                absolute_path = library_root / path
-                if absolute_path.exists():
-                    return absolute_path.resolve()  # eliminate “..” components
-                for child in library_root.iterdir():
-                    if not self._is_egg_folder(child):
-                        continue
-                    absolute_path = child / path
-                    if absolute_path.exists():
-                        return absolute_path.resolve()  # eliminate “..” components
             except PermissionError:
                 logger.warning(f"Permission denied to access (subfolders of) {library_root}")
+            absolute_path = library_root / path
+            try:
+                if absolute_path.exists():
+                    return absolute_path.resolve()  # eliminate “..” components
+            except PermissionError:
+                logger.warning(f"Permission denied to access {absolute_path}")
+            try:
+                resolved_egg_library = self._resolve_egg_library(library_root, path)
+                if resolved_egg_library is not None:
+                    return resolved_egg_library
+            except PermissionError:
+                logger.warning(f"Permission denied to access egg libraries in {library_root}")
 
+        return None
+
+    def _resolve_egg_library(self, library: Path, path: Path) -> Path | None:
+        for child in library.iterdir():
+            if not self._is_egg_folder(child):
+                continue
+            absolute_path = child / path
+            if absolute_path.exists():
+                return absolute_path.resolve()  # eliminate “..” components
         return None
 
     def has_path(self, path: Path):
