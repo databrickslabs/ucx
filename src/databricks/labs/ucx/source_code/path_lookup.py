@@ -50,15 +50,12 @@ class PathLookup:
             try:
                 if not library_root.is_dir():
                     continue
-
                 absolute_path = library_root / path
                 if absolute_path.exists():
                     return absolute_path.resolve()  # eliminate “..” components
-
                 for child in library_root.iterdir():
                     if not self._is_egg_folder(child):
                         continue
-
                     absolute_path = child / path
                     if absolute_path.exists():
                         return absolute_path.resolve()  # eliminate “..” components
