@@ -102,6 +102,7 @@ def test_job_task_linter_library_installed_cluster(
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
+
 def test_job_linter_some_notebook_graph_with_problems(simple_ctx, ws, make_job, make_notebook, make_random, caplog):
     expected_messages = {
         "second_notebook:4 [direct-filesystem-access] The use of default dbfs: references is deprecated: /mnt/something",
