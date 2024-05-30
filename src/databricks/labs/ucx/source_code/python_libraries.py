@@ -71,6 +71,11 @@ class PipResolver(LibraryResolver):
         return []
 
     def _install_egg(self, library: Path) -> list[DependencyProblem]:
+        """Install egss using easy_install.
+
+        Sources:
+            See easy_install in setuptools.command.easy_install
+        """
         verbosity = "--verbose" if is_in_debug() else "--quiet"
         easy_install_arguments = [
             "easy_install",
