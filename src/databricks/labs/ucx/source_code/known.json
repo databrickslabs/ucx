@@ -1,6 +1,27 @@
 {
+  "absl-py": {
+    "absl": []
+  },
+  "aiohttp": {
+    "aiohttp": []
+  },
+  "aiosignal": {
+    "aiosignal": []
+  },
+  "anyio": {
+    "anyio": []
+  },
+  "appdirs": {
+    "appdirs": []
+  },
   "astroid": {
     "astroid": []
+  },
+  "async-timeout": {
+    "async_timeout": []
+  },
+  "attrs": {
+    "attr": []
   },
   "black": {
     "_black_version": [],
@@ -67,6 +88,9 @@
   "execnet": {
     "execnet": []
   },
+  "frozenlist": {
+    "frozenlist": []
+  },
   "google-auth": {
     "google.auth": [],
     "google.oauth2": []
@@ -88,6 +112,9 @@
   },
   "mccabe": {
     "mccabe": []
+  },
+  "multidict": {
+    "multidict": []
   },
   "mypy": {
     "mypy": [],
@@ -195,6 +222,13 @@
   "six": {
     "six": []
   },
+  "sniffio": {
+    "sniffio": [],
+    "sniffio._impl": [],
+    "sniffio._tests": [],
+    "sniffio._tests.test_sniffio": [],
+    "sniffio._version": []
+  },
   "sqlglot": {
     "sqlglot": []
   },
@@ -220,5 +254,8 @@
   },
   "wheel": {
     "wheel": []
+  },
+  "yarl": {
+    "yarl": []
   }
 }
