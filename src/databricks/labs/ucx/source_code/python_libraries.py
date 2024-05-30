@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def current_working_directory(path: Path) -> Iterator[Path]:
-    old_working_directory = os.getcwd()
+    old_working_directory = Path.cwd()
     os.chdir(path)
     try:
         yield path
