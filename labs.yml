@@ -231,7 +231,10 @@ commands:
         description: (Optional) DBSQL dashboard ID to revert. If no dashboard ID is provided, all migrated DBSQL dashboards in the workspace will be reverted.
 
   - name: join-collection
-    description: Joins an existing ucx installation to a collection.
+    is_account_level: true
+    description: workspace_id to join a collection.
     flags:
       - name: workspace-id
-        description: workspace_id to join as a collection. If the workspace_id has no collection then a new collection will be created
+        description: workspace_id which should join a collection.
+      - name: target_workspace-id
+        description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
