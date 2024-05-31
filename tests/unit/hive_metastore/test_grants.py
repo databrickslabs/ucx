@@ -105,6 +105,13 @@ def test_hive_revoke_sql():
     assert grant.hive_revoke_sql() == "REVOKE SELECT ON TABLE hive_metastore.mydb.mytable FROM `user`"
 
 
+def test_hive_deny_sql():
+    grant = Grant(
+        principal="user", action_type="DENIED_SELECT", catalog="hive_metastore", database="mydb", table="mytable"
+    )
+    assert grant.hive_grant_sql() == ["DENY `SELECT` ON TABLE hive_metastore.mydb.mytable TO `user`"]
+
+
 @pytest.mark.parametrize(
     "grant,query",
     [
