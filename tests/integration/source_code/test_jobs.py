@@ -235,9 +235,9 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) > 0
 
     library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))
-    job_without_import_pytest_problem = make_job(notebook_path=notebook, libraries=[library])
+    job_without_import_problem = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_without_import_pytest_problem.job_id)
+    problems = simple_ctx.workflow_linter.lint_job(job_without_import_problem.job_id)
 
     assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
 
