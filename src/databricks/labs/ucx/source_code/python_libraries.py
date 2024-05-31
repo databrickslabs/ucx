@@ -99,8 +99,8 @@ class PythonLibraryResolver(LibraryResolver):
             try:
                 setup(script_args=easy_install_arguments)
                 return []
-            except (SystemExit, ImportError, ValueError):
-                pass
+            except (SystemExit, ImportError, ValueError) as e:
+                logger.warning(f"Failed to install {library} with (setuptools|distutils).setup, unzipping instead: {e}")
         library_folder = self._temporary_virtual_environment / library.name
         library_folder.mkdir(parents=True, exist_ok=True)
         try:
