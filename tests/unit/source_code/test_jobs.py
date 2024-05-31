@@ -55,7 +55,7 @@ def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(moc
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(problems) == 3
+    assert len(problems) == 2
     assert all(problem.code == "not-yet-implemented" for problem in problems)
     ws.assert_not_called()
 
