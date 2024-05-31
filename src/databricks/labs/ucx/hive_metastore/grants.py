@@ -137,6 +137,7 @@ class Grant:
     def _apply_grant_sql(self, action_type, object_type, object_key):
         if "DENIED" in action_type:
             action_type = action_type.replace("DENIED_", "")
+            # need to wrap the action type in backticks to avoid syntax errors with DENY SELECT
             return f"DENY `{action_type}` ON {object_type} {escape_sql_identifier(object_key)} TO `{self.principal}`"
         return f"GRANT {action_type} ON {object_type} {escape_sql_identifier(object_key)} TO `{self.principal}`"
 
