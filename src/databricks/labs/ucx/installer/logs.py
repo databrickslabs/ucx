@@ -76,6 +76,9 @@ def parse_logs(log: TextIO) -> Iterator[PartialLogRecord]:
 
     line = log.readline()
     match = pattern.match(line)
+    if match is None:
+        logger.warning(f"Logs do not match expected format ({log_format}): {line}")
+        return
     while len(line) > 0:
         assert match is not None
         time, *groups, message = match.groups()
