@@ -268,7 +268,7 @@ def test_spark_table_return_value(migration_index):
     sqf = SparkSql(ftf, migration_index)
     old_code = """
 spark.read.csv("s3://bucket/path")
-for table in spark.listTables():
+for table in spark.catalog.listTables():
     do_stuff_with_table(table)
 """
     assert [
@@ -295,7 +295,7 @@ def test_spark_table_return_value_apply(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """spark.read.csv('s3://bucket/path')
-for table in spark.listTables():
+for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
     fixed_code = sqf.apply(old_code)
     # no transformations to apply, only lint messages
