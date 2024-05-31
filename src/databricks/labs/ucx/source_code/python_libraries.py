@@ -101,10 +101,12 @@ class PythonLibraryResolver(LibraryResolver):
                 return []
             except (SystemExit, ImportError, ValueError):
                 pass
+        library_folder = self._temporary_virtual_environment / library.name
+        library_folder.mkdir(parents=True, exist_ok=True)
         try:
             # Not a "real" install, though, the best effort to still lint eggs without dependencies
             with zipfile.ZipFile(library, "r") as zip_ref:
-                zip_ref.extractall(self._temporary_virtual_environment)
+                zip_ref.extractall(library_folder)
         except zipfile.BadZipfile as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return [problem]
