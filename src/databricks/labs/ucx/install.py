@@ -699,10 +699,12 @@ class AccountInstaller(AccountContext):
                 try:
                     # if user is account admin list and show available workspaces to select from
                     accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
-                    target_workspace_id = self._get_collection_workspace(
+                    target_workspace = self._get_collection_workspace(
                         accessible_workspaces,
                         account_client,
                     )
+                    assert target_workspace is not None
+                    target_workspace_id = target_workspace.workspace_id
 
                 except PermissionDenied:
                     # if the user is not account admin, allow user to enter the workspace_id to join as collection.
@@ -784,7 +786,7 @@ class AccountInstaller(AccountContext):
         self,
         accessible_workspaces: list[Workspace],
         account_client: AccountClient,
-    ) -> int | None:
+    ) -> Workspace | None:
         # iterate through each workspace and select workspace which has existing ucx installation
         # allow user to select from the eligible workspace to join as collection
         installed_workspaces = []
@@ -801,16 +803,16 @@ class AccountInstaller(AccountContext):
             logger.warning("No existing installation found , setting up new installation without")
             return None
         workspaces = {
-            workspace.deployment_name: workspace.workspace_id
+            workspace.deployment_name: workspace
             for workspace in installed_workspaces
             if workspace.deployment_name is not None
         }
-        workspace_id = self.prompts.choice_from_dict(
+        target_workspace = self.prompts.choice_from_dict(
             "Please select a workspace, the current installation of ucx will be grouped as a "
             "collection with the selected workspace",
             workspaces,
         )
-        return workspace_id
+        return target_workspace
 
 
 if __name__ == "__main__":
