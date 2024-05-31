@@ -472,12 +472,11 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
     ctx.redash.revert_dashboards(dashboard_id)
 
 
-@ucx.command()
-def join_collection(a: AccountClient, w: WorkspaceClient, workspace_id: int):
+@ucx.command(is_account=True)
+def join_collection(a: AccountClient, workspace_id: int, join_workspace_id: int):
     """joins the workspace to an existing collection"""
     account_installer = AccountInstaller(a)
-    ctx = WorkspaceContext(w)
-    account_installer.join_collection(w.get_workspace_id(), ctx.workspace_info.load_workspace_info(), workspace_id)
+    account_installer.join_collection(workspace_id, join_workspace_id)
 
 
 @ucx.command

@@ -40,6 +40,7 @@ from databricks.sdk.service.sql import (
 )
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
@@ -672,10 +673,17 @@ class AccountInstaller(AccountContext):
             msg = "Current workspace is not known, Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise KeyError(msg) from None
 
+    def _get_workspace_info(self, current_workspace_id: int):
+        account_client = self._get_safe_account_client()
+        workspace = account_client.workspaces.get(current_workspace_id)
+        current_workspace_client = account_client.get_workspace_client(workspace)
+        installation = Installation.current(current_workspace_client, self.product_info.product_name())
+        workspace_info = WorkspaceInfo(installation, current_workspace_client)
+        return workspace_info.load_workspace_info()
+
     def join_collection(
         self,
         current_workspace_id: int,
-        ids_to_workspace: dict[int, Workspace],
         collection_workspace_id: int | None = None,
     ):
         if self.is_account_install:
@@ -684,7 +692,7 @@ class AccountInstaller(AccountContext):
         collection_workspace: Workspace
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        installed_workspaces: list[Workspace] | None = []
+        ids_to_workspace = self._get_workspace_info(current_workspace_id)
         if collection_workspace_id is None:
             if self.prompts.confirm("Do you want to join the current installation to an existing collection?"):
                 # If joining a collection as part of the installation then collection_workspace_id would be empty
@@ -726,13 +734,11 @@ class AccountInstaller(AccountContext):
             )
             return None
         if collection_workspace is not None:
-            installed_workspaces = self._sync_collection(
+            self._sync_collection(
                 collection_workspace,
                 current_workspace_id,
                 ids_to_workspace,
             )
-        if installed_workspaces is not None:
-            ctx.account_workspaces.sync_workspace_info(installed_workspaces)
         return None
 
     def _sync_collection(
@@ -818,8 +824,8 @@ if __name__ == "__main__":
         account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
+
         workspace_installer.run()
         account_installer.join_collection(
             workspace_installer.workspace_client.get_workspace_id(),
-            workspace_installer.workspace_info.load_workspace_info(),
         )

@@ -465,7 +465,6 @@ def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
     installation_ctx.with_workspace_info([workspace])
     installation_ctx.workspace_installer.run()
     workspace_id = installation_ctx.workspace_installer.workspace_client.get_workspace_id()
-    id_to_workspace = installation_ctx.workspace_info.load_workspace_info()
     acc_installer = installation_ctx.account_installer
     prompts = MockPrompts(
         {
@@ -478,7 +477,7 @@ def test_new_collection(ws, sql_backend, installation_ctx, env_or_skip):
         prompts=prompts,
         product_info=installation_ctx.product_info,
     )
-    acc_installer.join_collection(workspace_id, id_to_workspace)
+    acc_installer.join_collection(workspace_id)
     config = installation_ctx.installation.load(WorkspaceConfig)
     workspace_id = installation_ctx.workspace_installer.workspace_client.get_workspace_id()
     assert config.installed_workspace_ids == [workspace_id]
