@@ -1,4 +1,5 @@
 import datetime as dt
+import io
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -153,3 +154,13 @@ def test_task_logger(tmp_path):
     assert "log file is" in contents["logs/assessment/run-234-0/crawl-tables.log"]
     assert "something from sdk" in contents["logs/assessment/run-234-0/crawl-tables.log"]
     assert "[run #234](/#job/123/run/234)" in contents["logs/assessment/run-234-0/README.md"]
+
+
+def test_parse_logs_warns_for_corrupted_log_file(caplog):
+    corrupted_log_line = "13:56:47  INF"
+    with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.installer.logs"):
+        list(logs.parse_logs(io.StringIO(corrupted_log_line)))
+
+    last_message = caplog.messages[-1]
+    assert "Logs do not match expected format" in last_message
+    assert last_message.endswith(corrupted_log_line)
