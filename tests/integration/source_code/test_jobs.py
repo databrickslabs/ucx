@@ -222,7 +222,7 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     entrypoint.mkdir()
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist([]),  # pytest is in default list
+        whitelist=Whitelist(),  # pytest is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
     )
 
@@ -253,7 +253,7 @@ def test_workflow_linter_lints_job_with_missing_library(
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist([]),  # databricks is in default list
+        whitelist=Whitelist(),  # databricks is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
@@ -276,7 +276,7 @@ def test_workflow_linter_lints_job_with_wheel_dependency(
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist([]),  # databricks is in default list
+        whitelist=Whitelist(),  # databricks is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
