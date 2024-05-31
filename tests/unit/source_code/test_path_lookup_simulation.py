@@ -1,5 +1,6 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
@@ -223,3 +224,29 @@ def test_path_lookup_skips_resolving_egg_files(tmp_path):
         assert False, "PathLookup should skip resolving egg files"
     else:
         assert True
+
+
+def raise_permission_error():
+    raise PermissionError("Can't access path")
+
+
+def test_path_lookup_raises_permission_error_for_path():
+    path = create_autospec(Path)
+    path.is_absolute.side_effect = raise_permission_error
+
+    lookup = PathLookup(Path.cwd(), [])
+
+    resolved_path = lookup.resolve(path)
+    assert resolved_path is None
+    path.is_absolute.assert_called_once()
+
+
+def test_path_lookup_raises_permission_error_for_library_root():
+    library_root = create_autospec(Path)
+    library_root.is_dir.side_effect = raise_permission_error
+
+    lookup = PathLookup(Path.cwd(), [library_root])
+
+    resolved_path = lookup.resolve(Path("library.py"))
+    assert resolved_path is None
+    library_root.is_dir.assert_called_once()
