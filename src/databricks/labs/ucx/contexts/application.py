@@ -15,7 +15,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
@@ -355,7 +355,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pip_resolver(self):
-        return PipResolver(self.whitelist)
+        return PythonLibraryResolver(self.whitelist)
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:

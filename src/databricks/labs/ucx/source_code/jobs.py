@@ -1,5 +1,6 @@
 import functools
 import logging
+import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,8 +94,12 @@ class WorkflowTaskContainer(SourceContainer):
             if problems:
                 yield from problems
         if library.egg:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            yield DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
+            logger.info(f"Registering library from {library.egg}")
+            with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
+                with tempfile.TemporaryDirectory() as directory:
+                    local_file = Path(directory) / Path(library.egg).name
+                    local_file.write_bytes(remote_file.read())
+                    yield from graph.register_library(local_file.as_posix())
         if library.whl:
             # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
             # TODO: https://github.com/databrickslabs/ucx/issues/1640

@@ -1,5 +1,6 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import create_autospec
 
 import pytest
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
@@ -7,7 +8,7 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.known import Whitelist
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from tests.unit import (
     _samples_path,
 )
@@ -44,7 +45,7 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     notebook_resolver = NotebookResolver(notebook_loader)
     whitelist = Whitelist()
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
     assert not maybe.problems
@@ -70,7 +71,7 @@ def test_locates_files(source: list[str], expected: int):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
     maybe = resolver.build_local_file_dependency_graph(file_path)
     assert not maybe.problems
@@ -109,7 +110,7 @@ sys.path.append('{child_dir_path.as_posix()}')
         file_loader = FileLoader()
         whitelist = Whitelist()
         import_resolver = ImportFileResolver(file_loader, whitelist)
-        pip_resolver = PipResolver(whitelist)
+        pip_resolver = PythonLibraryResolver(whitelist)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
@@ -148,9 +149,104 @@ def func():
         whitelist = Whitelist()
         file_loader = FileLoader()
         import_resolver = ImportFileResolver(file_loader, whitelist)
-        pip_resolver = PipResolver(whitelist)
+        pip_resolver = PythonLibraryResolver(whitelist)
         resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
         maybe = resolver.build_notebook_dependency_graph(parent_file_path)
         assert not maybe.problems
         assert maybe.graph is not None
         assert maybe.graph.all_relative_names() == {"some_file.py", "import_file.py"}
+
+
+def test_path_lookup_skips_resolving_within_file_library(tmp_path):
+    file = tmp_path / "file.py"
+    file.touch()
+
+    lookup = PathLookup(Path.cwd(), [file])
+
+    try:
+        lookup.resolve(Path("package.py"))
+    except NotADirectoryError:
+        assert False, "PathLookup should skip resolving files"
+    else:
+        assert True
+
+
+def test_path_lookup_skips_resolving_non_existing_library(tmp_path):
+    library = tmp_path / "non-existing-library"
+
+    lookup = PathLookup(Path.cwd(), [library])
+
+    try:
+        lookup.resolve(Path("package.py"))
+    except FileNotFoundError:
+        assert False, "PathLookup should skip resolving non-existing libraries"
+    else:
+        assert True
+
+
+def test_path_lookup_resolves_egg_package(tmp_path):
+    egg_library = tmp_path / "library.egg"
+    egg_library.mkdir()
+    (egg_library / "EGG-INFO").touch()
+
+    package_path = egg_library / "package.py"
+    package_path.touch()
+
+    lookup = PathLookup(Path.cwd(), [tmp_path])
+    resolved_path = lookup.resolve(Path("package.py"))
+
+    assert resolved_path == package_path
+
+
+def test_path_lookup_does_not_resolve_package_in_corrupt_egg_package(tmp_path):
+    # Missing egg-info
+    egg_library = tmp_path / "library.egg"
+    egg_library.mkdir()
+
+    package_path = egg_library / "package.py"
+    package_path.touch()
+
+    lookup = PathLookup(Path.cwd(), [tmp_path])
+    resolved_path = lookup.resolve(Path("package.py"))
+
+    assert resolved_path is None
+
+
+def test_path_lookup_skips_resolving_egg_files(tmp_path):
+    egg_library = tmp_path / "library.egg"
+    egg_library.touch()
+
+    lookup = PathLookup(Path.cwd(), [tmp_path])
+
+    try:
+        lookup.resolve(Path("package.py"))
+    except NotADirectoryError:
+        assert False, "PathLookup should skip resolving egg files"
+    else:
+        assert True
+
+
+def raise_permission_error():
+    raise PermissionError("Can't access path")
+
+
+def test_path_lookup_raises_permission_error_for_path():
+    path = create_autospec(Path)
+    path.is_absolute.side_effect = raise_permission_error
+
+    lookup = PathLookup(Path.cwd(), [])
+
+    resolved_path = lookup.resolve(path)
+    assert resolved_path is None
+    path.is_absolute.assert_called_once()
+
+
+def test_path_lookup_raises_permission_error_for_library_root():
+    library_root = create_autospec(Path)
+    library_root.is_dir.side_effect = raise_permission_error
+
+    lookup = PathLookup(Path.cwd(), [library_root])
+
+    resolved_path = lookup.resolve(Path("library.py"))
+    assert resolved_path is None
+    library_root.is_dir.assert_called_once()

@@ -6,7 +6,7 @@ import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
 from databricks.sdk.service.workspace import Language
@@ -90,11 +90,11 @@ def test_migrator_walks_directory():
 
 
 def test_linter_walks_directory(mock_path_lookup, migration_index):
-    mock_path_lookup.append_path(_samples_path(SourceContainer))
+    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
     whitelist = Whitelist()
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
@@ -152,7 +152,7 @@ def test_known_issues(path: Path, migration_index):
     whitelist = Whitelist()
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: LinterContext(migration_index))
     linter.lint(MockPrompts({}), path)
