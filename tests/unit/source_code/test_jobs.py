@@ -1,10 +1,10 @@
-import logging
 import io
+import logging
 from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs
@@ -31,7 +31,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
     whitelist = Whitelist()
     resolver = DependencyResolver(
-        PipResolver(whitelist),
+        PythonLibraryResolver(whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
@@ -49,13 +49,13 @@ def graph(mock_path_lookup, dependency_resolver) -> DependencyGraph:
 def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(mock_path_lookup, graph):
     # Goal of test is to raise test coverage, remove after implementing
     ws = create_autospec(WorkspaceClient)
-    library = compute.Library(jar="library.jar", egg="library.egg", whl="library.whl")
+    library = compute.Library(jar="library.jar")
     task = jobs.Task(task_key="test", libraries=[library], existing_cluster_id="id")
 
     workflow_task_container = WorkflowTaskContainer(ws, task)
     problems = workflow_task_container.build_dependency_graph(graph)
 
-    assert len(problems) == 3
+    assert len(problems) == 1
     assert all(problem.code == "not-yet-implemented" for problem in problems)
     ws.assert_not_called()
 
@@ -96,6 +96,23 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
     assert problems[0].code == "library-install-failed"
     assert problems[0].message.startswith("Failed to install unknown-library-name")
     assert mock_path_lookup.resolve(Path("unknown-library-name")) is None
+    ws.assert_not_called()
+
+
+def test_workflow_task_container_builds_dependency_graph_for_python_wheel(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"test")
+
+    libraries = [compute.Library(whl="test.whl")]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install")
+    assert mock_path_lookup.resolve(Path("test")) is None
     ws.assert_not_called()
 
 
@@ -204,3 +221,39 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 0
     ws.assert_not_called()
+
+
+def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_library(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+    ws.workspace.download.return_value = io.BytesIO(b"test")
+
+    unknown_library = "/path/to/unknown/library.egg"
+    libraries = [compute.Library(egg=unknown_library)]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("Failed to install")
+    assert graph.path_lookup.resolve(Path(unknown_library)) is None
+    ws.workspace.download.assert_called_once_with(unknown_library, format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(mock_path_lookup, graph):
+    ws = create_autospec(WorkspaceClient)
+
+    egg_file = Path(__file__).parent / "samples" / "library-egg" / "demo_egg-0.0.1-py3.6.egg"
+    with egg_file.open("rb") as f:
+        ws.workspace.download.return_value = io.BytesIO(f.read())
+
+    libraries = [compute.Library(egg=egg_file.as_posix())]
+    task = jobs.Task(task_key="test", libraries=libraries)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 0
+    assert graph.path_lookup.resolve(Path("pkgdir")) is not None
+    ws.workspace.download.assert_called_once_with(egg_file.as_posix(), format=ExportFormat.AUTO)

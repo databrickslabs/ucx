@@ -4,15 +4,16 @@ from dataclasses import replace
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
+from unittest.mock import create_autospec
 
+from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
-from databricks.labs.blueprint.tui import Prompts
-
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.known import UNKNOWN, Whitelist
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -21,7 +22,12 @@ from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
-def test_running_real_workflow_linter_job(installation_ctx):
+def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job):
+    # Deprecated file system path in call to: /mnt/things/e/f/g
+    lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
+    notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=lint_problem)
+    make_job(notebook_path=notebook)
+
     ctx = installation_ctx
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
@@ -212,5 +218,83 @@ def test_workflow_linter_lints_job_with_requirements_dependency(
     job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+
+
+def test_workflow_linter_lints_job_with_egg_dependency(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_directory,
+):
+    expected_problem_message = "Could not locate import: pkgdir"
+    egg_file = Path(__file__).parent / "samples" / "library-egg" / "demo_egg-0.0.1-py3.6.egg"
+
+    entrypoint = make_directory()
+
+    remote_egg_file = f"{entrypoint}/{egg_file.name}"
+    with egg_file.open("rb") as f:
+        ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
+    library = compute.Library(egg=remote_egg_file)
+
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import pkgdir")
+    job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
+
+    assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+
+
+def test_workflow_linter_lints_job_with_missing_library(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_random,
+    make_directory,
+):
+    expected_problem_message = "Could not locate import: databricks.labs.ucx"
+    whitelist = create_autospec(Whitelist)  # databricks is in default list
+    whitelist.module_compatibility.return_value = UNKNOWN
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=whitelist,
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
+    )
+
+    notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
+    job_without_ucx_library = make_job(notebook_path=notebook)
+
+    problems = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
+
+    assert len([problem for problem in problems if problem.message == expected_problem_message]) > 0
+    whitelist.module_compatibility.assert_called_once_with("databricks.labs.ucx")
+
+
+def test_workflow_linter_lints_job_with_wheel_dependency(
+    simple_ctx,
+    ws,
+    make_job,
+    make_notebook,
+    make_random,
+    make_directory,
+):
+    expected_problem_message = "Could not locate import: databricks.labs.ucx"
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=Whitelist(),  # databricks is in default list
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
+    )
+
+    simple_ctx.workspace_installation.run()  # Creates ucx wheel
+    wheels = [file for file in simple_ctx.installation.files() if file.path.endswith(".whl")]
+    library = compute.Library(whl=wheels[0].path)
+
+    notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=b"import databricks.labs.ucx")
+    job_with_ucx_library = make_job(notebook_path=notebook, libraries=[library])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0

@@ -274,11 +274,6 @@ class SparkMatchers:
         # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
         # nothing to migrate in UDFRegistration, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDFRegistration.html
 
-        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDTFRegistration.html
-        spark_udtfregistration_matchers = [
-            TableNameMatcher("register", 1, 2, 0, "name"),
-        ]
-
         direct_fs_access_matchers = [
             DirectFilesystemAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
             DirectFilesystemAccessMatcher("cp", 1, 2, 0, call_context={"cp": {"dbutils.fs.cp"}}),
@@ -319,7 +314,6 @@ class SparkMatchers:
             + spark_dataframe_matchers
             + spark_dataframereader_matchers
             + spark_dataframewriter_matchers
-            + spark_udtfregistration_matchers
             + direct_fs_access_matchers
         ):
             self._matchers[matcher.method_name] = matcher
