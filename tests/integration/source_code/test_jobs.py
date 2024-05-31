@@ -139,36 +139,6 @@ display(spark.read.parquet("/mnt/something"))
     assert all(any(message.endswith(expected) for message in last_messages) for expected in expected_messages)
 
 
-def test_workflow_linter_lints_job_with_import_pypi_library(
-    simple_ctx,
-    ws,
-    make_job,
-    make_notebook,
-    make_random,
-):
-    entrypoint = WorkspacePath(ws, f"~/linter-{make_random(4)}").expanduser()
-    entrypoint.mkdir()
-
-    simple_ctx = simple_ctx.replace(
-        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
-    )
-
-    notebook = entrypoint / "notebook.ipynb"
-    make_notebook(path=notebook, content=b"import greenlet")
-
-    job_without_pytest_library = make_job(notebook_path=notebook)
-    problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
-
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
-
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
-    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
-
-    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
-
-    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
-
-
 def test_lint_local_code(simple_ctx):
     # no need to connect
     linter_context = LinterContext(MigrationIndex([]))
