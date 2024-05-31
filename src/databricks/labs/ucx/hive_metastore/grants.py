@@ -135,6 +135,9 @@ class Grant:
         return f"ALTER {object_type} {escape_sql_identifier(object_key)} OWNER TO `{self.principal}`"
 
     def _apply_grant_sql(self, action_type, object_type, object_key):
+        if "DENIED" in action_type:
+            action_type = action_type.replace("DENIED_", "")
+            return f"DENY `{action_type}` ON {object_type} {escape_sql_identifier(object_key)} TO `{self.principal}`"
         return f"GRANT {action_type} ON {object_type} {escape_sql_identifier(object_key)} TO `{self.principal}`"
 
     def _uc_action(self, action_type):
