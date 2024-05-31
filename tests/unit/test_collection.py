@@ -227,3 +227,33 @@ def test_join_collection_join_existing_collection():
     account_installer.join_collection(123, 789)
     ws.workspace.upload.assert_called()
     assert ws.workspace.upload.call_count == 3
+
+
+def test_join_collection_join_existing_collection_sync_not_upto_date():
+    ws = mock_workspace_client()
+    download_yaml = {
+        'config.yml': yaml.dump(
+            {
+                'version': 1,
+                'inventory_database': 'ucx',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            }
+        ),
+        'workspaces.json': None,
+    }
+    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
+    account_client = create_autospec(AccountClient)
+    account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
+    account_workspace = create_autospec(AccountWorkspaces)
+    account_workspace.can_administer.return_value = True
+    account_installer.replace(account_workspaces=account_workspace)
+    account_installer.replace(
+        product_info=ProductInfo.for_testing(WorkspaceConfig),
+    )
+
+    with pytest.raises(KeyError):
+        account_installer.join_collection(789, 123)
