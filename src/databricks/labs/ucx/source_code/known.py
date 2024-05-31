@@ -105,13 +105,20 @@ class Whitelist:
     def rebuild(cls, root: Path):
         """rebuild the known.json file by analyzing the source code of installed libraries. Invoked by `make known`."""
         path_lookup = PathLookup.from_sys_path(root)
+        logger.info("Scanning for newly installed distributions...")
         known_distributions = cls._get_known()
+        updated_distributions = known_distributions.copy()
         for library_root in path_lookup.library_roots:
             for dist_info_folder in library_root.glob("*.dist-info"):
-                cls._analyze_dist_info(dist_info_folder, known_distributions, library_root)
-        known_json = Path(__file__).parent / "known.json"
-        with known_json.open('w') as f:
-            json.dump(dict(sorted(known_distributions.items())), f, indent=2)
+                cls._analyze_dist_info(dist_info_folder, updated_distributions, library_root)
+        updated_distributions = dict(sorted(updated_distributions.items()))
+        if known_distributions == updated_distributions:
+            logger.info("No new distributions found.")
+        else:
+            known_json = Path(__file__).parent / "known.json"
+            with known_json.open('w') as f:
+                json.dump(updated_distributions, f, indent=2)
+            logger.info(f"Updated known distributions: {known_json.relative_to(Path.cwd())}")
 
     @classmethod
     def _analyze_dist_info(cls, dist_info_folder, known_distributions, library_root):
