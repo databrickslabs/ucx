@@ -1,4 +1,7 @@
 from pathlib import Path
+from unittest import mock
+
+import pytest
 
 from databricks.labs.ucx.source_code.known import Whitelist
 
@@ -32,5 +35,19 @@ def test_checks_library_compatibility():
 
 
 def test_loads_known_json():
+    known_json = Whitelist._get_known()  # pylint: disable=protected-access
+    assert known_json is not None and len(known_json) > 0
+
+
+def test_error_on_missing_known_json():
+    with (
+        mock.patch.object(Path, "open", side_effect=FileNotFoundError("simulate missing file")),
+        pytest.raises(FileNotFoundError),
+    ):
+        Whitelist._get_known()  # pylint: disable=protected-access
+
+
+def test_rebuild_trivial():
+    # No-op: the known.json file is already up-to-date
     cwd = Path.cwd()
     Whitelist.rebuild(cwd)
