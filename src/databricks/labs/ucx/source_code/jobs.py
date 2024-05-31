@@ -133,7 +133,7 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_spark_python_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_python_task:
-            return
+            return []
         notebook_path = self._task.spark_python_task.python_file
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
