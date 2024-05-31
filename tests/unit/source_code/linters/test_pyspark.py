@@ -180,10 +180,10 @@ def test_spark_table_named_args(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+df = spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = spark.saveAsTable(format="xyz", name="old.things")
-    do_stuff_with_df(df)
+    df = do_stuff_with_df(df)
+    df.write.saveAsTable(format="xyz", name="old.things")
 """
     assert [
         Deprecation(
@@ -209,10 +209,10 @@ def test_spark_table_variable_arg(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+df = spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = spark.saveAsTable(name)
-    do_stuff_with_df(df)
+    df = do_stuff_with_df(df)
+    df = spark.write.saveAsTable(name)
 """
     assert [
         Deprecation(
@@ -238,10 +238,10 @@ def test_spark_table_fstring_arg(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     old_code = """
-spark.read.csv("s3://bucket/path")
+df = spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = spark.saveAsTable(f"boop{stuff}")
-    do_stuff_with_df(df)
+    df = do_stuff_with_df(df)
+    df.write.saveAsTable(f"boop{stuff}")
 """
     assert [
         Deprecation(
