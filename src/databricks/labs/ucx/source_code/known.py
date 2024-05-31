@@ -57,6 +57,13 @@ class Whitelist:
 
     @staticmethod
     def _get_known() -> dict[str, dict[str, list[dict[str, str]]]]:
+        """Loads the set of known distributions (and false positives), included with this module.
+
+        Returns:
+            A dictionary (keyed by distribution name) containing the known problems for each module.
+        Raises:
+            FileNotFoundError: If the builtin set of known distribution is missing.
+        """
         this_module = __package__
         if this_module is None:
             # When this file is invoked directly as a script, __package__ is None.
@@ -105,8 +112,12 @@ class Whitelist:
     def rebuild(cls, root: Path):
         """rebuild the known.json file by analyzing the source code of installed libraries. Invoked by `make known`."""
         path_lookup = PathLookup.from_sys_path(root)
-        logger.info("Scanning for newly installed distributions...")
-        known_distributions = cls._get_known()
+        try:
+            known_distributions = cls._get_known()
+            logger.info("Scanning for newly installed distributions...")
+        except FileNotFoundError:
+            logger.info("No known distributions found; scanning all distributions...")
+            known_distributions = {}
         updated_distributions = known_distributions.copy()
         for library_root in path_lookup.library_roots:
             for dist_info_folder in library_root.glob("*.dist-info"):
