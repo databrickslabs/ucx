@@ -90,7 +90,7 @@ def test_migrator_walks_directory():
 
 
 def test_linter_walks_directory(mock_path_lookup, migration_index):
-    mock_path_lookup.append_path(_samples_path(SourceContainer))
+    mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
     whitelist = Whitelist()
