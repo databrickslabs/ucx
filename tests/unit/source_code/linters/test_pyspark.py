@@ -212,7 +212,7 @@ def test_spark_table_variable_arg(migration_index):
 df = spark.read.csv("s3://bucket/path")
 for i in range(10):
     df = do_stuff_with_df(df)
-    df = spark.write.saveAsTable(name)
+    df.write.saveAsTable(name)
 """
     assert [
         Deprecation(
