@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import logging
-import os
 import tempfile
 import zipfile
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
 
@@ -21,16 +19,6 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import Whitelist
 
 logger = logging.getLogger(__name__)
-
-
-@contextmanager
-def current_working_directory(path: Path) -> Iterator[Path]:
-    old_working_directory = Path.cwd()
-    os.chdir(path)
-    try:
-        yield path
-    finally:
-        os.chdir(old_working_directory)
 
 
 class PythonLibraryResolver(LibraryResolver):

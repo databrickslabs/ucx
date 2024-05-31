@@ -3,13 +3,8 @@ from unittest.mock import create_autospec, call
 
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver, current_working_directory
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
-
-
-def test_current_working_directory(tmp_path):
-    with current_working_directory(tmp_path):
-        assert Path.cwd() == tmp_path
 
 
 def test_pip_resolver_resolves_library(mock_path_lookup):
