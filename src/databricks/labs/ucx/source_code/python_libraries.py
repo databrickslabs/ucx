@@ -94,17 +94,8 @@ class PythonLibraryResolver(LibraryResolver):
             self._temporary_virtual_environment.as_posix(),
             library.as_posix(),
         ]
-        has_setup = True  # setup might not be present
-        try:
-            # Mypy can't analyze setuptools due to missing type hints
-            from setuptools import setup  # type: ignore
-        except ImportError:
-            try:
-                from distutils.core import setup  # pylint: disable=deprecated-module
-            except ImportError:
-                logger.warning("Could not import setup.")
-                has_setup = False
-        if has_setup:
+        setup = self._get_setup()
+        if callable(setup):
             try:
                 setup(script_args=easy_install_arguments)
                 return []
@@ -118,6 +109,19 @@ class PythonLibraryResolver(LibraryResolver):
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return [problem]
         return []
+
+    @staticmethod
+    def _get_setup() -> Callable | None:
+        setup = None
+        try:
+            # Mypy can't analyze setuptools due to missing type hints
+            from setuptools import setup  # type: ignore
+        except ImportError:
+            try:
+                from distutils.core import setup  # pylint: disable=deprecated-module
+            except ImportError:
+                logger.warning("Could not import setup.")
+        return setup
 
     def __str__(self) -> str:
         return f"PipResolver(whitelist={self._whitelist})"
