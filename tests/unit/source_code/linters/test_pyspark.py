@@ -101,7 +101,6 @@ METHOD_NAMES = [
     "table",
     "insertInto",
     "saveAsTable",
-    "register",
 ]
 
 
