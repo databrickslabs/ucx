@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
+from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.errors import NotFound
@@ -12,7 +13,7 @@ from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import UNKNOWN, Whitelist
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -250,9 +251,11 @@ def test_workflow_linter_lints_job_with_missing_library(
     make_directory,
 ):
     expected_problem_message = "Could not locate import: databricks.labs.ucx"
+    whitelist = create_autospec(Whitelist)  # databricks is in default list
+    whitelist.module_compatibility.return_value = UNKNOWN
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist(),  # databricks is in default list
+        whitelist=whitelist,
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
     )
 
@@ -262,6 +265,7 @@ def test_workflow_linter_lints_job_with_missing_library(
     problems = simple_ctx.workflow_linter.lint_job(job_without_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) > 0
+    whitelist.module_compatibility.assert_called_once_with("databricks.labs.ucx")
 
 
 def test_workflow_linter_lints_job_with_wheel_dependency(
