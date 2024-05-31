@@ -114,7 +114,6 @@ class PythonLibraryResolver(LibraryResolver):
 
     @staticmethod
     def _get_setup() -> Callable | None:
-        setup = None
         try:
             # Mypy can't analyze setuptools due to missing type hints
             from setuptools import setup  # type: ignore
@@ -123,6 +122,7 @@ class PythonLibraryResolver(LibraryResolver):
                 from distutils.core import setup  # pylint: disable=deprecated-module
             except ImportError:
                 logger.warning("Could not import setup.")
+                setup = None
         return setup
 
     def __str__(self) -> str:
