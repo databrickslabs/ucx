@@ -150,24 +150,23 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
     entrypoint.mkdir()
 
     simple_ctx = simple_ctx.replace(
-        whitelist=Whitelist(),  # pytest is in default list
         path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding the pytest you are running
     )
 
     notebook = entrypoint / "notebook.ipynb"
-    make_notebook(path=notebook, content=b"import pytest")
+    make_notebook(path=notebook, content=b"import greenlet")
 
-    job_with_import_pytest_problem = make_job(notebook_path=notebook)
-    problems = simple_ctx.workflow_linter.lint_job(job_with_import_pytest_problem.job_id)
+    job_without_pytest_library = make_job(notebook_path=notebook)
+    problems = simple_ctx.workflow_linter.lint_job(job_without_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) > 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) > 0
 
-    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="pytest"))
-    job_without_import_problem = make_job(notebook_path=notebook, libraries=[library])
+    library = compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))
+    job_with_pytest_library = make_job(notebook_path=notebook, libraries=[library])
 
-    problems = simple_ctx.workflow_linter.lint_job(job_without_import_problem.job_id)
+    problems = simple_ctx.workflow_linter.lint_job(job_with_pytest_library.job_id)
 
-    assert len([problem for problem in problems if problem.message == "Could not locate import: pytest"]) == 0
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
 
 
 def test_lint_local_code(simple_ctx):
