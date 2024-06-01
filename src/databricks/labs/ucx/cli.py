@@ -13,6 +13,7 @@ from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext, LocalCheckoutContext
 from databricks.labs.ucx.hive_metastore.tables import What
+from databricks.labs.ucx.install import AccountInstaller
 
 ucx = App(__file__)
 logger = get_logger(__file__)
@@ -469,6 +470,13 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
     """Revert migrated DBSQL Dashboard queries back to their original state"""
     ctx = WorkspaceContext(w)
     ctx.redash.revert_dashboards(dashboard_id)
+
+
+@ucx.command(is_account=True)
+def join_collection(a: AccountClient, workspace_id: int, join_workspace_id: int):
+    """joins the workspace to an existing collection"""
+    account_installer = AccountInstaller(a)
+    account_installer.join_collection(workspace_id, join_workspace_id)
 
 
 @ucx.command

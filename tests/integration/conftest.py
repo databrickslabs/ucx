@@ -19,6 +19,7 @@ from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -272,6 +273,9 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
+
+    def with_workspace_info(self, workspace_info):
+        self.installation.save(workspace_info, filename=AccountWorkspaces.SYNC_FILE_NAME)
 
     def make_schema(self, **kwargs):
         schema_info = self._make_schema(**kwargs)
@@ -764,18 +768,18 @@ def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[st
     )
 
     avro_table_name = f"avro_serde_{random}"
-    avro_ddl = f"""CREATE TABLE hive_metastore.{schema.name}.{avro_table_name} (id INT, region STRING) 
+    avro_ddl = f"""CREATE TABLE hive_metastore.{schema.name}.{avro_table_name} (id INT, region STRING)
                         ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
                         STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
                                   OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
                         TBLPROPERTIES ('avro.schema.literal'='{{
-                            "namespace": "org.apache.hive", 
-                            "name": "first_schema", 
+                            "namespace": "org.apache.hive",
+                            "name": "first_schema",
                             "type": "record",
                             "fields": [
                                 {{ "name":"id", "type":"int" }},
                                 {{ "name":"region", "type":"string" }}
-                            ] }}') 
+                            ] }}')
                         LOCATION '{table_base_dir}/{avro_table_name}'
                     """
     tables[avro_table_name] = context.make_table(
