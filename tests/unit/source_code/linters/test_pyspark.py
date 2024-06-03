@@ -142,7 +142,7 @@ def test_spark_table_too_many_args(migration_index, method_context, method_name)
     if matcher.max_args > 100:
         return
     args_list = ["a"] * (matcher.max_args + 1)
-    args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
+    args_list[matcher.table_arg_index] = '"old.things"'
     args = ", ".join(args_list)
     old_code = f"""
 for i in range(10):
