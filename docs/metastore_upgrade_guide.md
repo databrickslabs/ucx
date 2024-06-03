@@ -103,7 +103,7 @@ The manual process is documented in the following links:
 
 For AWS we have to create fresh new AWS roles and set them up for UC access, using the following command:
 ```bash
-databricks labs ucx create-missing-principles --aws-profile <aws_profile> --single-role <single_role>
+databricks labs ucx create-missing-principals --aws-profile <aws_profile> --single-role <single_role>
 ```
 This command identifies all the S3 locations that are missing a UC compatible role and creates them. 
 It takes single-role optional parameter. 
