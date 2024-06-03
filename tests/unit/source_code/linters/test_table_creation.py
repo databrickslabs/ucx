@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
 METHOD_NAMES = [
     "writeTo",
     "table",
-    "insertInto",
     "saveAsTable",
 ]
 ASSIGN = [True, False]

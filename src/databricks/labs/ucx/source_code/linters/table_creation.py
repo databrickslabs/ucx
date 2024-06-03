@@ -107,7 +107,6 @@ class DBRv8d0Linter(Linter):
             [
                 NoFormatPythonMatcher("writeTo", 1, 1),
                 NoFormatPythonMatcher("table", 1, 1),
-                NoFormatPythonMatcher("insertInto", 1, 2),
                 NoFormatPythonMatcher("saveAsTable", 1, 4, 2, "format"),
             ]
         )
