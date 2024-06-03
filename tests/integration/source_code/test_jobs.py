@@ -346,6 +346,7 @@ def test_job_spark_python_task_linter_unhappy_path(
 def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random):
     whitelist = create_autospec(Whitelist)  # databricks is in default list
     whitelist.module_compatibility.return_value = UNKNOWN
+    whitelist.distribution_compatibility.return_value = UNKNOWN
 
     simple_ctx = simple_ctx.replace(
         whitelist=whitelist,
