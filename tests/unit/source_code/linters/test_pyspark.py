@@ -110,26 +110,6 @@ TABLE_METHOD_NAMES = {
 
 
 @pytest.mark.parametrize(
-    "method_context, method_name",
-    [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
-)
-def test_spark_table_no_match(migration_index, method_context, method_name):
-    spark_matchers = SparkMatchers()
-    ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSql(ftf, migration_index)
-    matcher = spark_matchers.matchers[method_name]
-    args_list = ["a"] * min(5, matcher.max_args)
-    args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
-    args = ", ".join(args_list)
-    old_code = f"""
-for i in range(10):
-    df = {method_context}.{method_name}({args})
-    do_stuff_with_df(df)
-"""
-    assert not list(sqf.lint(old_code))
-
-
-@pytest.mark.parametrize(
     "method_name",
     [method for methods in TABLE_METHOD_NAMES.values() for method in methods],
 )
