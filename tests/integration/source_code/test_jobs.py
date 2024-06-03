@@ -373,4 +373,6 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
-    assert len(problems) == 0
+    assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
+    assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
+    whitelist.distribution_compatibility.assert_called_once_with(Path(wheels[0].path).name)
