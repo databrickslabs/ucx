@@ -4,9 +4,3 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists("old.things"):
         pass
-
-# "listColumns",  # -> list[Column]
-# "tableExists",  # -> bool
-# "recoverPartitions",  # -> bool
-# "refreshTable",  # -> None
-# "uncacheTable",  # -> None

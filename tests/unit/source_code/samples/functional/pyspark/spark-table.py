@@ -6,17 +6,3 @@ for i in range(10):
     ## ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     #df = spark.table("old.things")
     do_stuff_with(df)
-
-
-
-
-    # "cacheTable",  # -> None
-    # "createTable",  # -> DataFrame
-    # "createExternalTable",  # -> DataFrame
-    # "getTable",  # -> Table
-    # "isCached",  # -> bool
-    # "listColumns",  # -> list[Column]
-    # "tableExists",  # -> bool
-    # "recoverPartitions",  # -> bool
-    # "refreshTable",  # -> None
-    # "uncacheTable",  # -> None

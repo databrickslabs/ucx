@@ -3,9 +3,3 @@ spark.read.csv("s3://bucket/path")
 for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     spark.catalog.recoverPartitions("old.things")
-
-# "listColumns",  # -> list[Column]
-# "tableExists",  # -> bool
-# "recoverPartitions",  # -> bool
-# "refreshTable",  # -> None
-# "uncacheTable",  # -> None
