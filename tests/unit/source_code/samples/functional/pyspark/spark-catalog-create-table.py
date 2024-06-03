@@ -8,5 +8,5 @@ for i in range(10):
     do_stuff_with(df)
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
-    df = spark.catalog.createExternalTable("table.we.know.nothing.about")
+    df = spark.catalog.createTable("table.we.know.nothing.about")
     do_stuff_with(df)

@@ -6,6 +6,5 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     df.write.format("delta").saveAsTable("old.things")
 
-    ##
-    # Check a literal reference to an unknown table (that is not migrated); we expect no warning.
+    ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     df.write.format("delta").saveAsTable("table.we.know.nothing.about")
