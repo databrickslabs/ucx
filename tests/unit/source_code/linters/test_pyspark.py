@@ -118,13 +118,13 @@ def test_spark_table_match(migration_index, method_context, method_name):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
-    args = ["a"] * min(5, matcher.max_args)
-    args[matcher.table_arg_index] = 'old.things'
-    # Note: known bad code for some methods, which don't return a DataFrame
+    args_list = ["a"] * min(5, matcher.max_args)
+    args_list[matcher.table_arg_index] = '"old.things"'
+    args = ", ".join(args_list)
     old_code = f"""
 spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = {method_context}.{method_name}({args!r})
+    df = {method_context}.{method_name}({args})
     do_stuff_with_df(df)
 """
     assert [
@@ -156,11 +156,12 @@ def test_spark_table_no_match(migration_index, method_context, method_name):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
-    args = ["a"] * min(5, matcher.max_args)
-    args[matcher.table_arg_index] = 'table.we.know.nothing.about'
+    args_list = ["a"] * min(5, matcher.max_args)
+    args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
+    args = ", ".join(args_list)
     old_code = f"""
 for i in range(10):
-    df = {method_context}.{method_name}({args!r})
+    df = {method_context}.{method_name}({args})
     do_stuff_with_df(df)
 """
     assert not list(sqf.lint(old_code))
@@ -177,11 +178,12 @@ def test_spark_table_too_many_args(migration_index, method_context, method_name)
     matcher = spark_matchers.matchers[method_name]
     if matcher.max_args > 100:
         return
-    args = ["a"] * (matcher.max_args + 1)
-    args[matcher.table_arg_index] = '"table.we.know.nothing.about"'
+    args_list = ["a"] * (matcher.max_args + 1)
+    args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
+    args = ", ".join(args_list)
     old_code = f"""
 for i in range(10):
-    df = {method_context}.{method_name}({args!r})
+    df = {method_context}.{method_name}({args})
     do_stuff_with_df(df)
 """
     assert not list(sqf.lint(old_code))
