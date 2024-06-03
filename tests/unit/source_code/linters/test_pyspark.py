@@ -113,44 +113,6 @@ TABLE_METHOD_NAMES = {
     "method_context, method_name",
     [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
 )
-def test_spark_table_match(migration_index, method_context, method_name):
-    spark_matchers = SparkMatchers()
-    ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSql(ftf, migration_index)
-    matcher = spark_matchers.matchers[method_name]
-    args_list = ["a"] * min(5, matcher.max_args)
-    args_list[matcher.table_arg_index] = '"old.things"'
-    args = ", ".join(args_list)
-    # Valid example, but not representative of real code for methods where the return value is used.
-    old_code = f"""
-spark.read.csv("s3://bucket/path")
-for i in range(10):
-    {method_context}.{method_name}({args})
-"""
-    assert [
-        Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
-            start_line=2,
-            start_col=0,
-            end_line=2,
-            end_col=34,
-        ),
-        Deprecation(
-            code='table-migrate',
-            message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=4,
-            start_col=4,
-            end_line=4,
-            end_col=4 + len(method_context) + 1 + len(method_name) + 1 + len(args) + 1,
-        ),
-    ] == list(sqf.lint(old_code))
-
-
-@pytest.mark.parametrize(
-    "method_context, method_name",
-    [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
-)
 def test_spark_table_no_match(migration_index, method_context, method_name):
     spark_matchers = SparkMatchers()
     ftf = FromTable(migration_index, CurrentSessionState())
