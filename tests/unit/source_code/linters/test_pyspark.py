@@ -87,7 +87,7 @@ for i in range(10):
     ] == list(sqf.lint(old_code))
 
 
-METHOD_NAMES = [
+CATALOG_METHOD_NAMES = {
     "cacheTable",
     "createTable",
     "createExternalTable",
@@ -98,10 +98,15 @@ METHOD_NAMES = [
     "recoverPartitions",
     "refreshTable",
     "uncacheTable",
-    "table",
-    "insertInto",
-    "saveAsTable",
-]
+}
+TABLE_METHOD_NAMES = {
+    "spark": {
+        "table",
+    },
+    # '_catalog' is an alias for 'catalog'
+    "spark.catalog": CATALOG_METHOD_NAMES,
+    "spark._catalog": CATALOG_METHOD_NAMES,
+}
 
 
 @pytest.mark.parametrize(
