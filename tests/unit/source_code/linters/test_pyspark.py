@@ -104,19 +104,22 @@ METHOD_NAMES = [
 ]
 
 
-@pytest.mark.parametrize("method_name", METHOD_NAMES)
-def test_spark_table_match(migration_index, method_name):
+@pytest.mark.parametrize(
+    "method_context, method_name",
+    [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
+)
+def test_spark_table_match(migration_index, method_context, method_name):
     spark_matchers = SparkMatchers()
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
-    args_list = ["a"] * min(5, matcher.max_args)
-    args_list[matcher.table_arg_index] = '"old.things"'
-    args = ",".join(args_list)
+    args = ["a"] * min(5, matcher.max_args)
+    args[matcher.table_arg_index] = 'old.things'
+    # Note: known bad code for some methods, which don't return a DataFrame
     old_code = f"""
 spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = spark.{method_name}({args})
+    df = {method_context}.{method_name}({args!r})
     do_stuff_with_df(df)
 """
     assert [
@@ -139,37 +142,41 @@ for i in range(10):
     ] == list(sqf.lint(old_code))
 
 
-@pytest.mark.parametrize("method_name", METHOD_NAMES)
-def test_spark_table_no_match(migration_index, method_name):
+@pytest.mark.parametrize(
+    "method_context, method_name",
+    [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
+)
+def test_spark_table_no_match(migration_index, method_context, method_name):
     spark_matchers = SparkMatchers()
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
-    args_list = ["a"] * min(5, matcher.max_args)
-    args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
-    args = ",".join(args_list)
+    args = ["a"] * min(5, matcher.max_args)
+    args[matcher.table_arg_index] = 'table.we.know.nothing.about'
     old_code = f"""
 for i in range(10):
-    df = spark.{method_name}({args})
+    df = {method_context}.{method_name}({args!r})
     do_stuff_with_df(df)
 """
     assert not list(sqf.lint(old_code))
 
 
-@pytest.mark.parametrize("method_name", METHOD_NAMES)
-def test_spark_table_too_many_args(migration_index, method_name):
+@pytest.mark.parametrize(
+    "method_context, method_name",
+    [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
+)
+def test_spark_table_too_many_args(migration_index, method_context, method_name):
     spark_matchers = SparkMatchers()
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
     matcher = spark_matchers.matchers[method_name]
     if matcher.max_args > 100:
         return
-    args_list = ["a"] * (matcher.max_args + 1)
-    args_list[matcher.table_arg_index] = '"table.we.know.nothing.about"'
-    args = ",".join(args_list)
+    args = ["a"] * (matcher.max_args + 1)
+    args[matcher.table_arg_index] = '"table.we.know.nothing.about"'
     old_code = f"""
 for i in range(10):
-    df = spark.{method_name}({args})
+    df = {method_context}.{method_name}({args!r})
     do_stuff_with_df(df)
 """
     assert not list(sqf.lint(old_code))
