@@ -376,3 +376,22 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
     assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
     whitelist.distribution_compatibility.assert_called_once_with(Path(wheels[0].path).name)
+
+
+def test_job_dlt_task_linter_unhappy_path(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
+    entrypoint = make_directory()
+
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+
+    task = jobs.Task(
+        task_key=make_random(4),
+        pipeline_task=jobs.PipelineTask(pipeline_id=make_random(4)),
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert (
+        len([problem for problem in problems if problem.message == "Delta Pipeline task is not yet implemented"]) == 1
+    )

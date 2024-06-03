@@ -82,6 +82,7 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
         yield from self._register_spark_submit_task(graph)
+        yield from self._register_delta_pipeline_task(graph)
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
@@ -205,6 +206,11 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.spark_submit_task:
             return
         yield DependencyProblem('not-yet-implemented', 'Spark submit task is not yet implemented')
+
+    def _register_delta_pipeline_task(self, graph: DependencyGraph):
+        if not self._task.pipeline_task:
+            return
+        yield DependencyProblem('not-yet-implemented', 'Delta Pipeline task is not yet implemented')
 
 
 class WorkflowLinter:
