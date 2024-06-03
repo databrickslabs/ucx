@@ -298,3 +298,46 @@ def test_workflow_linter_lints_job_with_wheel_dependency(
     problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
 
     assert len([problem for problem in problems if problem.message == expected_problem_message]) == 0
+
+
+def test_job_spark_python_task_linter_happy_path(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
+    entrypoint = make_directory()
+
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(
+            python_file=f"{entrypoint}/notebook.py",
+        ),
+        existing_cluster_id=new_cluster.cluster_id,
+        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
+
+
+def test_job_spark_python_task_linter_unhappy_path(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+):
+    entrypoint = make_directory()
+
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+
+    new_cluster = make_cluster(single_node=True)
+    task = jobs.Task(
+        task_key=make_random(4),
+        spark_python_task=jobs.SparkPythonTask(
+            python_file=f"{entrypoint}/notebook.py",
+        ),
+        existing_cluster_id=new_cluster.cluster_id,
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1

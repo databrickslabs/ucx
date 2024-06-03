@@ -162,7 +162,9 @@ def mock_workspace_client(
     secret_exists=True,
 ):
     ws = create_autospec(WorkspaceClient)
-    ws.current_user.me = lambda: iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")])
+    ws.current_user.me.side_effect = lambda: iam.User(
+        user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]
+    )
     ws.clusters.list.return_value = _id_list(ClusterDetails, cluster_ids)
     ws.cluster_policies.list.return_value = _id_list(Policy, policy_ids)
     ws.cluster_policies.get = _cluster_policy
@@ -177,18 +179,28 @@ def mock_workspace_client(
         ws.secrets.get_secret.return_value = GetSecretResponse(key="username", value="SGVsbG8sIFdvcmxkIQ==")
     else:
         ws.secrets.get_secret = _secret_not_found
-    download_yaml = yaml.dump(
-        {
-            'version': 1,
-            'inventory_database': 'ucx_exists',
-            'connect': {
-                'host': '...',
-                'token': '...',
-            },
-            'installed_workspace_ids': [123, 456],
-        }
-    )
-    ws.workspace.download.return_value = io.StringIO(download_yaml)
+
+    download_yaml = {
+        'config.yml': yaml.dump(
+            {
+                'version': 1,
+                'inventory_database': 'ucx_exists',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+                'installed_workspace_ids': [123, 456],
+            }
+        ),
+        'workspaces.json': json.dumps(
+            [
+                {'workspace_id': 123, 'deployment_name': 'test'},
+                {'workspace_id': 456, 'deployment_name': 'test2'},
+                {'workspace_id': 789, 'deployment_name': 'test3'},
+            ]
+        ),
+    }
+    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
     return ws
 
 

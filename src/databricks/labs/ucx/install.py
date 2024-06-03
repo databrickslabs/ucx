@@ -40,6 +40,7 @@ from databricks.sdk.service.sql import (
 )
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
@@ -663,34 +664,94 @@ class AccountInstaller(AccountContext):
         # upload the json dump of workspace info in the .ucx folder
         ctx.account_workspaces.sync_workspace_info(installed_workspaces)
 
+    @staticmethod
+    def _get_workspace(workspace_id: int, ids_to_workspace: dict[int, Workspace]) -> Workspace:
+        try:
+            workspace = ids_to_workspace[workspace_id]
+            return workspace
+        except KeyError:
+            msg = "Current workspace is not known, Please run as account-admin: databricks labs ucx sync-workspace-info"
+            raise KeyError(msg) from None
+
+    def _get_workspace_info(self, current_workspace_id: int):
+        account_client = self._get_safe_account_client()
+        workspace = account_client.workspaces.get(current_workspace_id)
+        current_workspace_client = account_client.get_workspace_client(workspace)
+        installation = Installation.current(current_workspace_client, self.product_info.product_name())
+        workspace_info = WorkspaceInfo(installation, current_workspace_client)
+        return workspace_info.load_workspace_info()
+
     def join_collection(
         self,
         current_workspace_id: int,
+        target_workspace_id: int | None = None,
     ):
-        if not self.is_account_install and self.prompts.confirm(
-            "Do you want to join the current installation to an existing collection?"
-        ):
+        if self.is_account_install:
+            # skip joining collection when installer is running for all account workspaces
+            return None
+        collection_workspace: Workspace
+        account_client = self._get_safe_account_client()
+        ctx = AccountContext(account_client)
+        ids_to_workspace = self._get_workspace_info(current_workspace_id)
+        if target_workspace_id is None:
+            if self.prompts.confirm("Do you want to join the current installation to an existing collection?"):
+                # If joining a collection as part of the installation then collection_workspace_id would be empty
+                try:
+                    # if user is account admin list and show available workspaces to select from
+                    accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
+                    target_workspace = self._get_collection_workspace(
+                        accessible_workspaces,
+                        account_client,
+                    )
+                    assert target_workspace is not None
+                    target_workspace_id = target_workspace.workspace_id
 
-            installed_workspaces: list[Workspace] | None = []
-            accessible_workspaces: list[Workspace] = []
-            account_client = self._get_safe_account_client()
-            ctx = AccountContext(account_client)
-            try:
-                accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
-            except PermissionDenied:
-                logger.warning("User doesnt have account admin permission, cant join a collection, skipping...")
-            collection_workspace = self._get_collection_workspace(accessible_workspaces, account_client)
-            if collection_workspace is not None:
-                installed_workspaces = self._sync_collection(collection_workspace, current_workspace_id, account_client)
-            if installed_workspaces is not None:
-                ctx.account_workspaces.sync_workspace_info(installed_workspaces)
+                except PermissionDenied:
+                    # if the user is not account admin, allow user to enter the workspace_id to join as collection.
+                    # if no workspace_id is entered, then exit
+                    logger.warning("User doesnt have account admin permission, cant list workspaces")
+                    target_workspace_id = int(
+                        self.prompts.question(
+                            "Please enter, the workspace id to join as a collection (enter 0 to skip it)",
+                            valid_number=True,
+                            default="0",
+                        )
+                    )
+            else:
+                return None
+        if target_workspace_id == 0 or target_workspace_id is None:
+            # if user didn't enter workspace id
+            logger.info("Skipping joining collection...")
+            return None
+        # below code is executed if either joining an existing collection (through the cli)
+        # or selecting one while installing
+        collection_workspace = AccountInstaller._get_workspace(
+            target_workspace_id,
+            ids_to_workspace,
+        )
+        if not ctx.account_workspaces.can_administer(collection_workspace):
+            # if user is not workspace admin on the workspace to join as collection then exit
+            logger.error(
+                f"User doesnt have admin access on the workspace {target_workspace_id}, " f"cant join collection."
+            )
+            return None
+        if collection_workspace is not None:
+            self._sync_collection(
+                collection_workspace,
+                current_workspace_id,
+                ids_to_workspace,
+            )
+        return None
 
     def _sync_collection(
         self,
         collection_workspace: Workspace,
         current_workspace_id: int,
-        account_client: AccountClient,
+        ids_to_workspace: dict[int, Workspace],
     ) -> list[Workspace] | None:
+        # gets the list of existing collection of workspace from the config
+        # checks if user is workspace admin on all the workspace id, if yes
+        # then joins the collection and syncs the config with all the affected workspaces
         installer = self._get_installer(collection_workspace)
         installed_workspace_ids = installer.config.installed_workspace_ids
         if installed_workspace_ids is None:
@@ -701,9 +762,20 @@ class AccountInstaller(AccountContext):
             )
         installed_workspace_ids.append(current_workspace_id)
         installed_workspaces = []
-        for account_workspace in account_client.workspaces.list():
-            if account_workspace.workspace_id in installed_workspace_ids:
-                installed_workspaces.append(account_workspace)
+        ctx = AccountContext(self._get_safe_account_client())
+        for workspace_id in installed_workspace_ids:
+            workspace = AccountInstaller._get_workspace(
+                workspace_id,
+                ids_to_workspace,
+            )
+            installed_workspaces.append(workspace)
+            if not ctx.account_workspaces.can_administer(workspace):
+
+                logger.error(
+                    f"User doesnt have admin access on the workspace {workspace_id} in the collection, "
+                    f"cant join collection."
+                )
+                return None
 
         for installed_workspace in installed_workspaces:
             installer = self._get_installer(installed_workspace)
@@ -715,10 +787,15 @@ class AccountInstaller(AccountContext):
         accessible_workspaces: list[Workspace],
         account_client: AccountClient,
     ) -> Workspace | None:
+        # iterate through each workspace and select workspace which has existing ucx installation
+        # allow user to select from the eligible workspace to join as collection
         installed_workspaces = []
         for workspace in accessible_workspaces:
             workspace_client = account_client.get_workspace_client(workspace)
-            workspace_installation = Installation.existing(workspace_client, self.product_info.product_name())
+            workspace_installation = Installation.existing(
+                workspace_client,
+                self.product_info.product_name(),
+            )
             if len(workspace_installation) > 0:
                 installed_workspaces.append(workspace)
 
@@ -730,12 +807,12 @@ class AccountInstaller(AccountContext):
             for workspace in installed_workspaces
             if workspace.deployment_name is not None
         }
-        workspace = self.prompts.choice_from_dict(
+        target_workspace = self.prompts.choice_from_dict(
             "Please select a workspace, the current installation of ucx will be grouped as a "
             "collection with the selected workspace",
             workspaces,
         )
-        return workspace
+        return target_workspace
 
 
 if __name__ == "__main__":
@@ -749,5 +826,8 @@ if __name__ == "__main__":
         account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
+
         workspace_installer.run()
-        account_installer.join_collection(workspace_installer.workspace_client.get_workspace_id())
+        account_installer.join_collection(
+            workspace_installer.workspace_client.get_workspace_id(),
+        )
