@@ -3,6 +3,7 @@ import logging
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
+from importlib.metadata import Distribution
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -139,12 +140,23 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
-    def _register_python_wheel_task(
-        self, graph: DependencyGraph
-    ) -> Iterable[DependencyProblem]:
+    def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return
-        yield from graph.register_import(self._task.python_wheel_task.package_name.replace("_", ".").lower())
+        dist_infos = []
+        for library_root in graph.path_lookup.library_roots:
+            if not library_root.exists() or not library_root.is_dir():
+                continue
+            for path in library_root.iterdir():
+                if path.name.startswith(self._task.python_wheel_task.package_name) and path.suffix == ".dist-info":
+                    dist_infos.append(path)
+        if len(dist_infos) == 0:
+            yield DependencyProblem("library-dist-info-not-found", "Could not find the library dist info")
+        distribution = Distribution.at(dist_infos[0])
+        entry_points = distribution.entry_points.select(name=self._task.python_wheel_task.entry_point)
+        if len(entry_points) == 0:
+            yield DependencyProblem("library-entrypoint-not-found", "Could not find the library entrypoint")
+        return graph.register_import(entry_points[0].module)
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_jar_task:
