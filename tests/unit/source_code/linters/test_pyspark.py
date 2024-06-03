@@ -168,6 +168,27 @@ for i in range(10):
 
 
 @pytest.mark.parametrize(
+    "method_name",
+    [method for methods in TABLE_METHOD_NAMES.values() for method in methods],
+)
+def test_spark_table_no_false_positive(migration_index, method_name):
+    spark_matchers = SparkMatchers()
+    ftf = FromTable(migration_index, CurrentSessionState())
+    sqf = SparkSql(ftf, migration_index)
+    matcher = spark_matchers.matchers[method_name]
+    args_list = ["a"] * min(5, matcher.max_args)
+    args_list[matcher.table_arg_index] = '"old.things"'
+    args = ", ".join(args_list)
+    old_code = f"""
+for i in range(10):
+    # Some totally non-spark context.
+    result = another_object.{method_name}({args})
+"""
+    warnings = list(sqf.lint(old_code))
+    assert not warnings
+
+
+@pytest.mark.parametrize(
     "method_context, method_name",
     [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
 )
