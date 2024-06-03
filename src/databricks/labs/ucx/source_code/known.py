@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import collections
 import email
-import importlib.resources
 import json
 import logging
+import pkgutil
 import re
 import sys
 from dataclasses import dataclass
@@ -56,22 +56,13 @@ class Whitelist:
             self._module_problems[name] = []
 
     @staticmethod
-    def _get_known() -> dict[str, dict[str, list[dict[str, str]]]]:
-        """Loads the set of known distributions (and false positives), included with this module.
-
-        Returns:
-            A dictionary (keyed by distribution name) containing the known problems for each module.
-        Raises:
-            FileNotFoundError: If the builtin set of known distribution is missing.
-        """
-        this_module = __package__
-        if this_module is None:
-            # When this file is invoked directly as a script, __package__ is None.
-            # Note: can get confused if this package is _also_ installed in site-packages.
-            from databricks.labs.ucx import source_code as this_module  # pylint: disable=import-outside-toplevel
-        known_json = importlib.resources.files(this_module) / "known.json"
-        with known_json.open("rb") as f:
-            return json.load(f)
+    def _get_known():
+        module = __name__
+        if __name__ == "__main__":  # code path for UCX developers invoking `make known`
+            module = "databricks.labs.ucx.source_code.known"
+        # load known.json from package data, because we may want to use zipapp packaging
+        data = pkgutil.get_data(module, "known.json")
+        return json.loads(data)
 
     def module_compatibility(self, name: str) -> Compatibility:
         if not name:
