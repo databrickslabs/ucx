@@ -352,7 +352,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
     task = jobs.Task(
         task_key=make_random(4),
         python_wheel_task=python_wheel_task,
-        new_cluster = jobs.compute.ClusterSpec(
+        new_cluster=jobs.compute.ClusterSpec(
             num_workers=1,
             node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
             spark_version=ws.clusters.select_spark_version(latest=True),
