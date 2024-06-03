@@ -141,7 +141,7 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_python_wheel_task(
         self, graph: DependencyGraph
-    ) -> Iterable[DependencyProblem]:  # pylint: disable=unused-argument
+    ) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return
         yield from graph.register_import(self._task.python_wheel_task.package_name.replace("_", ".").lower())
