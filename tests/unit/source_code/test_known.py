@@ -41,7 +41,7 @@ def test_loads_known_json():
 
 def test_error_on_missing_known_json():
     with (
-        mock.patch.object(Path, "open", side_effect=FileNotFoundError("simulate missing file")),
+        mock.patch("pkgutil.get_data", side_effect=FileNotFoundError("simulate missing file")),
         pytest.raises(FileNotFoundError),
     ):
         Whitelist._get_known()  # pylint: disable=protected-access
