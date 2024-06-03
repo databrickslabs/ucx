@@ -14,3 +14,9 @@ for i in range(10):
     ##  - table-migrate: The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     # df = spark.table("table.we.know.nothing.about")
     do_stuff_with(df)
+
+    ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
+    ## DISABLED due to false positives:
+    ##  - table-migrate: The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    df = spark.table("old.things", "extra-argument")
+    do_stuff_with(df)

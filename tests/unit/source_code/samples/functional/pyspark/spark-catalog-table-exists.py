@@ -10,3 +10,7 @@ for i in range(10):
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     if spark.catalog.tableExists("table.we.know.nothing.about"):
         pass
+
+    ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
+    if spark.catalog.tableExists("old.things", None, "extra-argument"):
+        pass

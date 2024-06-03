@@ -8,3 +8,6 @@ for i in range(10):
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     df.write.format("delta").saveAsTable("table.we.know.nothing.about")
+
+    ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
+    df.write.format("delta").saveAsTable("old.things", None, None, None, "extra-argument")

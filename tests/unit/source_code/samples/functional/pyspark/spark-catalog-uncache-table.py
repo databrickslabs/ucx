@@ -8,3 +8,6 @@ for i in range(10):
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     spark.catalog.uncacheTable("table.we.know.nothing.about")
+
+    ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
+    spark.catalog.uncacheTable("old.things", "extra-argument")

@@ -130,28 +130,6 @@ for i in range(10):
     assert not warnings
 
 
-@pytest.mark.parametrize(
-    "method_context, method_name",
-    [(context, method) for context, methods in TABLE_METHOD_NAMES.items() for method in methods],
-)
-def test_spark_table_too_many_args(migration_index, method_context, method_name):
-    spark_matchers = SparkMatchers()
-    ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSql(ftf, migration_index)
-    matcher = spark_matchers.matchers[method_name]
-    if matcher.max_args > 100:
-        return
-    args_list = ["a"] * (matcher.max_args + 1)
-    args_list[matcher.table_arg_index] = '"old.things"'
-    args = ", ".join(args_list)
-    old_code = f"""
-for i in range(10):
-    df = {method_context}.{method_name}({args})
-    do_stuff_with_df(df)
-"""
-    assert not list(sqf.lint(old_code))
-
-
 def test_spark_table_named_args(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
