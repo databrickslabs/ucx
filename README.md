@@ -391,7 +391,7 @@ To effectively upgrade the metastores, four principal operations are required:
    4. Upgrade - The metastores objects (tables/views) will be converted to a format supported by UC
    4. Grant - The table upgrade the newly created object the same permission as the original object.
 
-## Prerequisites
+### Prerequisites
 For UCX to be able to upgrade the metastore. The following prerequisites must be met:
 1. UCX must be installed and configured on the workspace. For more information on how to install UCX, refer to [This Guide](#installation).
 2. In case of an external metastore (such as GLUE), UCX has to be configured to attach to the metastore. For more information on how to configure UCX to attach to an external metastore, refer to the [External Metastore Guide](docs/external_hms_glue.md).
@@ -400,12 +400,12 @@ For UCX to be able to upgrade the metastore. The following prerequisites must be
 5. The workspace should be configured with a Metastore follow the instruction here [Create UC Metastore](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html)<br>
    Metastore can be attached to the workspace using the following [UCX command](#assign-metastore-command)
 
-## Upgrade Process
+### Upgrade Process
 The upgrade process is done in multiple steps. For each step we will discuss the manual process and how to perform it using UCX.
 
-### Step 1: Mapping Metastore Tables (UCX Only)
+#### Step 1: Mapping Metastore Tables (UCX Only)
 In this step we will map the metastore tables to UC tables.
-#### Step 1.1: Create the mapping file
+##### Step 1.1: Create the mapping file
 This step can be performed using the `create-table-mapping` command documented in the [UCX Command](#create-table-mapping-command).
 
 The CLI command will create a mapping file in the workspace UCX folder.
@@ -413,7 +413,7 @@ The CLI command will create a mapping file in the workspace UCX folder.
 By default, all the tables/views will be mapped to UC tables.
 All the tables will be mapped to a single catalog (by default), maintaining the schema/name of the original table.
 
-#### Step 1.2: Update the mapping file
+##### Step 1.2: Update the mapping file
 Update the mapping file with the required mappings. That can be performed by editing the file that was created in the previous step.
 
 You can exclude tables from the mapping by removing the line from the mapping file.
@@ -436,7 +436,7 @@ After:
 
 We are seeing that by default the mapping file retains the same schema name and table name. We override the schema name and table name to be different in the UC catalog.
 
-### Step 2: Create the necessary cloud principals for the upgrade
+#### Step 2: Create the necessary cloud principals for the upgrade
 
 Throughout this guide, we will refer to IAM roles/instance profiles in AWS & service principals/managed identities in
 as cloud principals. These cloud principals must be created/modified as prerequisites for the upgrade process.
@@ -450,56 +450,21 @@ You can read about it here:
 [AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
 [Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
 
-#### Step 2.1: Map the cloud principals to the cloud "prefixes"
+##### Step 2.1: Map the cloud principals to the cloud "prefixes"
 In this step we are going to map all the cloud principals to the paths they have access to.
-We will use the principal-prefix-access [UCX Command](#principal-prefix-access-command)
+We will use the `principal-prefix-access` [UCX Command](#principal-prefix-access-command)
 
-#### Step 2.2: Create/Modify Cloud Principals and Credentials
+##### Step 2.2: Create/Modify Cloud Principals and Credentials
 In this step we will create the necessary cloud principals for the UC credentials.
 The manual process is documented in the following links:
 [AWS-Storage Credentials](https://docs.databricks.com/en/connect/unity-catalog/storage-credentials.html)
 [Azure-Storage Credentials](https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-storage-credentials)
 
-For AWS we have to create fresh new AWS roles and set them up for UC access, using the following command:
-```bash
-databricks labs ucx create-missing-principals --aws-profile <aws_profile> --single-role <single_role>
-```
-This command identifies all the S3 locations that are missing a UC compatible role and creates them.
-It takes single-role optional parameter.
-If set to True, it will create a single role for all the S3 locations.
-Otherwise, it will create a role for each S3 location.
+For AWS we have to create fresh new AWS roles and set them up for UC access, using the `create-missing-principals` [UCX Command](#create-missing-pricipals-command-aws-only)
 
-Two optional parameter are available for this command:
-`--role-name` - This parameter is used to set the prefix for the role name. The default value is `UCX-ROLE`.
-`--role-policy` - This parameter is used to set the prefix for the role policy name. The default value is `UCX-POLICY`.
+For both AWS and Azure we can use the `migrate-credentials` [UCX command](#migrate-credentials-command) to upgrade the necessary cloud principals:
 
-
-For both AWS and Azure we can use the following CLI command to upgrade the necessary cloud principals:
-```bash
-databricks labs ucx migrate-credentials
-```
-
-For both AWS and Azure this command will create the necessary UC storage credentials in the UC metastore.
-
-Azure: this command performs the following:
-1. Identifies the Service Principal required for the upgrade.
- These have one the following roles with the ADLS Gen 2 locations of one or more of the tables.
-   - Storage Blob Data Contributor
-   - Storage Blob Data Reader
-   - Storage Blob Data Owner
-2. Looks for SP with custom roles and prompts the user to create access connectors.<br/>
-The Azure Service Principals to location mapping are listed in
-`{workspace ucx folder}/azure_storage_account_info.csv` which is generated by principal_prefix_access command.
-Please review the file and delete the Service Principals you do not want to be migrated.
-The command will only migrate the Service Principals that have client secret stored in Databricks Secret.
-
-AWS: this command migrates AWS Instance Profiles that are being used in Databricks, to UC storage credentials.
-The AWS Instance Profiles to location mapping are listed in
-{workspace ucx folder}/aws_instance_profile_info.csv which is generated by principal_prefix_access command.
-Please review the file and delete the Instance Profiles you do not want to be migrated. <br/>The aws_profile parameter indicates the aws profile to use.
-
-
-#### Step 2.3: Create External Locations
+##### Step 2.3: Create External Locations
 Once the UC credentials are created, we can create the UC external locations.
 An external location will be created for each of the locations identified in the assessment.
 The Assessment dashboard displays all the locations that need to be created.
@@ -507,22 +472,18 @@ The Manual process is documented in the following links:
 [AWS - Create External Locations](https://docs.databricks.com/en/connect/unity-catalog/external-locations.html)
 [Azure - Create External Locations](https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/external-locations)
 
-For both AWS and Azure we can use the following CLI command to create the UC external locations:
-```bash
-databricks labs ucx migrate-locations
-```
+For both AWS and Azure we can use the `migrate-location` [UCX Command](#migrate-locations-command) to create the UC external locations.
 This command will create the UC external locations for all the locations identified in the assessment.<br/>It will use the UC credentials created in the previous step.
 
-#### Step 2.4: Create "Uber Principal"
-The table migration cluster requires a cloud principal that have access to all the external tables' locations. We call that cloud principal `Uber Principals`, which needs to be be created. These are only necessary for the migration process and not required to support ongoing UC usage.
+##### Step 2.4: Create "Uber Principal"
+The table migration cluster requires a cloud principal that have access to all the external tables' locations. We call that cloud principal "Uber Principals". These are only necessary for the migration process and not required to support ongoing UC usage.
 Once the upgrade is completed, these principals can (and should) be deleted.
+Use the `create-uber-principal` [UCX Command](#create-uber-principal-command) to create the Uber Principal.
 
-#### Step 2.5: Create Catalogs and Schemas
+##### Step 2.5: Create Catalogs and Schemas
 In this step we will create the UC catalogs and schemas required for the target tables.
-The following CLI command can be used to create the UC catalogs and schemas:
-```bash
-databricks labs ucx create-catalogs-schemas
-```
+The `create-catalogs-schemas` [UCX command](#create-catalogs-schemas-command) can be used to create the UC catalogs and schemas.
+
 The command will create the UC catalogs and schemas based on the mapping file created in the previous step.
 
 
@@ -547,10 +508,7 @@ We also add a `upgraded_from_workspace_id` property to the upgraded object, to i
 | DBFS_ROOT_NON_DELTA | Tables saved to the DBFS file system that are not in Delta format                                                                                                                  | The current upgrade process will create a managed table using CTAS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | VIEW                | Datbase Views                                                                                                                                                                      | Views are recreated during the upgrade process. The view's definition will be modified to repoint to the new UC tables. Views should be migrated only after all the dependent tables have been migrated. The upgrade process account for View to View dependencies.                                                                                                                                                                                                                                                                                                                   |
 
-The upgrade process can be triggered using the following command:
-```bash
-databricks labs ucx migrate-tables
-```
+The upgrade process can be triggered using the `migrate-tables` [UCX command](#migrate-tables-command)
 
 Or by running the "Migrate Tables" workflow deployed to the workspace.
 
@@ -862,14 +820,6 @@ identifies all the storage accounts used by tables in the workspace and their pe
 Once you're done running this command, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
 
-For AWS this command produces a file named `aws_instance_profile_info.csv`.
-It has the following format:
-
-| **role_arn**                                         | **resource_type** | **privilege** | **resource_path**     |
-|------------------------------------------------------|-------------------|---------------|-----------------------|
-| arn:aws:iam::1234:instance-profile/instance-profile1 | s3                | WRITE_FILES   | s3://s3_bucket1/path1 |
-
-
 [[back to top](#databricks-labs-ucx)]
 
 ### Access for AWS S3 Buckets
@@ -881,6 +831,14 @@ databricks labs ucx principal-prefix-access --aws-profile test-profile
 Use to identify all instance profiles in the workspace, and map their access to S3 buckets.
 Also captures the IAM roles which has UC arn listed, and map their access to S3 buckets
 This requires `aws` CLI to be installed and configured.
+
+For AWS this command produces a file named `aws_instance_profile_info.csv`.
+It has the following format:
+
+| **role_arn**                                         | **resource_type** | **privilege** | **resource_path**     |
+|------------------------------------------------------|-------------------|---------------|-----------------------|
+| arn:aws:iam::1234:instance-profile/instance-profile1 | s3                | WRITE_FILES   | s3://s3_bucket1/path1 |
+
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
@@ -899,6 +857,21 @@ used in Databricks. This requires Azure CLI to be installed and configured via `
 which will be later used by migrate-credentials command to create UC storage credentials.
 
 Once done, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
+
+[[back to top](#databricks-labs-ucx)]
+
+## `create-missing-pricipals` command (AWS Only)
+```bash
+databricks labs ucx create-missing-principals --aws-profile <aws_profile> --single-role <single_role>
+```
+This command identifies all the S3 locations that are missing a UC compatible role and creates them.
+It takes single-role optional parameter.
+If set to True, it will create a single role for all the S3 locations.
+Otherwise, it will create a role for each S3 location.
+
+Two optional parameter are available for this command:
+`--role-name` - This parameter is used to set the prefix for the role name. The default value is `UCX-ROLE`.
+`--role-policy` - This parameter is used to set the prefix for the role policy name. The default value is `UCX-POLICY`.
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -942,6 +915,11 @@ For Azure, this command prompts to confirm performing the following credential m
 
   **Warning**: Service principals used to access storage accounts behind firewalls might cause connectivity issues. We
   recommend to use access connectors instead.
+
+For AWS, this command migrates AWS Instance Profiles that are being used in Databricks, to UC storage credentials.
+The AWS Instance Profiles to location mapping are listed in
+{workspace ucx folder}/aws_instance_profile_info.csv which is generated by principal_prefix_access command.
+Please review the file and delete the Instance Profiles you do not want to be migrated. <br/>The aws_profile parameter indicates the aws profile to use.
 
 Once you're done with this command, run [`validate-external-locations` command](#validate-external-locations-command) after this one.
 
@@ -1019,7 +997,7 @@ databricks labs ucx skip --schema X [--table Y]
 
 Anytime after [`create-table-mapping` command](#create-table-mapping-command) is executed, you can run this command.
 
-This command allows users to skip certain schemas or tables during the [table migration](#table-migration-workflow) process.
+This command allows users to skip certain schemas or tables during the [table migration](#table-migration) process.
 The command takes `--schema` and optionally `--table` flags to specify the schema and table to skip. If no `--table` flag
 is provided, all tables in the specified HMS database are skipped.
 This command is useful to temporarily disable migration of a particular schema or table.
