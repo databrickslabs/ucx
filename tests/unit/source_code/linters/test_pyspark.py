@@ -121,11 +121,11 @@ def test_spark_table_match(migration_index, method_context, method_name):
     args_list = ["a"] * min(5, matcher.max_args)
     args_list[matcher.table_arg_index] = '"old.things"'
     args = ", ".join(args_list)
+    # Valid example, but not representative of real code for methods where the return value is used.
     old_code = f"""
 spark.read.csv("s3://bucket/path")
 for i in range(10):
-    df = {method_context}.{method_name}({args})
-    do_stuff_with_df(df)
+    {method_context}.{method_name}({args})
 """
     assert [
         Deprecation(
@@ -140,9 +140,9 @@ for i in range(10):
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=4,
-            start_col=9,
+            start_col=4,
             end_line=4,
-            end_col=17 + len(method_name) + len(args),
+            end_col=4 + len(method_context) + 1 + len(method_name) + 1 + len(args) + 1,
         ),
     ] == list(sqf.lint(old_code))
 
