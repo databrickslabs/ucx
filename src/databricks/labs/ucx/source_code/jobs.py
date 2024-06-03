@@ -131,7 +131,7 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
-    def _register_spark_python_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_spark_python_task(self, graph: DependencyGraph):
         if not self._task.spark_python_task:
             return []
         notebook_path = self._task.spark_python_task.python_file
