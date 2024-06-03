@@ -139,11 +139,12 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
-    def _register_python_wheel_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_python_wheel_task(
+        self, graph: DependencyGraph
+    ) -> Iterable[DependencyProblem]:  # pylint: disable=unused-argument
         if not self._task.python_wheel_task:
             return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        yield DependencyProblem('not-yet-implemented', 'Python wheel task is not yet implemented')
+        yield from graph.register_import(self._task.python_wheel_task.package_name.replace("_", ".").lower())
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_jar_task:
