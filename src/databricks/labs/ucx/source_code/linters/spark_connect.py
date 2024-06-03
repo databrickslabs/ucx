@@ -22,6 +22,15 @@ class SharedClusterMatcher:
     def lint(self, node: ast.AST) -> Iterator[Advice]:
         pass
 
+    def lint_tree(self, tree: ast.AST) -> Iterator[Advice]:
+        reported_locations = set()
+        for node in ast.walk(tree):
+            for advice in self.lint(node):
+                loc = (advice.start_line, advice.start_col)
+                if loc not in reported_locations:
+                    reported_locations.add(loc)
+                    yield advice
+
 
 class JvmAccessMatcher(SharedClusterMatcher):
     _FIELDS = [
@@ -195,6 +204,5 @@ class SparkConnectLinter(Linter):
 
     def lint(self, code: str) -> Iterator[Advice]:
         tree = ast.parse(code)
-        for node in ast.walk(tree):
-            for matcher in self._matchers:
-                yield from matcher.lint(node)
+        for matcher in self._matchers:
+            yield from matcher.lint_tree(tree)

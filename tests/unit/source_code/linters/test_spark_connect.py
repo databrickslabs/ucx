@@ -21,14 +21,6 @@ spark._jspark._jvm.com.my.custom.Name()
             end_line=3,
             end_col=18,
         ),
-        Failure(
-            code="jvm-access-in-shared-clusters",
-            message='Cannot access Spark Driver JVM on UC Shared Clusters',
-            start_line=3,
-            start_col=0,
-            end_line=3,
-            end_col=13,
-        ),
     ] == list(linter.lint(code))
 
 
@@ -47,14 +39,6 @@ spark._jspark._jvm.com.my.custom.Name()
             start_col=0,
             end_line=3,
             end_col=18,
-        ),
-        Failure(
-            code="jvm-access-in-shared-clusters",
-            message='Cannot access Spark Driver JVM on Serverless Compute',
-            start_line=3,
-            start_col=0,
-            end_line=3,
-            end_col=13,
         ),
     ] == list(linter.lint(code))
 
@@ -75,20 +59,20 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_col=32,
         ),
         Failure(
-            code='legacy-context-in-shared-clusters',
-            message='sc is not supported on UC Shared Clusters. Rewrite it using spark',
-            start_line=2,
-            start_col=7,
-            end_line=2,
-            end_col=21,
-        ),
-        Failure(
             code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
             start_line=3,
             start_col=29,
             end_line=3,
             end_col=42,
+        ),
+        Failure(
+            code='legacy-context-in-shared-clusters',
+            message='sc is not supported on UC Shared Clusters. Rewrite it using spark',
+            start_line=2,
+            start_col=7,
+            end_line=2,
+            end_col=21,
         ),
         Failure(
             code="legacy-context-in-shared-clusters",
@@ -117,20 +101,20 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_col=32,
         ),
         Failure(
-            code='legacy-context-in-shared-clusters',
-            message='sc is not supported on Serverless Compute. Rewrite it using spark',
-            start_line=2,
-            start_col=7,
-            end_line=2,
-            end_col=21,
-        ),
-        Failure(
             code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on Serverless Compute. Rewrite it using DataFrame API',
             start_line=3,
             start_col=29,
             end_line=3,
             end_col=42,
+        ),
+        Failure(
+            code='legacy-context-in-shared-clusters',
+            message='sc is not supported on Serverless Compute. Rewrite it using spark',
+            start_line=2,
+            start_col=7,
+            end_line=2,
+            end_col=21,
         ),
         Failure(
             code="legacy-context-in-shared-clusters",
@@ -157,14 +141,6 @@ df.rdd.mapPartitions(myUdf)
             start_col=0,
             end_line=3,
             end_col=27,
-        ),
-        Failure(
-            code="rdd-in-shared-clusters",
-            message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
-            start_line=3,
-            start_col=0,
-            end_line=3,
-            end_col=6,
         ),
     ] == list(linter.lint(code))
 
