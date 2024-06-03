@@ -49,6 +49,7 @@ from databricks.labs.ucx.cli import (
     validate_external_locations,
     validate_groups_membership,
     workflows,
+    join_collection,
 )
 from databricks.labs.ucx.contexts.account_cli import AccountContext
 from databricks.labs.ucx.contexts.workspace_cli import WorkspaceContext
@@ -590,3 +591,12 @@ def test_cli_missing_awscli(ws, mocker, caplog):
     with pytest.raises(ValueError):
         ctx = WorkspaceContext(ws).replace(is_aws=True, is_azure=False, aws_profile="profile")
         migrate_locations(ws, ctx)
+
+
+def test_join_collection():
+    a = create_autospec(AccountClient)
+    w = create_autospec(WorkspaceClient)
+    a.get_workspace_client.return_value = w
+    w.workspace.download.return_value = io.StringIO(json.dumps([{"workspace_id": 123, "workspace_name": "some"}]))
+    join_collection(a, w, 123)
+    w.workspace.download.assert_called()
