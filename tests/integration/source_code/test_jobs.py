@@ -344,6 +344,10 @@ def test_job_spark_python_task_linter_unhappy_path(
 
 
 def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random):
+    simple_ctx = simple_ctx.replace(
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
+    )
+
     simple_ctx.workspace_installation.run()  # Creates ucx wheel
     wheels = [file for file in simple_ctx.installation.files() if file.path.endswith(".whl")]
     library = compute.Library(whl=wheels[0].path)
