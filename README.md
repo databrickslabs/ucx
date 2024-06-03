@@ -382,7 +382,6 @@ simply add `--debug` flag to any command.
 [[back to top](#databricks-labs-ucx)]
 
 ## Table Migration
-## Table Upgrade
 This Section provides a guide for upgrading the Hive metastore objects to UC using UCX.
 The metastore upgrade process is composed of multiple steps.
 To effectively upgrade the metastores, four principal operations are required:
@@ -394,15 +393,12 @@ To effectively upgrade the metastores, four principal operations are required:
 
 ## Prerequisites
 For UCX to be able to upgrade the metastore. The following prerequisites must be met:
-1. UCX must be installed and configured on the workspace. For more information on how to install UCX, refer to the [external_hms_glue.md](external_hms_glue.md).
-2. In case of an external metastore (such as GLUE), UCX has to be configured to attach to the metastore. For more information on how to configure UCX to attach to an external metastore, refer to the [External Metastore Guide]().
+1. UCX must be installed and configured on the workspace. For more information on how to install UCX, refer to [This Guide](#installation).
+2. In case of an external metastore (such as GLUE), UCX has to be configured to attach to the metastore. For more information on how to configure UCX to attach to an external metastore, refer to the [External Metastore Guide](docs/external_hms_glue.md).
 3. The assessment workflow must be run.
-4. It is recommended that the group migration process will be completed before upgrading the metastore. For more information on how to migrate groups, refer to the [UCX Readme](../README.md).
+4. It is recommended that the group migration process will be completed before upgrading the metastore. For more information on how to migrate groups, refer to the [UCX Readme](#group-migration-workflow).
 5. The workspace should be configured with a Metastore follow the instruction here [Create UC Metastore](https://docs.databricks.com/en/data-governance/unity-catalog/create-metastore.html)<br>
-   Metastore can be attached to the workspace using the following UCX command:<br>
-   ```bash
-    databricks labs ucx assign-metastore --workspace-id <workspace-id> [--metastore-id <metastore-id>]
-    ```
+   Metastore can be attached to the workspace using the following [UCX command](#assign-metastore-command)
 
 ## Upgrade Process
 The upgrade process is done in multiple steps. For each step we will discuss the manual process and how to perform it using UCX.
@@ -410,19 +406,9 @@ The upgrade process is done in multiple steps. For each step we will discuss the
 ### Step 1: Mapping Metastore Tables (UCX Only)
 In this step we will map the metastore tables to UC tables.
 #### Step 1.1: Create the mapping file
-This step can be performed using the `create-table-mapping` command documented in the [UCX Readme](../README.md#create-table-mapping-command).
-CLI Command
-```bash
-databricks labs ucx create-table-mapping
-```
+This step can be performed using the `create-table-mapping` command documented in the [UCX Command](#create-table-mapping-command).
 
 The CLI command will create a mapping file in the workspace UCX folder.
-
-The format of the mapping file is as follows:
-
-| **columns:** | **workspace_name**      | **catalog_name** | **src_schema** | **dst_schema** | **src_table** | **dst_table** |
-|--------------|---------------------|--------------|----------------|----------------|---------------|---------------|
-| values:      | data_engineering_ws | de_catalog   | database1      | database1      | table1        | table1        |
 
 By default, all the tables/views will be mapped to UC tables.
 All the tables will be mapped to a single catalog (by default), maintaining the schema/name of the original table.
@@ -466,18 +452,7 @@ You can read about it here:
 
 #### Step 2.1: Map the cloud principals to the cloud "prefixes"
 In this step we are going to map all the cloud principals to the paths they have access to.
-We will use the following command:
-```bash
-databricks labs ucx principal-prefix-access
-```
-
-This command produces a file named `aws_instance_profile_info.csv`.
-It has the following format:
-
-| **role_arn**                                         | **resource_type** | **privilege** | **resource_path**     |
-|------------------------------------------------------|-------------------|---------------|-----------------------|
-| arn:aws:iam::1234:instance-profile/instance-profile1 | s3                | WRITE_FILES   | s3://s3_bucket1/path1 |
-
+We will use the principal-prefix-access [UCX Command](#principal-prefix-access-command)
 
 #### Step 2.2: Create/Modify Cloud Principals and Credentials
 In this step we will create the necessary cloud principals for the UC credentials.
@@ -886,6 +861,15 @@ or [Azure CLI](#access-for-azure-storage-accounts) to be installed and authentic
 identifies all the storage accounts used by tables in the workspace and their permissions on each storage account.
 Once you're done running this command, proceed to the [`migrate-credentials` command](#migrate-credentials-command).
 
+
+For AWS this command produces a file named `aws_instance_profile_info.csv`.
+It has the following format:
+
+| **role_arn**                                         | **resource_type** | **privilege** | **resource_path**     |
+|------------------------------------------------------|-------------------|---------------|-----------------------|
+| arn:aws:iam::1234:instance-profile/instance-profile1 | s3                | WRITE_FILES   | s3://s3_bucket1/path1 |
+
+
 [[back to top](#databricks-labs-ucx)]
 
 ### Access for AWS S3 Buckets
@@ -934,7 +918,7 @@ workflows. Once migration is complete, this service principal should be unprovis
 On Azure, it creates a principal with `Storage Blob Data Contributor` role assignment on every storage account using
 Azure Resource Manager APIs.
 
-This command is one of prerequisites for the [table migration workflow](#table-migration-workflow).
+This command is one of prerequisites for the [table migration workflow](#table-migration).
 
 [[back to top](#databricks-labs-ucx)]
 
@@ -1006,6 +990,12 @@ table mapping for review in CSV format in the Databricks Workspace:
 workspace_name,catalog_name,src_schema,dst_schema,src_table,dst_table
 labs-azure,labs_azure,default,default,ucx_tybzs,ucx_tybzs
 ```
+
+The format of the mapping file is as follows:
+
+| **columns:** | **workspace_name**      | **catalog_name** | **src_schema** | **dst_schema** | **src_table** | **dst_table** |
+|--------------|---------------------|--------------|----------------|----------------|---------------|---------------|
+| values:      | data_engineering_ws | de_catalog   | database1      | database1      | table1        | table1        |
 
 You are supposed to review this mapping and adjust it if necessary. This file is in CSV format, so that you can edit it
 easier in your favorite spreadsheet application.
