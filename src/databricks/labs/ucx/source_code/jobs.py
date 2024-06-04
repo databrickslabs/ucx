@@ -151,10 +151,11 @@ class WorkflowTaskContainer(SourceContainer):
                 distribution = Distribution.at(path)
                 if condition(distribution):
                     return distribution
+        return None
 
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
-            return
+            return []
         prepared = Prepared(self._task.python_wheel_task.package_name)
         # Yes, Databricks uses "legacy" normalized name
         distribution = self._find_distribution(graph.path_lookup, lambda d: d.name == prepared.legacy_normalized)
