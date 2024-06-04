@@ -167,6 +167,7 @@ class WorkflowTaskContainer(SourceContainer):
         entry_point_name = self._task.python_wheel_task.entry_point
         try:
             entry_point = distribution.entry_points[entry_point_name]
+            return graph.register_import(entry_point.module)
         except KeyError:
             return [
                 DependencyProblem(
@@ -174,7 +175,6 @@ class WorkflowTaskContainer(SourceContainer):
                     f"Could not find distribution entry point for {distribution_name}.{entry_point_name}",
                 )
             ]
-        return graph.register_import(entry_point.module)
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_jar_task:
