@@ -8,9 +8,9 @@ for i in range(10):
     do_stuff_with(table)
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
-    df = spark.catalog.getTable("table.we.know.nothing.about")
-    do_stuff_with(df)
+    table = spark.catalog.getTable("table.we.know.nothing.about")
+    do_stuff_with(table)
 
     ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
-    df = spark.catalog.getTable("old.things", "extra-argument")
-    do_stuff_with(df)
+    table = spark.catalog.getTable("old.things", "extra-argument")
+    do_stuff_with(table)
