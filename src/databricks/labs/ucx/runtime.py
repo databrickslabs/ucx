@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+from importlib.metadata import Distribution
+
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.workflows import Assessment, Failing
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
