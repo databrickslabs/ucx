@@ -5,8 +5,7 @@ import pytest
 from astroid import Attribute, Call, Expr  # type: ignore
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, PythonLinter, TreeWalker
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, DbutilsLinter
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter, PythonLinter, TreeWalker
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():

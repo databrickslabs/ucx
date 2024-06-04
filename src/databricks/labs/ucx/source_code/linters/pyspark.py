@@ -11,7 +11,7 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
 )
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
 

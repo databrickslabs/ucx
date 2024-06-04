@@ -5,7 +5,7 @@ import sqlglot
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, Visitor
+from databricks.labs.ucx.source_code.linters.imports import Visitor, ASTLinter
 
 
 class DetectDbfsVisitor(Visitor):

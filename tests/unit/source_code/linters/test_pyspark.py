@@ -2,11 +2,9 @@ import pytest
 
 from astroid import Call, Const, Expr  # type: ignore
 
-from databricks.labs.ucx.source_code.base import Advisory, Deprecation, CurrentSessionState
-from databricks.labs.ucx.source_code.pyspark import SparkMatchers, SparkSqlLinter, AstHelper, TableNameMatcher
-from databricks.labs.ucx.source_code.python_linter import ASTLinter
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
-from databricks.labs.ucx.source_code.linters.pyspark import SparkSql, AstHelper, TableNameMatcher
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter
+from databricks.labs.ucx.source_code.linters.pyspark import AstHelper, TableNameMatcher, SparkSqlLinter
 from databricks.labs.ucx.source_code.queries import FromTable
 
 

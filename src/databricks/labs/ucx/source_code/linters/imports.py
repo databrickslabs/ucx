@@ -409,4 +409,3 @@ class PythonLinter(Linter):
             )
             problems.append(problem)
             return [], problems
-
