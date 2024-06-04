@@ -1,11 +1,10 @@
 import functools
 import logging
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Callable
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
