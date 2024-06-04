@@ -260,7 +260,8 @@ def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(
 
 
 def test_workflow_task_container_builds_dependency_graph_with_missing_distribution_in_python_wheel_task(
-    mock_path_lookup, graph,
+    mock_path_lookup,
+    graph,
 ):
     ws = create_autospec(WorkspaceClient)
     python_wheel_task = jobs.PythonWheelTask(package_name="databricks_labs_ucx", entry_point="runtime")
@@ -273,3 +274,23 @@ def test_workflow_task_container_builds_dependency_graph_with_missing_distributi
     assert problems[0].code == "distribution-not-found"
     assert problems[0].message == "Could not find distribution for databricks_labs_ucx"
     ws.assert_not_called()
+
+
+def test_workflow_task_container_builds_dependency_graph_with_missing_entrypoint_in_python_wheel_task(graph):
+    ws = create_autospec(WorkspaceClient)
+
+    whl_file = Path(__file__).parent / "samples" / "library-wheel" / "demo_egg-0.0.1-py3-none-any.whl"
+    with whl_file.open("rb") as f:
+        ws.workspace.download.return_value = io.BytesIO(f.read())
+
+    python_wheel_task = jobs.PythonWheelTask(package_name="demo_egg", entry_point="non_existing_entrypoint")
+    libraries = [compute.Library(whl=whl_file.as_posix())]
+    task = jobs.Task(task_key="test", libraries=libraries, python_wheel_task=python_wheel_task)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "distribution-entry-point-not-found"
+    assert problems[0].message == "Could not find distribution entry point for demo_egg.non_existing_entrypoint"
+    ws.workspace.download.assert_called_once_with(whl_file.as_posix(), format=ExportFormat.AUTO)

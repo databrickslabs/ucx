@@ -154,21 +154,24 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return []
-        # Prepared exists in metadata.__init__py, but is not defined in
-        prepared = metadata.Prepared(self._task.python_wheel_task.package_name)  # type: ignore
-        # Yes, Databricks uses "legacy" normalized name
-        distribution = self._find_distribution(graph.path_lookup, lambda d: d.name == prepared.legacy_normalized)
+        distribution_name = self._task.python_wheel_task.package_name
+        distribution = self._find_distribution(
+            graph.path_lookup,
+            # Prepared exists in metadata.__init__py, but is not defined in
+            # Yes, Databricks uses "legacy" normalized name
+            lambda d: metadata.Prepared.legacy_normalize(d.name) == distribution_name,  # type: ignore
+        )
         if distribution is None:
-            return [
-                DependencyProblem(
-                    "distribution-not-found", f"Could not find distribution for {prepared.legacy_normalized}"
-                )
-            ]
+            return [DependencyProblem("distribution-not-found", f"Could not find distribution for {distribution_name}")]
+        entry_point_name = self._task.python_wheel_task.entry_point
         try:
-            entry_point = distribution.entry_points[self._task.python_wheel_task.entry_point]
+            entry_point = distribution.entry_points[entry_point_name]
         except KeyError:
             return [
-                DependencyProblem("distribution-entrypoint-not-found", "Could not find the distribution entrypoint")
+                DependencyProblem(
+                    "distribution-entry-point-not-found",
+                    f"Could not find distribution entry point for {distribution_name}.{entry_point_name}",
+                )
             ]
         return graph.register_import(entry_point.module)
 
