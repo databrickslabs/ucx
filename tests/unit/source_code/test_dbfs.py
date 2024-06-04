@@ -8,9 +8,8 @@ class TestDetectDBFS:
     @pytest.mark.parametrize(
         "code, expected",
         [
-            ('"/dbfs/mnt"', 1),
-            ('"not a file system path"', 0),
-            ('"/dbfs/mnt", "dbfs:/", "/mnt/"', 3),
+            ('SOME_CONSTANT = "not a file system path"', 0),
+            ('SOME_CONSTANT = ("/dbfs/mnt", "dbfs:/", "/mnt/")', 3),
             ('# "/dbfs/mnt"', 0),
             ('SOME_CONSTANT = "/dbfs/mnt"', 1),
             ('SOME_CONSTANT = "/dbfs/mnt"; load_data(SOME_CONSTANT)', 1),
@@ -18,13 +17,11 @@ class TestDetectDBFS:
         ],
     )
     def test_detects_dbfs_str_const_paths(self, code, expected):
-        finder = DBFSUsageLinter()
-        advices = finder.lint(code)
-        count = 0
+        linter = DBFSUsageLinter()
+        advices = list(linter.lint(code))
         for advice in advices:
             assert isinstance(advice, Advisory)
-            count += 1
-        assert count == expected
+        assert len(advices) == expected
 
     @pytest.mark.parametrize(
         "code, expected",

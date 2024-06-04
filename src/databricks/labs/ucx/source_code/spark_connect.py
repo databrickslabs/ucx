@@ -1,14 +1,15 @@
-import ast
 from abc import abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from astroid import Attribute, Call, Name, NodeNG  # type: ignore
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
     Linter,
 )
 from databricks.labs.ucx.source_code.ast_helpers import AstHelper
+from databricks.labs.ucx.source_code.python_linter import TreeWalker, ASTLinter
 
 
 @dataclass
@@ -19,7 +20,7 @@ class SharedClusterMatcher:
         return 'UC Shared Clusters' if not self.is_serverless else 'Serverless Compute'
 
     @abstractmethod
-    def lint(self, node: ast.AST) -> Iterator[Advice]:
+    def lint(self, node: NodeNG) -> Iterator[Advice]:
         pass
 
 
@@ -32,10 +33,10 @@ class JvmAccessMatcher(SharedClusterMatcher):
         "_jsparkSession",
     ]
 
-    def lint(self, node: ast.AST) -> Iterator[Advice]:
-        if not isinstance(node, ast.Attribute):
+    def lint(self, node: NodeNG) -> Iterator[Advice]:
+        if not isinstance(node, Attribute):
             return
-        if node.attr not in JvmAccessMatcher._FIELDS:
+        if node.attrname not in JvmAccessMatcher._FIELDS:
             return
         yield Failure(
             code='jvm-access-in-shared-clusters',
@@ -67,14 +68,14 @@ class RDDApiMatcher(SharedClusterMatcher):
         "wholeTextFiles",
     ]
 
-    def lint(self, node: ast.AST) -> Iterator[Advice]:
-        if not isinstance(node, ast.Call):
+    def lint(self, node: NodeNG) -> Iterator[Advice]:
+        if not isinstance(node, Call):
             return
-        assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
-        if node.func.attr not in self._SC_METHODS:
+        assert isinstance(node.func, Attribute)  # Avoid linter warning
+        if node.func.attrname not in self._SC_METHODS:
             return
         function_name = AstHelper.get_full_function_name(node)
-        if not function_name or not function_name.endswith(f"sc.{node.func.attr}"):
+        if not function_name or not function_name.endswith(f"sc.{node.func.attrname}"):
             return
         yield Failure(
             code='rdd-in-shared-clusters',
@@ -89,14 +90,14 @@ class RDDApiMatcher(SharedClusterMatcher):
 class SparkSqlContextMatcher(SharedClusterMatcher):
     _ATTRIBUTES = ["sc", "sqlContext", "sparkContext"]
 
-    def lint(self, node: ast.AST) -> Iterator[Advice]:
-        if not isinstance(node, ast.Attribute):
+    def lint(self, node: NodeNG) -> Iterator[Advice]:
+        if not isinstance(node, Attribute):
             return
-        if not isinstance(node.value, ast.Name) or node.value.id not in SparkSqlContextMatcher._ATTRIBUTES:
+        if not isinstance(node.expr, Name) or node.expr.name not in SparkSqlContextMatcher._ATTRIBUTES:
             return
         yield Failure(
             code='legacy-context-in-shared-clusters',
-            message=f'{node.value.id} is not supported on {self._cluster_type_str()}. Rewrite it using spark',
+            message=f'{node.expr.name} is not supported on {self._cluster_type_str()}. Rewrite it using spark',
             start_line=node.lineno,
             start_col=node.col_offset,
             end_line=node.end_lineno or 0,
@@ -113,7 +114,7 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
+        linter = ASTLinter.parse(code)
+        for node in TreeWalker.walk(linter.root):
             for matcher in self._matchers:
                 yield from matcher.lint(node)

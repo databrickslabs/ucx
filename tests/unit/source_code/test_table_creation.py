@@ -121,4 +121,5 @@ def test_dbr_version_filter(migration_index, dbr_version):
     """Tests the DBR version cutoff filter"""
     old_code = get_code(False, 'spark.foo().bar().table("catalog.db.table").baz()')
     expected = [] if dbr_version["suppress"] else [get_advice(False, 'table', 18)]
-    assert expected == lint(old_code, dbr_version["version"])
+    actual = lint(old_code, dbr_version["version"])
+    assert actual == expected

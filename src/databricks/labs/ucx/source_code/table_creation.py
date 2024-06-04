@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import ast
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
+from astroid import Attribute, Call, NodeNG  # type: ignore
 
-from databricks.labs.ucx.source_code.python_linter import ASTLinter
+from databricks.labs.ucx.source_code.python_linter import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
@@ -37,38 +37,36 @@ class NoFormatPythonMatcher:
     format_arg_index: int | None = None
     format_arg_name: str | None = None
 
-    def get_advice_span(self, node: ast.AST) -> Range | None:
-        # Check 1: retrieve full callchain:
-        callchain = ASTLinter(node).extract_callchain()
-        if callchain is None:
+    def get_advice_span(self, node: NodeNG) -> Range | None:
+        # Check 1: check Call:
+        if not isinstance(node, Call):
             return None
 
         # Check 2: check presence of the table-creating method call:
-        call = ASTLinter(callchain).extract_call_by_name(self.method_name)
-        if call is None:
+        if not isinstance(node.func, Attribute) or node.func.attrname != self.method_name:
             return None
-        call_args_count = ASTLinter(call).args_count()
+        call_args_count = ASTLinter.args_count(node)
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
         # Check 3: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
         #   >>> df.saveToTable("c.db.table", format="csv")
-        format_arg = ASTLinter(call).get_arg(self.format_arg_index, self.format_arg_name)
-        if format_arg is not None and not ASTLinter(format_arg).is_none():
+        format_arg = ASTLinter.get_arg(node, self.format_arg_index, self.format_arg_name)
+        if format_arg is not None and not ASTLinter.is_none(format_arg):
             # i.e., found an explicit "format" argument, and its value is not None.
             return None
         #   Option B. format specifier may be a separate ".format(...)" call in this callchain
         #   >>> df.format("csv").saveToTable("c.db.table")
-        format_call = ASTLinter(callchain).extract_call_by_name("format")
+        format_call = ASTLinter.extract_call_by_name(node, "format")
         if format_call is not None:
             # i.e., found an explicit ".format(...)" call in this chain.
             return None
 
         # Finally: matched the need for advice, so return the corresponding source range:
         return Range(
-            Position(call.lineno, call.col_offset),
-            Position(call.end_lineno or 0, call.end_col_offset or 0),
+            Position(node.lineno, node.col_offset),
+            Position(node.end_lineno or 0, node.end_col_offset or 0),
         )
 
 
@@ -78,7 +76,7 @@ class NoFormatPythonLinter:
     def __init__(self, matchers: list[NoFormatPythonMatcher]):
         self._matchers = matchers
 
-    def lint(self, node: ast.AST) -> Iterator[Advice]:
+    def lint(self, node: NodeNG) -> Iterator[Advice]:
         for matcher in self._matchers:
             span = matcher.get_advice_span(node)
             if span is not None:
@@ -90,6 +88,11 @@ class NoFormatPythonLinter:
                     end_line=span.end.line,
                     end_col=span.end.character,
                 )
+
+
+class LintingVisitor:
+
+    pass
 
 
 class DBRv8d0Linter(Linter):
@@ -116,6 +119,7 @@ class DBRv8d0Linter(Linter):
         if self._skip_dbr:
             return
 
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
-            yield from self._linter.lint(node)
+        linter = ASTLinter.parse(code)
+        for node in TreeWalker.walk(linter.root):
+            advices = list(self._linter.lint(node))
+            yield from advices

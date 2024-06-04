@@ -62,7 +62,7 @@ def test_rdd_context_match_shared():
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     """
-    assert [
+    expected = [
         Failure(
             code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
@@ -95,7 +95,9 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_line=3,
             end_col=40,
         ),
-    ] == list(linter.lint(code))
+    ]
+    actual = list(linter.lint(code))
+    assert actual == expected
 
 
 def test_rdd_context_match_serverless():
