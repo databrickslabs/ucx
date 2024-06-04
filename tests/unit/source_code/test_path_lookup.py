@@ -32,9 +32,12 @@ def test_lookup_inserts_path(tmp_path):
         sys_paths.append(path)
 
     provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
-    provider.insert_path(1, Path("is"))
 
-    assert provider.library_roots[1:] == sys_paths
+    new_sys_path = tmp_path / Path("is")
+    new_sys_path.mkdir()
+    provider.insert_path(1, new_sys_path)
+
+    assert provider.library_roots[1:] == [sys_paths[0]] + [new_sys_path] + sys_paths[1:]
 
 
 def test_lookup_removes_path(tmp_path):
