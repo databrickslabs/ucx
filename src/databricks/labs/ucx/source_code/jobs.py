@@ -1,7 +1,7 @@
 import functools
 import logging
 import tempfile
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
@@ -142,12 +142,17 @@ class WorkflowTaskContainer(SourceContainer):
 
     @staticmethod
     def _find_first_matching_distribution(
-        path_lookup: PathLookup, condition: Callable[[metadata.Distribution], bool]
+        path_lookup: PathLookup, distribution_name: str
     ) -> metadata.Distribution | None:
+        def legacy_normalize_name(name: str) -> str:
+            # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
+            return metadata.Prepared.legacy_normalize(name)  # type: ignore
+
         for library_root in path_lookup.library_roots:
             for path in library_root.glob("*.dist-info"):
                 distribution = metadata.Distribution.at(path)
-                if condition(distribution):
+                # Yes, Databricks uses "legacy" normalized name
+                if legacy_normalize_name(distribution.name) == legacy_normalize_name(distribution_name):
                     return distribution
         return None
 
@@ -155,16 +160,8 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.python_wheel_task:
             return []
 
-        def legacy_normalize_name(name: str) -> str:
-            # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
-            return metadata.Prepared.legacy_normalize(name)  # type: ignore
-
         distribution_name = self._task.python_wheel_task.package_name
-        distribution = self._find_first_matching_distribution(
-            graph.path_lookup,
-            # Yes, Databricks uses "legacy" normalized name
-            lambda d: legacy_normalize_name(distribution_name) == legacy_normalize_name(d.name),
-        )
+        distribution = self._find_first_matching_distribution(graph.path_lookup, distribution_name)
         if distribution is None:
             return [DependencyProblem("distribution-not-found", f"Could not find distribution for {distribution_name}")]
         entry_point_name = self._task.python_wheel_task.entry_point
