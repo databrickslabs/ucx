@@ -396,3 +396,23 @@ def test_job_dlt_task_linter_unhappy_path(
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+
+
+def test_job_dlt_task_linter_happy_path(
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory, make_pipeline
+):
+    entrypoint = make_directory()
+    make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    dlt_pipeline = make_pipeline(
+        libraries=[pipelines.PipelineLibrary(notebook=NotebookLibrary(path=f"{entrypoint}/notebook.py"))]
+    )
+
+    task = jobs.Task(
+        task_key=make_random(4),
+        pipeline_task=jobs.PipelineTask(pipeline_id=dlt_pipeline.pipeline_id),
+        libraries=[compute.Library(pypi=compute.PythonPyPiLibrary(package="greenlet"))],
+    )
+    j = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(j.job_id)
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 0
