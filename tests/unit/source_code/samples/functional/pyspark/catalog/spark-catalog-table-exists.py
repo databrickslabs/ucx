@@ -6,6 +6,10 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     if spark.catalog.tableExists("old.things"):
         pass
+    # TODO: Fix missing migration warning:
+    # #ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    if spark.catalog.tableExists("things", "old"):
+        pass
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     if spark.catalog.tableExists("table.we.know.nothing.about"):

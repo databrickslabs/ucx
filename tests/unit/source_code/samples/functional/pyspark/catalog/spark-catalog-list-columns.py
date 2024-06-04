@@ -5,6 +5,9 @@ for i in range(10):
     ## Check a literal reference to a known table that is migrated.
     # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     columns = spark.catalog.listColumns("old.things")
+    # TODO: Fix missing migration warning:
+    # #ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    columns = spark.catalog.listColumns("things", "old")
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     columns = spark.catalog.listColumns("table.we.know.nothing.about")
