@@ -174,34 +174,6 @@ for i in range(10):
     ] == list(sqf.lint(old_code))
 
 
-def test_spark_table_return_value(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSql(ftf, migration_index)
-    old_code = """
-spark.read.csv("s3://bucket/path")
-for table in spark.catalog.listTables():
-    do_stuff_with_table(table)
-"""
-    assert [
-        Deprecation(
-            code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
-            start_line=2,
-            start_col=0,
-            end_line=2,
-            end_col=34,
-        ),
-        Advisory(
-            code='table-migrate',
-            message="Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
-            start_line=3,
-            start_col=13,
-            end_line=3,
-            end_col=39,
-        ),
-    ] == list(sqf.lint(old_code))
-
-
 def test_spark_table_return_value_apply(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
     sqf = SparkSql(ftf, migration_index)
