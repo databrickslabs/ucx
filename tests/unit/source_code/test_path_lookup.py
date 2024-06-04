@@ -11,22 +11,40 @@ def test_lookup_is_initialized_with_syspath():
     assert len(filtered) > 0
 
 
-def test_lookup_is_initialized_with_handmade_string():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
+def test_lookup_is_initialized_with_handmade_string(tmp_path):
+    directories, sys_paths = ("what", "on", "earth"), []
+    for directory in directories:
+        path = tmp_path / directory
+        path.mkdir()
+        sys_paths.append(path)
+
+    provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
+
     assert provider is not None
-    paths = provider.library_roots[1:]
-    assert paths == [Path("what"), Path("on"), Path("earth")]
+    assert provider.library_roots[1:] == sys_paths
 
 
-def test_lookup_inserts_path():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
+def test_lookup_inserts_path(tmp_path):
+    directories, sys_paths = ("what", "on", "earth"), []
+    for directory in directories:
+        path = tmp_path / directory
+        path.mkdir()
+        sys_paths.append(path)
+
+    provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
     provider.insert_path(1, Path("is"))
-    paths = provider.library_roots[1:]
-    assert paths == [Path("what"), Path("is"), Path("on"), Path("earth")]
+
+    assert provider.library_roots[1:] == sys_paths
 
 
-def test_lookup_removes_path():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:is:on:earth")
+def test_lookup_removes_path(tmp_path):
+    directories, sys_paths = ("what", "is", "on", "earth"), []
+    for directory in directories:
+        path = tmp_path / directory
+        path.mkdir()
+        sys_paths.append(path)
+
+    provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
     provider.remove_path(1)
-    paths = provider.library_roots[1:]
-    assert paths == [Path("what"), Path("on"), Path("earth")]
+    sys_paths.pop(1)
+    assert provider.library_roots[1:] == sys_paths
