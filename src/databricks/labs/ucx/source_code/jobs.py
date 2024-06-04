@@ -186,21 +186,22 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_pipeline_task(self, graph: DependencyGraph):
         if not self._task.pipeline_task:
-            return []
+            return
 
         pipeline = self._ws.pipelines.get(self._task.pipeline_task.pipeline_id)
         if not pipeline.spec:
-            return []
+            return
         if not pipeline.spec.libraries:
-            return []
+            return
 
         pipeline_libraries = pipeline.spec.libraries
         for library in pipeline_libraries:
-            if library.notebook:
-                if library.notebook.path:
-                    notebook_path = library.notebook.path
-                    path = WorkspacePath(self._ws, notebook_path)
-                    yield from graph.register_notebook(path)
+            if not library.notebook:
+                return
+            if library.notebook.path:
+                notebook_path = library.notebook.path
+                path = WorkspacePath(self._ws, notebook_path)
+                yield from graph.register_notebook(path)
             if library.jar:
                 yield from self._register_library(graph, compute.Library(jar=library.jar))
             if library.maven:
