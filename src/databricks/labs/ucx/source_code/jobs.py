@@ -144,15 +144,12 @@ class WorkflowTaskContainer(SourceContainer):
     def _find_first_matching_distribution(
         path_lookup: PathLookup, distribution_name: str
     ) -> metadata.Distribution | None:
-        def legacy_normalize_name(name: str) -> str:
-            # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
-            return metadata.Prepared.legacy_normalize(name)  # type: ignore
-
+        # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
+        normalize_name = metadata.Prepared.normalize  # type: ignore
         for library_root in path_lookup.library_roots:
             for path in library_root.glob("*.dist-info"):
                 distribution = metadata.Distribution.at(path)
-                # Yes, Databricks uses "legacy" normalized name
-                if legacy_normalize_name(distribution.name) == legacy_normalize_name(distribution_name):
+                if normalize_name(distribution.name) == normalize_name(distribution_name):
                     return distribution
         return None
 
