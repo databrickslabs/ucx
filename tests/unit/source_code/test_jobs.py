@@ -244,7 +244,7 @@ def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_librar
 def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(mock_path_lookup, graph):
     ws = create_autospec(WorkspaceClient)
 
-    egg_file = Path(__file__).parent / "samples" / "library-egg" / "demo_egg-0.0.1-py3.6.egg"
+    egg_file = Path(__file__).parent / "samples/distribution/dist/thingy-0.0.1-py3.10.egg"
     with egg_file.open("rb") as f:
         ws.workspace.download.return_value = io.BytesIO(f.read())
 
@@ -255,5 +255,5 @@ def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("pkgdir")) is not None
+    assert graph.path_lookup.resolve(Path("thingy")) is not None
     ws.workspace.download.assert_called_once_with(egg_file.as_posix(), format=ExportFormat.AUTO)
