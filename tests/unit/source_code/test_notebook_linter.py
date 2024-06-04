@@ -23,7 +23,7 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
 
 
 
-    
+
 
 -- COMMAND ----------
 
@@ -76,14 +76,14 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 # MAGIC %md mess around with formatting
 
 
-    
+
 
 # COMMAND ----------
 
 
 # MAGIC %sql
-# MAGIC SELECT * FROM 
-# MAGIC   csv.`dbfs:/mnt/bar/e/f/g` 
+# MAGIC SELECT * FROM
+# MAGIC   csv.`dbfs:/mnt/bar/e/f/g`
 # MAGIC WHERE _c1 > 5
 
 
@@ -389,7 +389,7 @@ USE default
 SELECT * FROM testtable LIMIT 10
 
 -- COMMAND ----------
--- DBTITLE 1,A SQL cell that references tables 
+-- DBTITLE 1,A SQL cell that references tables
 
 MERGE INTO catalog.schema.testtable t USING source ON t.key = source.key WHEN MATCHED THEN DELETE
     """,
@@ -482,6 +482,14 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                     end_line=6,
                     end_col=29,
                 ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from ' 'Parquet to Delta',
+                    start_line=6,
+                    start_col=8,
+                    end_line=6,
+                    end_col=29,
+                ),
                 Deprecation(
                     code='table-migrate',
                     message='Table persons is migrated to cata4.newsomething.persons ' 'in Unity Catalog',
@@ -490,9 +498,25 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                     end_line=14,
                     end_col=30,
                 ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from ' 'Parquet to Delta',
+                    start_line=14,
+                    start_col=8,
+                    end_line=14,
+                    end_col=30,
+                ),
                 Deprecation(
                     code='table-migrate',
                     message='Table kittens is migrated to cata4.felines.toms in Unity ' 'Catalog',
+                    start_line=22,
+                    start_col=8,
+                    end_line=22,
+                    end_col=30,
+                ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from ' 'Parquet to Delta',
                     start_line=22,
                     start_col=8,
                     end_line=22,

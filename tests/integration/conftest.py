@@ -491,6 +491,7 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         )
 
     def save_locations(self):
+        locations: list[ExternalLocation] = []
         if self.workspace_client.config.is_azure:
             locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
         if self.workspace_client.config.is_aws:
@@ -764,18 +765,18 @@ def prepare_hiveserde_tables(context, random, schema, table_base_dir) -> dict[st
     )
 
     avro_table_name = f"avro_serde_{random}"
-    avro_ddl = f"""CREATE TABLE hive_metastore.{schema.name}.{avro_table_name} (id INT, region STRING) 
+    avro_ddl = f"""CREATE TABLE hive_metastore.{schema.name}.{avro_table_name} (id INT, region STRING)
                         ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
                         STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
                                   OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
                         TBLPROPERTIES ('avro.schema.literal'='{{
-                            "namespace": "org.apache.hive", 
-                            "name": "first_schema", 
+                            "namespace": "org.apache.hive",
+                            "name": "first_schema",
                             "type": "record",
                             "fields": [
                                 {{ "name":"id", "type":"int" }},
                                 {{ "name":"region", "type":"string" }}
-                            ] }}') 
+                            ] }}')
                         LOCATION '{table_base_dir}/{avro_table_name}'
                     """
     tables[avro_table_name] = context.make_table(
