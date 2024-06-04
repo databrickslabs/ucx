@@ -294,3 +294,21 @@ def test_workflow_task_container_builds_dependency_graph_with_missing_entrypoint
     assert problems[0].code == "distribution-entry-point-not-found"
     assert problems[0].message == "Could not find distribution entry point for thingy.non_existing_entrypoint"
     ws.workspace.download.assert_called_once_with(whl_file.as_posix(), format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(graph):
+    ws = create_autospec(WorkspaceClient)
+
+    whl_file = Path(__file__).parent / "samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"
+    with whl_file.open("rb") as f:
+        ws.workspace.download.return_value = io.BytesIO(f.read())
+
+    python_wheel_task = jobs.PythonWheelTask(package_name="thingy", entry_point="runtime")
+    libraries = [compute.Library(whl=whl_file.as_posix())]
+    task = jobs.Task(task_key="test", libraries=libraries, python_wheel_task=python_wheel_task)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 0
+    ws.workspace.download.assert_called_once_with(whl_file.as_posix(), format=ExportFormat.AUTO)
