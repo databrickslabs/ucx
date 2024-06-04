@@ -85,15 +85,15 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
-    whl = Path(__file__).parent / '../samples/library-wheel/demo_egg-0.0.1-py3-none-any.whl'
+    whl = Path(__file__).parent / '../samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl'
 
-    code = f"%pip install {whl.as_posix()}"  # installs pkgdir
+    code = f"%pip install {whl.as_posix()}"  # installs thingy
     cell = PipCell(code)
 
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("pkgdir")).exists()
+    assert graph.path_lookup.resolve(Path("thingy")).exists()
 
 
 def test_pip_cell_build_dependency_graph_handles_multiline_code():
