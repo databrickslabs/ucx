@@ -367,7 +367,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
             spark_version=ws.clusters.select_spark_version(latest=True),
         ),
         timeout_seconds=0,
-        libraries=[library]
+        libraries=[library],
     )
     job_with_ucx_library = make_job(tasks=[task])
 
