@@ -4,10 +4,12 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
+
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import compute, jobs
+from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
@@ -312,3 +314,49 @@ def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(g
 
     assert len(problems) == 0
     ws.workspace.download.assert_called_once_with(whl_file.as_posix(), format=ExportFormat.AUTO)
+
+
+def test_workflow_linter_dlt_pipeline_task(graph):
+    ws = create_autospec(WorkspaceClient)
+    pipeline = ws.pipelines.create(continous=False, name="test-pipeline")
+    task = jobs.Task(task_key="test", pipeline_task=jobs.PipelineTask(pipeline_id=pipeline.pipeline_id))
+
+    # no spec in GetPipelineResponse
+    ws.pipelines.get.return_value = GetPipelineResponse(
+        pipeline_id=pipeline.pipeline_id,
+        name="test-pipeline",
+    )
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 0
+
+    # no libraries in GetPipelineResponse.spec
+    ws.pipelines.get.return_value = GetPipelineResponse(
+        pipeline_id=pipeline.pipeline_id,
+        name="test-pipeline",
+        spec=pipelines.PipelineSpec(continuous=False),
+    )
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 0
+
+    ws.pipelines.get.return_value = GetPipelineResponse(
+        pipeline_id=pipeline.pipeline_id,
+        name="test-pipeline",
+        spec=pipelines.PipelineSpec(
+            libraries=[
+                PipelineLibrary(
+                    jar="some.jar",
+                    maven=compute.MavenLibrary(coordinates="com.example:example:1.0.0"),
+                    notebook=NotebookLibrary(path="test.py"),
+                    file=FileLibrary(path="test.txt"),
+                )
+            ]
+        ),
+    )
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+    assert len(problems) == 4
+    ws.assert_not_called()
