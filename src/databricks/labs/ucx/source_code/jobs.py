@@ -141,7 +141,7 @@ class WorkflowTaskContainer(SourceContainer):
         return graph.register_notebook(path)
 
     @staticmethod
-    def _find_distribution(
+    def _find_first_matching_distribution(
         path_lookup: PathLookup, condition: Callable[[metadata.Distribution], bool]
     ) -> metadata.Distribution | None:
         for library_root in path_lookup.library_roots:
@@ -155,7 +155,7 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.python_wheel_task:
             return []
         distribution_name = self._task.python_wheel_task.package_name
-        distribution = self._find_distribution(
+        distribution = self._find_first_matching_distribution(
             graph.path_lookup,
             # Prepared exists in metadata.__init__py, but is not defined in
             # Yes, Databricks uses "legacy" normalized name
