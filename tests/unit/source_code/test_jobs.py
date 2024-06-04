@@ -257,3 +257,19 @@ def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(
     assert len(problems) == 0
     assert graph.path_lookup.resolve(Path("thingy")) is not None
     ws.workspace.download.assert_called_once_with(egg_file.as_posix(), format=ExportFormat.AUTO)
+
+
+def test_workflow_task_container_builds_dependency_graph_with_missing_distribution_in_python_wheel_task(
+    mock_path_lookup, graph,
+):
+    ws = create_autospec(WorkspaceClient)
+    python_wheel_task = jobs.PythonWheelTask(package_name="databricks_labs_ucx", entry_point="runtime")
+    task = jobs.Task(task_key="test", python_wheel_task=python_wheel_task)
+
+    workflow_task_container = WorkflowTaskContainer(ws, task)
+    problems = workflow_task_container.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "distribution-not-found"
+    assert problems[0].message == "Could not find distribution for databricks_labs_ucx"
+    ws.assert_not_called()

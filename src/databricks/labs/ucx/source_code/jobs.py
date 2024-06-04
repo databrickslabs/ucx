@@ -159,7 +159,11 @@ class WorkflowTaskContainer(SourceContainer):
         # Yes, Databricks uses "legacy" normalized name
         distribution = self._find_distribution(graph.path_lookup, lambda d: d.name == prepared.legacy_normalized)
         if distribution is None:
-            return [DependencyProblem("distribution-not-found", "Could not find the library dist info")]
+            return [
+                DependencyProblem(
+                    "distribution-not-found", f"Could not find distribution for {prepared.legacy_normalized}"
+                )
+            ]
         try:
             entry_point = distribution.entry_points[self._task.python_wheel_task.entry_point]
         except KeyError:
