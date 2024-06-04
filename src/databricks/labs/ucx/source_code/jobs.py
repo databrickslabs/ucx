@@ -145,8 +145,6 @@ class WorkflowTaskContainer(SourceContainer):
             return
         dist_infos = []
         for library_root in graph.path_lookup.library_roots:
-            if not library_root.exists() or not library_root.is_dir():
-                continue
             for path in library_root.iterdir():
                 if path.name.startswith(self._task.python_wheel_task.package_name) and path.suffix == ".dist-info":
                     dist_infos.append(path)

@@ -96,7 +96,11 @@ class PathLookup:
     @property
     def library_roots(self) -> list[Path]:
         # we may return a combination of WorkspacePath and PosixPath here
-        return [self._cwd] + self._sys_paths
+        library_roots = []
+        for library_root in [self._cwd] + self._sys_paths:
+            if library_root.exists() and library_root.is_dir():
+                library_roots.append(library_root)
+        return library_roots
 
     @property
     def cwd(self):
