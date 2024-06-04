@@ -140,8 +140,9 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
+    @staticmethod
     def _find_distribution(
-        self, path_lookup: PathLookup, condition: Callable[[metadata.Distribution], bool]
+        path_lookup: PathLookup, condition: Callable[[metadata.Distribution], bool]
     ) -> metadata.Distribution | None:
         for library_root in path_lookup.library_roots:
             for path in library_root.glob("*.dist-info"):
