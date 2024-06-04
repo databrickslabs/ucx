@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import Distribution, Prepared
 from pathlib import Path
+from typing import Callable
 
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
@@ -140,13 +141,15 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
-    def _find_distribution(self, path_lookup: PathLookup, name: str) -> Distribution | None:
+    def _find_distribution(
+        self, path_lookup: PathLookup, condition: Callable[[Distribution], bool]
+    ) -> Distribution | None:
         for library_root in path_lookup.library_roots:
             for path in library_root.iterdir():
                 if path.suffix != ".dist-info":
                     continue
                 distribution = Distribution.at(path)
-                if distribution.name == name:
+                if condition(distribution):
                     return distribution
 
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -154,13 +157,15 @@ class WorkflowTaskContainer(SourceContainer):
             return
         prepared = Prepared(self._task.python_wheel_task.package_name)
         # Yes, Databricks uses "legacy" normalized name
-        distribution = self._find_distribution(graph.path_lookup, prepared.legacy_normalized)
+        distribution = self._find_distribution(graph.path_lookup, lambda d: d.name == prepared.legacy_normalized)
         if distribution is None:
             return [DependencyProblem("distribution-not-found", "Could not find the library dist info")]
         try:
             entry_point = distribution.entry_points[self._task.python_wheel_task.entry_point]
         except KeyError:
-            return [DependencyProblem("distribution-entrypoint-not-found", "Could not find the distribution entrypoint")]
+            return [
+                DependencyProblem("distribution-entrypoint-not-found", "Could not find the distribution entrypoint")
+            ]
         return graph.register_import(entry_point.module)
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
