@@ -48,7 +48,7 @@ dependencies = ["databricks-sdk>=0.27,<0.29",
                 "databricks-labs-lsql~=0.4.0",
                 "databricks-labs-blueprint>=0.6.0",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=23.9,<24.1",
+                "sqlglot>=23.9,<24.2",
                 "astroid>=3.2.2"]
 
 [project.entry-points.databricks]
@@ -200,7 +200,7 @@ fail-under = 10.0
 # ignore-list. The regex matches against paths and can be in Posix or Windows
 # format. Because '\\' represents the directory delimiter on Windows systems, it
 # can't be used as an escape character.
-# ignore-paths =
+ ignore-paths='^tests/unit/source_code/samples/.*$'
 
 # Files or directories matching the regular expression patterns are skipped. The
 # regex matches against base names, not paths. The default value ignores Emacs

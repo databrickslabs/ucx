@@ -33,7 +33,7 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {schema_b.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON SCHEMA {empty_schema.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"GRANT MODIFY ON VIEW {view_c.full_name} TO `{group_b.display_name}`")
-    sql_backend.execute(f"GRANT MODIFY ON TABLE {view_d.full_name} TO `{group_b.display_name}`")
+    sql_backend.execute(f"DENY MODIFY ON TABLE {view_d.full_name} TO `{group_b.display_name}`")
 
     # 20 seconds less than TablesCrawler(sql_backend, inventory_schema)
     grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
@@ -51,7 +51,7 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     assert all_grants[f"{group_b.display_name}.{schema_b.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.{empty_schema.full_name}"] == "MODIFY"
     assert all_grants[f"{group_b.display_name}.{view_c.full_name}"] == "MODIFY"
-    assert all_grants[f"{group_b.display_name}.{view_d.full_name}"] == "MODIFY"
+    assert all_grants[f"{group_b.display_name}.{view_d.full_name}"] == "DENIED_MODIFY"
     assert all_grants[f"{group_b.display_name}.{table_e.full_name}"] == "MODIFY"
 
 

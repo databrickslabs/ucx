@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver, FolderLoader
+from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver, FolderLoader
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
 
@@ -12,7 +12,7 @@ def test_dependency_graph_registers_library(mock_path_lookup):
     file_loader = FileLoader()
     whitelist = Whitelist()
     dependency_resolver = DependencyResolver(
-        PipResolver(whitelist),
+        PythonLibraryResolver(whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
@@ -30,7 +30,7 @@ def test_folder_loads_content(mock_path_lookup):
     file_loader = FileLoader()
     whitelist = Whitelist()
     dependency_resolver = DependencyResolver(
-        PipResolver(whitelist),
+        PythonLibraryResolver(whitelist),
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,

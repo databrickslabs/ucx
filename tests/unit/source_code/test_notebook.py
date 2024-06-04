@@ -12,8 +12,8 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
-from databricks.labs.ucx.source_code.python_linter import PythonLinter
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from tests.unit import _load_sources
 
 # fmt: off
@@ -130,7 +130,7 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PipResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
@@ -149,7 +149,7 @@ def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
     paths = ["root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PipResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
@@ -163,7 +163,7 @@ def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
     paths = ["root2.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PipResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
@@ -177,7 +177,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
     paths = ["root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PipResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
@@ -192,7 +192,7 @@ def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
     paths = ["cyclical1.run.py", "cyclical2.run.py"]
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PipResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
@@ -217,7 +217,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup):
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
@@ -233,7 +233,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
 
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(SourceContainer, "root4.py")
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
@@ -254,7 +254,7 @@ do_something_with_stuff(stuff)
 stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(source))
     assert len(advices) == 2
 
@@ -265,6 +265,6 @@ import stuff
 do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(source))
     assert len(advices) == 0

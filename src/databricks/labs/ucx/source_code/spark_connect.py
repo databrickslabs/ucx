@@ -8,8 +8,8 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     Linter,
 )
-from databricks.labs.ucx.source_code.ast_helpers import AstHelper
-from databricks.labs.ucx.source_code.python_linter import TreeWalker, ASTLinter
+from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
 
 
 @dataclass

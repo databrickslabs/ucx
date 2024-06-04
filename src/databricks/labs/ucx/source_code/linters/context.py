@@ -2,13 +2,16 @@ from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter, CurrentSessionState
-from databricks.labs.ucx.source_code.pyspark import SparkSqlLinter
+from databricks.labs.ucx.source_code.linters.dbfs import FromDbfsFolder, DBFSUsageLinter
+
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlLinter
+from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectLinter
+from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.dbfs import DBFSUsageLinter, FromDbfsFolder
-from databricks.labs.ucx.source_code.table_creation import DBRv8d0Linter
 
 
-class Languages:
+class LinterContext:
     def __init__(self, index: MigrationIndex, session_state: CurrentSessionState | None = None):
         self._index = index
         session_state = CurrentSessionState() if not session_state else session_state
@@ -20,6 +23,8 @@ class Languages:
                     SparkSqlLinter(from_table, index),
                     DBFSUsageLinter(),
                     DBRv8d0Linter(dbr_version=None),
+                    SparkConnectLinter(is_serverless=False),
+                    DbutilsLinter(),
                 ]
             ),
             Language.SQL: SequentialLinter([from_table, dbfs_from_folder]),

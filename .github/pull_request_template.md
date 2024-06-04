@@ -1,3 +1,4 @@
+<!-- REMOVE IRRELEVANT COMMENTS BEFORE CREATING A PULL REQUEST -->
 ## Changes
 <!-- Summary of your changes that are easy to understand. Add screenshots when necessary -->
 

@@ -1,0 +1,49 @@
+# ucx[direct-filesystem-access:+1:0:+1:0] The use of direct filesystem references is deprecated: s3://bucket/path
+spark.read.csv("s3://bucket/path")
+
+## Check that we generate a warning when the return value (which has changed) is used.
+# ucx[table-migrate:+1:0:+1:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+for table in spark.catalog.listTables():
+    do_stuff_with_table(table)
+
+## Check that we generate a warning when we reference a migrated database.
+# ucx[table-migrate:+3:0:+3:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## TODO: The following isn't yet implemented:
+## ucx[table-migrate:+1:0:+1:0] Database 'old' is migrated to 'brand.new' in Unity Catalog
+for table in spark.catalog.listTables("old"):
+    do_stuff_with_table(table)
+
+## Check that we do not generate a warning when we reference a non-migrated database.
+# ucx[table-migrate:+1:0:+1:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+for table in spark.catalog.listTables("unknown"):
+    do_stuff_with_table(table)
+
+## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
+# ucx[table-migrate:+1:0:+1:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+for table in spark.catalog.listTables("old", None, "extra-argument"):
+    do_stuff_with_table(table)
+
+## Check a call with an out-of-position named argument referencing a database known to be migrated.
+# ucx[table-migrate:+3:0:+3:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## TODO: The following isn't yet implemented:
+## ucx[table-migrate:+1:0:+1:0] Database 'old' is migrated to 'brand.new' in Unity Catalog
+for table in spark.catalog.listTables(pattern="st*", dbName="old"):
+    do_stuff_with_table(table)
+
+## Some calls that use a variable whose value is unknown: they could potentially reference a migrated database.
+# ucx[table-migrate:+3:0:+3:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## TODO: The following isn't yet implemented:
+## ucx[table-migrate:+1:0:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
+for table in spark.catalog.listTables(name):
+    do_stuff_with_table(table)
+# ucx[table-migrate:+3:0:+3:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## TODO: The following isn't yet implemented:
+## ucx[table-migrate:+1:0:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
+for table in spark.catalog.listTables(f"boop{stuff}"):
+    do_stuff_with_table(table)
+
+## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+# FIXME: This is a false positive; any method named 'listTables' is triggering the warning.
+# ucx[table-migrate:+1:0:+1:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+something_else.listTables("old.things")
+a_function("old.things")

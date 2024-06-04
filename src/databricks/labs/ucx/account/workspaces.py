@@ -93,11 +93,11 @@ class AccountWorkspaces:
         """
         accessible_workspaces = []
         for workspace in self._ac.workspaces.list():
-            if self._can_administer(workspace):
+            if self.can_administer(workspace):
                 accessible_workspaces.append(workspace)
         return accessible_workspaces
 
-    def _can_administer(self, workspace: Workspace) -> bool:
+    def can_administer(self, workspace: Workspace) -> bool:
         try:
             # check if user has access to workspace
             ws = self.client_for(workspace)
@@ -252,7 +252,7 @@ class WorkspaceInfo:
         self._installation = installation
         self._ws = ws
 
-    def _load_workspace_info(self) -> dict[int, Workspace]:
+    def load_workspace_info(self) -> dict[int, Workspace]:
         try:
             id_to_workspace = {}
             for workspace in self._installation.load(list[Workspace], filename=AccountWorkspaces.SYNC_FILE_NAME):
@@ -265,7 +265,7 @@ class WorkspaceInfo:
 
     def current(self) -> str:
         workspace_id = self._ws.get_workspace_id()
-        workspaces = self._load_workspace_info()
+        workspaces = self.load_workspace_info()
         if workspace_id not in workspaces:
             msg = f"Current workspace is not known: {workspace_id}"
             raise KeyError(msg) from None

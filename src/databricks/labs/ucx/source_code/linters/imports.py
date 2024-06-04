@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import ast
 import logging
 from collections.abc import Iterable, Callable
 from typing import TypeVar, Generic, cast
@@ -62,8 +63,8 @@ class MatchingVisitor(Visitor):
     def matched_nodes(self):
         return self._matched_nodes
 
-    def visit_call(self, node: Call):
-        if self._node_type is not Call:
+    def visit_Call(self, node: ast.Call):
+        if self._node_type is not ast.Call:
             return
         try:
             if self._matches(node.func, 0):
@@ -407,3 +408,5 @@ class PythonLinter(Linter):
                 end_col=node.end_col_offset or 0,
             )
             problems.append(problem)
+            return [], problems
+

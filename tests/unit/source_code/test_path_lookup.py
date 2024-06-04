@@ -11,22 +11,43 @@ def test_lookup_is_initialized_with_syspath():
     assert len(filtered) > 0
 
 
-def test_lookup_is_initialized_with_handmade_string():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
+def test_lookup_is_initialized_with_handmade_string(tmp_path):
+    directories, sys_paths = ("what", "on", "earth"), []
+    for directory in directories:
+        path = tmp_path / directory
+        path.mkdir()
+        sys_paths.append(path)
+
+    provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
+
     assert provider is not None
-    cwd, *paths = provider.library_roots
-    assert paths == [cwd / "what", cwd / "on", cwd / "earth"]
+    assert provider.library_roots[1:] == sys_paths
 
 
-def test_lookup_inserts_path():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:on:earth")
-    provider.insert_path(1, Path("is"))
-    cwd, *paths = provider.library_roots
-    assert paths == [cwd / "what", cwd / "is", cwd / "on", cwd / "earth"]
+def test_lookup_inserts_path(tmp_path):
+    directories, sys_paths = ("what", "on", "earth"), []
+    for directory in directories:
+        path = tmp_path / directory
+        path.mkdir()
+        sys_paths.append(path)
+
+    provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
+
+    new_sys_path = tmp_path / Path("is")
+    new_sys_path.mkdir()
+    provider.insert_path(1, new_sys_path)
+
+    assert provider.library_roots[1:] == [sys_paths[0]] + [new_sys_path] + sys_paths[1:]
 
 
-def test_lookup_removes_path():
-    provider = PathLookup.from_pathlike_string(Path.cwd(), "what:is:on:earth")
+def test_lookup_removes_path(tmp_path):
+    directories, sys_paths = ("what", "is", "on", "earth"), []
+    for directory in directories:
+        path = tmp_path / directory
+        path.mkdir()
+        sys_paths.append(path)
+
+    provider = PathLookup.from_pathlike_string(Path.cwd(), ":".join([p.as_posix() for p in sys_paths]))
     provider.remove_path(1)
-    cwd, *paths = provider.library_roots
-    assert paths == [cwd / "what", cwd / "on", cwd / "earth"]
+    sys_paths.pop(1)
+    assert provider.library_roots[1:] == sys_paths

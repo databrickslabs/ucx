@@ -13,7 +13,7 @@ from databricks.labs.ucx.source_code.base import (
 )
 from databricks.labs.ucx.source_code.python_linter import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.ast_helpers import AstHelper
+from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
 
 
 @dataclass
@@ -228,7 +228,6 @@ class SparkMatchers:
             TableNameMatcher("createTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("createExternalTable", 1, 1000, 0, "tableName"),
             TableNameMatcher("getTable", 1, 1, 0),
-            TableNameMatcher("table", 1, 1, 0),
             TableNameMatcher("isCached", 1, 1, 0),
             TableNameMatcher("listColumns", 1, 2, 0, "tableName"),
             TableNameMatcher("tableExists", 1, 2, 0, "tableName"),
@@ -266,11 +265,6 @@ class SparkMatchers:
 
         # nothing to migrate in DataFrameWriterV2, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriterV2.html
         # nothing to migrate in UDFRegistration, see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDFRegistration.html
-
-        # see https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.UDTFRegistration.html
-        spark_udtfregistration_matchers = [
-            TableNameMatcher("register", 1, 2, 0, "name"),
-        ]
 
         direct_fs_access_matchers = [
             DirectFilesystemAccessMatcher("ls", 1, 1, 0, call_context={"ls": {"dbutils.fs.ls"}}),
@@ -312,7 +306,6 @@ class SparkMatchers:
             + spark_dataframe_matchers
             + spark_dataframereader_matchers
             + spark_dataframewriter_matchers
-            + spark_udtfregistration_matchers
             + direct_fs_access_matchers
         ):
             self._matchers[matcher.method_name] = matcher

@@ -5,11 +5,11 @@ from dataclasses import dataclass
 
 from astroid import Attribute, Call, NodeNG  # type: ignore
 
-from databricks.labs.ucx.source_code.python_linter import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
 )
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
 
 
 @dataclass
@@ -90,11 +90,6 @@ class NoFormatPythonLinter:
                 )
 
 
-class LintingVisitor:
-
-    pass
-
-
 class DBRv8d0Linter(Linter):
     """Performs Python linting for backwards incompatible changes in DBR version 8.0.
     Specifically, it yields advice for table-creation with implicit format.
@@ -110,7 +105,6 @@ class DBRv8d0Linter(Linter):
             [
                 NoFormatPythonMatcher("writeTo", 1, 1),
                 NoFormatPythonMatcher("table", 1, 1),
-                NoFormatPythonMatcher("insertInto", 1, 2),
                 NoFormatPythonMatcher("saveAsTable", 1, 4, 2, "format"),
             ]
         )

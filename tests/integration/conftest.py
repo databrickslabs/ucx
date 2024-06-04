@@ -19,6 +19,7 @@ from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
+from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.assessment.aws import AWSRoleAction, run_command
 from databricks.labs.ucx.assessment.azure import (
     AzureServicePrincipalCrawler,
@@ -272,6 +273,9 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
+
+    def with_workspace_info(self, workspace_info):
+        self.installation.save(workspace_info, filename=AccountWorkspaces.SYNC_FILE_NAME)
 
     def make_schema(self, **kwargs):
         schema_info = self._make_schema(**kwargs)

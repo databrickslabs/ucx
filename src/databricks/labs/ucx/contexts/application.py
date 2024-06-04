@@ -15,7 +15,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.errors import ResourceDoesNotExist
 from databricks.sdk.service import sql
@@ -47,11 +47,10 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.files import FileLoader, FolderLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import FileLoader, FolderLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.graph import DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
-from databricks.labs.ucx.source_code.languages import Languages
 from databricks.labs.ucx.source_code.redash import Redash
 from databricks.labs.ucx.workspace_access import generic, redash
 from databricks.labs.ucx.workspace_access.groups import GroupManager
@@ -331,12 +330,6 @@ class GlobalContext(abc.ABC):
         return CatalogSchema(self.workspace_client, self.table_mapping, self.principal_acl, self.sql_backend)
 
     @cached_property
-    def languages(self):
-        index = self.tables_migrator.index()
-        # TODO: initialize Languages every time, because it has CurrentSessionState for the cache
-        return Languages(index)
-
-    @cached_property
     def verify_timeout(self):
         return timedelta(minutes=2)
 
@@ -362,7 +355,7 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def pip_resolver(self):
-        return PipResolver(self.whitelist)
+        return PythonLibraryResolver(self.whitelist)
 
     @cached_property
     def notebook_loader(self) -> NotebookLoader:

@@ -1,7 +1,9 @@
 import functools
 import logging
+import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -14,7 +16,7 @@ from databricks.sdk.service.workspace import ExportFormat
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.files import LocalFile
+from databricks.labs.ucx.source_code.linters.files import LocalFile
 from databricks.labs.ucx.source_code.graph import (
     Dependency,
     DependencyGraph,
@@ -23,7 +25,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     WrappingLoader,
 )
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook, NotebookLinter, FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -72,13 +74,13 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_task_dependencies(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         yield from self._register_libraries(graph)
+        yield from self._register_existing_cluster_id(graph)
         yield from self._register_notebook(graph)
         yield from self._register_spark_python_task(graph)
         yield from self._register_python_wheel_task(graph)
         yield from self._register_spark_jar_task(graph)
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
-        yield from self._register_existing_cluster_id(graph)
         yield from self._register_spark_submit_task(graph)
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
@@ -93,12 +95,18 @@ class WorkflowTaskContainer(SourceContainer):
             if problems:
                 yield from problems
         if library.egg:
-            # TODO: https://github.com/databrickslabs/ucx/issues/1643
-            yield DependencyProblem("not-yet-implemented", "Egg library is not yet implemented")
+            logger.info(f"Registering library from {library.egg}")
+            with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
+                with tempfile.TemporaryDirectory() as directory:
+                    local_file = Path(directory) / Path(library.egg).name
+                    local_file.write_bytes(remote_file.read())
+                    yield from graph.register_library(local_file.as_posix())
         if library.whl:
-            # TODO: download the wheel somewhere local and add it to "virtual sys.path" via graph.path_lookup.push_path
-            # TODO: https://github.com/databrickslabs/ucx/issues/1640
-            yield DependencyProblem("not-yet-implemented", "Wheel library is not yet implemented")
+            with self._ws.workspace.download(library.whl, format=ExportFormat.AUTO) as remote_file:
+                with tempfile.TemporaryDirectory() as directory:
+                    local_file = Path(directory) / Path(library.whl).name
+                    local_file.write_bytes(remote_file.read())
+                    yield from graph.register_library(local_file.as_posix())
         if library.requirements:  # https://pip.pypa.io/en/stable/reference/requirements-file-format/
             logger.info(f"Registering libraries from {library.requirements}")
             with self._ws.workspace.download(library.requirements, format=ExportFormat.AUTO) as remote_file:
@@ -124,17 +132,45 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
-    def _register_spark_python_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_spark_python_task(self, graph: DependencyGraph):
         if not self._task.spark_python_task:
-            return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1639
-        yield DependencyProblem('not-yet-implemented', 'Spark Python task is not yet implemented')
+            return []
+        notebook_path = self._task.spark_python_task.python_file
+        logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
+        path = WorkspacePath(self._ws, notebook_path)
+        return graph.register_notebook(path)
 
-    def _register_python_wheel_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    @staticmethod
+    def _find_first_matching_distribution(path_lookup: PathLookup, name: str) -> metadata.Distribution | None:
+        # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
+        normalize_name = metadata.Prepared.normalize  # type: ignore
+        normalized_name = normalize_name(name)
+        for library_root in path_lookup.library_roots:
+            for path in library_root.glob("*.dist-info"):
+                distribution = metadata.Distribution.at(path)
+                if normalize_name(distribution.name) == normalized_name:
+                    return distribution
+        return None
+
+    def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
-            return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        yield DependencyProblem('not-yet-implemented', 'Python wheel task is not yet implemented')
+            return []
+
+        distribution_name = self._task.python_wheel_task.package_name
+        distribution = self._find_first_matching_distribution(graph.path_lookup, distribution_name)
+        if distribution is None:
+            return [DependencyProblem("distribution-not-found", f"Could not find distribution for {distribution_name}")]
+        entry_point_name = self._task.python_wheel_task.entry_point
+        try:
+            entry_point = distribution.entry_points[entry_point_name]
+        except KeyError:
+            return [
+                DependencyProblem(
+                    "distribution-entry-point-not-found",
+                    f"Could not find distribution entry point for {distribution_name}.{entry_point_name}",
+                )
+            ]
+        return graph.register_import(entry_point.module)
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_jar_task:
@@ -154,12 +190,16 @@ class WorkflowTaskContainer(SourceContainer):
         # TODO: https://github.com/databrickslabs/ucx/issues/1638
         yield DependencyProblem('not-yet-implemented', 'Pipeline task is not yet implemented')
 
-    def _register_existing_cluster_id(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    def _register_existing_cluster_id(self, graph: DependencyGraph):
         if not self._task.existing_cluster_id:
             return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1637
+
         # load libraries installed on the referred cluster
-        yield DependencyProblem('not-yet-implemented', 'Existing cluster id is not yet implemented')
+        library_full_status_list = self._ws.libraries.cluster_status(self._task.existing_cluster_id)
+
+        for library_full_status in library_full_status_list:
+            if library_full_status.library:
+                yield from self._register_library(graph, library_full_status.library)
 
     def _register_spark_submit_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_submit_task:
@@ -244,23 +284,23 @@ class WorkflowLinter:
                 yield source_path, problem
             return
         session_state = CurrentSessionState()
-        state = Languages(self._migration_index, session_state)
+        ctx = LinterContext(self._migration_index, session_state)
         for dependency in graph.all_dependencies:
             logger.info(f'Linting {task.task_key} dependency: {dependency}')
             container = dependency.load(graph.path_lookup)
             if not container:
                 continue
             if isinstance(container, Notebook):
-                yield from self._lint_notebook(container, state)
+                yield from self._lint_notebook(container, ctx)
             if isinstance(container, LocalFile):
-                yield from self._lint_file(container, state)
+                yield from self._lint_file(container, ctx)
 
-    def _lint_file(self, file: LocalFile, state: Languages):
-        linter = FileLinter(state, file.path)
+    def _lint_file(self, file: LocalFile, ctx: LinterContext):
+        linter = FileLinter(ctx, file.path)
         for advice in linter.lint():
             yield file.path, advice
 
-    def _lint_notebook(self, notebook: Notebook, state: Languages):
-        linter = NotebookLinter(state, notebook)
+    def _lint_notebook(self, notebook: Notebook, ctx: LinterContext):
+        linter = NotebookLinter(ctx, notebook)
         for advice in linter.lint():
             yield notebook.path, advice

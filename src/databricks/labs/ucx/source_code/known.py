@@ -15,7 +15,7 @@ from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.graph import DependencyProblem
-from databricks.labs.ucx.source_code.languages import Languages
+from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -26,6 +26,15 @@ logger = logging.getLogger(__name__)
 class Compatibility:
     known: bool
     problems: list[DependencyProblem]
+
+
+@dataclass(unsafe_hash=True, frozen=True, eq=True, order=True)
+class KnownProblem:
+    code: str
+    message: str
+
+    def as_dict(self):
+        return {'code': self.code, 'message': self.message}
 
 
 UNKNOWN = Compatibility(False, [])
@@ -94,13 +103,24 @@ class Whitelist:
     def rebuild(cls, root: Path):
         """rebuild the known.json file by analyzing the source code of installed libraries. Invoked by `make known`."""
         path_lookup = PathLookup.from_sys_path(root)
-        known_distributions = cls._get_known()
+        try:
+            known_distributions = cls._get_known()
+            logger.info("Scanning for newly installed distributions...")
+        except FileNotFoundError:
+            logger.info("No known distributions found; scanning all distributions...")
+            known_distributions = {}
+        updated_distributions = known_distributions.copy()
         for library_root in path_lookup.library_roots:
             for dist_info_folder in library_root.glob("*.dist-info"):
-                cls._analyze_dist_info(dist_info_folder, known_distributions, library_root)
-        known_json = Path(__file__).parent / "known.json"
-        with known_json.open('w') as f:
-            json.dump(dict(sorted(known_distributions.items())), f, indent=2)
+                cls._analyze_dist_info(dist_info_folder, updated_distributions, library_root)
+        updated_distributions = dict(sorted(updated_distributions.items()))
+        if known_distributions == updated_distributions:
+            logger.info("No new distributions found.")
+        else:
+            known_json = Path(__file__).parent / "known.json"
+            with known_json.open('w') as f:
+                json.dump(updated_distributions, f, indent=2)
+            logger.info(f"Updated known distributions: {known_json.relative_to(Path.cwd())}")
 
     @classmethod
     def _analyze_dist_info(cls, dist_info_folder, known_distributions, library_root):
@@ -126,11 +146,12 @@ class Whitelist:
             if module_ref.endswith(suffix):
                 module_ref = module_ref[: -len(suffix)]
         logger.info(f"Processing module: {module_ref}")
-        languages = Languages(empty_index)
-        linter = FileLinter(languages, module_path)
-        problems = []
+        ctx = LinterContext(empty_index)
+        linter = FileLinter(ctx, module_path)
+        known_problems = set()
         for problem in linter.lint():
-            problems.append({'code': problem.code, 'message': problem.message})
+            known_problems.add(KnownProblem(problem.code, problem.message))
+        problems = [_.as_dict() for _ in sorted(known_problems)]
         known_distributions[dist_info.name][module_ref] = problems
 
     def __repr__(self):

@@ -2,13 +2,13 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
-from databricks.labs.ucx.source_code.files import FileLoader, ImportFileResolver
+from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
-from databricks.labs.ucx.source_code.python_libraries import PipResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
 
@@ -60,7 +60,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PipResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
@@ -80,20 +80,20 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     notebook_resolver = NotebookResolver(notebook_loader)
     whitelist = Whitelist()
     file_loader = FileLoader()
-    pip_resolver = PipResolver(whitelist)
+    pip_resolver = PythonLibraryResolver(whitelist)
     import_resolver = ImportFileResolver(file_loader, whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
-    whl = Path(__file__).parent / '../samples/library-wheel/demo_egg-0.0.1-py3-none-any.whl'
+    whl = Path(__file__).parent / '../samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl'
 
-    code = f"%pip install {whl.as_posix()}"  # installs pkgdir
+    code = f"%pip install {whl.as_posix()}"  # installs thingy
     cell = PipCell(code)
 
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    assert graph.path_lookup.resolve(Path("pkgdir")).exists()
+    assert graph.path_lookup.resolve(Path("thingy")).exists()
 
 
 def test_pip_cell_build_dependency_graph_handles_multiline_code():
