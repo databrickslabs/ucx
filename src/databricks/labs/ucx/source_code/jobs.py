@@ -145,9 +145,7 @@ class WorkflowTaskContainer(SourceContainer):
         self, path_lookup: PathLookup, condition: Callable[[metadata.Distribution], bool]
     ) -> metadata.Distribution | None:
         for library_root in path_lookup.library_roots:
-            for path in library_root.iterdir():
-                if path.suffix != ".dist-info":
-                    continue
+            for path in library_root.glob("*.dist-info"):
                 distribution = metadata.Distribution.at(path)
                 if condition(distribution):
                     return distribution
