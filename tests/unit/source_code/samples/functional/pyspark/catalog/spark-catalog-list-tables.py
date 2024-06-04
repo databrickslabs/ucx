@@ -29,3 +29,15 @@ for table in spark.catalog.listTables("old", None, "extra-argument"):
 ## ucx[table-migrate:+1:0:+1:0] Database 'old' is migrated to 'brand.new' in Unity Catalog
 for table in spark.catalog.listTables(pattern="st*", dbName="old"):
     do_stuff_with_table(table)
+
+## Some calls that use a variable whose value is unknown: they could potentially reference a migrated database.
+# ucx[table-migrate:+3:0:+3:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## TODO: The following isn't yet implemented:
+## ucx[table-migrate:+1:0:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
+for table in spark.catalog.listTables(name):
+    do_stuff_with_table(table)
+# ucx[table-migrate:+3:0:+3:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+## TODO: The following isn't yet implemented:
+## ucx[table-migrate:+1:0:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
+for table in spark.catalog.listTables(f"boop{stuff}"):
+    do_stuff_with_table(table)

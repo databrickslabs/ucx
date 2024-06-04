@@ -11,3 +11,9 @@ for i in range(10):
 
     ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
     spark.catalog.refreshTable("old.things", "extra-argument")
+
+    ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'refreshTable' because its table name argument is not a constant
+    spark.catalog.refreshTable(name)
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'refreshTable' because its table name argument is not a constant
+    spark.catalog.refreshTable(f"boop{stuff}")

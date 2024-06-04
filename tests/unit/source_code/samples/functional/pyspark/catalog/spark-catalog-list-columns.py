@@ -16,3 +16,14 @@ for i in range(10):
 
     ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
     columns = spark.catalog.listColumns("old.things", None, "extra-argument")
+
+    ## Check a call with an out-of-position named argument referencing a table known to be migrated.
+    # TODO: Fix missing migration warning:
+    # #ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    columns = spark.catalog.listColumns(dbName="old", name="things")
+
+    ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'listColumns' because its table name argument is not a constant
+    columns = spark.catalog.listColumns(name)
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'listColumns' because its table name argument is not a constant
+    columns = spark.catalog.listColumns(f"boop{stuff}")

@@ -18,3 +18,15 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table("old.things", "extra-argument")
     do_stuff_with(df)
+
+    ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
+    # ucx[table-migrate:+3:0:+3:0] Can't migrate 'table' because its table name argument is not a constant
+    # TODO: Fix false positive:
+    # ucx[table-migrate:+1:0:+1:0] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    df = spark.table(name)
+    do_stuff_with(df)
+    # ucx[table-migrate:+3:0:+3:0] Can't migrate 'table' because its table name argument is not a constant
+    # TODO: Fix false positive:
+    # ucx[table-migrate:+1:0:+1:0] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    df = spark.table(f"boop{stuff}")
+    do_stuff_with(df)

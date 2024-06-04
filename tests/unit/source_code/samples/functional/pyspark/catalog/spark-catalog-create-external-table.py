@@ -20,3 +20,17 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
     df = spark.catalog.createExternalTable("old.things", None, None, None, "extra-argument")
     do_stuff_with(df)
+
+    ## Check a call with an out-of-position named argument referencing a table known to be migrated.
+    # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    df = spark.catalog.createExternalTable(path="foo", tableName="old.things", source="delta")
+    do_stuff_with(df)
+
+    ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'createExternalTable' because its table name argument is not a constant
+    df = spark.catalog.createExternalTable(name)
+    do_stuff_with(df)
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'createExternalTable' because its table name argument is not a constant
+    df = spark.catalog.createExternalTable(f"boop{stuff}")
+    do_stuff_with(df)
+

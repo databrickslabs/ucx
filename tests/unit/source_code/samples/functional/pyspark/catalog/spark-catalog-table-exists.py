@@ -18,3 +18,17 @@ for i in range(10):
     ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
     if spark.catalog.tableExists("old.things", None, "extra-argument"):
         pass
+
+    ## Check a call with an out-of-position named argument referencing a table known to be migrated.
+    # TODO: Fix missing migration warning
+    # # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    if spark.catalog.tableExists(dbName="old", name="things"):
+        pass
+
+    ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'tableExists' because its table name argument is not a constant
+    if spark.catalog.tableExists(name):
+        pass
+    # ucx[table-migrate:+1:0:+1:0] Can't migrate 'tableExists' because its table name argument is not a constant
+    if spark.catalog.tableExists(f"boot{stuff}"):
+        pass
