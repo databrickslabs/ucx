@@ -154,12 +154,16 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return []
+
+        def legacy_normalize_name(name: str) -> str:
+            # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
+            return metadata.Prepared.legacy_normalize(name)  # type: ignore
+
         distribution_name = self._task.python_wheel_task.package_name
         distribution = self._find_first_matching_distribution(
             graph.path_lookup,
-            # Prepared exists in importlib.metadata.__init__pyi, but is not defined in, importlib.metadata.__init__.py
             # Yes, Databricks uses "legacy" normalized name
-            lambda d: distribution_name == metadata.Prepared.legacy_normalize(d.name),  # type: ignore
+            lambda d: legacy_normalize_name(distribution_name) == legacy_normalize_name(d.name),
         )
         if distribution is None:
             return [DependencyProblem("distribution-not-found", f"Could not find distribution for {distribution_name}")]
