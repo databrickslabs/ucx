@@ -305,10 +305,11 @@ class NotebookRunCall(NodeBase):
     def __init__(self, node: Call):
         super().__init__(node)
 
-    def get_constant_path(self) -> str | None:
-        path = PythonLinter.get_dbutils_notebook_run_path_arg(cast(Call, self.node))
-        if isinstance(path, Const):
-            return path.value.strip().strip("'").strip('"')
+    def get_notebook_path(self) -> str | None:
+        node = PythonLinter.get_dbutils_notebook_run_path_arg(cast(Call, self.node))
+        inferred = next(node.infer(), None)
+        if isinstance(inferred, Const):
+            return inferred.value.strip().strip("'").strip('"')
         return None
 
 

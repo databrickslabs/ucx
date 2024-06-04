@@ -169,7 +169,7 @@ dbutils.notebook.run(name)
 def test_infers_string_variable_value(code, expected):
     linter = ASTLinter.parse(code)
     calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-    actual = list(call.get_constant_path() for call in calls)
+    actual = list(call.get_notebook_path() for call in calls)
     assert [expected] == actual
 
 
