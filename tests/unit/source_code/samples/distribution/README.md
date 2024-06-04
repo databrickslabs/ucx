@@ -1,5 +1,6 @@
 # Demo wheel
 
-This contains sources for a wheel. The wheel is a Python package format, and it is the standard binary distribution format for Python packages.
+This contains sources for a wheel and an egg.
 
-Use `make dist` to rebuild the wheel after changing any content in this folder.
+Use `make all` to rebuild the wheel and egg after changing any content in this folder.
+
