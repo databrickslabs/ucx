@@ -159,7 +159,7 @@ class WorkflowTaskContainer(SourceContainer):
             graph.path_lookup,
             # Prepared exists in importlib.metadata.__init__pyi, but is not defined in, importlib.metadata.__init__.py
             # Yes, Databricks uses "legacy" normalized name
-            lambda d: distribution_name == metadata.Prepared.legacy_normalize(d.name),
+            lambda d: distribution_name == metadata.Prepared.legacy_normalize(d.name),  # type: ignore
         )
         if distribution is None:
             return [DependencyProblem("distribution-not-found", f"Could not find distribution for {distribution_name}")]
