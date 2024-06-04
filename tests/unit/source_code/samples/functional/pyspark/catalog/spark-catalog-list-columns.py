@@ -11,6 +11,8 @@ for i in range(10):
 
     ## Check a literal reference to an unknown table (that is not migrated); we expect no warning.
     columns = spark.catalog.listColumns("table.we.know.nothing.about")
+    columns = spark.catalog.listColumns("other.things")
+    columns = spark.catalog.listColumns("old.socks")
 
     ## Check that a call with too many positional arguments is ignored as (presumably) something else; we expect no warning.
     columns = spark.catalog.listColumns("old.things", None, "extra-argument")
