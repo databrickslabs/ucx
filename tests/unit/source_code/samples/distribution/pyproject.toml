@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "thingy"
 version = "0.0.1"
-description = 'This package does nothing useful and is meant for testing wheels.'
+description = 'This package does nothing useful and is meant for testing code distributions.'
 
 [project.entry-points.databricks]
 runtime = "thingy:main"

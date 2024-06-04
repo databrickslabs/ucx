@@ -239,7 +239,7 @@ def test_workflow_linter_lints_job_with_egg_dependency(
         ws.workspace.upload(remote_egg_file, f.read(), format=ImportFormat.AUTO)
     library = compute.Library(egg=remote_egg_file)
 
-    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"from thingy import fn")
+    notebook = make_notebook(path=f"{entrypoint}/notebook.ipynb", content=b"import thingy")
     job_with_egg_dependency = make_job(notebook_path=notebook, libraries=[library])
 
     problems = simple_ctx.workflow_linter.lint_job(job_with_egg_dependency.job_id)
