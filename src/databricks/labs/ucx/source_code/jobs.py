@@ -140,21 +140,26 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
+    def _find_distribution(self, path_lookup: PathLookup, name: str) -> Distribution | None:
+        for library_root in path_lookup.library_roots:
+            for path in library_root.iterdir():
+                if path.suffix != ".dist-info":
+                    continue
+                distribution = Distribution.at(path)
+                if distribution.name == name:
+                    return distribution
+
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return
-        dist_infos = []
-        for library_root in graph.path_lookup.library_roots:
-            for path in library_root.iterdir():
-                if path.name.startswith(self._task.python_wheel_task.package_name) and path.suffix == ".dist-info":
-                    dist_infos.append(path)
-        if len(dist_infos) == 0:
-            yield DependencyProblem("library-dist-info-not-found", "Could not find the library dist info")
-        distribution = Distribution.at(dist_infos[0])
-        entry_points = distribution.entry_points.select(name=self._task.python_wheel_task.entry_point)
-        if len(entry_points) == 0:
-            yield DependencyProblem("library-entrypoint-not-found", "Could not find the library entrypoint")
-        return graph.register_import(entry_points[0].module)
+        distribution = self._find_distribution(graph.path_lookup, self._task.python_wheel_task.package_name)
+        if distribution is None:
+            return [DependencyProblem("distribution-not-found", "Could not find the library dist info")]
+        try:
+            entry_point = distribution.entry_points[self._task.python_wheel_task.entry_point]
+        except KeyError:
+            return [DependencyProblem("distribution-entrypoint-not-found", "Could not find the distribution entrypoint")]
+        return graph.register_import(entry_point.module)
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_jar_task:
