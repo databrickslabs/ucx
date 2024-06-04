@@ -200,14 +200,13 @@ class WorkflowTaskContainer(SourceContainer):
                 if library.notebook.path:
                     notebook_path = library.notebook.path
                     path = WorkspacePath(self._ws, notebook_path)
-                    return graph.register_notebook(path)
+                    yield from graph.register_notebook(path)
             if library.jar:
-                self._register_library(graph, compute.Library(jar=library.jar))
+                yield from self._register_library(graph, compute.Library(jar=library.jar))
             if library.maven:
                 yield DependencyProblem('not-yet-implemented', 'Maven library is not yet implemented')
             if library.file:
                 yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
-        return []
 
     def _register_existing_cluster_id(self, graph: DependencyGraph):
         if not self._task.existing_cluster_id:
