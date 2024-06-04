@@ -10,6 +10,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary
+from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -17,7 +18,7 @@ from databricks.labs.ucx.source_code.known import UNKNOWN, Whitelist
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.sdk.service import jobs, compute
+from databricks.sdk.service import jobs, compute, pipelines
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 
@@ -379,19 +380,20 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
 
 
 def test_job_dlt_task_linter_unhappy_path(
-    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory
+    simple_ctx, ws, make_job, make_random, make_cluster, make_notebook, make_directory, make_pipeline
 ):
     entrypoint = make_directory()
 
     make_notebook(path=f"{entrypoint}/notebook.py", content=b"import greenlet")
+    dlt_pipeline = make_pipeline(
+        libraries=[pipelines.PipelineLibrary(notebook=NotebookLibrary(path=f"{entrypoint}/notebook.py"))]
+    )
 
     task = jobs.Task(
         task_key=make_random(4),
-        pipeline_task=jobs.PipelineTask(pipeline_id=make_random(4)),
+        pipeline_task=jobs.PipelineTask(pipeline_id=dlt_pipeline.pipeline_id),
     )
     j = make_job(tasks=[task])
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
-    assert (
-        len([problem for problem in problems if problem.message == "Delta Pipeline task is not yet implemented"]) == 1
-    )
+    assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
