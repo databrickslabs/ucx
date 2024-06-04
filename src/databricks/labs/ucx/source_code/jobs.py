@@ -155,7 +155,7 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.python_wheel_task:
             return []
         # Prepared exists in metadata.__init__py, but is not defined in
-        prepared = metadata.Prepared(self._task.python_wheel_task.package_name)  # mypy: ignore
+        prepared = metadata.Prepared(self._task.python_wheel_task.package_name)  # type: ignore
         # Yes, Databricks uses "legacy" normalized name
         distribution = self._find_distribution(graph.path_lookup, lambda d: d.name == prepared.legacy_normalized)
         if distribution is None:
