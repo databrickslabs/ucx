@@ -186,23 +186,28 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _register_pipeline_task(self, graph: DependencyGraph):
         if not self._task.pipeline_task:
-            return
+            return []
 
         pipeline = self._ws.pipelines.get(self._task.pipeline_task.pipeline_id)
-        if pipeline.spec.libraries:
-            pipeline_libraries = pipeline.spec.libraries
-            for library in pipeline_libraries:
-                if library.notebook:
-                    if library.notebook.path:
-                        notebook_path = library.notebook.path
-                        path = WorkspacePath(self._ws, notebook_path)
-                        return graph.register_notebook(path)
-                if library.jar:
-                    self._register_library(graph, compute.Library(jar=library.jar))
-                if library.maven:
-                    yield DependencyProblem('not-yet-implemented', 'Maven library is not yet implemented')
-                if library.file:
-                    yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
+        if not pipeline.spec:
+            return []
+        if not pipeline.spec.libraries:
+            return []
+
+        pipeline_libraries = pipeline.spec.libraries
+        for library in pipeline_libraries:
+            if library.notebook:
+                if library.notebook.path:
+                    notebook_path = library.notebook.path
+                    path = WorkspacePath(self._ws, notebook_path)
+                    return graph.register_notebook(path)
+            if library.jar:
+                self._register_library(graph, compute.Library(jar=library.jar))
+            if library.maven:
+                yield DependencyProblem('not-yet-implemented', 'Maven library is not yet implemented')
+            if library.file:
+                yield DependencyProblem('not-yet-implemented', 'File library is not yet implemented')
+        return []
 
     def _register_existing_cluster_id(self, graph: DependencyGraph):
         if not self._task.existing_cluster_id:
