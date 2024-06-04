@@ -98,7 +98,11 @@ class PathLookup:
         # we may return a combination of WorkspacePath and PosixPath here
         library_roots = []
         for library_root in [self._cwd] + self._sys_paths:
-            if library_root.exists() and library_root.is_dir():
+            try:
+                is_existing_directory = library_root.exists() and library_root.is_dir()
+            except PermissionError:
+                continue
+            if is_existing_directory:
                 library_roots.append(library_root)
         return library_roots
 
