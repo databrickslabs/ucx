@@ -3,6 +3,7 @@ import logging
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -139,11 +140,37 @@ class WorkflowTaskContainer(SourceContainer):
         path = WorkspacePath(self._ws, notebook_path)
         return graph.register_notebook(path)
 
-    def _register_python_wheel_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
+    @staticmethod
+    def _find_first_matching_distribution(path_lookup: PathLookup, name: str) -> metadata.Distribution | None:
+        # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
+        normalize_name = metadata.Prepared.normalize  # type: ignore
+        normalized_name = normalize_name(name)
+        for library_root in path_lookup.library_roots:
+            for path in library_root.glob("*.dist-info"):
+                distribution = metadata.Distribution.at(path)
+                if normalize_name(distribution.name) == normalized_name:
+                    return distribution
+        return None
+
+    def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
-            return
-        # TODO: https://github.com/databrickslabs/ucx/issues/1640
-        yield DependencyProblem('not-yet-implemented', 'Python wheel task is not yet implemented')
+            return []
+
+        distribution_name = self._task.python_wheel_task.package_name
+        distribution = self._find_first_matching_distribution(graph.path_lookup, distribution_name)
+        if distribution is None:
+            return [DependencyProblem("distribution-not-found", f"Could not find distribution for {distribution_name}")]
+        entry_point_name = self._task.python_wheel_task.entry_point
+        try:
+            entry_point = distribution.entry_points[entry_point_name]
+        except KeyError:
+            return [
+                DependencyProblem(
+                    "distribution-entry-point-not-found",
+                    f"Could not find distribution entry point for {distribution_name}.{entry_point_name}",
+                )
+            ]
+        return graph.register_import(entry_point.module)
 
     def _register_spark_jar_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
         if not self._task.spark_jar_task:

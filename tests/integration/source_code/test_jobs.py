@@ -341,3 +341,38 @@ def test_job_spark_python_task_linter_unhappy_path(
 
     problems = simple_ctx.workflow_linter.lint_job(j.job_id)
     assert len([problem for problem in problems if problem.message == "Could not locate import: greenlet"]) == 1
+
+
+def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_random):
+    whitelist = create_autospec(Whitelist)  # databricks is in default list
+    whitelist.module_compatibility.return_value = UNKNOWN
+    whitelist.distribution_compatibility.return_value = UNKNOWN
+
+    simple_ctx = simple_ctx.replace(
+        whitelist=whitelist,
+        path_lookup=PathLookup(Path("/non/existing/path"), []),  # Avoid finding current project
+    )
+
+    simple_ctx.workspace_installation.run()  # Creates ucx wheel
+    wheels = [file for file in simple_ctx.installation.files() if file.path.endswith(".whl")]
+    library = compute.Library(whl=wheels[0].path)
+
+    python_wheel_task = jobs.PythonWheelTask("databricks_labs_ucx", "runtime")
+    task = jobs.Task(
+        task_key=make_random(4),
+        python_wheel_task=python_wheel_task,
+        new_cluster=compute.ClusterSpec(
+            num_workers=1,
+            node_type_id=ws.clusters.select_node_type(local_disk=True, min_memory_gb=16),
+            spark_version=ws.clusters.select_spark_version(latest=True),
+        ),
+        timeout_seconds=0,
+        libraries=[library],
+    )
+    job_with_ucx_library = make_job(tasks=[task])
+
+    problems = simple_ctx.workflow_linter.lint_job(job_with_ucx_library.job_id)
+
+    assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
+    assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
+    whitelist.distribution_compatibility.assert_called_once_with(Path(wheels[0].path).name)
