@@ -141,15 +141,14 @@ class WorkflowTaskContainer(SourceContainer):
         return graph.register_notebook(path)
 
     @staticmethod
-    def _find_first_matching_distribution(
-        path_lookup: PathLookup, distribution_name: str
-    ) -> metadata.Distribution | None:
+    def _find_first_matching_distribution(path_lookup: PathLookup, name: str) -> metadata.Distribution | None:
         # Prepared exists in importlib.metadata.__init__pyi, but is not defined in importlib.metadata.__init__.py
         normalize_name = metadata.Prepared.normalize  # type: ignore
+        normalized_name = normalize_name(name)
         for library_root in path_lookup.library_roots:
             for path in library_root.glob("*.dist-info"):
                 distribution = metadata.Distribution.at(path)
-                if normalize_name(distribution.name) == normalize_name(distribution_name):
+                if normalize_name(distribution.name) == normalized_name:
                     return distribution
         return None
 
