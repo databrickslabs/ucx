@@ -3,7 +3,7 @@ import logging
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
-from importlib.metadata import Distribution
+from importlib.metadata import Distribution, Prepared
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import Threads
@@ -152,7 +152,9 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return
-        distribution = self._find_distribution(graph.path_lookup, self._task.python_wheel_task.package_name)
+        prepared = Prepared(self._task.python_wheel_task.package_name)
+        # Yes, Databricks uses "legacy" normalized name
+        distribution = self._find_distribution(graph.path_lookup, prepared.legacy_normalized)
         if distribution is None:
             return [DependencyProblem("distribution-not-found", "Could not find the library dist info")]
         try:
