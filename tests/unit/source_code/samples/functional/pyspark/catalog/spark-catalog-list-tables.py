@@ -41,3 +41,9 @@ for table in spark.catalog.listTables(name):
 ## ucx[table-migrate:+1:0:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
 for table in spark.catalog.listTables(f"boop{stuff}"):
     do_stuff_with_table(table)
+
+## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+# FIXME: This is a false positive; any method named 'listTables' is triggering the warning.
+# ucx[table-migrate:+1:0:+1:0] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
+something_else.listTables("old.things")
+a_function("old.things")

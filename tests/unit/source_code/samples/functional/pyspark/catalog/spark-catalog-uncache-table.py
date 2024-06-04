@@ -17,3 +17,9 @@ for i in range(10):
     spark.catalog.uncacheTable(name)
     # ucx[table-migrate:+1:0:+1:0] Can't migrate 'uncacheTable' because its table name argument is not a constant
     spark.catalog.uncacheTable(f"boop{stuff}")
+
+    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+    # FIXME: This is a false positive; any method named 'uncacheTable' is triggering the warning.
+    # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    something_else.uncacheTable("old.things")
+    a_function("old.things")

@@ -21,3 +21,10 @@ for i in range(10):
     df.write.format("delta").saveAsTable(name)
     # ucx[table-migrate:+1:0:+1:0] Can't migrate 'saveAsTable' because its table name argument is not a constant
     df.write.format("delta").saveAsTable(f"boop{stuff}")
+
+    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+    # FIXME: This are false positives; any method named 'saveAsTable' is triggering the warnings.
+    # ucx[table-migrate:+2:0:+2:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    # ucx[table-migrate:+2:0:+1:0] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
+    something_else.saveAsTable("old.things")
+    a_function("old.things")

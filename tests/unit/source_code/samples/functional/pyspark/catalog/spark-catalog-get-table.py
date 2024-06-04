@@ -22,3 +22,9 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Can't migrate 'getTable' because its table name argument is not a constant
     table = spark.catalog.getTable(f"boop{stuff}")
     do_stuff_with(table)
+
+    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+    # FIXME: This is a false positive; any method named 'getTable' is triggering the warning.
+    # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    something_else.getTable("old.things")
+    a_function("old.things")

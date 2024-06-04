@@ -34,3 +34,8 @@ for i in range(10):
     df = spark.catalog.createExternalTable(f"boop{stuff}")
     do_stuff_with(df)
 
+    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+    # FIXME: This is a false positive; any method named 'createExternalTable' is triggering the warning.
+    # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    something_else.createExternalTable("old.things")
+    a_function("old.things")

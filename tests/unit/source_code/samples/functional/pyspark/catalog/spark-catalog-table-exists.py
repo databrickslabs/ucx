@@ -32,3 +32,9 @@ for i in range(10):
     # ucx[table-migrate:+1:0:+1:0] Can't migrate 'tableExists' because its table name argument is not a constant
     if spark.catalog.tableExists(f"boot{stuff}"):
         pass
+
+    ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
+    # FIXME: This is a false positive; any method named 'tableExists' is triggering the warning.
+    # ucx[table-migrate:+1:0:+1:0] Table old.things is migrated to brand.new.stuff in Unity Catalog
+    something_else.tableExists("old.things")
+    a_function("old.things")
