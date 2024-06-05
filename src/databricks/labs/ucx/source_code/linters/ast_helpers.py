@@ -4,6 +4,8 @@ from astroid import Attribute, Call, Name  # type: ignore
 
 logger = logging.getLogger(__file__)
 
+missing_handlers: set[str] = set()
+
 
 class AstHelper:
     @classmethod
@@ -30,5 +32,8 @@ class AstHelper:
         if isinstance(node.expr, Call):
             name = cls.get_full_function_name(node.expr)
             return node.attrname if name is None else name + '.' + node.attrname
-        # logger.error(f"Missing handler for {type(node.expr).__name__}")
+        name = type(node.expr).__name__
+        if name not in missing_handlers:
+            missing_handlers.add(name)
+            logger.debug(f"Missing handler for {name}")
         return None
