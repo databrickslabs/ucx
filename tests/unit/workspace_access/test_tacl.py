@@ -391,7 +391,7 @@ def test_tacl_udf_applier(mocker):
     assert validation_res
 
 
-def test_tacl_applier_multiple_actions(mocker):
+def test_tacl_applier_multiple_actions():
     sql_backend = MockBackend(
         rows={
             "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
@@ -439,6 +439,61 @@ def test_tacl_applier_multiple_actions(mocker):
 
     assert [
         "GRANT SELECT, MODIFY ON TABLE catalog_a.database_b.table_c TO `account-abc`",
+        "SHOW GRANTS ON TABLE catalog_a.database_b.table_c",
+    ] == sql_backend.queries
+    assert validation_res
+
+
+def test_tacl_applier_deny_and_grant():
+    sql_backend = MockBackend(
+        rows={
+            "SELECT \\* FROM hive_metastore.test.grants": UCX_GRANTS[
+                ("abc", "SELECT", "catalog_a", "database_b", "table_c", None, None, False, False)
+            ],
+            "SHOW GRANTS ON TABLE catalog_a.database_b.table_c": SHOW_GRANTS[
+                ("account-abc", "READ_METADATA", "TABLE", "table_c"),
+                ("account-abc", "SELECT", "TABLE", "table_c"),
+                ("account-abc", "DENIED_MODIFY", "TABLE", "table_c"),
+            ],
+        }
+    )
+    tables_crawler = TablesCrawler(sql_backend, "test")
+    udf_crawler = UdfsCrawler(sql_backend, "test")
+    grants_crawler = GrantsCrawler(tables_crawler, udf_crawler)
+    table_acl_support = TableAclSupport(grants_crawler, sql_backend)
+
+    permissions = Permissions(
+        object_type="TABLE",
+        object_id="catalog_a.database_b.table_c",
+        raw=json.dumps(
+            {
+                "principal": "abc",
+                "action_type": "SELECT, READ_METADATA, DENIED_MODIFY",
+                "catalog": "catalog_a",
+                "database": "database_b",
+                "table": "table_c",
+            }
+        ),
+    )
+    grp = [
+        MigratedGroup(
+            id_in_workspace=None,
+            name_in_workspace="abc",
+            name_in_account="account-abc",
+            temporary_name="tmp-backup-abc",
+            members=None,
+            entitlements=None,
+            external_id=None,
+            roles=None,
+        )
+    ]
+    migration_state = MigrationState(grp)
+    task = table_acl_support.get_apply_task(permissions, migration_state)
+    validation_res = task()
+
+    assert [
+        "GRANT SELECT, READ_METADATA ON TABLE catalog_a.database_b.table_c TO `account-abc`",
+        "DENY `MODIFY` ON TABLE catalog_a.database_b.table_c TO `account-abc`",
         "SHOW GRANTS ON TABLE catalog_a.database_b.table_c",
     ] == sql_backend.queries
     assert validation_res

@@ -120,11 +120,15 @@ class Grant:
         # See https://docs.databricks.com/en/sql/language-manual/security-grant.html
         statements = []
         actions = self.action_type.split(", ")
-        if "OWN" in actions:
-            actions.remove("OWN")
+        deny_actions = [action for action in actions if "DENIED" in action]
+        grant_actions = [action for action in actions if "DENIED" not in action]
+        if "OWN" in grant_actions:
+            grant_actions.remove("OWN")
             statements.append(self._set_owner_sql(object_type, object_key))
-        if actions:
-            statements.append(self._apply_grant_sql(", ".join(actions), object_type, object_key))
+        if grant_actions:
+            statements.append(self._apply_grant_sql(", ".join(grant_actions), object_type, object_key))
+        if deny_actions:
+            statements.append(self._apply_grant_sql(", ".join(deny_actions), object_type, object_key))
         return statements
 
     def hive_revoke_sql(self) -> str:

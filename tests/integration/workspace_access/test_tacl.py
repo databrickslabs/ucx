@@ -212,6 +212,7 @@ def test_permission_for_udfs(sql_backend, runtime_ctx, make_group_pair):
     sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.name_in_workspace}`")
     sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.name_in_workspace}`")
     sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
+    sql_backend.execute(f"DENY `SELECT` ON FUNCTION {udf_b.full_name} TO `{group.name_in_workspace}`")
 
     grants = runtime_ctx.grants_crawler
 
@@ -222,6 +223,7 @@ def test_permission_for_udfs(sql_backend, runtime_ctx, make_group_pair):
     assert f"{group.name_in_workspace}.{udf_a.full_name}:SELECT" in all_initial_grants
     assert f"{group.name_in_workspace}.{udf_a.full_name}:OWN" in all_initial_grants
     assert f"{group.name_in_workspace}.{udf_b.full_name}:READ_METADATA" in all_initial_grants
+    assert f"{group.name_in_workspace}.{udf_b.full_name}:DENIED_SELECT" in all_initial_grants
 
     tacl_support = TableAclSupport(grants, sql_backend)
     apply_tasks(tacl_support, [group])
@@ -234,7 +236,7 @@ def test_permission_for_udfs(sql_backend, runtime_ctx, make_group_pair):
     actual_udf_b_grants = defaultdict(set)
     for grant in grants.grants(catalog=schema.catalog_name, database=schema.name, udf=udf_b.name):
         actual_udf_b_grants[grant.principal].add(grant.action_type)
-    assert {"READ_METADATA"} == actual_udf_b_grants[group.name_in_account]
+    assert {"READ_METADATA", "DENIED_SELECT"} == actual_udf_b_grants[group.name_in_account]
 
 
 def test_verify_permission_for_udfs(sql_backend, runtime_ctx, make_group):
