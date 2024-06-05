@@ -1281,16 +1281,16 @@ def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
 
     def create(*, src_path: str, dst_path: str, wait_for_provisioning=True):
         @retried(on=[NotFound], timeout=timedelta(minutes=2))
-        def _wait_for_provisioning() -> None:
-            if not ws.dbfs.exists(src_path):
-                raise NotFound(f"Location not found: {src_path}")
+        def _wait_for_provisioning(path) -> None:
+            if not ws.dbfs.exists(path):
+                raise NotFound(f"Location not found: {path}")
 
         if ws.config.is_aws:
             cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
         else:
             ws.dbfs.copy(src_path, dst_path, recursive=True)
             if wait_for_provisioning:
-                _wait_for_provisioning()
+                _wait_for_provisioning(dst_path)
         return dst_path
 
     def remove(dst_path: str):
