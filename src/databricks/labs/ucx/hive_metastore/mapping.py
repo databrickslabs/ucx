@@ -8,7 +8,7 @@ from databricks.labs.blueprint.installation import Installation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict, DatabricksError
+from databricks.sdk.errors import BadRequest, NotFound, ResourceConflict, DatabricksError, InvalidParameterValue
 from databricks.sdk.service.catalog import TableInfo, SchemaInfo
 
 from databricks.labs.ucx.account.workspaces import WorkspaceInfo
@@ -264,5 +264,5 @@ class TableMapping:
     def _try_get_table_in_uc(self, target_key: str):
         try:
             return self._ws.tables.get(target_key)
-        except NotFound:
+        except (NotFound, InvalidParameterValue):
             return None
