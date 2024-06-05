@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 import pytest
-from astroid import Attribute, Call, Expr  # type: ignore
+from astroid import Attribute, Call, Const, Expr  # type: ignore
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 from databricks.labs.ucx.source_code.linters.imports import ASTLinter, DbutilsLinter, TreeWalker
@@ -136,7 +136,7 @@ sys.path.append(stuff("relative_path"))
     assert "relative_path" in [p.path for p in appended]
 
 
-def test_extract_call_by_name(migration_index):
+def test_extract_call_by_name():
     linter = ASTLinter.parse("o.m1().m2().m3()")
     stmt = linter.first_statement()
     assert isinstance(stmt, Expr)
@@ -146,12 +146,43 @@ def test_extract_call_by_name(migration_index):
     assert act.func.attrname == "m2"
 
 
-def test_extract_call_by_name_none(migration_index):
+def test_extract_call_by_name_none():
     linter = ASTLinter.parse("o.m1().m2().m3()")
     stmt = linter.first_statement()
     assert isinstance(stmt, Expr)
+    assert isinstance(stmt.value, Call)
     act = ASTLinter.extract_call_by_name(stmt.value, "m5000")
     assert act is None
+
+
+@pytest.mark.parametrize(
+    "code, arg_index, arg_name, expected",
+    [
+        ("o.m1()", 1, "second", None),
+        ("o.m1(3)", 1, "second", None),
+        ("o.m1(first=3)", 1, "second", None),
+        ("o.m1(4, 3)", None, None, None),
+        ("o.m1(4, 3)", None, "second", None),
+        ("o.m1(4, 3)", 1, "second", 3),
+        ("o.m1(4, 3)", 1, None, 3),
+        ("o.m1(first=4, second=3)", 1, "second", 3),
+        ("o.m1(second=3, first=4)", 1, "second", 3),
+        ("o.m1(second=3, first=4)", None, "second", 3),
+        ("o.m1(second=3)", 1, "second", 3),
+        ("o.m1(4, 3, 2)", 1, "second", 3),
+    ],
+)
+def test_linter_gets_arg(code, arg_index, arg_name, expected):
+    linter = ASTLinter.parse(code)
+    stmt = linter.first_statement()
+    assert isinstance(stmt, Expr)
+    assert isinstance(stmt.value, Call)
+    act = ASTLinter.get_arg(stmt.value, arg_index, arg_name)
+    if expected is None:
+        assert act is None
+    else:
+        assert isinstance(act, Const)
+        assert act.value == expected
 
 
 @pytest.mark.parametrize(
