@@ -1308,7 +1308,7 @@ def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
     # external table migration tests
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
-    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)
+    make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location, wait_for_provisioning=True)
     return new_mounted_location
 
 
