@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     NotebookRunCall,
     ImportSource,
     NodeBase,
-    PythonLinter,
+    DbutilsLinter,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -165,9 +165,9 @@ class DependencyGraph:
     def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
         linter = ASTLinter.parse(python_code)
-        syspath_changes = PythonLinter.list_sys_path_changes(linter)
-        run_calls = PythonLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources, import_problems = PythonLinter.list_import_sources(linter, DependencyProblem)
+        syspath_changes = DbutilsLinter.list_sys_path_changes(linter)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
+        import_sources, import_problems = DbutilsLinter.list_import_sources(linter, DependencyProblem)
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort

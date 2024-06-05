@@ -7,7 +7,7 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
-from databricks.labs.ucx.source_code.linters.imports import PythonLinter
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
@@ -217,7 +217,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup):
 
 def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
@@ -233,7 +233,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
 
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
     sources: list[str] = _load_sources(SourceContainer, "root4.py")
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))
     assert [
         Advisory(
@@ -254,7 +254,7 @@ do_something_with_stuff(stuff)
 stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(source))
     assert len(advices) == 2
 
@@ -265,6 +265,6 @@ import stuff
 do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
-    linter = PythonLinter()
+    linter = DbutilsLinter()
     advices = list(linter.lint(source))
     assert len(advices) == 0
