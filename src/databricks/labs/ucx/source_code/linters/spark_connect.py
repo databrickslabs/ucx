@@ -205,6 +205,5 @@ class SparkConnectLinter(Linter):
 
     def lint(self, code: str) -> Iterator[Advice]:
         linter = ASTLinter.parse(code)
-        for node in TreeWalker.walk(linter.root):
-            for matcher in self._matchers:
-                yield from matcher.lint(node)
+        for matcher in self._matchers:
+            yield from matcher.lint_tree(linter.root)

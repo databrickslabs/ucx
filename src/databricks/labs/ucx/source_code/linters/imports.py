@@ -410,4 +410,3 @@ class DbutilsLinter(Linter):
                 end_col=node.end_col_offset or 0,
             )
             problems.append(problem)
-
