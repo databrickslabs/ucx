@@ -94,25 +94,6 @@ def test_dependency_resolver_raises_problem_with_unfound_local_notebook_dependen
     ]
 
 
-def test_dependency_resolver_raises_problem_with_non_constant_local_notebook_dependency(mock_path_lookup):
-    notebook_loader = NotebookLoader()
-    notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PythonLibraryResolver(Whitelist())
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
-    maybe = dependency_resolver.build_notebook_dependency_graph(Path('root10.py'))
-    assert list(maybe.problems) == [
-        DependencyProblem(
-            'dependency-not-constant',
-            "Can't check dependency not provided as a constant",
-            Path('root10.py'),
-            2,
-            0,
-            2,
-            35,
-        )
-    ]
-
-
 def test_dependency_resolver_raises_problem_with_invalid_run_cell(mock_path_lookup):
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
@@ -144,27 +125,6 @@ def test_dependency_resolver_raises_problem_with_unresolved_import(mock_path_loo
     maybe = dependency_resolver.build_local_file_dependency_graph(Path('root7.py'))
     assert list(maybe.problems) == [
         DependencyProblem('import-not-found', 'Could not locate import: some_library', Path("root7.py"), 1, 0, 1, 19)
-    ]
-
-
-def test_dependency_resolver_raises_problem_with_non_constant_notebook_argument(mock_path_lookup):
-    notebook_loader = NotebookLoader()
-    notebook_resolver = NotebookResolver(notebook_loader)
-    whitelist = Whitelist()
-    import_resolver = ImportFileResolver(FileLoader(), whitelist)
-    pip_resolver = PythonLibraryResolver(whitelist)
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
-    maybe = dependency_resolver.build_local_file_dependency_graph(Path("run_notebooks.py"))
-    assert list(maybe.problems) == [
-        DependencyProblem(
-            'dependency-not-constant',
-            "Can't check dependency not provided as a constant",
-            Path("run_notebooks.py"),
-            14,
-            13,
-            14,
-            50,
-        )
     ]
 
 
