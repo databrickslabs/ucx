@@ -114,4 +114,4 @@ class PythonLibraryResolver(LibraryResolver):
         return setup
 
     def __str__(self) -> str:
-        return f"PipResolver(whitelist={self._whitelist})"
+        return f"PythonLibraryResolver(whitelist={self._whitelist})"
