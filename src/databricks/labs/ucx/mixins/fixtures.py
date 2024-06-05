@@ -609,11 +609,13 @@ def make_repo(ws, make_random):
 
 @pytest.fixture
 def make_user(ws, make_random):
-    yield from factory(
-        "workspace user",
-        lambda **kwargs: ws.users.create(user_name=f"sdk-{make_random(4)}@example.com".lower(), **kwargs),
-        lambda item: ws.users.delete(item.id),
-    )
+
+    @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
+    def create(**kwargs):
+        user = ws.users.create(user_name=f"sdk-{make_random(4)}@example.com".lower(), **kwargs)
+        return user
+
+    yield from factory("workspace user", create, lambda item: ws.users.delete(item.id))
 
 
 def _scim_values(ids: list[str]) -> list[iam.ComplexValue]:
