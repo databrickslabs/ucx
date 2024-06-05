@@ -44,7 +44,7 @@ class PythonLibraryResolver(LibraryResolver):
         # environment. If we don't have a virtual environment, create a temporary one.
         # simulate notebook-scoped virtual environment
         lib_install_folder = tempfile.mkdtemp(prefix='ucx-')
-        return Path(lib_install_folder)
+        return Path(lib_install_folder).resolve()
 
     def _install_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
