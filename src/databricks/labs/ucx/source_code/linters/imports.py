@@ -47,7 +47,7 @@ class TreeWalker:
     def walk(cls, node: NodeNG) -> Iterable[NodeNG]:
         yield node
         for child in node.get_children():
-            yield from TreeWalker.walk(child)
+            yield from cls.walk(child)
 
 
 class MatchingVisitor(Visitor):
@@ -363,12 +363,15 @@ class PythonLinter(Linter):
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
             nodes = linter.locate(Import, [])
-            sources.extend(list(cls._make_sources_for_import_nodes(nodes)))
+            for source in cls._make_sources_for_import_nodes(nodes):
+                sources.append(source)
             nodes = linter.locate(ImportFrom, [])
-            sources.extend(list(cls._make_sources_for_import_from_nodes(nodes)))
+            for source in cls._make_sources_for_import_from_nodes(nodes):
+                sources.append(source)
             nodes = linter.locate(Call, [("import_module", Attribute), ("importlib", Name)])
             nodes.extend(linter.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
-            sources.extend(list(cls._make_sources_for_import_call_nodes(nodes, problem_type, problems)))
+            for source in cls._make_sources_for_import_call_nodes(nodes, problem_type, problems):
+                sources.append(source)
             return sources, problems
         except Exception as e:  # pylint: disable=broad-except
             problem = problem_type('internal-error', f"While linter {linter} was checking imports: {e}")
@@ -407,4 +410,4 @@ class PythonLinter(Linter):
                 end_col=node.end_col_offset or 0,
             )
             problems.append(problem)
-            return [], problems
+
