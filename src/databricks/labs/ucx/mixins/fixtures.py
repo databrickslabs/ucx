@@ -1279,11 +1279,18 @@ def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
     if ws.config.is_aws:
         cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
 
-    def create(*, src_path: str, dst_path: str):
+    def create(*, src_path: str, dst_path: str, wait_for_provisioning=False):
+        @retried(on=[NotFound], timeout=timedelta(minutes=2))
+        def _wait_for_provisioning() -> None:
+            if not ws.dbfs.exists(src_path):
+                raise NotFound(f"Location not found: {src_path}")
+
         if ws.config.is_aws:
             cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
         else:
             ws.dbfs.copy(src_path, dst_path, recursive=True)
+            if wait_for_provisioning:
+                _wait_for_provisioning()
         return dst_path
 
     def remove(dst_path: str):
