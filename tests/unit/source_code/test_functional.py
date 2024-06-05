@@ -32,7 +32,7 @@ class Expectation:
 
 class Functional:
     _re = re.compile(
-        r"# ucx\[(?P<code>[\w-]+):(?P<start_line>[\d\+]+):(?P<start_col>[\d]+):(?P<end_line>[\d\+]+):(?P<end_col>[\d]+)\] (?P<message>.*)"
+        r"# ucx\[(?P<code>[\w-]+):(?P<start_line>[\d+]+):(?P<start_col>[\d]+):(?P<end_line>[\d+]+):(?P<end_col>[\d]+)] (?P<message>.*)"
     )
     _location = Path(__file__).parent / 'samples/functional'
 
