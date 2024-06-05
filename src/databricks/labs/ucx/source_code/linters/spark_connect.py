@@ -133,8 +133,8 @@ class SparkSqlContextMatcher(SharedClusterMatcher):
             yield self._get_advice(node, node.expr.attrname)
 
     def _get_advice(self, node: Attribute, name: str) -> Advice:
-        if node.attrname in SparkSqlContextMatcher._KNOWN_REPLACEMENTS:
-            replacement = SparkSqlContextMatcher._KNOWN_REPLACEMENTS[node.attrname]
+        if node.attrname in self._KNOWN_REPLACEMENTS:
+            replacement = self._KNOWN_REPLACEMENTS[node.attrname]
             return Failure(
                 code='legacy-context-in-shared-clusters',
                 message=f'{name} and {node.attrname} are not supported on {self._cluster_type_str()}. '
