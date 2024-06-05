@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import NotFound, ResourceConflict
 from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
@@ -119,7 +119,7 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
     assert ws.groups.get(ws_group.id).display_name == ws_group.display_name
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=2))
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, _ = make_ucx_group()
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
