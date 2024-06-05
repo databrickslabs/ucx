@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import ast
 import logging
 from collections.abc import Iterable, Callable
 from typing import TypeVar, Generic, cast

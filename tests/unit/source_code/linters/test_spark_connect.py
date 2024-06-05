@@ -28,7 +28,6 @@ spark._jspark._jvm.com.my.custom.Name()
             end_line=3,
             end_col=13,
         ),
-
     ]
     actual = list(linter.lint(code))
     assert actual == expected
