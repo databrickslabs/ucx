@@ -1,5 +1,6 @@
 import re
 import tokenize
+from collections.abc import Iterable, Generator
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
+from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 
@@ -35,17 +37,17 @@ class Functional:
     _location = Path(__file__).parent / 'samples/functional'
 
     @classmethod
-    def all(cls):
+    def all(cls) -> list['Functional']:
         return [Functional(_) for _ in cls._location.glob('**/*.py')]
 
     @classmethod
-    def test_id(cls, sample: 'Functional'):
+    def test_id(cls, sample: 'Functional') -> str:
         return sample.path.relative_to(cls._location).as_posix()
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path) -> None:
         self.path = path
 
-    def verify(self):
+    def verify(self) -> None:
         expected_problems = list(self._expected_problems())
         actual_problems = sorted(list(self._lint()), key=lambda a: (a.start_line, a.start_col))
         high_level_expected = [f'{p.code}:{p.message}' for p in expected_problems]
@@ -54,7 +56,7 @@ class Functional:
         # TODO: match start/end lines/columns as well. At the moment notebook parsing has a bug that makes it impossible
         # TODO: output annotated file with comments for quick fixing
 
-    def _lint(self):
+    def _lint(self) -> Iterable[Advice]:
         migration_index = MigrationIndex(
             [
                 MigrationStatus('old', 'things', dst_catalog='brand', dst_schema='new', dst_table='stuff'),
@@ -65,7 +67,7 @@ class Functional:
         linter = FileLinter(ctx, self.path)
         return linter.lint()
 
-    def _expected_problems(self):
+    def _expected_problems(self) -> Generator[Expectation, None, None]:
         with self.path.open('rb') as f:
             for comment in self._comments(f):
                 if not comment.text.startswith('# ucx['):
@@ -90,7 +92,7 @@ class Functional:
                 )
 
     @staticmethod
-    def _comments(f):
+    def _comments(f) -> Generator[Comment, None, None]:
         for token in tokenize.tokenize(f.readline):
             if token.type != tokenize.COMMENT:
                 continue
@@ -98,5 +100,5 @@ class Functional:
 
 
 @pytest.mark.parametrize("sample", Functional.all(), ids=Functional.test_id)
-def test_functional(sample: Functional):
+def test_functional(sample: Functional) -> None:
     sample.verify()
