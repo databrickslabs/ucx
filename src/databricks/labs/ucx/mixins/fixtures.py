@@ -612,7 +612,7 @@ def make_user(ws, make_random):
 
     @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(**kwargs):
-        user = ws.users.create(user_name=f"sdk-{make_random(4)}@example.com".lower(), **kwargs)
+        user = ws.users.create(user_name=f"sdk-{make_random(8)}@example.com".lower(), **kwargs)
         return user
 
     yield from factory("workspace user", create, lambda item: ws.users.delete(item.id))
