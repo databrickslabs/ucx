@@ -94,7 +94,13 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
 ):
     ws_group, _ = make_ucx_group()
 
-    group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
+    group_manager = GroupManager(
+        sql_backend,
+        ws,
+        inventory_schema,
+        [ws_group.display_name],
+        "ucx-temp-",
+    )
     group_manager.rename_groups()
     group_manager.reflect_account_groups_on_workspace()
     group_manager.delete_original_workspace_groups()
@@ -105,7 +111,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
-    with pytest.raises(NotFound):
+    with pytest.raises(NotFound, match=f"Group with id {ws_group.id} not found."):
         get_group(ws_group.id)
 
 

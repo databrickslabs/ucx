@@ -190,7 +190,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
-    with pytest.raises(NotFound):
+    with pytest.raises(NotFound, match=f"Group with id {ws_group_a.id} not found."):
         get_group(ws_group_a.id)
 
 
