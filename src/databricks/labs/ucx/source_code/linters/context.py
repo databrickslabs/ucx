@@ -5,7 +5,7 @@ from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter
 from databricks.labs.ucx.source_code.linters.dbfs import FromDbfsFolder, DBFSUsageLinter
 from databricks.labs.ucx.source_code.linters.imports import PythonLinter
 
-from databricks.labs.ucx.source_code.linters.pyspark import SparkSqlLinter
+from databricks.labs.ucx.source_code.linters.pyspark import SparkSql
 from databricks.labs.ucx.source_code.linters.spark_connect import SparkConnectLinter
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
 from databricks.labs.ucx.source_code.queries import FromTable
@@ -20,7 +20,7 @@ class LinterContext:
         self._linters = {
             Language.PYTHON: SequentialLinter(
                 [
-                    SparkSqlLinter(from_table, index),
+                    SparkSql(from_table, index),
                     DBFSUsageLinter(),
                     DBRv8d0Linter(dbr_version=None),
                     SparkConnectLinter(is_serverless=False),
@@ -30,7 +30,7 @@ class LinterContext:
             Language.SQL: SequentialLinter([from_table, dbfs_from_folder]),
         }
         self._fixers: dict[Language, list[Fixer]] = {
-            Language.PYTHON: [SparkSqlLinter(from_table, index)],
+            Language.PYTHON: [SparkSql(from_table, index)],
             Language.SQL: [from_table],
         }
 

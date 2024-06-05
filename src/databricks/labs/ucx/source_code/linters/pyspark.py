@@ -315,7 +315,7 @@ class SparkMatchers:
         return self._matchers
 
 
-class SparkSqlLinter(Linter, Fixer):
+class SparkSql(Linter, Fixer):
 
     _spark_matchers = SparkMatchers()
 

@@ -4,20 +4,20 @@ from astroid import Call, Const, Expr  # type: ignore
 
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.imports import ASTLinter
-from databricks.labs.ucx.source_code.linters.pyspark import AstHelper, TableNameMatcher, SparkSqlLinter
+from databricks.labs.ucx.source_code.linters.pyspark import AstHelper, TableNameMatcher, SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
 def test_spark_no_sql(empty_index):
     ftf = FromTable(empty_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index)
 
     assert not list(sqf.lint("print(1)"))
 
 
 def test_spark_sql_no_match(empty_index):
     ftf = FromTable(empty_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index)
 
     old_code = """
 for i in range(10):
@@ -30,7 +30,7 @@ for i in range(10):
 
 def test_spark_sql_match(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, migration_index)
+    sqf = SparkSql(ftf, migration_index)
 
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -60,7 +60,7 @@ for i in range(10):
 
 def test_spark_sql_match_named(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, migration_index)
+    sqf = SparkSql(ftf, migration_index)
 
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -90,7 +90,7 @@ for i in range(10):
 
 def test_spark_table_return_value_apply(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, migration_index)
+    sqf = SparkSql(ftf, migration_index)
     old_code = """spark.read.csv('s3://bucket/path')
 for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
@@ -101,7 +101,7 @@ for table in spark.catalog.listTables():
 
 def test_spark_sql_fix(migration_index):
     ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, migration_index)
+    sqf = SparkSql(ftf, migration_index)
 
     old_code = """spark.read.csv("s3://bucket/path")
 for i in range(10):
@@ -523,7 +523,7 @@ for i in range(10):
 )
 def test_spark_cloud_direct_access(empty_index, code, expected):
     ftf = FromTable(empty_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index)
     advisories = list(sqf.lint(code))
     assert advisories == expected
 
@@ -542,7 +542,7 @@ FS_FUNCTIONS = [
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
 def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
     ftf = FromTable(empty_index, CurrentSessionState())
-    sqf = SparkSqlLinter(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index)
     # ls function calls have to be from dbutils.fs, or we ignore them
     code = f"""spark.{fs_function}("/bucket/path")"""
     advisories = list(sqf.lint(code))
