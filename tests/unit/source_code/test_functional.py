@@ -76,12 +76,16 @@ class Functional:
                 if not match:
                     continue
                 groups = match.groupdict()
-                start_line = groups['start_line']
-                if '+' in start_line:
-                    start_line = int(start_line[1:]) + comment.start_line
-                end_line = groups['end_line']
-                if '+' in end_line:
-                    end_line = int(end_line[1:]) + comment.start_line
+                reported_start_line = groups['start_line']
+                if '+' in reported_start_line:
+                    start_line = int(reported_start_line[1:]) + comment.start_line
+                else:
+                    start_line = int(reported_start_line)
+                reported_end_line = groups['end_line']
+                if '+' in reported_end_line:
+                    end_line = int(reported_end_line[1:]) + comment.start_line
+                else:
+                    end_line = int(reported_end_line)
                 yield Expectation(
                     code=groups['code'],
                     message=groups['message'],
