@@ -1281,11 +1281,18 @@ def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
     if ws.config.is_aws:
         cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
 
-    def create(*, src_path: str, dst_path: str):
+    def create(*, src_path: str, dst_path: str, wait_for_provisioning=True):
+        @retried(on=[NotFound], timeout=timedelta(minutes=2))
+        def _wait_for_provisioning(path) -> None:
+            if not ws.dbfs.exists(path):
+                raise NotFound(f"Location not found: {path}")
+
         if ws.config.is_aws:
             cmd_exec.run(f"dbutils.fs.cp('{src_path}', '{dst_path}', recurse=True)")
         else:
             ws.dbfs.copy(src_path, dst_path, recursive=True)
+            if wait_for_provisioning:
+                _wait_for_provisioning(dst_path)
         return dst_path
 
     def remove(dst_path: str):
@@ -1299,8 +1306,14 @@ def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
 
 @pytest.fixture
 def make_mounted_location(make_random, make_dbfs_data_copy, env_or_skip):
-    # make a copy of src data to a new location to avoid overlapping UC table path that will fail other
-    # external table migration tests
+    """Make a copy of source data to a new location
+
+    Use the fixture to avoid overlapping UC table path that will fail other external table migration tests.
+
+    Note:
+        This fixture is different to the other `make_` fixtures as it does not return a `Callable` to make the mounted
+        location; the mounted location is made with fixture setup already.
+    """
     existing_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/c'
     new_mounted_location = f'dbfs:/mnt/{env_or_skip("TEST_MOUNT_NAME")}/a/b/{make_random(4)}'
     make_dbfs_data_copy(src_path=existing_mounted_location, dst_path=new_mounted_location)

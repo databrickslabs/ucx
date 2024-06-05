@@ -1,11 +1,11 @@
 from datetime import timedelta
 
 import pytest
-from databricks.sdk.errors import NotFound
+from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize(
     "prepare_tables_for_migration,workflow",
     [
