@@ -188,6 +188,27 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected):
 @pytest.mark.parametrize(
     "code, expected",
     [
+        ("o.m1()", 0),
+        ("o.m1(3)", 1),
+        ("o.m1(first=3)", 1),
+        ("o.m1(3, 3)", 2),
+        ("o.m1(first=3, second=3)", 2),
+        ("o.m1(3, second=3)", 2),
+        ("o.m1(3, *b, **c, second=3)", 4),
+    ],
+)
+def test_args_count(code, expected):
+    linter = ASTLinter.parse(code)
+    stmt = linter.first_statement()
+    assert isinstance(stmt, Expr)
+    assert isinstance(stmt.value, Call)
+    act = ASTLinter.args_count(stmt.value)
+    assert act == expected
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
         (
             """
 name = "xyz"
