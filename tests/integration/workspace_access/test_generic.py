@@ -26,7 +26,7 @@ from . import apply_tasks
 
 
 @pytest.mark.parametrize("is_experimental", [True, False])
-@retried(on=[NotFound], timeout=timedelta(minutes=3))
+@retried(on=[NotFound, TimeoutError], timeout=timedelta(minutes=3))
 def test_instance_pools(
     ws: WorkspaceClient,
     migrated_group,
