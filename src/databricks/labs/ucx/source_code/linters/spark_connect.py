@@ -91,7 +91,7 @@ class RDDApiMatcher(SharedClusterMatcher):
     def _lint_sc(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Call) or not isinstance(node.func, Attribute):
             return
-        if node.func.attr not in self._SC_METHODS:
+        if node.func.attrname not in self._SC_METHODS:
             return
         function_name = AstHelper.get_full_function_name(node)
         if not function_name or not function_name.endswith(f"sc.{node.func.attrname}"):
