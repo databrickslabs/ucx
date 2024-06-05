@@ -63,8 +63,8 @@ class MatchingVisitor(Visitor):
     def matched_nodes(self):
         return self._matched_nodes
 
-    def visit_Call(self, node: ast.Call):
-        if self._node_type is not ast.Call:
+    def visit_call(self, node: Call):
+        if self._node_type is not Call:
             return
         try:
             if self._matches(node.func, 0):
