@@ -13,4 +13,3 @@ def test_loads_pip_library_from_notebook(simple_ctx):
 
     assert not maybe.problems
     assert maybe.graph.all_relative_names() == {'install_demo_wheel.py', 'thingy/__init__.py'}
-    
