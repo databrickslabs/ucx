@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shlex
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
@@ -206,8 +207,16 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
+    @staticmethod
+    def _split(code) -> list[str]:
+        match = re.search(r"(?<!\\)\n", code)
+        if match:
+            code = code[:match.start()]
+        code = code.replace("\\n", " ")
+        return list(shlex.split(code))
+
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        argv = re.split(r" |\n", self.original_code)
+        argv = self._split(self.original_code)
         try:
             cmd_name, cmd_args = parse_command(argv[1:])  # Skipping %pip
         except PipError as e:

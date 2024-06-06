@@ -2,6 +2,8 @@ from pathlib import Path
 from unittest.mock import create_autospec
 import yaml
 
+import pytest
+
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
@@ -134,3 +136,20 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     graph.register_library.assert_called_once_with(
         "databricks", installation_arguments=["databricks", "more", "code", "defined"]
     )
+
+
+@pytest.mark.parametrize(
+    "code,split",
+    [
+        ("%pip install foo", ["%pip", "install", "foo"]),
+        ("%pip install", ["%pip", "install"]),
+        ("%pip installl foo", ["%pip", "installl", "foo"]),
+        ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url \\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url bar\nmore code", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url bar\\n -t /tmp/", ["%pip", "install", "foo", "--index-url", "bar", "-t", "/tmp/"]),
+    ]
+)
+def test_pip_cell_split(code, split):
+    assert PipCell._split(code) == split
