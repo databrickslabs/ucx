@@ -207,9 +207,9 @@ class PipCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        splits = re.split(r" |\n", self.original_code)
+        argv = re.split(r" |\n", self.original_code)
         try:
-            cmd_name, cmd_args = parse_command(splits[1:])  # Skipping %pip
+            cmd_name, cmd_args = parse_command(argv[1:])  # Skipping %pip
         except PipError as e:
             return [DependencyProblem("library-install-failed", str(e))]
         if cmd_name != "install":
