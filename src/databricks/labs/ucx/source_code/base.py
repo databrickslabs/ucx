@@ -21,6 +21,7 @@ from pathlib import Path
 class Advice:
     code: str
     message: str
+    # Lines are 1-based, columns are 0-based.
     start_line: int
     start_col: int
     end_line: int

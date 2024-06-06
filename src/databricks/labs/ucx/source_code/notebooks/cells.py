@@ -24,13 +24,20 @@ COMMENT_PI = 'COMMENT'
 
 class Cell(ABC):
 
-    def __init__(self, source: str, original_offset: int = 0):
+    def __init__(self, source: str, original_offset: int):
+        # The header line prevents a cell from having a zero offset.
+        if original_offset < 1:
+            raise ValueError("Cells must have a positive offset within the original file.")
         self._original_offset = original_offset
         self._original_code = source
         self._migrated_code = source
 
     @property
     def original_offset(self) -> int:
+        """Line offset of this cell within the original notebook file.
+
+        Example: if the line offset is 5, then line 10 within this cell corresponds to line 5 of the original file.
+        """
         return self._original_offset
 
     @property
@@ -295,12 +302,14 @@ class CellLanguage(Enum):
 
         next_cell_pos = 1
         for i in range(1, len(lines)):
+            # Actually line i+1
             line = lines[i].strip()
             if line.startswith(separator):
                 cell = make_cell(cell_lines, next_cell_pos)
                 cells.append(cell)
                 cell_lines = []
-                next_cell_pos = i
+                # i represents the cell separator, the next cell begins 1 line later.
+                next_cell_pos = i + 1
             else:
                 cell_lines.append(lines[i])
 

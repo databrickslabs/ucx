@@ -68,9 +68,9 @@ class FromTable(Linter, Fixer):
                     code='table-migrate',
                     message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
                     # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                    start_line=0,
+                    start_line=1,
                     start_col=0,
-                    end_line=0,
+                    end_line=1,
                     end_col=1024,
                 )
 

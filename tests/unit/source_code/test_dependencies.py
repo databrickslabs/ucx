@@ -73,9 +73,9 @@ def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_depe
             'notebook-not-found',
             'Notebook not found: __NOT_FOUND__',
             Path('root1-no-leaf.run.py'),
-            19,
+            20,
             0,
-            19,
+            20,
             22,
         )
     ]
@@ -101,7 +101,7 @@ def test_dependency_resolver_raises_problem_with_invalid_run_cell(mock_path_look
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path('leaf6.py'))
     assert list(maybe.problems) == [
-        DependencyProblem('invalid-run-cell', 'Missing notebook path in %run command', Path('leaf6.py'), 5, 0, 5, 4)
+        DependencyProblem('invalid-run-cell', 'Missing notebook path in %run command', Path('leaf6.py'), 6, 0, 6, 4)
     ]
 
 

@@ -109,8 +109,8 @@ class FromDbfsFolder(Linter):
                 code='dbfs-query',
                 message=f"The use of DBFS is deprecated: {table.name}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                start_line=0,
+                start_line=1,
                 start_col=0,
-                end_line=0,
+                end_line=1,
                 end_col=1024,
             )

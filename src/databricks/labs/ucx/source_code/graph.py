@@ -386,6 +386,7 @@ class DependencyProblem:
     code: str
     message: str
     source_path: Path = Path(MISSING_SOURCE_PATH)
+    # Lines are 1-based, columns are 0-based.
     start_line: int = -1
     start_col: int = -1
     end_line: int = -1

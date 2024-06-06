@@ -13,14 +13,14 @@ from databricks.labs.ucx.source_code.known import Whitelist
 
 
 def test_pip_cell_language_is_pip():
-    assert PipCell("code").language == CellLanguage.PIP
+    assert PipCell("code", original_offset=1).language == CellLanguage.PIP
 
 
 def test_pip_cell_build_dependency_graph_invokes_register_library():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install databricks"
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
@@ -32,7 +32,7 @@ def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install"
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
@@ -46,7 +46,7 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip installl pytest"  # typo on purpose
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
@@ -65,7 +65,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
 
     code = "%pip install unknown-library-name"
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
@@ -88,7 +88,7 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     whl = Path(__file__).parent / '../samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl'
 
     code = f"%pip install {whl.as_posix()}"  # installs thingy
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
@@ -100,7 +100,7 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip install databricks\nmore code defined"
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
