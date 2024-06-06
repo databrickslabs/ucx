@@ -11,9 +11,8 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -52,7 +51,7 @@ class Matcher(ABC):
     def _check_call_context(self, node: Call) -> bool:
         assert isinstance(node.func, Attribute)  # Avoid linter warning
         func_name = node.func.attrname
-        qualified_name = AstHelper.get_full_function_name(node)
+        qualified_name = Tree.get_full_function_name(node)
 
         # Check if the call_context is None as that means all calls are checked
         if self.call_context is None:
@@ -328,8 +327,8 @@ class SparkSql(Linter, Fixer):
         return self._from_table.name()
 
     def lint(self, code: str) -> Iterable[Advice]:
-        linter = ASTLinter.parse(code)
-        for node in TreeWalker.walk(linter.root):
+        tree = Tree.parse(code)
+        for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
@@ -337,15 +336,15 @@ class SparkSql(Linter, Fixer):
             yield from matcher.lint(self._from_table, self._index, node)
 
     def apply(self, code: str) -> str:
-        linter = ASTLinter.parse(code)
+        tree = Tree.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
-        for node in TreeWalker.walk(linter.root):
+        for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
             assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return linter.root.as_string()
+        return tree.root.as_string()
 
     def _find_matcher(self, node: NodeNG):
         if not isinstance(node, Call):

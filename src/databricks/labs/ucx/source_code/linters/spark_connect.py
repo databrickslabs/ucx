@@ -8,8 +8,7 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -23,9 +22,9 @@ class SharedClusterMatcher:
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         pass
 
-    def lint_tree(self, tree: NodeNG) -> Iterator[Advice]:
+    def lint_tree(self, root: NodeNG) -> Iterator[Advice]:
         reported_locations = set()
-        for node in TreeWalker.walk(tree):
+        for node in Tree(root).walk():
             for advice in self.lint(node):
                 loc = (advice.start_line, advice.start_col)
                 if loc not in reported_locations:
@@ -102,7 +101,7 @@ class RDDApiMatcher(SharedClusterMatcher):
             return
         if node.func.attrname not in self._SC_METHODS:
             return
-        function_name = AstHelper.get_full_function_name(node)
+        function_name = Tree.get_full_function_name(node)
         if not function_name or not function_name.endswith(f"sc.{node.func.attrname}"):
             return
         yield self._rdd_failure(node)
@@ -164,7 +163,7 @@ class LoggingMatcher(SharedClusterMatcher):
             return
         if node.func.attrname != 'setLogLevel':
             return
-        function_name = AstHelper.get_full_function_name(node)
+        function_name = Tree.get_full_function_name(node)
         if not function_name or not function_name.endswith('sc.setLogLevel'):
             return
 
@@ -181,7 +180,7 @@ class LoggingMatcher(SharedClusterMatcher):
     def _match_jvm_log(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Attribute):
             return
-        attribute_name = AstHelper.get_full_attribute_name(node)
+        attribute_name = Tree.get_full_attribute_name(node)
         if attribute_name and attribute_name.endswith('org.apache.log4j'):
             yield Failure(
                 code='spark-logging-in-shared-clusters',
@@ -204,6 +203,6 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
-        linter = ASTLinter.parse(code)
+        tree = Tree.parse(code)
         for matcher in self._matchers:
-            yield from matcher.lint_tree(linter.root)
+            yield from matcher.lint_tree(tree.root)
