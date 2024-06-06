@@ -37,7 +37,7 @@ class PythonLibraryResolver(LibraryResolver):
         compatibility = self._whitelist.distribution_compatibility(library.name)
         if compatibility.known:
             return compatibility.problems
-        return self._install_library(path_lookup, library, installation_parameters=installation_parameters or dict())
+        return self._install_library(path_lookup, library, installation_parameters=installation_parameters or {})
 
     @cached_property
     def _temporary_virtual_environment(self):
@@ -64,6 +64,7 @@ class PythonLibraryResolver(LibraryResolver):
         return self._install_pip(library, installation_parameters=installation_parameters)
 
     def _install_pip(self, library: Path, *, installation_parameters: dict[str, str]) -> list[DependencyProblem]:
+        _ = installation_parameters
         return_code, stdout, stderr = self._runner(f"pip install {library} -t {self._temporary_virtual_environment}")
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
