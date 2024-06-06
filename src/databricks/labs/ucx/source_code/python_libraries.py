@@ -57,6 +57,9 @@ class PythonLibraryResolver(LibraryResolver):
         # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
         maybe_library = path_lookup.resolve(library)
         if maybe_library is not None:
+            library_position = installation_arguments.index(library.as_posix())
+            if library_position < len(installation_arguments):
+                installation_arguments[library_position] = maybe_library.as_posix()
             library = maybe_library
 
         if library.suffix == ".egg":
