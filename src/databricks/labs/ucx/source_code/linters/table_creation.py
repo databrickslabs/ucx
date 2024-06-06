@@ -113,6 +113,6 @@ class DBRv8d0Linter(Linter):
         if self._skip_dbr:
             return
 
-        linter = Tree.parse(code)
-        for node in TreeWalker.walk(linter.root):
+        tree = Tree.parse(code)
+        for node in TreeWalker.walk(tree.root):
             yield from self._linter.lint(node)

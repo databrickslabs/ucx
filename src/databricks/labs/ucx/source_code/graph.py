@@ -162,10 +162,10 @@ class DependencyGraph:
 
     def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
-        linter = Tree.parse(python_code)
-        syspath_changes = SysPathChangesCollector.list_sys_path_changes(linter)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources, import_problems = ImportSourcesCollector.list_import_sources(linter, DependencyProblem)
+        tree = Tree.parse(python_code)
+        syspath_changes = SysPathChangesCollector.collect_sys_path_changes(tree)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        import_sources, import_problems = ImportSourcesCollector.collect_import_sources(tree, DependencyProblem)
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort

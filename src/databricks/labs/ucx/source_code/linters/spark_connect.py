@@ -203,6 +203,6 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
-        linter = Tree.parse(code)
+        tree = Tree.parse(code)
         for matcher in self._matchers:
-            yield from matcher.lint_tree(linter.root)
+            yield from matcher.lint_tree(tree.root)

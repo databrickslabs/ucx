@@ -327,8 +327,8 @@ class SparkSql(Linter, Fixer):
         return self._from_table.name()
 
     def lint(self, code: str) -> Iterable[Advice]:
-        linter = Tree.parse(code)
-        for node in TreeWalker.walk(linter.root):
+        tree = Tree.parse(code)
+        for node in TreeWalker.walk(tree.root):
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
@@ -336,15 +336,15 @@ class SparkSql(Linter, Fixer):
             yield from matcher.lint(self._from_table, self._index, node)
 
     def apply(self, code: str) -> str:
-        linter = Tree.parse(code)
+        tree = Tree.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
-        for node in TreeWalker.walk(linter.root):
+        for node in TreeWalker.walk(tree.root):
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
             assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return linter.root.as_string()
+        return tree.root.as_string()
 
     def _find_matcher(self, node: NodeNG):
         if not isinstance(node, Call):

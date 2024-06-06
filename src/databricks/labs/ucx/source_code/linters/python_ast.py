@@ -34,7 +34,7 @@ class Tree(Generic[T]):
         return visitor.matched_nodes
 
     def collect_sys_paths_changes(self):
-        visitor = SysPathVisitor()
+        visitor = SysPathChangesVisitor()
         visitor.visit(self._root)
         return visitor.syspath_changes
 
@@ -248,7 +248,7 @@ class RelativePath(SysPathChange):
     pass
 
 
-class SysPathVisitor(TreeVisitor):
+class SysPathChangesVisitor(TreeVisitor):
 
     def __init__(self):
         super()
@@ -313,5 +313,5 @@ class SysPathVisitor(TreeVisitor):
 
 class SysPathChangesCollector:
     @staticmethod
-    def list_sys_path_changes(tree: Tree) -> list[SysPathChange]:
+    def collect_sys_path_changes(tree: Tree) -> list[SysPathChange]:
         return tree.collect_sys_paths_changes()

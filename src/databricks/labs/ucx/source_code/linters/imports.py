@@ -48,8 +48,8 @@ T = TypeVar("T", bound=Callable)
 class DbutilsLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
-        linter = Tree.parse(code)
-        nodes = self.list_dbutils_notebook_run_calls(linter)
+        tree = Tree.parse(code)
+        nodes = self.list_dbutils_notebook_run_calls(tree)
         return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
 
     @classmethod
@@ -90,7 +90,7 @@ class DbutilsLinter(Linter):
 class ImportSourcesCollector:
 
     @classmethod
-    def list_import_sources(cls, tree: Tree, problem_type: T) -> tuple[list[ImportSource], list[T]]:
+    def collect_import_sources(cls, tree: Tree, problem_type: T) -> tuple[list[ImportSource], list[T]]:
         problems: list[T] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
