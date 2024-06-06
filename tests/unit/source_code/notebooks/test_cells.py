@@ -1,3 +1,4 @@
+import yaml
 from pathlib import Path
 from unittest.mock import create_autospec
 
@@ -10,6 +11,31 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
 )
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
+
+
+def test_basic_cell_extraction() -> None:
+    """Ensure that simple cell splitting (including cell type) and offset tracking works as intended."""
+    # Fixture: a basic notebook with a few cell types, along with a YAML-encoded description of the cells.
+    sample_notebook_path = Path(__file__).parent.parent / "samples" / "simple_notebook.py"
+    with sample_notebook_path.open() as f:
+        sample_notebook_content = f.read()
+    cell_description_path = sample_notebook_path.parent / "simple_notebook.yml"
+    with cell_description_path.open() as f:
+        cell_descriptions = yaml.safe_load(f)
+
+    # Perform the test.
+    cells = CellLanguage.PYTHON.extract_cells(sample_notebook_content)
+
+    # Verify the results.
+    cell_metadata = cell_descriptions["cells"]
+    assert len(cells) == len(cell_metadata), "Wrong number of cells"
+    for i, (actual, expected) in enumerate(zip(cells, cell_metadata, strict=True)):
+        assert type(actual).__name__ == f"{expected['type']}Cell", f"Cell {i} is of the wrong type"
+        assert actual.original_offset == expected["starts_at_line"] - 1, f"Cell {i} starts on the wrong line"
+        # TODO: Fix content checking. Current problems:
+        #  - Chomping of the final line ending.
+        #  - Various MAGIC/COMMENT/etc prefixes seem to end up in the content.
+        # assert actual.original_code == expected["content"], f"Cell {i} starts on the wrong line"
 
 
 def test_pip_cell_language_is_pip():

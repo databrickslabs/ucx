@@ -1,0 +1,65 @@
+---
+cells:
+  - type: Markdown
+    starts_at_line: 2
+    content: |
+      %md # Simple Notebook (Multiple cell types)
+  - type: Python
+    starts_at_line: 6
+    content: |
+      # This is a python cell, the default (non-magic) type.
+      print(sys.version)
+  - type: Markdown
+    starts_at_line: 11
+    content: |
+      %md And this is a Markdown cell.
+
+      It has two paragraphs.
+  - type: SQL
+    starts_at_line: 17
+    content: |
+      %sql select 1 -- This is a single-line SQL cell.
+  - type: SQL
+    starts_at_line: 21
+    content: |
+      %sql
+      -- This is a multi-line SQL statement.
+      %sql
+      select foo
+      from values('baz', 'daz'),('diz', 'fiz') as (foo, bar)
+      where bar <> 'daz'
+  - type: Python  # TODO: Fix support for unknown magic.
+    starts_at_line: 30
+    content: |
+      %fs ls
+  - type: Scala
+    starts_at_line: 34
+    content: |
+      %scala
+      println(sys.props)
+  - type: Shell
+    starts_at_line: 39
+    content: |
+      %sh ls -ltr /
+  - type: Pip
+    starts_at_line: 43
+    content: |
+      %pip install tqdm
+  - type: Python
+    starts_at_line: 47
+    content: |
+      %python
+      # Explicitly-marked python cell.
+      from tqdm.notebook import tqdm
+      count = 0
+      with open("/etc/passwd") as f:
+          lines = list(f)
+      for line in tqdm(lines):
+          fields = line.split(":")
+          if len(fields) == 7:
+              count += 1
+      print(f"System seems to have {count} local accounts.")
+  - type: Python  # TODO: Fix support for unknown magic.
+    starts_at_line: 61
+    content: |
+      %lsmagic
