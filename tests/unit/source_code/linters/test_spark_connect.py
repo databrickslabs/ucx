@@ -1,7 +1,7 @@
 from itertools import chain
 
 from databricks.labs.ucx.source_code.base import Failure
-from databricks.labs.ucx.source_code.linters.imports import TreeWalker, ASTLinter
+from databricks.labs.ucx.source_code.linters.python_ast import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 
 

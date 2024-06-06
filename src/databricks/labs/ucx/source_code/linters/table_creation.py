@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import ASTLinter, TreeWalker
 
 
 @dataclass

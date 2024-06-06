@@ -9,13 +9,11 @@ from typing import cast
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
-    ASTLinter,
     DbutilsLinter,
     ImportSource,
-    NodeBase,
     NotebookRunCall,
-    SysPathChange,
 )
+from databricks.labs.ucx.source_code.linters.python_ast import ASTLinter, NodeBase, SysPathChange
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
