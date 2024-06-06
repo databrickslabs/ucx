@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import abc
-import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 from typing import cast
+from astroid import ImportFrom  # type: ignore
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
@@ -192,7 +192,9 @@ class DependencyGraph:
             else:
                 yield from self.register_notebook(Path(strpath))
         if isinstance(base_node, ImportSource):
-            prefix = ("." * base_node.node.level) if isinstance(base_node.node, ast.ImportFrom) else ""
+            prefix = ""
+            if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
+                prefix = "." * base_node.node.level
             name = base_node.name or ""
             yield from self.register_import(prefix + name)
 
