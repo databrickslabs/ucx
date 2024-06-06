@@ -38,7 +38,7 @@ class PythonLibraryResolver(LibraryResolver):
         return self._install_library(path_lookup, library)
 
     @cached_property
-    def _temporary_virtual_environment(self):
+    def _temporary_virtual_environment(self) -> Path:
         # TODO: for `databricks labs ucx lint-local-code`, detect if we already have a virtual environment
         # and use that one. See Databricks CLI code for the labs command to see how to detect the virtual
         # environment. If we don't have a virtual environment, create a temporary one.
@@ -56,8 +56,11 @@ class PythonLibraryResolver(LibraryResolver):
             library = maybe_library
 
         if library.suffix == ".egg":
-            return self._install_egg(library)
-        return self._install_pip(library)
+            dependency_problems = self._install_egg(library)
+        else:
+            dependency_problems = self._install_pip(library)
+        logger.debug(f"Installation directory: {list(self._temporary_virtual_environment.iterdir())}")
+        return dependency_problems
 
     def _install_pip(self, library: Path) -> list[DependencyProblem]:
         return_code, stdout, stderr = self._runner(f"pip install {library} -t {self._temporary_virtual_environment}")
