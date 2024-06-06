@@ -211,7 +211,7 @@ class PipCell(Cell):
     def _split(code) -> list[str]:
         match = re.search(r"(?<!\\)\n", code)
         if match:
-            code = code[:match.start()]
+            code = code[: match.start()]
         code = code.replace("\\n", " ")
         return list(shlex.split(code))
 

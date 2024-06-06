@@ -148,8 +148,12 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
         ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
         ("%pip install foo --index-url \\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
         ("%pip install foo --index-url bar\nmore code", ["%pip", "install", "foo", "--index-url", "bar"]),
-        ("%pip install foo --index-url bar\\n -t /tmp/", ["%pip", "install", "foo", "--index-url", "bar", "-t", "/tmp/"]),
-    ]
+        (
+            "%pip install foo --index-url bar\\n -t /tmp/",
+            ["%pip", "install", "foo", "--index-url", "bar", "-t", "/tmp/"],
+        ),
+        ("%pip install foo --index-url \\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+    ],
 )
 def test_pip_cell_split(code, split):
     assert PipCell._split(code) == split
