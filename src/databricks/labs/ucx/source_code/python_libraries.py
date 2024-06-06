@@ -64,8 +64,11 @@ class PythonLibraryResolver(LibraryResolver):
         return self._install_pip(library, installation_arguments=installation_arguments)
 
     def _install_pip(self, library: Path, *, installation_arguments: list[str]) -> list[DependencyProblem]:
-        _ = installation_arguments
-        return_code, stdout, stderr = self._runner(f"pip install {library} -t {self._temporary_virtual_environment}")
+        if len(installation_arguments) == 0:
+            install_command = f"pip install {library} -t {self._temporary_virtual_environment}"
+        else:
+            install_command = f"pip install {' '.join(installation_arguments)} -t {self._temporary_virtual_environment}"
+        return_code, stdout, stderr = self._runner(install_command)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {stderr}")
