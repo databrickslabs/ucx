@@ -109,7 +109,7 @@ class PythonLibraryResolver(LibraryResolver):
         try:
             # Mypy can't analyze setuptools due to missing type hints
             from setuptools import setup  # type: ignore
-        except ImportError:
+        except (ImportError, AssertionError):
             try:
                 from distutils.core import setup  # pylint: disable=deprecated-module
             except ImportError:
