@@ -91,7 +91,7 @@ class Tree(Generic[T]):
         code = repr(self._root)
         if len(code) > truncate_after:
             code = code[0:truncate_after] + "..."
-        return f"<ASTLinter: {code}>"
+        return f"<Tree: {code}>"
 
     @classmethod
     def get_full_attribute_name(cls, node: Attribute) -> str:
@@ -309,3 +309,9 @@ class SysPathVisitor(TreeVisitor):
         changed = node.args[0]
         if isinstance(changed, Const):
             self._syspath_changes.append(RelativePath(changed, changed.value, is_append))
+
+
+class SysPathChangesCollector:
+    @staticmethod
+    def list_sys_path_changes(tree: Tree) -> list[SysPathChange]:
+        return tree.collect_sys_paths_changes()

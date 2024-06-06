@@ -17,7 +17,7 @@ from astroid import (  # type: ignore
 )
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, SysPathChange
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class NotebookRunCall(NodeBase):
         return None
 
 
-P = TypeVar("P", bound=Callable)
+T = TypeVar("T", bound=Callable)
 
 
 class DbutilsLinter(Linter):
@@ -82,34 +82,33 @@ class DbutilsLinter(Linter):
         return arg.value if arg is not None else None
 
     @staticmethod
-    def list_dbutils_notebook_run_calls(linter: Tree) -> list[NotebookRunCall]:
-        calls = linter.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
+    def list_dbutils_notebook_run_calls(tree: Tree) -> list[NotebookRunCall]:
+        calls = tree.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
         return [NotebookRunCall(call) for call in calls]
 
+
+class ImportSourcesCollector:
+
     @classmethod
-    def list_import_sources(cls, linter: Tree, problem_type: P) -> tuple[list[ImportSource], list[P]]:
-        problems: list[P] = []
+    def list_import_sources(cls, tree: Tree, problem_type: T) -> tuple[list[ImportSource], list[T]]:
+        problems: list[T] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
-            nodes = linter.locate(Import, [])
+            nodes = tree.locate(Import, [])
             for source in cls._make_sources_for_import_nodes(nodes):
                 sources.append(source)
-            nodes = linter.locate(ImportFrom, [])
+            nodes = tree.locate(ImportFrom, [])
             for source in cls._make_sources_for_import_from_nodes(nodes):
                 sources.append(source)
-            nodes = linter.locate(Call, [("import_module", Attribute), ("importlib", Name)])
-            nodes.extend(linter.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
+            nodes = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
+            nodes.extend(tree.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
             for source in cls._make_sources_for_import_call_nodes(nodes, problem_type, problems):
                 sources.append(source)
             return sources, problems
         except Exception as e:  # pylint: disable=broad-except
-            problem = problem_type('internal-error', f"While linter {linter} was checking imports: {e}")
+            problem = problem_type('internal-error', f"While checking imports: {e}")
             problems.append(problem)
             return [], problems
-
-    @staticmethod
-    def list_sys_path_changes(linter: Tree) -> list[SysPathChange]:
-        return linter.collect_sys_paths_changes()
 
     @classmethod
     def _make_sources_for_import_nodes(cls, nodes: list[Import]) -> Iterable[ImportSource]:
@@ -124,7 +123,7 @@ class DbutilsLinter(Linter):
             yield ImportSource(node, node.modname)
 
     @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_type: P, problems: list[P]):
+    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_type: T, problems: list[T]):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
@@ -139,3 +138,5 @@ class DbutilsLinter(Linter):
                 end_col=node.end_col_offset or 0,
             )
             problems.append(problem)
+
+
