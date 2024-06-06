@@ -20,6 +20,7 @@ from databricks.sdk.errors import (
     AlreadyExists,
     InvalidParameterValue,
     NotFound,
+    ResourceConflict,
 )
 
 from databricks.sdk.retries import retried
@@ -90,6 +91,7 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
+@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=2))
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx,
     make_cluster_policy,
@@ -190,7 +192,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
         ws.groups.get(group_id)
         raise KeyError(f"Group is not deleted: {group_id}")
 
-    with pytest.raises(NotFound):
+    with pytest.raises(NotFound, match=f"Group with id {ws_group_a.id} not found."):
         get_group(ws_group_a.id)
 
 
