@@ -96,7 +96,7 @@ for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
     fixed_code = sqf.apply(old_code)
     # no transformations to apply, only lint messages
-    assert fixed_code.strip() == old_code.strip()
+    assert fixed_code.rstrip() == old_code.rstrip()
 
 
 def test_spark_sql_fix(migration_index):
@@ -110,7 +110,7 @@ for i in range(10):
 """
     fixed_code = sqf.apply(old_code)
     assert (
-        fixed_code.strip()
+        fixed_code.rstrip()
         == """spark.read.csv('s3://bucket/path')
 for i in range(10):
     result = spark.sql('SELECT * FROM brand.new.stuff').collect()

@@ -115,5 +115,4 @@ class DBRv8d0Linter(Linter):
 
         linter = ASTLinter.parse(code)
         for node in TreeWalker.walk(linter.root):
-            advices = list(self._linter.lint(node))
-            yield from advices
+            yield from self._linter.lint(node)
