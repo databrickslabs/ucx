@@ -14,6 +14,7 @@ from astroid import (  # type: ignore
     Name,
     NodeNG,
 )
+
 logger = logging.getLogger(__file__)
 
 missing_handlers: set[str] = set()
@@ -22,12 +23,12 @@ T = TypeVar("T", bound=NodeNG)
 
 
 # disclaimer this class is NOT thread-safe
-class ASTBuilder(Generic[T]):
+class Tree(Generic[T]):
 
     @staticmethod
     def parse(code: str):
         root = parse(code)
-        return ASTBuilder(root)
+        return Tree(root)
 
     def __init__(self, root: Module):
         self._root: Module = root
@@ -127,7 +128,7 @@ class ASTBuilder(Generic[T]):
         return f"<ASTLinter: {code}>"
 
 
-class Visitor:
+class TreeVisitor:
 
     def visit(self, node: NodeNG):
         self._visit_specific(node)
@@ -155,7 +156,7 @@ class TreeWalker:
             yield from cls.walk(child)
 
 
-class MatchingVisitor(Visitor):
+class MatchingVisitor(TreeVisitor):
 
     def __init__(self, node_type: type, match_nodes: list[tuple[str, type]]):
         super()
@@ -251,16 +252,16 @@ class RelativePath(SysPathChange):
     pass
 
 
-class SysPathVisitor(Visitor):
+class SysPathVisitor(TreeVisitor):
 
     def __init__(self):
         super()
         self._aliases: dict[str, str] = {}
-        self._syspath_changes: list[SysPathChange] = []
+        self._sys_path_changes: list[SysPathChange] = []
 
     @property
-    def syspath_changes(self):
-        return self._syspath_changes
+    def sys_path_changes(self):
+        return self._sys_path_changes
 
     def visit_import(self, node: Import):
         for name, alias in node.names:
@@ -288,7 +289,7 @@ class SysPathVisitor(Visitor):
         is_append = func.attrname == "append"
         changed = node.args[0] if is_append else node.args[1]
         if isinstance(changed, Const):
-            self._syspath_changes.append(AbsolutePath(node, changed.value, is_append))
+            self._sys_path_changes.append(AbsolutePath(node, changed.value, is_append))
         elif isinstance(changed, Call):
             self._visit_relative_path(changed, is_append)
 
@@ -305,21 +306,19 @@ class SysPathVisitor(Visitor):
             return node.name == alias
         return False
 
-    def _visit_relative_path(self, node: NodeNG, is_append: bool):
+    def _visit_relative_path(self, node: Call, is_append: bool):
         # check for 'os.path.abspath'
         if not self._match_aliases(node.func, ["os", "path", "abspath"]):
             return
         changed = node.args[0]
         if isinstance(changed, Const):
-            self._syspath_changes.append(RelativePath(changed, changed.value, is_append))
+            self._sys_path_changes.append(RelativePath(changed, changed.value, is_append))
 
 
-class SysPathCollector:
+class SysPathChangesCollector:
 
     @classmethod
-    def collect_sys_paths_changes(cls, node: NodeNG):
+    def collect_sys_path_changes(cls, node: NodeNG) -> list[SysPathChange]:
         visitor = SysPathVisitor()
         visitor.visit(node)
-        return visitor.syspath_changes
-
-
+        return visitor.sys_path_changes

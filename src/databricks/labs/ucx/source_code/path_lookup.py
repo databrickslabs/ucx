@@ -17,20 +17,20 @@ class PathLookup:
     """
 
     @classmethod
-    def from_pathlike_string(cls, cwd: Path, syspath: str):
-        paths = syspath.split(':')
+    def from_pathlike_string(cls, cwd: Path, sys_path: str):
+        paths = sys_path.split(':')
         return PathLookup(cwd, [Path(path) for path in paths])
 
     @classmethod
     def from_sys_path(cls, cwd: Path):
         return PathLookup(cwd, [Path(path) for path in sys.path])
 
-    def __init__(self, cwd: Path, sys_paths: list[Path]):
+    def __init__(self, cwd: Path, sys_path: list[Path]):
         self._cwd = cwd
-        self._sys_paths = sys_paths
+        self._sys_path = sys_path
 
     def change_directory(self, new_working_directory: Path) -> PathLookup:
-        return PathLookup(new_working_directory, self._sys_paths)
+        return PathLookup(new_working_directory, self._sys_path)
 
     def resolve(self, path: Path) -> Path | None:
         try:
@@ -77,27 +77,27 @@ class PathLookup:
         )
 
     def has_path(self, path: Path):
-        return next(p for p in self._sys_paths if path == p) is not None
+        return next(p for p in self._sys_path if path == p) is not None
 
     def prepend_path(self, path: Path):
-        self._sys_paths.insert(0, path)
+        self._sys_path.insert(0, path)
 
     def insert_path(self, index: int, path: Path):
-        self._sys_paths.insert(index, path)
+        self._sys_path.insert(index, path)
 
     def append_path(self, path: Path):
-        if path in self._sys_paths:
+        if path in self._sys_path:
             return
-        self._sys_paths.append(path)
+        self._sys_path.append(path)
 
     def remove_path(self, index: int):
-        del self._sys_paths[index]
+        del self._sys_path[index]
 
     @property
     def library_roots(self) -> list[Path]:
         # we may return a combination of WorkspacePath and PosixPath here
         library_roots = []
-        for library_root in [self._cwd] + self._sys_paths:
+        for library_root in [self._cwd] + self._sys_path:
             try:
                 is_existing_directory = library_root.exists() and library_root.is_dir()
             except PermissionError:
@@ -111,4 +111,4 @@ class PathLookup:
         return self._cwd
 
     def __repr__(self):
-        return f"PathLookup(cwd={self._cwd}, sys_paths={self._sys_paths})"
+        return f"PathLookup(cwd={self._cwd}, sys_path={self._sys_path})"

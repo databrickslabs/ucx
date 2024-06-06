@@ -8,12 +8,17 @@ from collections.abc import Callable
 from typing import cast
 
 from databricks.labs.ucx.source_code.base import Advisory
-from databricks.labs.ucx.source_code.linters.ast_helpers import ASTBuilder, NodeBase, SysPathChange, SysPathVisitor, \
-    SysPathCollector
+from databricks.labs.ucx.source_code.linters.python_ast import (
+    NodeBase,
+    SysPathChange,
+    SysPathChangesCollector,
+    Tree,
+)
 from databricks.labs.ucx.source_code.linters.imports import (
     DbutilsLinter,
     ImportSource,
-    NotebookRunCall, ImportSourceCollector,
+    NotebookRunCall,
+    ImportSourceCollector,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -163,10 +168,10 @@ class DependencyGraph:
 
     def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
         problems: list[DependencyProblem] = []
-        linter = ASTBuilder.parse(python_code)
-        syspath_changes = SysPathCollector.collect_sys_paths_changes(linter.root)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources, import_problems = ImportSourceCollector.collect_import_sources(linter, DependencyProblem)
+        tree = Tree.parse(python_code)
+        syspath_changes = SysPathChangesCollector.collect_sys_path_changes(tree.root)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        import_sources, import_problems = ImportSourceCollector.collect_import_sources(tree, DependencyProblem)
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
