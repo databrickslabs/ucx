@@ -2,7 +2,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install ./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl
+# MAGIC %pip install distribution/dist/thingy-0.0.1-py2.py3-none-any.whl
 
 # COMMAND ----------
 
