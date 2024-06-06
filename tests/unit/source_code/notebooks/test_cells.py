@@ -152,6 +152,7 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
         ),
         ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
         ("%pip install ./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl", ["%pip", "install", "./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"]),
+        ("%pip install distribution/dist/thingy-0.0.1-py2.py3-none-any.whl", ["%pip", "install", "distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"]),
     ],
 )
 def test_pip_cell_split(code, split):
