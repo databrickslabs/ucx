@@ -16,16 +16,9 @@ from astroid import (  # type: ignore
 )
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
+from databricks.labs.ucx.source_code.linters.ast_helpers import NodeBase, ASTBuilder
 
 logger = logging.getLogger(__name__)
-
-
-
-class ImportSource(NodeBase):
-
-    def __init__(self, node: NodeNG, name: str):
-        super().__init__(node)
-        self.name = name
 
 
 class NotebookRunCall(NodeBase):
@@ -47,7 +40,7 @@ P = TypeVar("P", bound=Callable)
 class DbutilsLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
-        linter = ASTLinter.parse(code)
+        linter = ASTBuilder.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(linter)
         return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
 
@@ -81,12 +74,21 @@ class DbutilsLinter(Linter):
         return arg.value if arg is not None else None
 
     @staticmethod
-    def list_dbutils_notebook_run_calls(linter: ASTLinter) -> list[NotebookRunCall]:
+    def list_dbutils_notebook_run_calls(linter: ASTBuilder) -> list[NotebookRunCall]:
         calls = linter.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
         return [NotebookRunCall(call) for call in calls]
 
+
+class ImportSource(NodeBase):
+
+    def __init__(self, node: NodeNG, name: str):
+        super().__init__(node)
+        self.name = name
+
+
+class ImportSourceCollector:
     @classmethod
-    def list_import_sources(cls, linter: ASTLinter, problem_type: P) -> tuple[list[ImportSource], list[P]]:
+    def collect_import_sources(cls, linter: ASTBuilder, problem_type: P) -> tuple[list[ImportSource], list[P]]:
         problems: list[P] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
@@ -105,10 +107,6 @@ class DbutilsLinter(Linter):
             problem = problem_type('internal-error', f"While linter {linter} was checking imports: {e}")
             problems.append(problem)
             return [], problems
-
-    @staticmethod
-    def list_sys_path_changes(linter: ASTLinter) -> list[SysPathChange]:
-        return linter.collect_sys_paths_changes()
 
     @classmethod
     def _make_sources_for_import_nodes(cls, nodes: list[Import]) -> Iterable[ImportSource]:

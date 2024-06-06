@@ -5,7 +5,7 @@ import sqlglot
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
-from databricks.labs.ucx.source_code.linters.imports import Visitor, ASTLinter
+from databricks.labs.ucx.source_code.linters.ast_helpers import Visitor, ASTBuilder
 
 
 class DetectDbfsVisitor(Visitor):
@@ -77,7 +77,7 @@ class DBFSUsageLinter(Linter):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        linter = ASTLinter.parse(code)
+        linter = ASTBuilder.parse(code)
         visitor = DetectDbfsVisitor()
         visitor.visit(linter.root)
         yield from visitor.get_advices()

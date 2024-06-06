@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.ast_helpers import ASTBuilder, TreeWalker
 
 
 @dataclass
@@ -45,20 +45,20 @@ class NoFormatPythonMatcher:
         # Check 2: check presence of the table-creating method call:
         if not isinstance(node.func, Attribute) or node.func.attrname != self.method_name:
             return None
-        call_args_count = ASTLinter.args_count(node)
+        call_args_count = ASTBuilder.args_count(node)
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
         # Check 3: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
         #   >>> df.saveToTable("c.db.table", format="csv")
-        format_arg = ASTLinter.get_arg(node, self.format_arg_index, self.format_arg_name)
-        if format_arg is not None and not ASTLinter.is_none(format_arg):
+        format_arg = ASTBuilder.get_arg(node, self.format_arg_index, self.format_arg_name)
+        if format_arg is not None and not ASTBuilder.is_none(format_arg):
             # i.e., found an explicit "format" argument, and its value is not None.
             return None
         #   Option B. format specifier may be a separate ".format(...)" call in this callchain
         #   >>> df.format("csv").saveToTable("c.db.table")
-        format_call = ASTLinter.extract_call_by_name(node, "format")
+        format_call = ASTBuilder.extract_call_by_name(node, "format")
         if format_call is not None:
             # i.e., found an explicit ".format(...)" call in this chain.
             return None
@@ -113,7 +113,7 @@ class DBRv8d0Linter(Linter):
         if self._skip_dbr:
             return
 
-        linter = ASTLinter.parse(code)
+        linter = ASTBuilder.parse(code)
         for node in TreeWalker.walk(linter.root):
             advices = list(self._linter.lint(node))
             yield from advices

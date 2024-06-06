@@ -1,6 +1,7 @@
 import abc
 import logging
-from typing import TypeVar, Generic
+from collections.abc import Iterable
+from typing import TypeVar, Generic, cast
 
 from astroid import (  # type: ignore
     parse,
@@ -21,12 +22,12 @@ T = TypeVar("T", bound=NodeNG)
 
 
 # disclaimer this class is NOT thread-safe
-class ASTLinter(Generic[T]):
+class ASTBuilder(Generic[T]):
 
     @staticmethod
     def parse(code: str):
         root = parse(code)
-        return ASTLinter(root)
+        return ASTBuilder(root)
 
     def __init__(self, root: Module):
         self._root: Module = root
@@ -39,11 +40,6 @@ class ASTLinter(Generic[T]):
         visitor = MatchingVisitor(node_type, match_nodes)
         visitor.visit(self._root)
         return visitor.matched_nodes
-
-    def collect_sys_paths_changes(self):
-        visitor = SysPathVisitor()
-        visitor.visit(self._root)
-        return visitor.syspath_changes
 
     def first_statement(self):
         return self._root.body[0]
@@ -225,7 +221,6 @@ class NodeBase(abc.ABC):
         return f"<{self.__class__.__name__}: {repr(self._node)}>"
 
 
-
 class SysPathChange(NodeBase, abc.ABC):
 
     def __init__(self, node: NodeNG, path: str, is_append: bool):
@@ -317,3 +312,14 @@ class SysPathVisitor(Visitor):
         changed = node.args[0]
         if isinstance(changed, Const):
             self._syspath_changes.append(RelativePath(changed, changed.value, is_append))
+
+
+class SysPathCollector:
+
+    @classmethod
+    def collect_sys_paths_changes(cls, node: NodeNG):
+        visitor = SysPathVisitor()
+        visitor.visit(node)
+        return visitor.syspath_changes
+
+

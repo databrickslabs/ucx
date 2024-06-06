@@ -4,12 +4,13 @@ from __future__ import annotations
 import pytest
 from astroid import Attribute, Call, Const, Expr  # type: ignore
 from databricks.labs.ucx.source_code.graph import DependencyProblem
+from databricks.labs.ucx.source_code.linters.ast_helpers import ASTBuilder, TreeWalker
 
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, DbutilsLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
-    linter = ASTLinter.parse('')
+    linter = ASTBuilder.parse('')
     assert not DbutilsLinter.list_dbutils_notebook_run_calls(linter)
 
 
@@ -19,33 +20,33 @@ dbutils.notebook.run("stuff")
 for i in z:
     ww =   dbutils.notebook.run("toto")
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
     assert {"toto", "stuff"} == {str(call.node.args[0].value) for call in calls}
 
 
 def test_linter_returns_empty_list_of_imports():
-    linter = ASTLinter.parse('')
+    linter = ASTBuilder.parse('')
     assert not DbutilsLinter.list_import_sources(linter, DependencyProblem)[0]
 
 
 def test_linter_returns_import():
-    linter = ASTLinter.parse('import x')
+    linter = ASTBuilder.parse('import x')
     assert ["x"] == [node.name for node in DbutilsLinter.list_import_sources(linter, DependencyProblem)[0]]
 
 
 def test_linter_returns_import_from():
-    linter = ASTLinter.parse('from x import z')
+    linter = ASTBuilder.parse('from x import z')
     assert ["x"] == [node.name for node in DbutilsLinter.list_import_sources(linter, DependencyProblem)[0]]
 
 
 def test_linter_returns_import_module():
-    linter = ASTLinter.parse('importlib.import_module("x")')
+    linter = ASTBuilder.parse('importlib.import_module("x")')
     assert ["x"] == [node.name for node in DbutilsLinter.list_import_sources(linter, DependencyProblem)[0]]
 
 
 def test_linter_returns__import__():
-    linter = ASTLinter.parse('importlib.__import__("x")')
+    linter = ASTBuilder.parse('importlib.__import__("x")')
     assert ["x"] == [node.name for node in DbutilsLinter.list_import_sources(linter, DependencyProblem)[0]]
 
 
@@ -55,7 +56,7 @@ import sys
 sys.path.append("absolute_path_1")
 sys.path.append("absolute_path_2")
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
@@ -66,7 +67,7 @@ import sys as stuff
 stuff.path.append("absolute_path_1")
 stuff.path.append("absolute_path_2")
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
@@ -76,7 +77,7 @@ def test_linter_returns_appended_absolute_paths_with_sys_path_alias():
 from sys import path as stuff
 stuff.append("absolute_path")
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert "absolute_path" in [p.path for p in appended]
 
@@ -87,7 +88,7 @@ import sys
 import os
 sys.path.append(os.path.abspath("relative_path"))
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert "relative_path" in [p.path for p in appended]
 
@@ -98,7 +99,7 @@ import sys
 import os as stuff
 sys.path.append(stuff.path.abspath("relative_path"))
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert "relative_path" in [p.path for p in appended]
 
@@ -109,7 +110,7 @@ import sys
 from os import path as stuff
 sys.path.append(stuff.abspath("relative_path"))
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert "relative_path" in [p.path for p in appended]
 
@@ -120,7 +121,7 @@ import sys
 from os.path import abspath
 sys.path.append(abspath("relative_path"))
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert "relative_path" in [p.path for p in appended]
 
@@ -131,27 +132,27 @@ import sys
 from os.path import abspath as stuff
 sys.path.append(stuff("relative_path"))
 """
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     appended = DbutilsLinter.list_sys_path_changes(linter)
     assert "relative_path" in [p.path for p in appended]
 
 
 def test_extract_call_by_name():
-    linter = ASTLinter.parse("o.m1().m2().m3()")
+    linter = ASTBuilder.parse("o.m1().m2().m3()")
     stmt = linter.first_statement()
     assert isinstance(stmt, Expr)
-    act = ASTLinter.extract_call_by_name(stmt.value, "m2")
+    act = ASTBuilder.extract_call_by_name(stmt.value, "m2")
     assert isinstance(act, Call)
     assert isinstance(act.func, Attribute)
     assert act.func.attrname == "m2"
 
 
 def test_extract_call_by_name_none():
-    linter = ASTLinter.parse("o.m1().m2().m3()")
+    linter = ASTBuilder.parse("o.m1().m2().m3()")
     stmt = linter.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = ASTLinter.extract_call_by_name(stmt.value, "m5000")
+    act = ASTBuilder.extract_call_by_name(stmt.value, "m5000")
     assert act is None
 
 
@@ -173,11 +174,11 @@ def test_extract_call_by_name_none():
     ],
 )
 def test_linter_gets_arg(code, arg_index, arg_name, expected):
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     stmt = linter.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = ASTLinter.get_arg(stmt.value, arg_index, arg_name)
+    act = ASTBuilder.get_arg(stmt.value, arg_index, arg_name)
     if expected is None:
         assert act is None
     else:
@@ -198,11 +199,11 @@ def test_linter_gets_arg(code, arg_index, arg_name, expected):
     ],
 )
 def test_args_count(code, expected):
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     stmt = linter.first_statement()
     assert isinstance(stmt, Expr)
     assert isinstance(stmt.value, Call)
-    act = ASTLinter.args_count(stmt.value)
+    act = ASTBuilder.args_count(stmt.value)
     assert act == expected
 
 
@@ -219,7 +220,7 @@ dbutils.notebook.run(name)
     ],
 )
 def test_infers_string_variable_value(code, expected):
-    linter = ASTLinter.parse(code)
+    linter = ASTBuilder.parse(code)
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
     actual = list(call.get_notebook_path() for call in calls)
     assert [expected] == actual
@@ -228,7 +229,7 @@ def test_infers_string_variable_value(code, expected):
 def test_tree_walker_walks_nodes_once():
     nodes = set()
     count = 0
-    linter = ASTLinter.parse("o.m1().m2().m3()")
+    linter = ASTBuilder.parse("o.m1().m2().m3()")
     for node in TreeWalker.walk(linter.root):
         nodes.add(node)
         count += 1

@@ -8,8 +8,7 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.ast_helpers import TreeWalker, ASTBuilder
 
 
 @dataclass
@@ -102,7 +101,7 @@ class RDDApiMatcher(SharedClusterMatcher):
             return
         if node.func.attrname not in self._SC_METHODS:
             return
-        function_name = AstHelper.get_full_function_name(node)
+        function_name = ASTBuilder.get_full_function_name(node)
         if not function_name or not function_name.endswith(f"sc.{node.func.attrname}"):
             return
         yield self._rdd_failure(node)
@@ -164,7 +163,7 @@ class LoggingMatcher(SharedClusterMatcher):
             return
         if node.func.attrname != 'setLogLevel':
             return
-        function_name = AstHelper.get_full_function_name(node)
+        function_name = ASTBuilder.get_full_function_name(node)
         if not function_name or not function_name.endswith('sc.setLogLevel'):
             return
 
@@ -181,7 +180,7 @@ class LoggingMatcher(SharedClusterMatcher):
     def _match_jvm_log(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Attribute):
             return
-        attribute_name = AstHelper.get_full_attribute_name(node)
+        attribute_name = ASTBuilder.get_full_attribute_name(node)
         if attribute_name and attribute_name.endswith('org.apache.log4j'):
             yield Failure(
                 code='spark-logging-in-shared-clusters',
@@ -204,6 +203,6 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
-        linter = ASTLinter.parse(code)
+        linter = ASTBuilder.parse(code)
         for matcher in self._matchers:
             yield from matcher.lint_tree(linter.root)
