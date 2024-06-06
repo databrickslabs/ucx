@@ -78,7 +78,7 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Unsupported %pip command: installl"
+    assert "installl" in problems[0].message  # Message coming directly from pip
     graph.register_library.assert_not_called()
 
 

@@ -28,7 +28,9 @@ class PythonLibraryResolver(LibraryResolver):
         self._whitelist = whitelist
         self._runner = runner
 
-    def register_library(self, path_lookup: PathLookup, library: Path, *, installation_parameters: dict[str, str] | None = None) -> list[DependencyProblem]:
+    def register_library(
+        self, path_lookup: PathLookup, library: Path, *, installation_parameters: dict[str, str] | None = None
+    ) -> list[DependencyProblem]:
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
         This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
         bother about parsing cross-version dependencies in our code."""
@@ -46,7 +48,9 @@ class PythonLibraryResolver(LibraryResolver):
         lib_install_folder = tempfile.mkdtemp(prefix='ucx-')
         return Path(lib_install_folder).resolve()
 
-    def _install_library(self, path_lookup: PathLookup, library: Path, *, installation_parameters: dict[str, str]) -> list[DependencyProblem]:
+    def _install_library(
+        self, path_lookup: PathLookup, library: Path, *, installation_parameters: dict[str, str]
+    ) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
         path_lookup.append_path(self._temporary_virtual_environment)
 

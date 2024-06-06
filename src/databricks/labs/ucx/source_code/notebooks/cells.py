@@ -8,6 +8,10 @@ from enum import Enum
 from pathlib import Path
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
+from pip._internal.cli.main_parser import parse_command
+from pip._internal.commands.install import InstallCommand
+from pip._internal.exceptions import PipError
+
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 
@@ -203,15 +207,18 @@ class PipCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        # TODO: this is very basic code, we need to improve it
         splits = re.split(r" |\n", self.original_code)
-        if len(splits) < 3:
-            return [DependencyProblem("library-install-failed", f"Missing arguments in '{self.original_code}'")]
-        if splits[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {splits[1]}")]
-        # TODO: we need to support different formats of the library name and etc
-        library = splits[2]
-        return graph.register_library(library)
+        try:
+            cmd_name, cmd_args = parse_command(splits[1:])  # Skipping %pip
+        except PipError as e:
+            return [DependencyProblem("library-install-failed", str(e))]
+        if cmd_name != "install":
+            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {cmd_name}")]
+        if len(cmd_args) == 0:
+            return [DependencyProblem("library-install-failed", "Missing arguments in '%pip install'")]
+        install = InstallCommand(name="install", summary="Install packages.")
+        _, args = install.parse_args(cmd_args)
+        return graph.register_library(args[0])  # TODO: Install multiple libraries
 
 
 class CellLanguage(Enum):
