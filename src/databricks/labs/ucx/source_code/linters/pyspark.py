@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import AstHelper, ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import AstHelper, Tree, TreeWalker
 
 
 @dataclass
@@ -327,7 +327,7 @@ class SparkSql(Linter, Fixer):
         return self._from_table.name()
 
     def lint(self, code: str) -> Iterable[Advice]:
-        linter = ASTLinter.parse(code)
+        linter = Tree.parse(code)
         for node in TreeWalker.walk(linter.root):
             matcher = self._find_matcher(node)
             if matcher is None:
@@ -336,7 +336,7 @@ class SparkSql(Linter, Fixer):
             yield from matcher.lint(self._from_table, self._index, node)
 
     def apply(self, code: str) -> str:
-        linter = ASTLinter.parse(code)
+        linter = Tree.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
         for node in TreeWalker.walk(linter.root):
             matcher = self._find_matcher(node)

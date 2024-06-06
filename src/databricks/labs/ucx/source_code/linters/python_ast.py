@@ -46,12 +46,12 @@ class AstHelper:
 T = TypeVar("T", bound=NodeNG)
 
 
-class ASTLinter(Generic[T]):
+class Tree(Generic[T]):
 
     @staticmethod
     def parse(code: str):
         root = parse(code)
-        return ASTLinter(root)
+        return Tree(root)
 
     def __init__(self, root: Module):
         self._root: Module = root
@@ -126,7 +126,7 @@ class ASTLinter(Generic[T]):
         return f"<ASTLinter: {code}>"
 
 
-class Visitor:
+class TreeVisitor:
 
     def visit(self, node: NodeNG):
         self._visit_specific(node)
@@ -154,7 +154,7 @@ class TreeWalker:
             yield from cls.walk(child)
 
 
-class MatchingVisitor(Visitor):
+class MatchingVisitor(TreeVisitor):
 
     def __init__(self, node_type: type, match_nodes: list[tuple[str, type]]):
         super()
@@ -250,7 +250,7 @@ class RelativePath(SysPathChange):
     pass
 
 
-class SysPathVisitor(Visitor):
+class SysPathVisitor(TreeVisitor):
 
     def __init__(self):
         super()

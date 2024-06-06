@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import AstHelper, ASTLinter, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import AstHelper, Tree, TreeWalker
 
 
 @dataclass
@@ -203,6 +203,6 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
-        linter = ASTLinter.parse(code)
+        linter = Tree.parse(code)
         for matcher in self._matchers:
             yield from matcher.lint_tree(linter.root)

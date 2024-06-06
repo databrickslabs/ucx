@@ -5,10 +5,10 @@ import sqlglot
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
-from databricks.labs.ucx.source_code.linters.python_ast import ASTLinter, Visitor
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
 
 
-class DetectDbfsVisitor(Visitor):
+class DetectDbfsVisitor(TreeVisitor):
     """
     Visitor that detects file system paths in Python code and checks them
     against a list of known deprecated paths.
@@ -77,7 +77,7 @@ class DBFSUsageLinter(Linter):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        linter = ASTLinter.parse(code)
+        linter = Tree.parse(code)
         visitor = DetectDbfsVisitor()
         visitor.visit(linter.root)
         yield from visitor.get_advices()
