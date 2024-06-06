@@ -220,7 +220,7 @@ class PipCell(Cell):
         match = re.search(r"(?<!\\)\n", code)
         if match:
             code = code[: match.start()]  # Remove code after non-escaped newline
-        code = code.replace("\\n", " ")
+        code = code.replace("\\\n", " ")
         lexer = shlex.split(code, posix=True)
         return list(lexer)
 

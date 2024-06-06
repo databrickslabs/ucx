@@ -144,13 +144,13 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
         ("%pip installl foo", ["%pip", "installl", "foo"]),
         ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
         ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
-        ("%pip install foo --index-url \\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
         ("%pip install foo --index-url bar\nmore code", ["%pip", "install", "foo", "--index-url", "bar"]),
         (
-            "%pip install foo --index-url bar\\n -t /tmp/",
+            "%pip install foo --index-url bar\\\n -t /tmp/",
             ["%pip", "install", "foo", "--index-url", "bar", "-t", "/tmp/"],
         ),
-        ("%pip install foo --index-url \\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
         ("%pip install ./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl", ["%pip", "install", "./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"]),
     ],
 )
