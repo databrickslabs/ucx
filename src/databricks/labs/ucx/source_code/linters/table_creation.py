@@ -9,7 +9,7 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -114,5 +114,5 @@ class DBRv8d0Linter(Linter):
             return
 
         tree = Tree.parse(code)
-        for node in TreeWalker.walk(tree.root):
+        for node in tree.walk():
             yield from self._linter.lint(node)

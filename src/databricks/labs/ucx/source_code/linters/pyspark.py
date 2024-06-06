@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -328,7 +328,7 @@ class SparkSql(Linter, Fixer):
 
     def lint(self, code: str) -> Iterable[Advice]:
         tree = Tree.parse(code)
-        for node in TreeWalker.walk(tree.root):
+        for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
@@ -338,7 +338,7 @@ class SparkSql(Linter, Fixer):
     def apply(self, code: str) -> str:
         tree = Tree.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
-        for node in TreeWalker.walk(tree.root):
+        for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue

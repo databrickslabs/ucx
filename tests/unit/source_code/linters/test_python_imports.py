@@ -5,8 +5,8 @@ import pytest
 from astroid import Attribute, Call, Const, Expr  # type: ignore
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
-from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSourcesCollector
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeWalker, SysPathChangesCollector
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 def test_linter_returns_empty_list_of_dbutils_notebook_run_calls():
@@ -27,27 +27,27 @@ for i in z:
 
 def test_linter_returns_empty_list_of_imports():
     tree = Tree.parse('')
-    assert not ImportSourcesCollector.collect_import_sources(tree, DependencyProblem)[0]
+    assert not ImportSource.extract_from_tree(tree, DependencyProblem)[0]
 
 
 def test_linter_returns_import():
     tree = Tree.parse('import x')
-    assert ["x"] == [node.name for node in ImportSourcesCollector.collect_import_sources(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
 
 
 def test_linter_returns_import_from():
     tree = Tree.parse('from x import z')
-    assert ["x"] == [node.name for node in ImportSourcesCollector.collect_import_sources(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
 
 
 def test_linter_returns_import_module():
     tree = Tree.parse('importlib.import_module("x")')
-    assert ["x"] == [node.name for node in ImportSourcesCollector.collect_import_sources(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
 
 
 def test_linter_returns__import__():
     tree = Tree.parse('importlib.__import__("x")')
-    assert ["x"] == [node.name for node in ImportSourcesCollector.collect_import_sources(tree, DependencyProblem)[0]]
+    assert ["x"] == [node.name for node in ImportSource.extract_from_tree(tree, DependencyProblem)[0]]
 
 
 def test_linter_returns_appended_absolute_paths():
@@ -57,7 +57,7 @@ sys.path.append("absolute_path_1")
 sys.path.append("absolute_path_2")
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
 
@@ -68,7 +68,7 @@ stuff.path.append("absolute_path_1")
 stuff.path.append("absolute_path_2")
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
 
@@ -78,7 +78,7 @@ from sys import path as stuff
 stuff.append("absolute_path")
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert "absolute_path" in [p.path for p in appended]
 
 
@@ -89,7 +89,7 @@ import os
 sys.path.append(os.path.abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -100,7 +100,7 @@ import os as stuff
 sys.path.append(stuff.path.abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -111,7 +111,7 @@ from os import path as stuff
 sys.path.append(stuff.abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -122,7 +122,7 @@ from os.path import abspath
 sys.path.append(abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -133,7 +133,7 @@ from os.path import abspath as stuff
 sys.path.append(stuff("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChangesCollector.collect_sys_path_changes(tree)
+    appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -231,7 +231,7 @@ def test_tree_walker_walks_nodes_once():
     nodes = set()
     count = 0
     tree = Tree.parse("o.m1().m2().m3()")
-    for node in TreeWalker.walk(tree.root):
+    for node in tree.walk():
         nodes.add(node)
         count += 1
     assert len(nodes) == count

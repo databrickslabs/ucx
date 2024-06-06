@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -22,9 +22,9 @@ class SharedClusterMatcher:
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         pass
 
-    def lint_tree(self, tree: NodeNG) -> Iterator[Advice]:
+    def lint_tree(self, root: NodeNG) -> Iterator[Advice]:
         reported_locations = set()
-        for node in TreeWalker.walk(tree):
+        for node in Tree(root).walk():
             for advice in self.lint(node):
                 loc = (advice.start_line, advice.start_col)
                 if loc not in reported_locations:

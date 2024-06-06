@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 from collections.abc import Iterable
-from typing import Generic, TypeVar, cast
+from typing import TypeVar
 
 from astroid import Attribute, Call, Name, parse, Module, NodeNG, Const, Import, ImportFrom  # type: ignore
 
@@ -15,32 +15,38 @@ missing_handlers: set[str] = set()
 T = TypeVar("T", bound=NodeNG)
 
 
-class Tree(Generic[T]):
+class Tree:
 
     @staticmethod
     def parse(code: str):
         root = parse(code)
         return Tree(root)
 
-    def __init__(self, root: Module):
-        self._root: Module = root
+    def __init__(self, root: NodeNG):
+        self._root: NodeNG = root
 
     @property
     def root(self):
         return self._root
+
+    def walk(self) -> Iterable[NodeNG]:
+        yield from self._walk(self._root)
+
+    @classmethod
+    def _walk(cls, node: NodeNG) -> Iterable[NodeNG]:
+        yield node
+        for child in node.get_children():
+            yield from cls._walk(child)
 
     def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
         visitor.visit(self._root)
         return visitor.matched_nodes
 
-    def collect_sys_paths_changes(self):
-        visitor = SysPathChangesVisitor()
-        visitor.visit(self._root)
-        return visitor.syspath_changes
-
     def first_statement(self):
-        return self._root.body[0]
+        if isinstance(self._root, Module):
+            return self._root.body[0]
+        return None
 
     @classmethod
     def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
@@ -137,20 +143,11 @@ class TreeVisitor:
         method_slot = getattr(self, method_name, None)
         if callable(method_slot):
             method_slot(node)
-        else:
-            self.visit_nodeng(node)
+            return
+        self.visit_nodeng(node)
 
     def visit_nodeng(self, node: NodeNG):
         pass
-
-
-class TreeWalker:
-
-    @classmethod
-    def walk(cls, node: NodeNG) -> Iterable[NodeNG]:
-        yield node
-        for child in node.get_children():
-            yield from cls.walk(child)
 
 
 class MatchingVisitor(TreeVisitor):
@@ -217,102 +214,3 @@ class NodeBase(abc.ABC):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {repr(self._node)}>"
-
-
-class SysPathChange(NodeBase, abc.ABC):
-
-    def __init__(self, node: NodeNG, path: str, is_append: bool):
-        super().__init__(node)
-        self._path = path
-        self._is_append = is_append
-
-    @property
-    def node(self):
-        return self._node
-
-    @property
-    def path(self):
-        return self._path
-
-    @property
-    def is_append(self):
-        return self._is_append
-
-
-class AbsolutePath(SysPathChange):
-    # path directly added to sys.path
-    pass
-
-
-class RelativePath(SysPathChange):
-    # path added to sys.path using os.path.abspath
-    pass
-
-
-class SysPathChangesVisitor(TreeVisitor):
-
-    def __init__(self):
-        super()
-        self._aliases: dict[str, str] = {}
-        self._syspath_changes: list[SysPathChange] = []
-
-    @property
-    def syspath_changes(self):
-        return self._syspath_changes
-
-    def visit_import(self, node: Import):
-        for name, alias in node.names:
-            if alias is None or name not in {"sys", "os"}:
-                continue
-            self._aliases[name] = alias
-
-    def visit_importfrom(self, node: ImportFrom):
-        interesting_aliases = [("sys", "path"), ("os", "path"), ("os.path", "abspath")]
-        interesting_alias = next((t for t in interesting_aliases if t[0] == node.modname), None)
-        if interesting_alias is None:
-            return
-        for name, alias in node.names:
-            if name == interesting_alias[1]:
-                self._aliases[f"{node.modname}.{interesting_alias[1]}"] = alias or name
-                break
-
-    def visit_call(self, node: Call):
-        func = cast(Attribute, node.func)
-        # check for 'sys.path.append'
-        if not (
-            self._match_aliases(func, ["sys", "path", "append"]) or self._match_aliases(func, ["sys", "path", "insert"])
-        ):
-            return
-        is_append = func.attrname == "append"
-        changed = node.args[0] if is_append else node.args[1]
-        if isinstance(changed, Const):
-            self._syspath_changes.append(AbsolutePath(node, changed.value, is_append))
-        elif isinstance(changed, Call):
-            self._visit_relative_path(changed, is_append)
-
-    def _match_aliases(self, node: NodeNG, names: list[str]):
-        if isinstance(node, Attribute):
-            if node.attrname != names[-1]:
-                return False
-            if len(names) == 1:
-                return True
-            return self._match_aliases(node.expr, names[0 : len(names) - 1])
-        if isinstance(node, Name):
-            full_name = ".".join(names)
-            alias = self._aliases.get(full_name, full_name)
-            return node.name == alias
-        return False
-
-    def _visit_relative_path(self, node: NodeNG, is_append: bool):
-        # check for 'os.path.abspath'
-        if not self._match_aliases(node.func, ["os", "path", "abspath"]):
-            return
-        changed = node.args[0]
-        if isinstance(changed, Const):
-            self._syspath_changes.append(RelativePath(changed, changed.value, is_append))
-
-
-class SysPathChangesCollector:
-    @staticmethod
-    def collect_sys_path_changes(tree: Tree) -> list[SysPathChange]:
-        return tree.collect_sys_paths_changes()
