@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import AstHelper, Tree, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeWalker
 
 
 @dataclass
@@ -51,7 +51,7 @@ class Matcher(ABC):
     def _check_call_context(self, node: Call) -> bool:
         assert isinstance(node.func, Attribute)  # Avoid linter warning
         func_name = node.func.attrname
-        qualified_name = AstHelper.get_full_function_name(node)
+        qualified_name = Tree.get_full_function_name(node)
 
         # Check if the call_context is None as that means all calls are checked
         if self.call_context is None:

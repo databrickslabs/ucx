@@ -8,7 +8,7 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     Linter,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import AstHelper, Tree, TreeWalker
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeWalker
 
 
 @dataclass
@@ -101,7 +101,7 @@ class RDDApiMatcher(SharedClusterMatcher):
             return
         if node.func.attrname not in self._SC_METHODS:
             return
-        function_name = AstHelper.get_full_function_name(node)
+        function_name = Tree.get_full_function_name(node)
         if not function_name or not function_name.endswith(f"sc.{node.func.attrname}"):
             return
         yield self._rdd_failure(node)
@@ -163,7 +163,7 @@ class LoggingMatcher(SharedClusterMatcher):
             return
         if node.func.attrname != 'setLogLevel':
             return
-        function_name = AstHelper.get_full_function_name(node)
+        function_name = Tree.get_full_function_name(node)
         if not function_name or not function_name.endswith('sc.setLogLevel'):
             return
 
@@ -180,7 +180,7 @@ class LoggingMatcher(SharedClusterMatcher):
     def _match_jvm_log(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Attribute):
             return
-        attribute_name = AstHelper.get_full_attribute_name(node)
+        attribute_name = Tree.get_full_attribute_name(node)
         if attribute_name and attribute_name.endswith('org.apache.log4j'):
             yield Failure(
                 code='spark-logging-in-shared-clusters',
