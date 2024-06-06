@@ -1,13 +1,14 @@
-import ast
 from collections.abc import Iterable
 
+from astroid import Call, Const  # type: ignore
 import sqlglot
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
+from databricks.labs.ucx.source_code.linters.imports import Visitor, ASTLinter
 
 
-class DetectDbfsVisitor(ast.NodeVisitor):
+class DetectDbfsVisitor(Visitor):
     """
     Visitor that detects file system paths in Python code and checks them
     against a list of known deprecated paths.
@@ -18,44 +19,44 @@ class DetectDbfsVisitor(ast.NodeVisitor):
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
         self._reported_locations = set()  # Set to store reported locations
 
-    def visit_Call(self, node):
+    def visit_call(self, node: Call):
         for arg in node.args:
-            if isinstance(arg, (ast.Str, ast.Constant)) and isinstance(arg.s, str):
-                if any(arg.s.startswith(prefix) for prefix in self._fs_prefixes):
+            if isinstance(arg, Const) and isinstance(arg.value, str):
+                value = arg.value
+                if any(value.startswith(prefix) for prefix in self._fs_prefixes):
                     self._advices.append(
                         Deprecation(
                             code='dbfs-usage',
-                            message=f"Deprecated file system path in call to: {arg.s}",
+                            message=f"Deprecated file system path in call to: {value}",
                             start_line=arg.lineno,
                             start_col=arg.col_offset,
                             end_line=arg.lineno,
-                            end_col=arg.col_offset + len(arg.s),
+                            end_col=arg.col_offset + len(value),
                         )
                     )
                     # Record the location of the reported constant, so we do not double report
                     self._reported_locations.add((arg.lineno, arg.col_offset))
-        self.generic_visit(node)
 
-    def visit_Constant(self, node):
+    def visit_const(self, node: Const):
         # Constant strings yield Advisories
         if isinstance(node.value, str):
             self._check_str_constant(node)
 
-    def _check_str_constant(self, node):
+    def _check_str_constant(self, node: Const):
         # Check if the location has been reported before
         if (node.lineno, node.col_offset) not in self._reported_locations:
-            if any(node.s.startswith(prefix) for prefix in self._fs_prefixes):
+            value = node.value
+            if any(value.startswith(prefix) for prefix in self._fs_prefixes):
                 self._advices.append(
                     Advisory(
                         code='dbfs-usage',
-                        message=f"Possible deprecated file system path: {node.s}",
+                        message=f"Possible deprecated file system path: {value}",
                         start_line=node.lineno,
                         start_col=node.col_offset,
                         end_line=node.lineno,
-                        end_col=node.col_offset + len(node.s),
+                        end_col=node.col_offset + len(value),
                     )
                 )
-        self.generic_visit(node)
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
@@ -76,9 +77,9 @@ class DBFSUsageLinter(Linter):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        tree = ast.parse(code)
+        linter = ASTLinter.parse(code)
         visitor = DetectDbfsVisitor()
-        visitor.visit(tree)
+        visitor.visit(linter.root)
         yield from visitor.get_advices()
 
 

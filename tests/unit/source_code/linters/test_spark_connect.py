@@ -1,7 +1,7 @@
-import ast
 from itertools import chain
 
 from databricks.labs.ucx.source_code.base import Failure
+from databricks.labs.ucx.source_code.linters.imports import TreeWalker, ASTLinter
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 
 
@@ -11,8 +11,7 @@ def test_jvm_access_match_shared():
 spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
     """
-
-    assert [
+    expected = [
         Failure(
             code="jvm-access-in-shared-clusters",
             message='Cannot access Spark Driver JVM on UC Shared Clusters',
@@ -21,7 +20,9 @@ spark._jspark._jvm.com.my.custom.Name()
             end_line=3,
             end_col=18,
         ),
-    ] == list(linter.lint(code))
+    ]
+    actual = list(linter.lint(code))
+    assert actual == expected
 
 
 def test_jvm_access_match_serverless():
@@ -31,7 +32,7 @@ spark.range(10).collect()
 spark._jspark._jvm.com.my.custom.Name()
     """
 
-    assert [
+    expected = [
         Failure(
             code="jvm-access-in-shared-clusters",
             message='Cannot access Spark Driver JVM on Serverless Compute',
@@ -40,7 +41,9 @@ spark._jspark._jvm.com.my.custom.Name()
             end_line=3,
             end_col=18,
         ),
-    ] == list(linter.lint(code))
+    ]
+    actual = list(linter.lint(code))
+    assert actual == expected
 
 
 def test_rdd_context_match_shared():
@@ -49,7 +52,7 @@ def test_rdd_context_match_shared():
 rdd1 = sc.parallelize([1, 2, 3])
 rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
     """
-    assert [
+    expected = [
         Failure(
             code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API',
@@ -82,7 +85,9 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_line=3,
             end_col=40,
         ),
-    ] == list(linter.lint(code))
+    ]
+    actual = list(linter.lint(code))
+    assert actual == expected
 
 
 def test_rdd_context_match_serverless():
@@ -133,7 +138,7 @@ def test_rdd_map_partitions():
 df = spark.createDataFrame([])
 df.rdd.mapPartitions(myUdf)
     """
-    assert [
+    expected = [
         Failure(
             code="rdd-in-shared-clusters",
             message='RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead',
@@ -142,7 +147,9 @@ df.rdd.mapPartitions(myUdf)
             end_line=3,
             end_col=27,
         ),
-    ] == list(linter.lint(code))
+    ]
+    actual = list(linter.lint(code))
+    assert actual == expected
 
 
 def test_conf_shared():
@@ -163,7 +170,7 @@ def test_conf_shared():
 def test_conf_serverless():
     linter = SparkConnectLinter(is_serverless=True)
     code = """sc._conf().get('spark.my.conf')"""
-    assert [
+    expected = [
         Failure(
             code='legacy-context-in-shared-clusters',
             message='sc and _conf are not supported on Serverless Compute. Rewrite it using spark.conf',
@@ -172,7 +179,9 @@ def test_conf_serverless():
             end_line=1,
             end_col=8,
         ),
-    ] == list(linter.lint(code))
+    ]
+    actual = list(linter.lint(code))
+    assert actual == expected
 
 
 def test_logging_shared():
@@ -213,7 +222,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
             end_line=7,
             end_col=24,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in ast.walk(ast.parse(code))]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in TreeWalker.walk(ASTLinter.parse(code).root)]))
 
 
 def test_logging_serverless():
@@ -242,7 +251,7 @@ log4jLogger = sc._jvm.org.apache.log4j
             end_line=3,
             end_col=38,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in ast.walk(ast.parse(code))]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in TreeWalker.walk(ASTLinter.parse(code).root)]))
 
 
 def test_valid_code():

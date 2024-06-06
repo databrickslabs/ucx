@@ -1,9 +1,10 @@
-import ast
-
 import pytest
 
+from astroid import Call, Const, Expr  # type: ignore
+
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
-from databricks.labs.ucx.source_code.linters.pyspark import SparkSql, AstHelper, TableNameMatcher
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter
+from databricks.labs.ucx.source_code.linters.pyspark import AstHelper, TableNameMatcher, SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -95,7 +96,7 @@ for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
     fixed_code = sqf.apply(old_code)
     # no transformations to apply, only lint messages
-    assert fixed_code == old_code
+    assert fixed_code.rstrip() == old_code.rstrip()
 
 
 def test_spark_sql_fix(migration_index):
@@ -109,7 +110,7 @@ for i in range(10):
 """
     fixed_code = sqf.apply(old_code)
     assert (
-        fixed_code
+        fixed_code.rstrip()
         == """spark.read.csv('s3://bucket/path')
 for i in range(10):
     result = spark.sql('SELECT * FROM brand.new.stuff').collect()
@@ -548,53 +549,67 @@ def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
     assert not advisories
 
 
-def test_get_full_function_name():
-
-    # Test when node.func is an instance of ast.Attribute
-    node = ast.Call(func=ast.Attribute(value=ast.Name(id='value'), attr='attr'))
-    # noinspection PyProtectedMember
-    assert AstHelper.get_full_function_name(node) == 'value.attr'
-
-    # Test when node.func is an instance of ast.Name
-    node = ast.Call(func=ast.Name(id='name'))
-    # noinspection PyProtectedMember
-    assert AstHelper.get_full_function_name(node) == 'name'
-
-    # Test when node.func is neither ast.Attribute nor ast.Name
-    node = ast.Call(func=ast.Constant(value='constant'))
-    # noinspection PyProtectedMember
-    assert AstHelper.get_full_function_name(node) is None
-
-    # Test when next_node in _get_value is an instance of ast.Name
-    node = ast.Call(func=ast.Attribute(value=ast.Name(id='name'), attr='attr'))
-    # noinspection PyProtectedMember
-    assert AstHelper.get_full_function_name(node) == 'name.attr'
-
-    # Test when next_node in _get_value is an instance of ast.Attribute
-    node = ast.Call(func=ast.Attribute(value=ast.Attribute(value=ast.Name(id='value'), attr='attr'), attr='attr'))
-    # noinspection PyProtectedMember
-    assert AstHelper.get_full_function_name(node) == 'value.attr.attr'
-
-    # Test when next_node in _get_value is neither ast.Name nor ast.Attribute
-    node = ast.Call(func=ast.Attribute(value=ast.Constant(value='constant'), attr='attr'))
-    # noinspection PyProtectedMember
-    assert AstHelper.get_full_function_name(node) is None
+def test_get_full_function_name_for_member_function():
+    linter = ASTLinter.parse("value.attr()")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert isinstance(node.value, Call)
+    assert AstHelper.get_full_function_name(node.value) == 'value.attr'
 
 
-def test_apply_table_name_matcher(migration_index):
+def test_get_full_function_name_for_member_member_function():
+    linter = ASTLinter.parse("value1.value2.attr()")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert isinstance(node.value, Call)
+    assert AstHelper.get_full_function_name(node.value) == 'value1.value2.attr'
+
+
+def test_get_full_function_name_for_chained_function():
+    linter = ASTLinter.parse("value.attr1().attr2()")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert isinstance(node.value, Call)
+    assert AstHelper.get_full_function_name(node.value) == 'value.attr1.attr2'
+
+
+def test_get_full_function_name_for_global_function():
+    linter = ASTLinter.parse("name()")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert isinstance(node.value, Call)
+    assert AstHelper.get_full_function_name(node.value) == 'name'
+
+
+def test_get_full_function_name_for_non_method():
+    linter = ASTLinter.parse("not_a_function")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert AstHelper.get_full_function_name(node.value) is None
+
+
+def test_apply_table_name_matcher_with_missing_constant(migration_index):
     from_table = FromTable(migration_index, CurrentSessionState('old'))
     matcher = TableNameMatcher('things', 1, 1, 0)
 
-    # Test when table_arg is an instance of ast.Constant but the destination does not exist in the index
-    node = ast.Call(args=[ast.Constant(value='some.things')])
-    matcher.apply(from_table, migration_index, node)
-    table_constant = node.args[0]
-    assert isinstance(table_constant, ast.Constant)
+    linter = ASTLinter.parse("call('some.things')")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert isinstance(node.value, Call)
+    matcher.apply(from_table, migration_index, node.value)
+    table_constant = node.value.args[0]
+    assert isinstance(table_constant, Const)
     assert table_constant.value == 'some.things'
 
-    # Test when table_arg is an instance of ast.Constant and the destination exists in the index
-    node = ast.Call(args=[ast.Constant(value='old.things')])
-    matcher.apply(from_table, migration_index, node)
-    table_constant = node.args[0]
-    assert isinstance(table_constant, ast.Constant)
+
+def test_apply_table_name_matcher_with_existing_constant(migration_index):
+    from_table = FromTable(migration_index, CurrentSessionState('old'))
+    matcher = TableNameMatcher('things', 1, 1, 0)
+    linter = ASTLinter.parse("call('old.things')")
+    node = linter.first_statement()
+    assert isinstance(node, Expr)
+    assert isinstance(node.value, Call)
+    matcher.apply(from_table, migration_index, node.value)
+    table_constant = node.value.args[0]
+    assert isinstance(table_constant, Const)
     assert table_constant.value == 'brand.new.stuff'

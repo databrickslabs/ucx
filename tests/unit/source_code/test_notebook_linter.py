@@ -476,7 +476,15 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
             [
                 Deprecation(
                     code='table-migrate',
-                    message='Table people is migrated to cata4.nondefault.newpeople ' 'in Unity Catalog',
+                    message='Table people is migrated to cata4.nondefault.newpeople in Unity Catalog',
+                    start_line=6,
+                    start_col=8,
+                    end_line=6,
+                    end_col=29,
+                ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
                     start_line=6,
                     start_col=8,
                     end_line=6,
@@ -484,7 +492,15 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                 ),
                 Deprecation(
                     code='table-migrate',
-                    message='Table persons is migrated to cata4.newsomething.persons ' 'in Unity Catalog',
+                    message='Table persons is migrated to cata4.newsomething.persons in Unity Catalog',
+                    start_line=14,
+                    start_col=8,
+                    end_line=14,
+                    end_col=30,
+                ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
                     start_line=14,
                     start_col=8,
                     end_line=14,
@@ -492,7 +508,15 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                 ),
                 Deprecation(
                     code='table-migrate',
-                    message='Table kittens is migrated to cata4.felines.toms in Unity ' 'Catalog',
+                    message='Table kittens is migrated to cata4.felines.toms in Unity Catalog',
+                    start_line=22,
+                    start_col=8,
+                    end_line=22,
+                    end_col=30,
+                ),
+                Advice(
+                    code='table-migrate',
+                    message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
                     start_line=22,
                     start_col=8,
                     end_line=22,
@@ -500,7 +524,7 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                 ),
                 Deprecation(
                     code='table-migrate',
-                    message='Table numbers is migrated to cata4.counting.numbers in ' 'Unity Catalog',
+                    message='Table numbers is migrated to cata4.counting.numbers in Unity Catalog',
                     start_line=26,
                     start_col=0,
                     end_line=26,
@@ -508,7 +532,7 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
                 ),
                 Advice(
                     code='table-migrate',
-                    message='The default format changed in Databricks Runtime 8.0, from ' 'Parquet to Delta',
+                    message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
                     start_line=26,
                     start_col=0,
                     end_line=26,

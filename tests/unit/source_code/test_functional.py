@@ -50,7 +50,7 @@ class Functional:
         actual_problems = sorted(list(self._lint()), key=lambda a: (a.start_line, a.start_col))
         high_level_expected = [f'{p.code}:{p.message}' for p in expected_problems]
         high_level_actual = [f'{p.code}:{p.message}' for p in actual_problems]
-        assert high_level_expected == high_level_actual
+        assert high_level_actual == high_level_expected
         # TODO: match start/end lines/columns as well. At the moment notebook parsing has a bug that makes it impossible
         # TODO: output annotated file with comments for quick fixing
 

@@ -495,6 +495,7 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         )
 
     def save_locations(self):
+        locations: list[ExternalLocation] = []
         if self.workspace_client.config.is_azure:
             locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
         if self.workspace_client.config.is_aws:

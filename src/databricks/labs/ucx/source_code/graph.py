@@ -11,10 +11,10 @@ from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
     ASTLinter,
     DbutilsLinter,
-    SysPathChange,
-    NotebookRunCall,
     ImportSource,
     NodeBase,
+    NotebookRunCall,
+    SysPathChange,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -186,7 +186,7 @@ class DependencyGraph:
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
         if isinstance(base_node, NotebookRunCall):
-            strpath = base_node.get_constant_path()
+            strpath = base_node.get_notebook_path()
             if strpath is None:
                 yield DependencyProblem('dependency-not-constant', "Can't check dependency not provided as a constant")
             else:

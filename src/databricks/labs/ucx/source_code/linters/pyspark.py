@@ -1,8 +1,8 @@
-import ast
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
+from astroid import Attribute, Call, Const, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -11,6 +11,7 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
 )
+from databricks.labs.ucx.source_code.linters.imports import ASTLinter, TreeWalker
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.linters.ast_helpers import AstHelper
 
@@ -24,22 +25,18 @@ class Matcher(ABC):
     table_arg_name: str | None = None
     call_context: dict[str, set[str]] | None = None
 
-    def matches(self, node: ast.AST):
-        return (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and self._get_table_arg(node) is not None
-        )
+    def matches(self, node: NodeNG):
+        return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
 
     @abstractmethod
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
         """raises Advices by linting the code"""
 
     @abstractmethod
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         """applies recommendations"""
 
-    def _get_table_arg(self, node: ast.Call):
+    def _get_table_arg(self, node: Call):
         node_argc = len(node.args)
         if self.min_args <= node_argc <= self.max_args and self.table_arg_index < node_argc:
             return node.args[self.table_arg_index]
@@ -52,9 +49,9 @@ class Matcher(ABC):
                 return keyword.value
         return None
 
-    def _check_call_context(self, node: ast.Call) -> bool:
-        assert isinstance(node.func, ast.Attribute)  # Avoid linter warning
-        func_name = node.func.attr
+    def _check_call_context(self, node: Call) -> bool:
+        assert isinstance(node.func, Attribute)  # Avoid linter warning
+        func_name = node.func.attrname
         qualified_name = AstHelper.get_full_function_name(node)
 
         # Check if the call_context is None as that means all calls are checked
@@ -71,9 +68,9 @@ class Matcher(ABC):
 @dataclass
 class QueryMatcher(Matcher):
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if isinstance(table_arg, ast.Constant):
+        if isinstance(table_arg, Const):
             for advice in from_table.lint(table_arg.value):
                 yield advice.replace(
                     start_line=node.lineno,
@@ -91,9 +88,9 @@ class QueryMatcher(Matcher):
                 end_col=node.end_col_offset or 0,
             )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, ast.Constant)
+        assert isinstance(table_arg, Const)
         new_query = from_table.apply(table_arg.value)
         table_arg.value = new_query
 
@@ -101,14 +98,14 @@ class QueryMatcher(Matcher):
 @dataclass
 class TableNameMatcher(Matcher):
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
 
-        if not isinstance(table_arg, ast.Constant):
-            assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
+        if not isinstance(table_arg, Const):
+            assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
             yield Advisory(
                 code='table-migrate',
-                message=f"Can't migrate '{node.func.attr}' because its table name argument is not a constant",
+                message=f"Can't migrate '{node.func.attrname}' because its table name argument is not a constant",
                 start_line=node.lineno,
                 start_col=node.col_offset,
                 end_line=node.end_lineno or 0,
@@ -130,9 +127,9 @@ class TableNameMatcher(Matcher):
             end_col=node.end_col_offset or 0,
         )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
-        assert isinstance(table_arg, ast.Constant)
+        assert isinstance(table_arg, Const)
         dst = self._find_dest(index, table_arg.value, from_table.schema)
         if dst is not None:
             table_arg.value = dst.destination()
@@ -149,21 +146,21 @@ class TableNameMatcher(Matcher):
 @dataclass
 class ReturnValueMatcher(Matcher):
 
-    def matches(self, node: ast.AST):
-        return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    def matches(self, node: NodeNG):
+        return isinstance(node, Call) and isinstance(node.func, Attribute)
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
-        assert isinstance(node.func, ast.Attribute)  # always true, avoids a pylint warning
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
+        assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory(
             code='table-migrate',
-            message=f"Call to '{node.func.attr}' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
+            message=f"Call to '{node.func.attrname}' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
             start_line=node.lineno,
             start_col=node.col_offset,
             end_line=node.end_lineno or 0,
             end_col=node.end_col_offset or 0,
         )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -183,16 +180,12 @@ class DirectFilesystemAccessMatcher(Matcher):
         "file:/",
     }
 
-    def matches(self, node: ast.AST):
-        return (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and self._get_table_arg(node) is not None
-        )
+    def matches(self, node: NodeNG):
+        return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> Iterator[Advice]:
+    def lint(self, from_table: FromTable, index: MigrationIndex, node: NodeNG) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if not isinstance(table_arg, ast.Constant):
+        if not isinstance(table_arg, Const):
             return
         if not table_arg.value:
             return
@@ -218,7 +211,7 @@ class DirectFilesystemAccessMatcher(Matcher):
                 end_col=node.end_col_offset or 0,
             )
 
-    def apply(self, from_table: FromTable, index: MigrationIndex, node: ast.Call) -> None:
+    def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         # No transformations to apply
         return
 
@@ -335,31 +328,31 @@ class SparkSql(Linter, Fixer):
         return self._from_table.name()
 
     def lint(self, code: str) -> Iterable[Advice]:
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
+        linter = ASTLinter.parse(code)
+        for node in TreeWalker.walk(linter.root):
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
-            assert isinstance(node, ast.Call)
+            assert isinstance(node, Call)
             yield from matcher.lint(self._from_table, self._index, node)
 
     def apply(self, code: str) -> str:
-        tree = ast.parse(code)
+        linter = ASTLinter.parse(code)
         # we won't be doing it like this in production, but for the sake of the example
-        for node in ast.walk(tree):
+        for node in TreeWalker.walk(linter.root):
             matcher = self._find_matcher(node)
             if matcher is None:
                 continue
-            assert isinstance(node, ast.Call)
+            assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return ast.unparse(tree)
+        return linter.root.as_string()
 
-    def _find_matcher(self, node: ast.AST):
-        if not isinstance(node, ast.Call):
+    def _find_matcher(self, node: NodeNG):
+        if not isinstance(node, Call):
             return None
-        if not isinstance(node.func, ast.Attribute):
+        if not isinstance(node.func, Attribute):
             return None
-        matcher = self._spark_matchers.matchers.get(node.func.attr, None)
+        matcher = self._spark_matchers.matchers.get(node.func.attrname, None)
         if matcher is None:
             return None
         return matcher if matcher.matches(node) else None
