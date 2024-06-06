@@ -29,12 +29,12 @@ class PythonLibraryResolver(LibraryResolver):
         self._runner = runner
 
     def register_library(
-        self, path_lookup: PathLookup, library: Path, *, installation_arguments: list[str] | None = None
+        self, path_lookup: PathLookup, library: str, *, installation_arguments: list[str] | None = None
     ) -> list[DependencyProblem]:
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
         This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
         bother about parsing cross-version dependencies in our code."""
-        compatibility = self._whitelist.distribution_compatibility(library.name)
+        compatibility = self._whitelist.distribution_compatibility(library)
         if compatibility.known:
             return compatibility.problems
         return self._install_library(path_lookup, library, installation_arguments=installation_arguments or [])
@@ -49,24 +49,24 @@ class PythonLibraryResolver(LibraryResolver):
         return Path(lib_install_folder).resolve()
 
     def _install_library(
-        self, path_lookup: PathLookup, library: Path, *, installation_arguments: list[str]
+        self, path_lookup: PathLookup, library: str, *, installation_arguments: list[str]
     ) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
         path_lookup.append_path(self._temporary_virtual_environment)
 
         # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
-        maybe_library = path_lookup.resolve(library)
+        maybe_library = path_lookup.resolve(Path(library))
         if maybe_library is not None:
-            library_position = installation_arguments.index(library.as_posix())
+            library_position = installation_arguments.index(library)
             if library_position < len(installation_arguments):
                 installation_arguments[library_position] = maybe_library.as_posix()
-            library = maybe_library
+            library = maybe_library.as_posix()
 
-        if library.suffix == ".egg":
+        if library.endswith(".egg"):
             return self._install_egg(library)
         return self._install_pip(library, installation_arguments=installation_arguments)
 
-    def _install_pip(self, library: Path, *, installation_arguments: list[str]) -> list[DependencyProblem]:
+    def _install_pip(self, library: str, *, installation_arguments: list[str]) -> list[DependencyProblem]:
         if len(installation_arguments) == 0:
             install_command = f"pip install {library} -t {self._temporary_virtual_environment}"
         else:
@@ -78,7 +78,7 @@ class PythonLibraryResolver(LibraryResolver):
             return [problem]
         return []
 
-    def _install_egg(self, library: Path) -> list[DependencyProblem]:
+    def _install_egg(self, library: str) -> list[DependencyProblem]:
         """Install egss using easy_install.
 
         Sources:
@@ -91,7 +91,7 @@ class PythonLibraryResolver(LibraryResolver):
             "--always-unzip",
             "--install-dir",
             self._temporary_virtual_environment.as_posix(),
-            library.as_posix(),
+            library,
         ]
         setup = self._get_setup()
         if callable(setup):
@@ -100,7 +100,7 @@ class PythonLibraryResolver(LibraryResolver):
                 return []
             except (SystemExit, ImportError, ValueError) as e:
                 logger.warning(f"Failed to install {library} with (setuptools|distutils).setup, unzipping instead: {e}")
-        library_folder = self._temporary_virtual_environment / library.name
+        library_folder = self._temporary_virtual_environment / Path(library).name
         library_folder.mkdir(parents=True, exist_ok=True)
         try:
             # Not a "real" install, though, the best effort to still lint eggs without dependencies

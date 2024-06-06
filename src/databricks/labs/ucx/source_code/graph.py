@@ -291,7 +291,7 @@ class WrappingLoader(DependencyLoader):
 class LibraryResolver(abc.ABC):
     @abc.abstractmethod
     def register_library(
-        self, path_lookup: PathLookup, library: Path, *, installation_arguments: list[str] | None = None
+        self, path_lookup: PathLookup, library: str, *, installation_arguments: list[str] | None = None
     ) -> list[DependencyProblem]:
         pass
 
@@ -357,7 +357,7 @@ class DependencyResolver:
         self, path_lookup: PathLookup, library: str, *, installation_arguments: list[str] | None = None
     ) -> list[DependencyProblem]:
         return self._library_resolver.register_library(
-            path_lookup, Path(library), installation_arguments=installation_arguments
+            path_lookup, library, installation_arguments=installation_arguments
         )
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
