@@ -272,12 +272,12 @@ class CellLanguage(Enum):
     def new_cell(self, source: str, original_offset: int) -> Cell:
         return self._new_cell(source, original_offset)
 
-    def extract_cells(self, source: str) -> list[Cell] | None:
+    def extract_cells(self, source: str) -> list[Cell]:
         lines = source.split('\n')
         if not lines[0].startswith(self.file_magic_header):
             raise ValueError("Not a Databricks notebook source!")
 
-        def make_cell(cell_lines: list[str], start: int):
+        def make_cell(cell_lines: list[str], start: int) -> Cell:
             # trim leading blank lines
             while len(cell_lines) > 0 and len(cell_lines[0]) == 0:
                 cell_lines.pop(0)

@@ -25,7 +25,7 @@ class Notebook(SourceContainer):
             raise ValueError(f"Could not parse Notebook: {path}")
         return Notebook(path, source, default_language, cells, source.endswith('\n'))
 
-    def __init__(self, path: Path, source: str, language: Language, cells: list[Cell], ends_with_lf):
+    def __init__(self, path: Path, source: str, language: Language, cells: list[Cell], ends_with_lf: bool):
         self._path = path
         self._source = source
         self._language = language
