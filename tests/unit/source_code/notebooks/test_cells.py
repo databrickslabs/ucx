@@ -133,9 +133,7 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.register_library.assert_called_once_with(
-        "databricks", installation_arguments=["databricks", "more", "code", "defined"]
-    )
+    graph.register_library.assert_called_once_with("databricks", installation_arguments=["databricks"])
 
 
 @pytest.mark.parametrize(
@@ -156,4 +154,4 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     ],
 )
 def test_pip_cell_split(code, split):
-    assert PipCell._split(code) == split
+    assert PipCell._split(code) == split  # pylint: disable=protected-access
