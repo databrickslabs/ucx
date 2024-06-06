@@ -5,13 +5,11 @@ from collections.abc import Iterable, Callable
 from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
-    parse,
     Attribute,
     Call,
     Const,
     Import,
     ImportFrom,
-    Module,
     Name,
     NodeNG,
 )
@@ -138,5 +136,3 @@ class ImportSourcesCollector:
                 end_col=node.end_col_offset or 0,
             )
             problems.append(problem)
-
-

@@ -11,7 +11,8 @@ from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
     DbutilsLinter,
     ImportSource,
-    NotebookRunCall, ImportSourcesCollector,
+    NotebookRunCall,
+    ImportSourcesCollector,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, SysPathChange, SysPathChangesCollector
 from databricks.labs.ucx.source_code.path_lookup import PathLookup

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import Generic, TypeVar, Iterable, cast
+from collections.abc import Iterable
+from typing import Generic, TypeVar, cast
 
 from astroid import Attribute, Call, Name, parse, Module, NodeNG, Const, Import, ImportFrom  # type: ignore
 
