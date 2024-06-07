@@ -68,7 +68,7 @@ def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_depe
     pip_resolver = PythonLibraryResolver(Whitelist())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     maybe = dependency_resolver.build_notebook_dependency_graph(Path("root1-no-leaf.run.py"))
-    assert list(maybe.problems) == [
+    assert maybe.problems == [
         DependencyProblem(
             'notebook-not-found',
             'Notebook not found: __NOT_FOUND__',
