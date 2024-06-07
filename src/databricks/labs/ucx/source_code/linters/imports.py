@@ -83,6 +83,11 @@ class NotebookRunCall(NodeBase):
         super().__init__(node)
 
     def get_notebook_paths(self) -> list[str | None]:
+        """we return multiple paths because astroid can infer them in scenarios such as:
+        paths = ["p1", "p2"]
+        for path in paths:
+            dbutils.notebook.run(path)
+        """
         node = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
         try:
             return self._get_notebook_paths(node.infer())
