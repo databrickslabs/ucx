@@ -4,7 +4,6 @@ import abc
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
-from typing import cast
 
 from astroid import ImportFrom, NodeNG  # type: ignore
 
@@ -175,7 +174,7 @@ class DependencyGraph:
         import_sources: list[ImportSource]
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
-        problems.extend(cast(list[DependencyProblem], import_problems))
+        problems.extend(import_problems)
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
         for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
