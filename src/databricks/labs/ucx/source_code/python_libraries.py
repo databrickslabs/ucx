@@ -118,10 +118,11 @@ class PythonLibraryResolver(LibraryResolver):
         Sources:
             See easy_install in setuptools.command.easy_install
         """
-        problems = []
         if len(libraries) > 1:
-            problem = DependencyProblem("not-implemented-yet", "Installing multiple eggs at once")
-            problems.append(problem)
+            problems = []
+            for library in libraries:
+                problems.extend(self._install_egg(library))
+            return problems
         library = libraries[0]
 
         verbosity = "--verbose" if is_in_debug() else "--quiet"
@@ -137,7 +138,7 @@ class PythonLibraryResolver(LibraryResolver):
         if callable(setup):
             try:
                 setup(script_args=easy_install_arguments)
-                return problems
+                return []
             except (SystemExit, ImportError, ValueError) as e:
                 logger.warning(f"Failed to install {library} with (setuptools|distutils).setup, unzipping instead: {e}")
         library_folder = self._temporary_virtual_environment / Path(library).name
@@ -148,8 +149,8 @@ class PythonLibraryResolver(LibraryResolver):
                 zip_ref.extractall(library_folder)
         except (zipfile.BadZipfile, FileNotFoundError) as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
-            problems.append(problem)
-        return problems
+            return [problem]
+        return []
 
     @staticmethod
     def _get_setup() -> Callable | None:
