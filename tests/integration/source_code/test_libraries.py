@@ -28,6 +28,12 @@ def test_build_notebook_dependency_graphs_installs_wheel_with_pip_cell_in_notebo
     assert maybe.graph.all_relative_names() == {f"{notebook}.py", "thingy/__init__.py"}
 
 
+def test_build_notebook_dependency_graphs_installs_pytest_from_index_url(simple_ctx):
+    ctx = simple_ctx.replace(path_lookup=MockPathLookup())
+    maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path("pip_install_pytest_with_index_url"))
+    assert not maybe.problems
+
+
 @pytest.mark.xfail(reason="Spaces in path are not handled by subprocess when quoted")
 @pytest.mark.parametrize("notebook", ("pip_install_demo_wheel_with_spaces_in_target_directory",))
 def test_build_notebook_dependency_graphs_fails_installing_when_spaces(simple_ctx, notebook):
