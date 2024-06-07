@@ -29,15 +29,24 @@ class PythonLibraryResolver(LibraryResolver):
         self._runner = runner
 
     def register_library(
-        self, path_lookup: PathLookup, library: str, *, installation_arguments: list[str] | None = None
+        self, path_lookup: PathLookup, *libraries: str, installation_arguments: list[str] | None = None
     ) -> list[DependencyProblem]:
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
         This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
         bother about parsing cross-version dependencies in our code."""
-        compatibility = self._whitelist.distribution_compatibility(library)
-        if compatibility.known:
-            return compatibility.problems
-        return self._install_library(path_lookup, library, installation_arguments=installation_arguments or [])
+        compatibility_problems, install_libraries = [], []
+        for library in libraries:
+            compatibility = self._whitelist.distribution_compatibility(library)
+            if compatibility.known:
+                compatibility_problems.extend(compatibility.problems)
+            else:
+                install_libraries.append(library)
+        install_problems = []
+        if len(install_libraries) > 0:
+            install_problems = self._install_library(
+                path_lookup, *install_libraries, installation_arguments=installation_arguments or []
+            )
+        return compatibility_problems + install_problems
 
     @cached_property
     def _temporary_virtual_environment(self):
@@ -49,46 +58,63 @@ class PythonLibraryResolver(LibraryResolver):
         return Path(lib_install_folder).resolve()
 
     def _install_library(
-        self, path_lookup: PathLookup, library: str, *, installation_arguments: list[str]
+        self, path_lookup: PathLookup, *libraries: str, installation_arguments: list[str]
     ) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
         path_lookup.append_path(self._temporary_virtual_environment)
+        resolved_libraries, resolved_installation_arguments = self._resolve_libraries(
+            path_lookup, *libraries, installation_arguments=installation_arguments
+        )
+        if libraries[0].endswith(".egg"):
+            return self._install_egg(*resolved_libraries)
+        return self._install_pip(*resolved_libraries, installation_arguments=resolved_installation_arguments)
 
+    @staticmethod
+    def _resolve_libraries(
+        path_lookup: PathLookup, *libraries: str, installation_arguments: list[str]
+    ) -> tuple[list[str], list[str]]:
         # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
-        maybe_library = path_lookup.resolve(Path(library))
-        if maybe_library is not None:
-            new_installation_arguments = []
-            for argument in installation_arguments:
-                if argument == library:
-                    new_installation_arguments.append(maybe_library.as_posix())
-                else:
-                    new_installation_arguments.append(argument)
-            installation_arguments = new_installation_arguments
-            library = maybe_library.as_posix()
+        libs, args = [], installation_arguments.copy()
+        for library in libraries:
+            maybe_library = path_lookup.resolve(Path(library))
+            if maybe_library is None:
+                libs.append(library)
+            else:
+                args = [maybe_library.as_posix() if arg == library else arg for arg in args]
+                libs.append(maybe_library.as_posix())
+        return libs, args
 
-        if library.endswith(".egg"):
-            return self._install_egg(library)
-        return self._install_pip(library, installation_arguments=installation_arguments)
-
-    def _install_pip(self, library: str, *, installation_arguments: list[str]) -> list[DependencyProblem]:
+    def _install_pip(self, *libraries: str, installation_arguments: list[str]) -> list[DependencyProblem]:
+        install_commands = []
         if len(installation_arguments) == 0:
-            install_command = f"pip install {library} -t {self._temporary_virtual_environment}"
+            for library in libraries:
+                install_command = f"pip install {library} -t {self._temporary_virtual_environment}"
+                install_commands.append(install_command)
         else:
             # pip allows multiple target directories in its call, it uses the last one, thus the one added here
             install_command = f"pip install {' '.join(installation_arguments)} -t {self._temporary_virtual_environment}"
-        return_code, stdout, stderr = self._runner(install_command)
-        logger.debug(f"pip output:\n{stdout}\n{stderr}")
-        if return_code != 0:
-            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {stderr}")
-            return [problem]
-        return []
+            install_commands.append(install_command)
+        problems = []
+        for install_command in install_commands:
+            return_code, stdout, stderr = self._runner(install_command)
+            logger.debug(f"pip output:\n{stdout}\n{stderr}")
+            if return_code != 0:
+                problem = DependencyProblem("library-install-failed", f"'{install_command}' failed with '{stderr}'")
+                problems.append(problem)
+        return problems
 
-    def _install_egg(self, library: str) -> list[DependencyProblem]:
+    def _install_egg(self, *libraries: str) -> list[DependencyProblem]:
         """Install egss using easy_install.
 
         Sources:
             See easy_install in setuptools.command.easy_install
         """
+        problems = []
+        if len(libraries) > 1:
+            problem = DependencyProblem("not-implemented-yet", "Installing multiple eggs at once")
+            problems.append(problem)
+        library = libraries[0]
+
         verbosity = "--verbose" if is_in_debug() else "--quiet"
         easy_install_arguments = [
             "easy_install",
@@ -102,7 +128,7 @@ class PythonLibraryResolver(LibraryResolver):
         if callable(setup):
             try:
                 setup(script_args=easy_install_arguments)
-                return []
+                return problems
             except (SystemExit, ImportError, ValueError) as e:
                 logger.warning(f"Failed to install {library} with (setuptools|distutils).setup, unzipping instead: {e}")
         library_folder = self._temporary_virtual_environment / Path(library).name
@@ -113,8 +139,8 @@ class PythonLibraryResolver(LibraryResolver):
                 zip_ref.extractall(library_folder)
         except (zipfile.BadZipfile, FileNotFoundError) as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
-            return [problem]
-        return []
+            problems.append(problem)
+        return problems
 
     @staticmethod
     def _get_setup() -> Callable | None:

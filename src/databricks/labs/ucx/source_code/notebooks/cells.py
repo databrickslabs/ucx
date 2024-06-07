@@ -236,7 +236,7 @@ class PipCell(Cell):
             return [DependencyProblem("library-install-failed", "Missing arguments in '%pip install'")]
         install = InstallCommand(name="install", summary="Install packages.")
         _, args = install.parse_args(cmd_args)
-        return graph.register_library(args[0], installation_arguments=cmd_args)  # TODO: Install multiple libraries
+        return graph.register_library(*args, installation_arguments=cmd_args)
 
 
 class CellLanguage(Enum):

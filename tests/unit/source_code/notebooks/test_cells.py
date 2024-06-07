@@ -99,7 +99,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("Failed to install unknown-library-name")
+    assert problems[0].message.startswith("'pip install unknown-library-name")
 
 
 def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lookup):

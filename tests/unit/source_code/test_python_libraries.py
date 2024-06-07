@@ -1,6 +1,5 @@
 from unittest.mock import create_autospec, call
 
-from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
@@ -24,7 +23,10 @@ def test_pip_resolver_failing(mock_path_lookup):
     pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
     problems = pip_resolver.register_library(mock_path_lookup, "anything")
 
-    assert problems == [DependencyProblem("library-install-failed", "Failed to install anything: nope")]
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message.startswith("'pip install anything")
+    assert problems[0].message.endswith("nope'")
 
 
 def test_pip_resolver_adds_to_path_lookup_only_once():
