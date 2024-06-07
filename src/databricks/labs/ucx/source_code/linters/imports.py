@@ -97,7 +97,7 @@ class NotebookRunCall(NodeBase):
         paths: list[str | None] = []
         for node in nodes:
             if isinstance(node, Const):
-                paths.append(node.as_string().strip("'").strip("'"))
+                paths.append(node.as_string().strip("'").strip('"'))
                 continue
             paths.append(None)
         return paths
