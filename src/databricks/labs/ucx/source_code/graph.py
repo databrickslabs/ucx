@@ -186,15 +186,17 @@ class DependencyGraph:
             self._mutate_path_lookup(base_node)
         if isinstance(base_node, NotebookRunCall):
             paths = base_node.get_notebook_paths()
-            if None in paths:
-                yield DependencyProblem(
-                    'dependency-too-complex',
-                    f"Can't check dependency from {base_node.node.as_string()} because the expression is too complex",
-                )
-            else:
-                for path in paths:
-                    assert isinstance(path, str)
-                    yield from self.register_notebook(Path(path))
+            asserted = False
+            for path in paths:
+                if path is None:
+                    if not asserted:
+                        asserted = True
+                        yield DependencyProblem(
+                            'dependency-cannot-compute',
+                            f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
+                        )
+                        continue
+                yield from self.register_notebook(Path(path))
         if isinstance(base_node, ImportSource):
             prefix = ""
             if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
