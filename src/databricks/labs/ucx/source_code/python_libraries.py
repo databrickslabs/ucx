@@ -86,6 +86,7 @@ class PythonLibraryResolver(LibraryResolver):
         return libs, args
 
     def _install_pip(self, *libraries: str, installation_arguments: list[str]) -> list[DependencyProblem]:
+        problems = []
         venv = self._temporary_virtual_environment
         install_commands = []
         if len(installation_arguments) == 0:
@@ -96,7 +97,13 @@ class PythonLibraryResolver(LibraryResolver):
             # pip allows multiple target directories in its call, it uses the last one, thus the one added here
             install_command = f"pip install {shlex.join(installation_arguments)} -t {venv}"
             install_commands.append(install_command)
-        problems = []
+            missing_libraries = ",".join([library for library in libraries if library not in installation_arguments])
+            if len(missing_libraries) > 0:
+                problem = DependencyProblem(
+                    "library-install-failed",
+                    f"Missing libraries '{missing_libraries} in installation command '{install_command}'",
+                )
+                problems.append(problem)
         for install_command in install_commands:
             return_code, stdout, stderr = self._runner(install_command)
             logger.debug(f"pip output:\n{stdout}\n{stderr}")
