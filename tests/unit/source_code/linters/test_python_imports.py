@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-
-import pytest
-from astroid import Attribute, Call, Const, Expr  # type: ignore
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
@@ -135,4 +132,3 @@ sys.path.append(stuff("relative_path"))
     tree = Tree.parse(code)
     appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
-

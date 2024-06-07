@@ -1,3 +1,9 @@
+import pytest
+from astroid import Attribute, Call, Const, Expr  # type: ignore
+
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
+
 
 def test_extract_call_by_name():
     tree = Tree.parse("o.m1().m2().m3()")
@@ -70,6 +76,16 @@ def test_args_count(code, expected):
     assert act == expected
 
 
+def test_tree_walks_nodes_once():
+    nodes = set()
+    count = 0
+    tree = Tree.parse("o.m1().m2().m3()")
+    for node in tree.walk():
+        nodes.add(node)
+        count += 1
+    assert len(nodes) == count
+
+
 @pytest.mark.parametrize(
     "code, expected",
     [
@@ -87,13 +103,3 @@ def test_infers_string_variable_value(code, expected):
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
     actual = list(call.get_notebook_path() for call in calls)
     assert [expected] == actual
-
-
-def test_tree_walker_walks_nodes_once():
-    nodes = set()
-    count = 0
-    tree = Tree.parse("o.m1().m2().m3()")
-    for node in tree.walk():
-        nodes.add(node)
-        count += 1
-    assert len(nodes) == count
