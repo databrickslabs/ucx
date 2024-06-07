@@ -113,7 +113,7 @@ class PythonLibraryResolver(LibraryResolver):
         return problems
 
     def _install_egg(self, *libraries: str) -> list[DependencyProblem]:
-        """Install egss using easy_install.
+        """Install eggs using easy_install.
 
         Sources:
             See easy_install in setuptools.command.easy_install
