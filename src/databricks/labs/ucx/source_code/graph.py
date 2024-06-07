@@ -171,7 +171,7 @@ class DependencyGraph:
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
-        for base_node in sorted(nodes, key=lambda node: node.node.lineno * 10000 + node.node.col_offset):
+        for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             for problem in self._process_node(base_node):
                 problem = problem.replace(
                     start_line=base_node.node.lineno,
