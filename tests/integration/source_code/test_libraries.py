@@ -17,4 +17,4 @@ def test_build_notebook_dependency_graphs_installs_wheel_with_pip_cell_in_notebo
     maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path(notebook))
 
     assert not maybe.problems
-    assert maybe.graph.all_relative_names() == {"pip_install_demo_wheel.py", "thingy/__init__.py"}
+    assert maybe.graph.all_relative_names() == {f"{notebook}.py", "thingy/__init__.py"}
