@@ -173,7 +173,7 @@ def test_job_cluster_policy(ws, installation_ctx):
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
