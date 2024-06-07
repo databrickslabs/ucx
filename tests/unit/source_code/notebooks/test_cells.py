@@ -53,7 +53,7 @@ def test_pip_cell_build_dependency_graph_invokes_register_library():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.register_library.assert_called_once_with("databricks", installation_arguments=["databricks"])
+    graph.register_library.assert_called_once_with("databricks", installation_arguments=[])
 
 
 def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
@@ -133,7 +133,7 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.register_library.assert_called_once_with("databricks", installation_arguments=["databricks"])
+    graph.register_library.assert_called_once_with("databricks", installation_arguments=[])
 
 
 @pytest.mark.parametrize(
