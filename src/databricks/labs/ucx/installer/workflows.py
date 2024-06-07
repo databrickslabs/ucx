@@ -53,6 +53,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 logger = logging.getLogger(__name__)
 
 TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)
+TEST_CI_JOBS_PURGE_TIMEOUT = timedelta(hours=12)  # Buffer for debugging nightly integration test runs
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
@@ -441,8 +442,12 @@ class WorkflowsDeployment(InstallationMixin):
         return self._product_info.product_name() != "ucx"
 
     @staticmethod
-    def _get_test_purge_time() -> str:
-        return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+    def _is_ci():
+        return os.getenv("CI") is not None
+
+    def _get_test_purge_time(self) -> str:
+        timeout = TEST_CI_JOBS_PURGE_TIMEOUT if self._is_ci() else TEST_JOBS_PURGE_TIMEOUT
+        return (datetime.utcnow() + timeout).strftime("%Y%m%d%H")
 
     def _create_readme(self) -> str:
         debug_notebook_link = self._installation.workspace_markdown_link('debug notebook', 'DEBUG.py')
