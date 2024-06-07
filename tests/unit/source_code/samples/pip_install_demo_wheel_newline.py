@@ -7,4 +7,4 @@
 
 # COMMAND ----------
 
-import pytest
+import thingy
