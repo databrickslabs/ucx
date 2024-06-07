@@ -185,24 +185,27 @@ class DependencyGraph:
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
         if isinstance(base_node, NotebookRunCall):
-            paths = base_node.get_notebook_paths()
-            asserted = False
-            for path in paths:
-                if path is None:
-                    if not asserted:
-                        asserted = True
-                        yield DependencyProblem(
-                            'dependency-cannot-compute',
-                            f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
-                        )
-                        continue
-                yield from self.register_notebook(Path(path))
+            yield from self._register_notebook(base_node)
         if isinstance(base_node, ImportSource):
             prefix = ""
             if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
                 prefix = "." * base_node.node.level
             name = base_node.name or ""
             yield from self.register_import(prefix + name)
+
+    def _register_notebook(self, base_node: NotebookRunCall):
+        paths = base_node.get_notebook_paths()
+        asserted = False
+        for path in paths:
+            if isinstance(path, str):
+                yield from self.register_notebook(Path(path))
+                continue
+            if not asserted:
+                asserted = True
+                yield DependencyProblem(
+                    'dependency-cannot-compute',
+                    f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
+                )
 
     def _mutate_path_lookup(self, change: SysPathChange):
         path = Path(change.path)
