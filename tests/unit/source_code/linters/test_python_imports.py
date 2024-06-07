@@ -132,3 +132,14 @@ sys.path.append(stuff("relative_path"))
     tree = Tree.parse(code)
     appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
+
+
+def test_linter_returns_inferred_paths():
+    code = """
+import sys
+path = "absolute_path_1"
+sys.path.append(path)
+"""
+    tree = Tree.parse(code)
+    appended = SysPathChange.extract_from_tree(tree)
+    assert ["absolute_path_1"] == [p.path for p in appended]
