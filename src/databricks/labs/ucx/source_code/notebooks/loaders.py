@@ -55,14 +55,14 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         except NotFound:
             logger.warning(f"Could not read notebook from workspace: {absolute_path}")
             return None
-        language = self._detect_language(absolute_path, content)
+        language = self.detect_language(absolute_path, content)
         if not language:
             logger.warning(f"Could not detect language for {absolute_path}")
             return None
         return Notebook.parse(absolute_path, content, language)
 
     @staticmethod
-    def _detect_language(path: Path, content: str):
+    def detect_language(path: Path, content: str):
         language = SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix, None)
         if language:
             return language
