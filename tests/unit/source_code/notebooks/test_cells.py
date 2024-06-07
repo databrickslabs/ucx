@@ -1,6 +1,6 @@
-import yaml
 from pathlib import Path
 from unittest.mock import create_autospec
+import yaml
 
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
