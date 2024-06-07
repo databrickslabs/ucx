@@ -1,8 +1,11 @@
 from databricks.labs.ucx.source_code.redash import Redash
+from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Query, Dashboard
 
+from ..conftest import TestInstallationContext
 
-def test_fix_dashboard(ws, installation_ctx, make_dashboard, make_query):
+
+def test_fix_dashboard(ws: WorkspaceClient, installation_ctx: TestInstallationContext, make_dashboard, make_query):
     dashboard: Dashboard = make_dashboard()
     another_query: Query = make_query()
     installation_ctx.workspace_installation.run()
@@ -10,16 +13,19 @@ def test_fix_dashboard(ws, installation_ctx, make_dashboard, make_query):
     # make sure the query is marked as migrated
     queries = Redash.get_queries_from_dashboard(dashboard)
     for query in queries:
+        assert query.id is not None
         content = ws.queries.get(query.id)
-        assert Redash.MIGRATED_TAG in content.tags
+        assert content.tags is not None and Redash.MIGRATED_TAG in content.tags
 
     # make sure a different query does not get migrated
+    assert another_query.id is not None
     another_query = ws.queries.get(another_query.id)
-    assert len(another_query.tags) == 1
+    assert another_query.tags is not None and len(another_query.tags) == 1
     assert Redash.MIGRATED_TAG not in another_query.tags
 
     # revert the dashboard, make sure the query has only a single tag
     installation_ctx.redash.revert_dashboards(dashboard.id)
     for query in queries:
+        assert query.id is not None
         content = ws.queries.get(query.id)
-        assert len(content.tags) == 1
+        assert content.tags is not None and len(content.tags) == 1

@@ -215,7 +215,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup):
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
+def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_() -> None:
     sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
     linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))
@@ -231,7 +231,7 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
     ] == advices
 
 
-def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
+def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_() -> None:
     sources: list[str] = _load_sources(SourceContainer, "root4.py")
     linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))

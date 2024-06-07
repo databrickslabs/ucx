@@ -14,10 +14,10 @@ class DetectDbfsVisitor(TreeVisitor):
     against a list of known deprecated paths.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._advices: list[Advice] = []
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
-        self._reported_locations = set()  # Set to store reported locations
+        self._reported_locations: set[tuple[int, int]] = set()  # Set to store reported locations
 
     def visit_call(self, node: Call):
         for arg in node.args:

@@ -130,7 +130,7 @@ def wsfs_wheel(ws, fresh_wheel_file, make_random):
 
 
 @pytest.fixture
-def make_random():
+def make_random() -> Callable[[int], str]:
     import random
 
     def inner(k=16) -> str:
@@ -1182,7 +1182,7 @@ def make_udf(
 
 
 @pytest.fixture
-def make_query(ws, make_table, make_random):
+def make_query(ws, make_table, make_random) -> Generator[Query, None, None]:
     def create() -> Query:
         table = make_table()
         query_name = f"ucx_query_Q{make_random(4)}"
@@ -1342,7 +1342,7 @@ def make_storage_dir(ws, env_or_skip):
 
 
 @pytest.fixture
-def make_dashboard(ws, make_random, make_query):
+def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_query):
     def create() -> Dashboard:
         query = make_query()
         viz = ws.query_visualizations.create(
@@ -1361,6 +1361,7 @@ def make_dashboard(ws, make_random, make_query):
 
         dashboard_name = f"ucx_D{make_random(4)}"
         dashboard = ws.dashboards.create(name=dashboard_name, tags=["original_dashboard_tag"])
+        assert dashboard.id is not None
         ws.dashboard_widgets.create(
             dashboard_id=dashboard.id,
             visualization_id=viz.id,
@@ -1378,8 +1379,9 @@ def make_dashboard(ws, make_random, make_query):
         logger.info(f"Dashboard Created {dashboard_name}: {ws.config.host}/sql/dashboards/{dashboard.id}")
         return dashboard
 
-    def remove(dashboard: Dashboard):
+    def remove(dashboard: Dashboard) -> None:
         try:
+            assert dashboard.id is not None
             ws.dashboards.delete(dashboard_id=dashboard.id)
         except RuntimeError as e:
             logger.info(f"Can't delete dashboard {e}")
