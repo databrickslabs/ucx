@@ -31,11 +31,11 @@ def test_basic_cell_extraction() -> None:
     assert len(cells) == len(cell_metadata), "Wrong number of cells"
     for i, (actual, expected) in enumerate(zip(cells, cell_metadata, strict=True)):
         assert type(actual).__name__ == f"{expected['type']}Cell", f"Cell {i} is of the wrong type"
-        assert actual.original_offset == expected["starts_at_line"] - 1, f"Cell {i} starts on the wrong line"
+        assert actual.original_offset == expected["starts_at_line"], f"Cell {i} starts on the wrong line"
         # TODO: Fix content checking. Current problems:
         #  - Chomping of the final line ending.
         #  - Various MAGIC/COMMENT/etc prefixes seem to end up in the content.
-        # assert actual.original_code == expected["content"], f"Cell {i} starts on the wrong line"
+        # asssert actual.original_code == expected["content"], f"Cell {i} starts on the wrong line"
 
 
 def test_pip_cell_language_is_pip():

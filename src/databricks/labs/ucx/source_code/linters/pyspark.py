@@ -72,20 +72,12 @@ class QueryMatcher(Matcher):
         table_arg = self._get_table_arg(node)
         if isinstance(table_arg, Const):
             for advice in from_table.lint(table_arg.value):
-                yield advice.replace(
-                    start_line=node.lineno,
-                    start_col=node.col_offset,
-                    end_line=node.end_lineno,
-                    end_col=node.end_col_offset,
-                )
+                yield advice.replace_from_node(node)
         else:
-            yield Advisory(
+            yield Advisory.from_node(
                 code='table-migrate',
                 message=f"Can't migrate '{node}' because its table name argument is not a constant",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
@@ -103,13 +95,10 @@ class TableNameMatcher(Matcher):
 
         if not isinstance(table_arg, Const):
             assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
-            yield Advisory(
+            yield Advisory.from_node(
                 code='table-migrate',
                 message=f"Can't migrate '{node.func.attrname}' because its table name argument is not a constant",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
             return
 
@@ -117,14 +106,11 @@ class TableNameMatcher(Matcher):
         if dst is None:
             return
 
-        yield Deprecation(
+        yield Deprecation.from_node(
             code='table-migrate',
             message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
             # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-            start_line=node.lineno,
-            start_col=node.col_offset,
-            end_line=node.end_lineno or 0,
-            end_col=node.end_col_offset or 0,
+            node=node,
         )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
@@ -151,13 +137,10 @@ class ReturnValueMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
-        yield Advisory(
+        yield Advisory.from_node(
             code='table-migrate',
             message=f"Call to '{node.func.attrname}' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.",
-            start_line=node.lineno,
-            start_col=node.col_offset,
-            end_line=node.end_lineno or 0,
-            end_col=node.end_col_offset or 0,
+            node=node,
         )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
@@ -192,23 +175,17 @@ class DirectFilesystemAccessMatcher(Matcher):
         if not isinstance(table_arg.value, str):
             return
         if any(table_arg.value.startswith(prefix) for prefix in self._DIRECT_FS_REFS):
-            yield Deprecation(
+            yield Deprecation.from_node(
                 code='direct-filesystem-access',
                 message=f"The use of direct filesystem references is deprecated: {table_arg.value}",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
             return
         if table_arg.value.startswith("/") and self._check_call_context(node):
-            yield Deprecation(
+            yield Deprecation.from_node(
                 code='direct-filesystem-access',
                 message=f"The use of default dbfs: references is deprecated: {table_arg.value}",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:

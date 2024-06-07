@@ -313,7 +313,8 @@ class NotebookRunCall(NodeBase):
         return None
 
 
-P = TypeVar("P", bound=Callable)
+P = TypeVar("P")
+ProblemFactory = Callable[[str, str, NodeNG], P]
 
 
 class DbutilsLinter(Linter):
@@ -328,21 +329,15 @@ class DbutilsLinter(Linter):
         assert isinstance(node, Call)
         path = cls.get_dbutils_notebook_run_path_arg(node)
         if isinstance(path, Const):
-            return Advisory(
+            return Advisory.from_node(
                 'dbutils-notebook-run-literal',
                 "Call to 'dbutils.notebook.run' will be migrated automatically",
-                node.lineno,
-                node.col_offset,
-                node.end_lineno or 0,
-                node.end_col_offset or 0,
+                node=node,
             )
-        return Advisory(
+        return Advisory.from_node(
             'dbutils-notebook-run-dynamic',
             "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            node.lineno,
-            node.col_offset,
-            node.end_lineno or 0,
-            node.end_col_offset or 0,
+            node=node,
         )
 
     @staticmethod
@@ -358,7 +353,9 @@ class DbutilsLinter(Linter):
         return [NotebookRunCall(call) for call in calls]
 
     @classmethod
-    def list_import_sources(cls, linter: ASTLinter, problem_type: P) -> tuple[list[ImportSource], list[P]]:
+    def list_import_sources(
+        cls, linter: ASTLinter, problem_factory: ProblemFactory
+    ) -> tuple[list[ImportSource], list[P]]:
         problems: list[P] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
@@ -370,11 +367,11 @@ class DbutilsLinter(Linter):
                 sources.append(source)
             nodes = linter.locate(Call, [("import_module", Attribute), ("importlib", Name)])
             nodes.extend(linter.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
-            for source in cls._make_sources_for_import_call_nodes(nodes, problem_type, problems):
+            for source in cls._make_sources_for_import_call_nodes(nodes, problem_factory, problems):
                 sources.append(source)
             return sources, problems
         except Exception as e:  # pylint: disable=broad-except
-            problem = problem_type('internal-error', f"While linter {linter} was checking imports: {e}")
+            problem = problem_factory('internal-error', f"While linter {linter} was checking imports: {e}", linter.root)
             problems.append(problem)
             return [], problems
 
@@ -395,18 +392,13 @@ class DbutilsLinter(Linter):
             yield ImportSource(node, node.modname)
 
     @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_type: P, problems: list[P]):
+    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[P]):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
                 yield ImportSource(node, arg.value)
                 continue
-            problem = problem_type(
-                'dependency-not-constant',
-                "Can't check dependency not provided as a constant",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+            problem = problem_factory(
+                'dependency-not-constant', "Can't check dependency not provided as a constant", node
             )
             problems.append(problem)

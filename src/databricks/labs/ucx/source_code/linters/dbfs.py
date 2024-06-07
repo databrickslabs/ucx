@@ -17,23 +17,17 @@ class DetectDbfsVisitor(Visitor):
     def __init__(self):
         self._advices: list[Advice] = []
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
-        self._reported_locations = set()  # Set to store reported locations
+        self._reported_locations = set()  # Set to store reported locations; astroid coordinates!
 
     def visit_call(self, node: Call):
         for arg in node.args:
             if isinstance(arg, Const) and isinstance(arg.value, str):
                 value = arg.value
                 if any(value.startswith(prefix) for prefix in self._fs_prefixes):
-                    self._advices.append(
-                        Deprecation(
-                            code='dbfs-usage',
-                            message=f"Deprecated file system path in call to: {value}",
-                            start_line=arg.lineno,
-                            start_col=arg.col_offset,
-                            end_line=arg.lineno,
-                            end_col=arg.col_offset + len(value),
-                        )
+                    deprecation = Deprecation.from_node(
+                        code='dbfs-usage', message=f"Deprecated file system path in call to: {value}", node=arg
                     )
+                    self._advices.append(deprecation.replace(end_col=arg.col_offset + len(value)))
                     # Record the location of the reported constant, so we do not double report
                     self._reported_locations.add((arg.lineno, arg.col_offset))
 
@@ -47,16 +41,10 @@ class DetectDbfsVisitor(Visitor):
         if (node.lineno, node.col_offset) not in self._reported_locations:
             value = node.value
             if any(value.startswith(prefix) for prefix in self._fs_prefixes):
-                self._advices.append(
-                    Advisory(
-                        code='dbfs-usage',
-                        message=f"Possible deprecated file system path: {value}",
-                        start_line=node.lineno,
-                        start_col=node.col_offset,
-                        end_line=node.lineno,
-                        end_col=node.col_offset + len(value),
-                    )
+                advisory = Advisory.from_node(
+                    code='dbfs-usage', message=f"Possible deprecated file system path: {value}", node=node
                 )
+                self._advices.append(advisory.replace(end_col=node.col_offset + len(value)))
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
@@ -109,8 +97,8 @@ class FromDbfsFolder(Linter):
                 code='dbfs-query',
                 message=f"The use of DBFS is deprecated: {table.name}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                start_line=1,
+                start_line=0,
                 start_col=0,
-                end_line=1,
+                end_line=0,
                 end_col=1024,
             )

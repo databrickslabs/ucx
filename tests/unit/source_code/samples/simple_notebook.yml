@@ -1,26 +1,26 @@
 ---
 cells:
   - type: Markdown
-    starts_at_line: 2
+    starts_at_line: 1
     content: |
       %md # Simple Notebook (Multiple cell types)
   - type: Python
-    starts_at_line: 6
+    starts_at_line: 5
     content: |
       # This is a python cell, the default (non-magic) type.
       print(sys.version)
   - type: Markdown
-    starts_at_line: 11
+    starts_at_line: 10
     content: |
       %md And this is a Markdown cell.
 
       It has two paragraphs.
   - type: SQL
-    starts_at_line: 17
+    starts_at_line: 16
     content: |
       %sql select 1 -- This is a single-line SQL cell.
   - type: SQL
-    starts_at_line: 21
+    starts_at_line: 20
     content: |
       %sql
       -- This is a multi-line SQL statement.
@@ -29,24 +29,24 @@ cells:
       from values('baz', 'daz'),('diz', 'fiz') as (foo, bar)
       where bar <> 'daz'
   - type: Python  # TODO: Fix support for unknown magic.
-    starts_at_line: 30
+    starts_at_line: 29
     content: |
       %fs ls
   - type: Scala
-    starts_at_line: 34
+    starts_at_line: 33
     content: |
       %scala
       println(sys.props)
   - type: Shell
-    starts_at_line: 39
+    starts_at_line: 38
     content: |
       %sh ls -ltr /
   - type: Pip
-    starts_at_line: 43
+    starts_at_line: 42
     content: |
       %pip install tqdm
   - type: Python
-    starts_at_line: 47
+    starts_at_line: 46
     content: |
       %python
       # Explicitly-marked python cell.
@@ -60,6 +60,6 @@ cells:
               count += 1
       print(f"System seems to have {count} local accounts.")
   - type: Python  # TODO: Fix support for unknown magic.
-    starts_at_line: 61
+    starts_at_line: 60
     content: |
       %lsmagic

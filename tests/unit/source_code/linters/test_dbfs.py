@@ -87,9 +87,9 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
         Deprecation(
             code='dbfs-query',
             message=f'The use of DBFS is deprecated: {table}',
-            start_line=1,
+            start_line=0,
             start_col=0,
-            end_line=1,
+            end_line=0,
             end_col=1024,
         ),
     ] == list(ftf.lint(query))

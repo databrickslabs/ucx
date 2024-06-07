@@ -62,6 +62,11 @@ class Cell(ABC):
         """whether of not this cell can be run"""
 
     def build_dependency_graph(self, _: DependencyGraph) -> list[DependencyProblem]:
+        """Check for any problems with dependencies of this cell.
+
+        Returns:
+            A list of found dependency problems; position information for problems is relative to the enclosing notebook.
+        """
         return []
 
     def __repr__(self):
@@ -82,7 +87,14 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        return parent.build_graph_from_python_source(self._original_code)
+        python_dependency_problems = parent.build_graph_from_python_source(self._original_code)
+        # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
+        return [
+            problem.replace(
+                start_line=self.original_offset + problem.start_line, end_line=self.original_offset + problem.end_line
+            )
+            for problem in python_dependency_problems
+        ]
 
 
 class RCell(Cell):
@@ -150,13 +162,13 @@ class RunCell(Cell):
                 if len(path) == 0:
                     continue
                 notebook_path = Path(path)
-                start_line = self._original_offset + idx + 1
+                start_line = self._original_offset + idx
                 problems = parent.register_notebook(notebook_path)
                 return [
                     problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
                     for problem in problems
                 ]
-        start_line = self._original_offset + 1
+        start_line = self._original_offset
         problem = DependencyProblem(
             'invalid-run-cell',
             "Missing notebook path in %run command",
@@ -300,15 +312,15 @@ class CellLanguage(Enum):
         cell_lines: list[str] = []
         separator = f"{self.comment_prefix} {CELL_SEPARATOR}"
 
+        # Start iterating from the 2nd line (after the header) to split the cells.
         next_cell_pos = 1
         for i in range(1, len(lines)):
-            # Actually line i+1
             line = lines[i].strip()
             if line.startswith(separator):
                 cell = make_cell(cell_lines, next_cell_pos)
                 cells.append(cell)
                 cell_lines = []
-                # i represents the cell separator, the next cell begins 1 line later.
+                # i points to the cell separator, the next cell begins 1 line later.
                 next_cell_pos = i + 1
             else:
                 cell_lines.append(lines[i])

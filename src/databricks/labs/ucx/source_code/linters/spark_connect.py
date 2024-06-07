@@ -47,13 +47,10 @@ class JvmAccessMatcher(SharedClusterMatcher):
             return
         if node.attrname not in JvmAccessMatcher._FIELDS:
             return
-        yield Failure(
+        yield Failure.from_node(
             code='jvm-access-in-shared-clusters',
             message=f'Cannot access Spark Driver JVM on {self._cluster_type_str()}',
-            start_line=node.lineno,
-            start_col=node.col_offset,
-            end_line=node.end_lineno or 0,
-            end_col=node.end_col_offset or 0,
+            node=node,
         )
 
 
@@ -87,14 +84,11 @@ class RDDApiMatcher(SharedClusterMatcher):
                 yield self._rdd_failure(node)
                 return
         if isinstance(node, Call) and isinstance(node.func, Attribute) and node.func.attrname == 'mapPartitions':
-            yield Failure(
+            yield Failure.from_node(
                 code='rdd-in-shared-clusters',
                 message=f'RDD APIs are not supported on {self._cluster_type_str()}. '
                 f'Use mapInArrow() or Pandas UDFs instead',
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
 
     def _lint_sc(self, node: NodeNG) -> Iterator[Advice]:
@@ -108,13 +102,10 @@ class RDDApiMatcher(SharedClusterMatcher):
         yield self._rdd_failure(node)
 
     def _rdd_failure(self, node: NodeNG) -> Advice:
-        return Failure(
+        return Failure.from_node(
             code='rdd-in-shared-clusters',
             message=f'RDD APIs are not supported on {self._cluster_type_str()}. Rewrite it using DataFrame API',
-            start_line=node.lineno,
-            start_col=node.col_offset,
-            end_line=node.end_lineno or 0,
-            end_col=node.end_col_offset or 0,
+            node=node,
         )
 
 
@@ -135,22 +126,16 @@ class SparkSqlContextMatcher(SharedClusterMatcher):
     def _get_advice(self, node: Attribute, name: str) -> Advice:
         if node.attrname in self._KNOWN_REPLACEMENTS:
             replacement = self._KNOWN_REPLACEMENTS[node.attrname]
-            return Failure(
+            return Failure.from_node(
                 code='legacy-context-in-shared-clusters',
                 message=f'{name} and {node.attrname} are not supported on {self._cluster_type_str()}. '
                 f'Rewrite it using spark.{replacement}',
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
-        return Failure(
+        return Failure.from_node(
             code='legacy-context-in-shared-clusters',
             message=f'{name} is not supported on {self._cluster_type_str()}. Rewrite it using spark',
-            start_line=node.lineno,
-            start_col=node.col_offset,
-            end_line=node.end_lineno or 0,
-            end_col=node.end_col_offset or 0,
+            node=node,
         )
 
 
@@ -168,14 +153,11 @@ class LoggingMatcher(SharedClusterMatcher):
         if not function_name or not function_name.endswith('sc.setLogLevel'):
             return
 
-        yield Failure(
+        yield Failure.from_node(
             code='spark-logging-in-shared-clusters',
             message=f'Cannot set Spark log level directly from code on {self._cluster_type_str()}. '
             f'Remove the call and set the cluster spark conf \'spark.log.level\' instead',
-            start_line=node.lineno,
-            start_col=node.col_offset,
-            end_line=node.end_lineno or 0,
-            end_col=node.end_col_offset or 0,
+            node=node,
         )
 
     def _match_jvm_log(self, node: NodeNG) -> Iterator[Advice]:
@@ -183,14 +165,11 @@ class LoggingMatcher(SharedClusterMatcher):
             return
         attribute_name = AstHelper.get_full_attribute_name(node)
         if attribute_name and attribute_name.endswith('org.apache.log4j'):
-            yield Failure(
+            yield Failure.from_node(
                 code='spark-logging-in-shared-clusters',
                 message=f'Cannot access Spark Driver JVM logger on {self._cluster_type_str()}. '
                 f'Use logging.getLogger() instead',
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+                node=node,
             )
 
 

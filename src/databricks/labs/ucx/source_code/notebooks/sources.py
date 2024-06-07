@@ -62,6 +62,11 @@ class Notebook(SourceContainer):
         return '\n'.join(sources)
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
+        """Check for any problems with dependencies of the cells in this notebook.
+
+        Returns:
+            A list of found dependency problems; position information for problems is relative to the notebook source.
+        """
         problems: list[DependencyProblem] = []
         for cell in self._cells:
             cell_problems = cell.build_dependency_graph(parent)

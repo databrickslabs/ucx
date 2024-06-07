@@ -7,6 +7,8 @@ from pathlib import Path
 from collections.abc import Callable
 from typing import cast
 
+from astroid import NodeNG  # type: ignore
+
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
     ASTLinter,
@@ -163,20 +165,28 @@ class DependencyGraph:
         return False
 
     def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
+        """Check python code for dependency-related problems.
+
+        Returns:
+            A list of dependency problems; position information is relative to the python code itself.
+        """
         problems: list[DependencyProblem] = []
         linter = ASTLinter.parse(python_code)
         syspath_changes = DbutilsLinter.list_sys_path_changes(linter)
         run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources, import_problems = DbutilsLinter.list_import_sources(linter, DependencyProblem)
+        import_sources: list[ImportSource]
+        import_problems: list[DependencyProblem]
+        import_sources, import_problems = DbutilsLinter.list_import_sources(linter, DependencyProblem.from_node)
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
         for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             for problem in self._process_node(base_node):
+                # Astroid line numbers are 1-based.
                 problem = problem.replace(
-                    start_line=base_node.node.lineno,
+                    start_line=base_node.node.lineno - 1,
                     start_col=base_node.node.col_offset,
-                    end_line=base_node.node.end_lineno or 0,
+                    end_line=(base_node.node.end_lineno or 1) - 1,
                     end_col=base_node.node.end_col_offset or 0,
                 )
                 problems.append(problem)
@@ -386,7 +396,7 @@ class DependencyProblem:
     code: str
     message: str
     source_path: Path = Path(MISSING_SOURCE_PATH)
-    # Lines are 1-based, columns are 0-based.
+    # Lines and colums are both 0-based: the first line is line 0.
     start_line: int = -1
     start_col: int = -1
     end_line: int = -1
@@ -423,6 +433,18 @@ class DependencyProblem:
             start_col=self.start_col,
             end_line=self.end_line,
             end_col=self.end_col,
+        )
+
+    @staticmethod
+    def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
+        # Astroid line numbers are 1-based.
+        return DependencyProblem(
+            code=code,
+            message=message,
+            start_line=(node.lineno or 1) - 1,
+            start_col=node.col_offset,
+            end_line=(node.end_lineno or 1) - 1,
+            end_col=(node.end_col_offset),
         )
 
 
