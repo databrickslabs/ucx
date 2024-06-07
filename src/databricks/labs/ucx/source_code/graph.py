@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import abc
-import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
-from typing import cast
+
+from astroid import ImportFrom, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
-    ASTLinter,
     DbutilsLinter,
-    SysPathChange,
-    NotebookRunCall,
     ImportSource,
-    NodeBase,
+    NotebookRunCall,
+    SysPathChange,
 )
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -163,20 +162,28 @@ class DependencyGraph:
         return False
 
     def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
+        """Check python code for dependency-related problems.
+
+        Returns:
+            A list of dependency problems; position information is relative to the python code itself.
+        """
         problems: list[DependencyProblem] = []
-        linter = ASTLinter.parse(python_code)
-        syspath_changes = DbutilsLinter.list_sys_path_changes(linter)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
-        import_sources, import_problems = DbutilsLinter.list_import_sources(linter, DependencyProblem)
-        problems.extend(cast(list[DependencyProblem], import_problems))
+        tree = Tree.parse(python_code)
+        syspath_changes = SysPathChange.extract_from_tree(tree)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        import_sources: list[ImportSource]
+        import_problems: list[DependencyProblem]
+        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(import_problems)
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
-        for base_node in sorted(nodes, key=lambda node: node.node.lineno * 10000 + node.node.col_offset):
+        for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             for problem in self._process_node(base_node):
+                # Astroid line numbers are 1-based.
                 problem = problem.replace(
-                    start_line=base_node.node.lineno,
+                    start_line=base_node.node.lineno - 1,
                     start_col=base_node.node.col_offset,
-                    end_line=base_node.node.end_lineno or 0,
+                    end_line=(base_node.node.end_lineno or 1) - 1,
                     end_col=base_node.node.end_col_offset or 0,
                 )
                 problems.append(problem)
@@ -186,13 +193,15 @@ class DependencyGraph:
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
         if isinstance(base_node, NotebookRunCall):
-            strpath = base_node.get_constant_path()
+            strpath = base_node.get_notebook_path()
             if strpath is None:
                 yield DependencyProblem('dependency-not-constant', "Can't check dependency not provided as a constant")
             else:
                 yield from self.register_notebook(Path(strpath))
         if isinstance(base_node, ImportSource):
-            prefix = ("." * base_node.node.level) if isinstance(base_node.node, ast.ImportFrom) else ""
+            prefix = ""
+            if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
+                prefix = "." * base_node.node.level
             name = base_node.name or ""
             yield from self.register_import(prefix + name)
 
@@ -386,6 +395,7 @@ class DependencyProblem:
     code: str
     message: str
     source_path: Path = Path(MISSING_SOURCE_PATH)
+    # Lines and colums are both 0-based: the first line is line 0.
     start_line: int = -1
     start_col: int = -1
     end_line: int = -1
@@ -422,6 +432,18 @@ class DependencyProblem:
             start_col=self.start_col,
             end_line=self.end_line,
             end_col=self.end_col,
+        )
+
+    @staticmethod
+    def from_node(code: str, message: str, node: NodeNG) -> DependencyProblem:
+        # Astroid line numbers are 1-based.
+        return DependencyProblem(
+            code=code,
+            message=message,
+            start_line=(node.lineno or 1) - 1,
+            start_col=node.col_offset,
+            end_line=(node.end_lineno or 1) - 1,
+            end_col=(node.end_col_offset),
         )
 
 

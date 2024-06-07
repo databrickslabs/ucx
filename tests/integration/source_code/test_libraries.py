@@ -12,4 +12,4 @@ def test_loads_pip_library_from_notebook(simple_ctx):
     maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path('install_demo_wheel'))
 
     assert not maybe.problems
-    assert maybe.graph.all_relative_names() == {'install_demo_wheel.py', 'pkgdir/__init__.py'}
+    assert maybe.graph.all_relative_names() == {'install_demo_wheel.py', 'thingy/__init__.py'}

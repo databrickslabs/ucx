@@ -48,9 +48,9 @@ def get_advice(assign: bool, method_name: str, args_len: int) -> Advice:
     return Advice(
         code="table-migrate",
         message="The default format changed in Databricks Runtime 8.0, from Parquet to Delta",
-        start_line=4,
+        start_line=3,
         start_col=(9 if assign else 4),
-        end_line=4,
+        end_line=3,
         end_col=(29 if assign else 24) + len(method_name) + args_len,
     )
 
@@ -120,4 +120,5 @@ def test_dbr_version_filter(migration_index, dbr_version):
     """Tests the DBR version cutoff filter"""
     old_code = get_code(False, 'spark.foo().bar().table("catalog.db.table").baz()')
     expected = [] if dbr_version["suppress"] else [get_advice(False, 'table', 18)]
-    assert expected == lint(old_code, dbr_version["version"])
+    actual = lint(old_code, dbr_version["version"])
+    assert actual == expected

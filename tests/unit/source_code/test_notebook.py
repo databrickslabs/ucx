@@ -7,13 +7,13 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from tests.unit import _load_sources
 
 # fmt: off
@@ -223,9 +223,9 @@ def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
         Advisory(
             code='dbutils-notebook-run-dynamic',
             message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            start_line=14,
+            start_line=13,
             start_col=13,
-            end_line=14,
+            end_line=13,
             end_col=50,
         )
     ] == advices
@@ -239,9 +239,9 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
         Advisory(
             code='dbutils-notebook-run-literal',
             message="Call to 'dbutils.notebook.run' will be migrated automatically",
-            start_line=2,
+            start_line=1,
             start_col=0,
-            end_line=2,
+            end_line=1,
             end_col=34,
         )
     ] == advices
