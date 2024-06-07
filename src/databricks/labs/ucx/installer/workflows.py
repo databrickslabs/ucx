@@ -443,7 +443,8 @@ class WorkflowsDeployment(InstallationMixin):
 
     @staticmethod
     def _is_ci():
-        return os.getenv("CI") is not None
+        ci_env = os.getenv("CI")
+        return ci_env is not None and ci_env.lower() == "true"
 
     def _get_test_purge_time(self) -> str:
         timeout = TEST_CI_JOBS_PURGE_TIMEOUT if self._is_ci() else TEST_JOBS_PURGE_TIMEOUT
