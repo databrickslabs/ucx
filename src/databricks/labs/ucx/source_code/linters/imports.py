@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import logging
-from collections.abc import Iterable, Callable
+from collections.abc import Callable, Iterable
 from typing import TypeVar, Generic, cast
 
 from astroid import (  # type: ignore
