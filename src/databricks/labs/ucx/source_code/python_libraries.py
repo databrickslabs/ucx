@@ -74,6 +74,7 @@ class PythonLibraryResolver(LibraryResolver):
         if len(installation_arguments) == 0:
             install_command = f"pip install {library} -t {self._temporary_virtual_environment}"
         else:
+            # pip allows multiple target directories in its call, it uses the last one, thus the one added here
             install_command = f"pip install {' '.join(installation_arguments)} -t {self._temporary_virtual_environment}"
         return_code, stdout, stderr = self._runner(install_command)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
