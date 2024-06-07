@@ -84,6 +84,20 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
     graph.register_library.assert_not_called()
 
 
+def test_pip_cell_build_dependency_graph_reports_unsupported_command():
+    graph = create_autospec(DependencyGraph)
+
+    code = "%pip freeze"
+    cell = PipCell(code)
+
+    problems = cell.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message == "Unsupported %pip command: freeze"
+    graph.register_library.assert_not_called()
+
+
 def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_lookup):
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
