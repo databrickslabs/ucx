@@ -32,6 +32,7 @@ def test_pip_resolver_adds_to_path_lookup_only_once():
         return 0, "", ""
 
     path_lookup = create_autospec(PathLookup)
+    path_lookup.resolve.return_value = None
     pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
 
     problems = pip_resolver.register_library(path_lookup, "library")
