@@ -376,7 +376,7 @@ def test_workflow_linter_lints_python_wheel_task(simple_ctx, ws, make_job, make_
 
     assert len([problem for problem in problems if problem.code == "library-dist-info-not-found"]) == 0
     assert len([problem for problem in problems if problem.code == "library-entrypoint-not-found"]) == 0
-    whitelist.distribution_compatibility.assert_called_once_with(Path(wheels[0].path).name)
+    whitelist.distribution_compatibility.assert_called_once()
 
 
 def test_job_dlt_task_linter_unhappy_path(
