@@ -3,120 +3,135 @@ from __future__ import annotations
 import abc
 import logging
 from collections.abc import Callable, Iterable
-from typing import TypeVar, Generic, cast
+from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
-    parse,
     Attribute,
     Call,
     Const,
     Import,
     ImportFrom,
-    Module,
     Name,
     NodeNG,
 )
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor
 
 logger = logging.getLogger(__name__)
 
-
-class Visitor:
-
-    def visit(self, node: NodeNG):
-        self._visit_specific(node)
-        for child in node.get_children():
-            self.visit(child)
-
-    def _visit_specific(self, node: NodeNG):
-        method_name = "visit_" + type(node).__name__.lower()
-        method_slot = getattr(self, method_name, None)
-        if callable(method_slot):
-            method_slot(node)
-        else:
-            self.visit_nodeng(node)
-
-    def visit_nodeng(self, node: NodeNG):
-        pass
+P = TypeVar("P")
+ProblemFactory = Callable[[str, str, NodeNG], P]
 
 
-class TreeWalker:
+class ImportSource(NodeBase):
 
     @classmethod
-    def walk(cls, node: NodeNG) -> Iterable[NodeNG]:
-        yield node
-        for child in node.get_children():
-            yield from cls.walk(child)
+    def extract_from_tree(cls, tree: Tree, problem_factory: ProblemFactory) -> tuple[list[ImportSource], list[P]]:
+        problems: list[P] = []
+        sources: list[ImportSource] = []
+        try:  # pylint: disable=too-many-try-statements
+            nodes = tree.locate(Import, [])
+            for source in cls._make_sources_for_import_nodes(nodes):
+                sources.append(source)
+            nodes = tree.locate(ImportFrom, [])
+            for source in cls._make_sources_for_import_from_nodes(nodes):
+                sources.append(source)
+            nodes = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
+            nodes.extend(tree.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
+            for source in cls._make_sources_for_import_call_nodes(nodes, problem_factory, problems):
+                sources.append(source)
+            return sources, problems
+        except Exception as e:  # pylint: disable=broad-except
+            problem = problem_factory('internal-error', f"While checking imports: {e}", tree.root)
+            problems.append(problem)
+            return [], problems
+
+    @classmethod
+    def _make_sources_for_import_nodes(cls, nodes: list[Import]) -> Iterable[ImportSource]:
+        for node in nodes:
+            for name, _ in node.names:
+                if name is not None:
+                    yield ImportSource(node, name)
+
+    @classmethod
+    def _make_sources_for_import_from_nodes(cls, nodes: list[ImportFrom]) -> Iterable[ImportSource]:
+        for node in nodes:
+            yield ImportSource(node, node.modname)
+
+    @classmethod
+    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[P]):
+        for node in nodes:
+            arg = node.args[0]
+            if isinstance(arg, Const):
+                yield ImportSource(node, arg.value)
+                continue
+            problem = problem_factory(
+                'dependency-not-constant', "Can't check dependency not provided as a constant", node
+            )
+            problems.append(problem)
+
+    def __init__(self, node: NodeNG, name: str):
+        super().__init__(node)
+        self.name = name
 
 
-class MatchingVisitor(Visitor):
+class NotebookRunCall(NodeBase):
 
-    def __init__(self, node_type: type, match_nodes: list[tuple[str, type]]):
-        super()
-        self._matched_nodes: list[NodeNG] = []
-        self._node_type = node_type
-        self._match_nodes = match_nodes
+    def __init__(self, node: Call):
+        super().__init__(node)
 
-    @property
-    def matched_nodes(self):
-        return self._matched_nodes
-
-    def visit_call(self, node: Call):
-        if self._node_type is not Call:
-            return
-        try:
-            if self._matches(node.func, 0):
-                self._matched_nodes.append(node)
-        except NotImplementedError as e:
-            logger.warning(f"Missing implementation: {e.args[0]}")
-
-    def visit_import(self, node: Import):
-        if self._node_type is not Import:
-            return
-        self._matched_nodes.append(node)
-
-    def visit_importfrom(self, node: ImportFrom):
-        if self._node_type is not ImportFrom:
-            return
-        self._matched_nodes.append(node)
-
-    def _matches(self, node: NodeNG, depth: int):
-        if depth >= len(self._match_nodes):
-            return False
-        name, match_node = self._match_nodes[depth]
-        if not isinstance(node, match_node):
-            return False
-        next_node: NodeNG | None = None
-        if isinstance(node, Attribute):
-            if node.attrname != name:
-                return False
-            next_node = node.expr
-        elif isinstance(node, Name):
-            if node.name != name:
-                return False
-        else:
-            raise NotImplementedError(str(type(node)))
-        if next_node is None:
-            # is this the last node to match ?
-            return len(self._match_nodes) - 1 == depth
-        return self._matches(next_node, depth + 1)
+    def get_notebook_path(self) -> str | None:
+        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(cast(Call, self.node))
+        inferred = next(node.infer(), None)
+        if isinstance(inferred, Const):
+            return inferred.value.strip().strip("'").strip('"')
+        return None
 
 
-class NodeBase(abc.ABC):
+class DbutilsLinter(Linter):
 
-    def __init__(self, node: NodeNG):
-        self._node = node
+    def lint(self, code: str) -> Iterable[Advice]:
+        tree = Tree.parse(code)
+        nodes = self.list_dbutils_notebook_run_calls(tree)
+        return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
 
-    @property
-    def node(self):
-        return self._node
+    @classmethod
+    def _convert_dbutils_notebook_run_to_advice(cls, node: NodeNG) -> Advisory:
+        assert isinstance(node, Call)
+        path = cls.get_dbutils_notebook_run_path_arg(node)
+        if isinstance(path, Const):
+            return Advisory.from_node(
+                'dbutils-notebook-run-literal',
+                "Call to 'dbutils.notebook.run' will be migrated automatically",
+                node=node,
+            )
+        return Advisory.from_node(
+            'dbutils-notebook-run-dynamic',
+            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
+            node=node,
+        )
 
-    def __repr__(self):
-        return f"<{self.__class__.__name__}: {repr(self._node)}>"
+    @staticmethod
+    def get_dbutils_notebook_run_path_arg(node: Call):
+        if len(node.args) > 0:
+            return node.args[0]
+        arg = next(kw for kw in node.keywords if kw.arg == "path")
+        return arg.value if arg is not None else None
+
+    @staticmethod
+    def list_dbutils_notebook_run_calls(tree: Tree) -> list[NotebookRunCall]:
+        calls = tree.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
+        return [NotebookRunCall(call) for call in calls]
 
 
 class SysPathChange(NodeBase, abc.ABC):
+
+    @staticmethod
+    def extract_from_tree(tree: Tree) -> list[SysPathChange]:
+        visitor = SysPathChangesVisitor()
+        visitor.visit(tree.root)
+        return visitor.sys_path_changes
 
     def __init__(self, node: NodeNG, path: str, is_append: bool):
         super().__init__(node)
@@ -136,26 +151,22 @@ class SysPathChange(NodeBase, abc.ABC):
         return self._is_append
 
 
-# path directly added to sys.path
 class AbsolutePath(SysPathChange):
+    # path directly added to sys.path
     pass
 
 
-# path added to sys.path using os.path.abspath
 class RelativePath(SysPathChange):
+    # path added to sys.path using os.path.abspath
     pass
 
 
-class SysPathVisitor(Visitor):
+class SysPathChangesVisitor(TreeVisitor):
 
     def __init__(self):
         super()
         self._aliases: dict[str, str] = {}
-        self._syspath_changes: list[SysPathChange] = []
-
-    @property
-    def syspath_changes(self):
-        return self._syspath_changes
+        self.sys_path_changes: list[SysPathChange] = []
 
     def visit_import(self, node: Import):
         for name, alias in node.names:
@@ -183,7 +194,7 @@ class SysPathVisitor(Visitor):
         is_append = func.attrname == "append"
         changed = node.args[0] if is_append else node.args[1]
         if isinstance(changed, Const):
-            self._syspath_changes.append(AbsolutePath(node, changed.value, is_append))
+            self.sys_path_changes.append(AbsolutePath(node, changed.value, is_append))
         elif isinstance(changed, Call):
             self._visit_relative_path(changed, is_append)
 
@@ -200,205 +211,10 @@ class SysPathVisitor(Visitor):
             return node.name == alias
         return False
 
-    def _visit_relative_path(self, node: NodeNG, is_append: bool):
+    def _visit_relative_path(self, node: Call, is_append: bool):
         # check for 'os.path.abspath'
         if not self._match_aliases(node.func, ["os", "path", "abspath"]):
             return
         changed = node.args[0]
         if isinstance(changed, Const):
-            self._syspath_changes.append(RelativePath(changed, changed.value, is_append))
-
-
-T = TypeVar("T", bound=NodeNG)
-
-
-# disclaimer this class is NOT thread-safe
-class ASTLinter(Generic[T]):
-
-    @staticmethod
-    def parse(code: str):
-        root = parse(code)
-        return ASTLinter(root)
-
-    def __init__(self, root: Module):
-        self._root: Module = root
-
-    @property
-    def root(self):
-        return self._root
-
-    def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
-        visitor = MatchingVisitor(node_type, match_nodes)
-        visitor.visit(self._root)
-        return visitor.matched_nodes
-
-    def collect_sys_paths_changes(self):
-        visitor = SysPathVisitor()
-        visitor.visit(self._root)
-        return visitor.syspath_changes
-
-    def first_statement(self):
-        return self._root.body[0]
-
-    @classmethod
-    def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
-        """Given a call-chain, extract its sub-call by method name (if it has one)"""
-        assert isinstance(call, Call)
-        node = call
-        while True:
-            func = node.func
-            if not isinstance(func, Attribute):
-                return None
-            if func.attrname == name:
-                return node
-            if not isinstance(func.expr, Call):
-                return None
-            node = func.expr
-
-    @classmethod
-    def args_count(cls, node: Call) -> int:
-        """Count the number of arguments (positionals + keywords)"""
-        assert isinstance(node, Call)
-        return len(node.args) + len(node.keywords)
-
-    @classmethod
-    def get_arg(
-        cls,
-        node: Call,
-        arg_index: int | None,
-        arg_name: str | None,
-    ) -> NodeNG | None:
-        """Extract the call argument identified by an optional position or name (if it has one)"""
-        assert isinstance(node, Call)
-        if arg_index is not None and len(node.args) > arg_index:
-            return node.args[arg_index]
-        if arg_name is not None:
-            arg = [kw.value for kw in node.keywords if kw.arg == arg_name]
-            if len(arg) == 1:
-                return arg[0]
-        return None
-
-    @classmethod
-    def is_none(cls, node: NodeNG) -> bool:
-        """Check if the given AST expression is the None constant"""
-        if not isinstance(node, Const):
-            return False
-        return node.value is None
-
-    def __repr__(self):
-        truncate_after = 32
-        code = repr(self._root)
-        if len(code) > truncate_after:
-            code = code[0:truncate_after] + "..."
-        return f"<ASTLinter: {code}>"
-
-
-class ImportSource(NodeBase):
-
-    def __init__(self, node: NodeNG, name: str):
-        super().__init__(node)
-        self.name = name
-
-
-class NotebookRunCall(NodeBase):
-
-    def __init__(self, node: Call):
-        super().__init__(node)
-
-    def get_notebook_path(self) -> str | None:
-        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(cast(Call, self.node))
-        inferred = next(node.infer(), None)
-        if isinstance(inferred, Const):
-            return inferred.value.strip().strip("'").strip('"')
-        return None
-
-
-P = TypeVar("P")
-ProblemFactory = Callable[[str, str, NodeNG], P]
-
-
-class DbutilsLinter(Linter):
-
-    def lint(self, code: str) -> Iterable[Advice]:
-        linter = ASTLinter.parse(code)
-        nodes = self.list_dbutils_notebook_run_calls(linter)
-        return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
-
-    @classmethod
-    def _convert_dbutils_notebook_run_to_advice(cls, node: NodeNG) -> Advisory:
-        assert isinstance(node, Call)
-        path = cls.get_dbutils_notebook_run_path_arg(node)
-        if isinstance(path, Const):
-            return Advisory.from_node(
-                'dbutils-notebook-run-literal',
-                "Call to 'dbutils.notebook.run' will be migrated automatically",
-                node=node,
-            )
-        return Advisory.from_node(
-            'dbutils-notebook-run-dynamic',
-            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            node=node,
-        )
-
-    @staticmethod
-    def get_dbutils_notebook_run_path_arg(node: Call):
-        if len(node.args) > 0:
-            return node.args[0]
-        arg = next(kw for kw in node.keywords if kw.arg == "path")
-        return arg.value if arg is not None else None
-
-    @staticmethod
-    def list_dbutils_notebook_run_calls(linter: ASTLinter) -> list[NotebookRunCall]:
-        calls = linter.locate(Call, [("run", Attribute), ("notebook", Attribute), ("dbutils", Name)])
-        return [NotebookRunCall(call) for call in calls]
-
-    @classmethod
-    def list_import_sources(
-        cls, linter: ASTLinter, problem_factory: ProblemFactory
-    ) -> tuple[list[ImportSource], list[P]]:
-        problems: list[P] = []
-        sources: list[ImportSource] = []
-        try:  # pylint: disable=too-many-try-statements
-            nodes = linter.locate(Import, [])
-            for source in cls._make_sources_for_import_nodes(nodes):
-                sources.append(source)
-            nodes = linter.locate(ImportFrom, [])
-            for source in cls._make_sources_for_import_from_nodes(nodes):
-                sources.append(source)
-            nodes = linter.locate(Call, [("import_module", Attribute), ("importlib", Name)])
-            nodes.extend(linter.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
-            for source in cls._make_sources_for_import_call_nodes(nodes, problem_factory, problems):
-                sources.append(source)
-            return sources, problems
-        except Exception as e:  # pylint: disable=broad-except
-            problem = problem_factory('internal-error', f"While linter {linter} was checking imports: {e}", linter.root)
-            problems.append(problem)
-            return [], problems
-
-    @staticmethod
-    def list_sys_path_changes(linter: ASTLinter) -> list[SysPathChange]:
-        return linter.collect_sys_paths_changes()
-
-    @classmethod
-    def _make_sources_for_import_nodes(cls, nodes: list[Import]) -> Iterable[ImportSource]:
-        for node in nodes:
-            for name, _ in node.names:
-                if name is not None:
-                    yield ImportSource(node, name)
-
-    @classmethod
-    def _make_sources_for_import_from_nodes(cls, nodes: list[ImportFrom]) -> Iterable[ImportSource]:
-        for node in nodes:
-            yield ImportSource(node, node.modname)
-
-    @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[P]):
-        for node in nodes:
-            arg = node.args[0]
-            if isinstance(arg, Const):
-                yield ImportSource(node, arg.value)
-                continue
-            problem = problem_factory(
-                'dependency-not-constant', "Can't check dependency not provided as a constant", node
-            )
-            problems.append(problem)
+            self.sys_path_changes.append(RelativePath(changed, changed.value, is_append))

@@ -1,7 +1,7 @@
 from itertools import chain
 
 from databricks.labs.ucx.source_code.base import Failure
-from databricks.labs.ucx.source_code.linters.imports import TreeWalker, ASTLinter
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 
 
@@ -222,7 +222,7 @@ sc._jvm.org.apache.log4j.LogManager.getLogger(__name__).info("test")
             end_line=6,
             end_col=24,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in TreeWalker.walk(ASTLinter.parse(code).root)]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in Tree.parse(code).walk()]))
 
 
 def test_logging_serverless():
@@ -251,7 +251,7 @@ log4jLogger = sc._jvm.org.apache.log4j
             end_line=2,
             end_col=38,
         ),
-    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in TreeWalker.walk(ASTLinter.parse(code).root)]))
+    ] == list(chain.from_iterable([logging_matcher.lint(node) for node in Tree.parse(code).walk()]))
 
 
 def test_valid_code():

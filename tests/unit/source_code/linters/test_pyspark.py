@@ -3,8 +3,8 @@ import pytest
 from astroid import Call, Const, Expr  # type: ignore
 
 from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
-from databricks.labs.ucx.source_code.linters.imports import ASTLinter
-from databricks.labs.ucx.source_code.linters.pyspark import AstHelper, TableNameMatcher, SparkSql
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.linters.pyspark import TableNameMatcher, SparkSql
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -550,50 +550,49 @@ def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
 
 
 def test_get_full_function_name_for_member_function():
-    linter = ASTLinter.parse("value.attr()")
-    node = linter.first_statement()
+    tree = Tree.parse("value.attr()")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
-    assert AstHelper.get_full_function_name(node.value) == 'value.attr'
+    assert Tree.get_full_function_name(node.value) == 'value.attr'
 
 
 def test_get_full_function_name_for_member_member_function():
-    linter = ASTLinter.parse("value1.value2.attr()")
-    node = linter.first_statement()
+    tree = Tree.parse("value1.value2.attr()")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
-    assert AstHelper.get_full_function_name(node.value) == 'value1.value2.attr'
+    assert Tree.get_full_function_name(node.value) == 'value1.value2.attr'
 
 
 def test_get_full_function_name_for_chained_function():
-    linter = ASTLinter.parse("value.attr1().attr2()")
-    node = linter.first_statement()
+    tree = Tree.parse("value.attr1().attr2()")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
-    assert AstHelper.get_full_function_name(node.value) == 'value.attr1.attr2'
+    assert Tree.get_full_function_name(node.value) == 'value.attr1.attr2'
 
 
 def test_get_full_function_name_for_global_function():
-    linter = ASTLinter.parse("name()")
-    node = linter.first_statement()
+    tree = Tree.parse("name()")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
-    assert AstHelper.get_full_function_name(node.value) == 'name'
+    assert Tree.get_full_function_name(node.value) == 'name'
 
 
 def test_get_full_function_name_for_non_method():
-    linter = ASTLinter.parse("not_a_function")
-    node = linter.first_statement()
+    tree = Tree.parse("not_a_function")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
-    assert AstHelper.get_full_function_name(node.value) is None
+    assert Tree.get_full_function_name(node.value) is None
 
 
 def test_apply_table_name_matcher_with_missing_constant(migration_index):
     from_table = FromTable(migration_index, CurrentSessionState('old'))
     matcher = TableNameMatcher('things', 1, 1, 0)
-
-    linter = ASTLinter.parse("call('some.things')")
-    node = linter.first_statement()
+    tree = Tree.parse("call('some.things')")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     matcher.apply(from_table, migration_index, node.value)
@@ -605,8 +604,8 @@ def test_apply_table_name_matcher_with_missing_constant(migration_index):
 def test_apply_table_name_matcher_with_existing_constant(migration_index):
     from_table = FromTable(migration_index, CurrentSessionState('old'))
     matcher = TableNameMatcher('things', 1, 1, 0)
-    linter = ASTLinter.parse("call('old.things')")
-    node = linter.first_statement()
+    tree = Tree.parse("call('old.things')")
+    node = tree.first_statement()
     assert isinstance(node, Expr)
     assert isinstance(node.value, Call)
     matcher.apply(from_table, migration_index, node.value)

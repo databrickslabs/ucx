@@ -1,23 +1,21 @@
 from __future__ import annotations
 
 import abc
-import ast
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 from typing import cast
 
-from astroid import NodeNG  # type: ignore
+from astroid import ImportFrom, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
-    ASTLinter,
     DbutilsLinter,
     ImportSource,
-    NodeBase,
     NotebookRunCall,
     SysPathChange,
 )
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -171,12 +169,12 @@ class DependencyGraph:
             A list of dependency problems; position information is relative to the python code itself.
         """
         problems: list[DependencyProblem] = []
-        linter = ASTLinter.parse(python_code)
-        syspath_changes = DbutilsLinter.list_sys_path_changes(linter)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(linter)
+        tree = Tree.parse(python_code)
+        syspath_changes = SysPathChange.extract_from_tree(tree)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
         import_sources: list[ImportSource]
         import_problems: list[DependencyProblem]
-        import_sources, import_problems = DbutilsLinter.list_import_sources(linter, DependencyProblem.from_node)
+        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(cast(list[DependencyProblem], import_problems))
         nodes = syspath_changes + run_calls + import_sources
         # need to execute things in intertwined sequence so concat and sort
@@ -202,7 +200,9 @@ class DependencyGraph:
             else:
                 yield from self.register_notebook(Path(strpath))
         if isinstance(base_node, ImportSource):
-            prefix = ("." * base_node.node.level) if isinstance(base_node.node, ast.ImportFrom) else ""
+            prefix = ""
+            if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
+                prefix = "." * base_node.node.level
             name = base_node.name or ""
             yield from self.register_import(prefix + name)
 
