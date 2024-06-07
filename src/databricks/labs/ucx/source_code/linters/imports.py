@@ -116,7 +116,7 @@ class DbutilsLinter(Linter):
         if None in paths:
             return Advisory.from_node(
                 'dbutils-notebook-run-dynamic',
-                "Path for 'dbutils.notebook.run' is too complex and requires adjusting the notebook path(s)",
+                "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
                 node=node,
             )
         return Advisory.from_node(
