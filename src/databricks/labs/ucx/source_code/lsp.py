@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Position:
+    # LSP uses 0-based line and character positions.
     line: int
     character: int
 
