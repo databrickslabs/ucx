@@ -1,5 +1,5 @@
 """
-These tests uses part of unit testing framework to mock the path lookup, and the only reason it"s integration tests
+These tests uses part of unit testing framework to mock the path lookup, and the only reason it's integration tests
 because it uses the context and the time it takes to run the test.
 """
 
