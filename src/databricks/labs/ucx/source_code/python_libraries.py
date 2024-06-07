@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import shlex
 import tempfile
 import zipfile
 from collections.abc import Callable
@@ -85,14 +86,15 @@ class PythonLibraryResolver(LibraryResolver):
         return libs, args
 
     def _install_pip(self, *libraries: str, installation_arguments: list[str]) -> list[DependencyProblem]:
+        venv = self._temporary_virtual_environment
         install_commands = []
         if len(installation_arguments) == 0:
             for library in libraries:
-                install_command = f"pip install {library} -t {self._temporary_virtual_environment}"
+                install_command = f"pip install {shlex.quote(library)} -t {venv}"
                 install_commands.append(install_command)
         else:
             # pip allows multiple target directories in its call, it uses the last one, thus the one added here
-            install_command = f"pip install {' '.join(installation_arguments)} -t {self._temporary_virtual_environment}"
+            install_command = f"pip install {shlex.join(installation_arguments)} -t {venv}"
             install_commands.append(install_command)
         problems = []
         for install_command in install_commands:
