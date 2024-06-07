@@ -82,6 +82,8 @@ class TableToMigrate:
 class TableMapping:
     FILENAME = 'mapping.csv'
     UCX_SKIP_PROPERTY = "databricks.labs.ucx.skip"
+    UCX_MIGRATE_ERROR_PROPERTY = "databricks.labs.ucx.upgrade_error"
+    UCX_ACL_ERROR_PROPERTY = "databricks.labs.ucx.acl_error"
 
     def __init__(
         self,
