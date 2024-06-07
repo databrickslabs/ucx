@@ -185,11 +185,16 @@ class DependencyGraph:
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
         if isinstance(base_node, NotebookRunCall):
-            strpath = base_node.get_notebook_path()
-            if strpath is None:
-                yield DependencyProblem('dependency-not-constant', "Can't check dependency not provided as a constant")
+            paths = base_node.get_notebook_paths()
+            if None in paths:
+                yield DependencyProblem(
+                    'dependency-too-complex',
+                    f"Can't check dependency from {base_node.node.as_string()} because the expression is too complex",
+                )
             else:
-                yield from self.register_notebook(Path(strpath))
+                for path in paths:
+                    assert isinstance(path, str)
+                    yield from self.register_notebook(Path(path))
         if isinstance(base_node, ImportSource):
             prefix = ""
             if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:

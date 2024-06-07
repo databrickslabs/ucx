@@ -1,3 +1,6 @@
+import functools
+import operator
+
 import pytest
 from astroid import Attribute, Call, Const, Expr  # type: ignore
 
@@ -94,12 +97,27 @@ def test_tree_walks_nodes_once():
 name = "xyz"
 dbutils.notebook.run(name)
 """,
-            "xyz",
-        )
+            ["xyz"],
+        ),
+        (
+            """
+name = "xyz" + "-" + "abc"
+dbutils.notebook.run(name)
+""",
+            ["xyz-abc"],
+        ),
+        (
+            """
+names = ["abc", "xyz"]
+for name in names:
+    dbutils.notebook.run(name)
+""",
+            ["abc", "xyz"],
+        ),
     ],
 )
-def test_infers_string_variable_value(code, expected):
+def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
     tree = Tree.parse(code)
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
-    actual = list(call.get_notebook_path() for call in calls)
-    assert [expected] == actual
+    actual = functools.reduce(operator.iconcat, list(call.get_notebook_paths() for call in calls), [])
+    assert expected == actual

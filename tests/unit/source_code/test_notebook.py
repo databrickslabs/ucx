@@ -7,6 +7,7 @@ from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
@@ -215,23 +216,21 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup):
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
-    linter = DbutilsLinter()
-    advices = list(linter.lint(sources[0]))
-    assert [
-        Advisory(
-            code='dbutils-notebook-run-dynamic',
-            message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            start_line=14,
-            start_col=13,
-            end_line=14,
-            end_col=50,
-        )
-    ] == advices
+def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup):
+    path = "run_notebooks.py"
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolver = ImportFileResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver([], notebook_resolver, import_resolver, mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(path))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    container.build_dependency_graph(graph)
+    expected_paths = [path, "leaf1.py", "leaf2.py", "leaf3.py"]
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
 
 
-def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
+def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code():
     sources: list[str] = _load_sources(SourceContainer, "root4.py")
     linter = DbutilsLinter()
     advices = list(linter.lint(sources[0]))
@@ -247,7 +246,7 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code_():
     ] == advices
 
 
-def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code_():
+def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code():
     source = """
 import stuff
 do_something_with_stuff(stuff)
@@ -268,3 +267,14 @@ stuff2 = notebook.run("where is notebook 1?")
     linter = DbutilsLinter()
     advices = list(linter.lint(source))
     assert len(advices) == 0
+
+
+def test_raises_advice_when_dbutils_notebook_run_is_too_complex():
+    source = """
+name = "xyz"
+dbutils.notebook.run(f"Hey {name}")
+    """
+    linter = DbutilsLinter()
+    advices = list(linter.lint(source))
+    assert len(advices) == 1
+    assert advices[0].code == "dbutils-notebook-run-dynamic"

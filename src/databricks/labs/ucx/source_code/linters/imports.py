@@ -9,6 +9,7 @@ from astroid import (  # type: ignore
     Attribute,
     Call,
     Const,
+    InferenceError,
     Import,
     ImportFrom,
     Name,
@@ -83,12 +84,23 @@ class NotebookRunCall(NodeBase):
     def __init__(self, node: Call):
         super().__init__(node)
 
-    def get_notebook_path(self) -> str | None:
-        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(cast(Call, self.node))
-        inferred = next(node.infer(), None)
-        if isinstance(inferred, Const):
-            return inferred.value.strip().strip("'").strip('"')
-        return None
+    def get_notebook_paths(self) -> list[str | None]:
+        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
+        try:
+            return self._get_notebook_paths(node.infer())
+        except InferenceError:
+            logger.debug(f"Can't infer value(s) of {node.as_string()}")
+            return [None]
+
+    @classmethod
+    def _get_notebook_paths(cls, nodes: Iterable[NodeNG]) -> list[str | None]:
+        paths: list[str | None] = []
+        for node in nodes:
+            if isinstance(node, Const):
+                paths.append(node.as_string().strip("'").strip("'"))
+                continue
+            paths.append(None)
+        return paths
 
 
 T = TypeVar("T", bound=Callable)
@@ -104,19 +116,20 @@ class DbutilsLinter(Linter):
     @classmethod
     def _convert_dbutils_notebook_run_to_advice(cls, node: NodeNG) -> Advisory:
         assert isinstance(node, Call)
-        path = cls.get_dbutils_notebook_run_path_arg(node)
-        if isinstance(path, Const):
+        call = NotebookRunCall(cast(Call, node))
+        paths = call.get_notebook_paths()
+        if None in paths:
             return Advisory(
-                'dbutils-notebook-run-literal',
-                "Call to 'dbutils.notebook.run' will be migrated automatically",
+                'dbutils-notebook-run-dynamic',
+                "Path for 'dbutils.notebook.run' is too complex and requires adjusting the notebook path(s)",
                 node.lineno,
                 node.col_offset,
                 node.end_lineno or 0,
                 node.end_col_offset or 0,
             )
         return Advisory(
-            'dbutils-notebook-run-dynamic',
-            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
+            'dbutils-notebook-run-literal',
+            "Call to 'dbutils.notebook.run' will be migrated automatically",
             node.lineno,
             node.col_offset,
             node.end_lineno or 0,

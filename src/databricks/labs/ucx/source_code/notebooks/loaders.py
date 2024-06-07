@@ -14,7 +14,7 @@ from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
 )
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
-from databricks.labs.ucx.source_code.notebooks.sources import Notebook
+from databricks.labs.ucx.source_code.notebooks.sources import Notebook, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
@@ -55,17 +55,20 @@ class NotebookLoader(DependencyLoader, abc.ABC):
         except NotFound:
             logger.warning(f"Could not read notebook from workspace: {absolute_path}")
             return None
-        language = self._detect_language(content)
+        language = self._detect_language(absolute_path, content)
         if not language:
             logger.warning(f"Could not detect language for {absolute_path}")
             return None
         return Notebook.parse(absolute_path, content, language)
 
     @staticmethod
-    def _detect_language(content: str):
-        for language in CellLanguage:
-            if content.startswith(language.file_magic_header):
-                return language.language
+    def _detect_language(path: Path, content: str):
+        language = SUPPORTED_EXTENSION_LANGUAGES.get(path.suffix, None)
+        if language:
+            return language
+        for cell_language in CellLanguage:
+            if content.startswith(cell_language.file_magic_header):
+                return cell_language.language
         return None
 
     @staticmethod
