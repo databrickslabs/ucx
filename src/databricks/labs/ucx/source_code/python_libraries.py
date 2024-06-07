@@ -106,7 +106,7 @@ class PythonLibraryResolver(LibraryResolver):
             # Not a "real" install, though, the best effort to still lint eggs without dependencies
             with zipfile.ZipFile(library, "r") as zip_ref:
                 zip_ref.extractall(library_folder)
-        except zipfile.BadZipfile as e:
+        except (zipfile.BadZipfile, FileNotFoundError) as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return [problem]
         return []
