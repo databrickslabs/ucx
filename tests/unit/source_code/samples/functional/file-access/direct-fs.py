@@ -9,7 +9,7 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 
 # COMMAND ----------
 
-# ucx[dbfs-query:+1:0:+1:1024] The use of DBFS is deprecated: dbfs:/mnt/foo
+# ucx[dbfs-query:+0:0:+0:1024] The use of DBFS is deprecated: dbfs:/mnt/foo
 # MAGIC %sql  SELECT * FROM csv.`dbfs:/mnt/foo`
 
 # COMMAND ----------
@@ -18,7 +18,7 @@ display(spark.read.csv('/mnt/things/e/f/g'))
 
 # COMMAND ----------
 
-# ucx[dbfs-query:+1:0:+1:1024] The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g
+# ucx[dbfs-query:+0:0:+0:1024] The use of DBFS is deprecated: dbfs:/mnt/bar/e/f/g
 # MAGIC %sql
 # MAGIC SELECT * FROM
 # MAGIC   csv.`dbfs:/mnt/bar/e/f/g`
