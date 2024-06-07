@@ -55,3 +55,15 @@ def test_pip_resolver_resolves_library_with_known_problems(mock_path_lookup):
 
     assert len(problems) == 1
     assert problems[0].code == "direct-filesystem-access"
+
+
+def test_pip_resolver_installs_with_command(mock_path_lookup):
+    def mock_pip_install(_):
+        return 0, "", ""
+
+    pip_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
+    problems = pip_resolver.register_library(
+        mock_path_lookup, "library.whl", installation_arguments=["library.whl", "--verbose"]
+    )
+
+    assert len(problems) == 0
