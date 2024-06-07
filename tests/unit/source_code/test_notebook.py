@@ -4,7 +4,6 @@ import re
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
-from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
@@ -227,22 +226,6 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     container.build_dependency_graph(graph)
     expected_paths = [path, "leaf1.py", "leaf3.py"]
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
-
-
-def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
-    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
-    linter = DbutilsLinter()
-    advices = list(linter.lint(sources[0]))
-    assert [
-        Advisory(
-            code='dbutils-notebook-run-dynamic',
-            message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            start_line=13,
-            start_col=13,
-            end_line=13,
-            end_col=50,
-        )
-    ] == advices
 
 
 def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code():

@@ -1,10 +1,7 @@
-import functools
-import operator
 
 import pytest
 from astroid import Attribute, Call, Const, Expr  # type: ignore
 
-from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
@@ -87,37 +84,3 @@ def test_tree_walks_nodes_once():
         nodes.add(node)
         count += 1
     assert len(nodes) == count
-
-
-@pytest.mark.parametrize(
-    "code, expected",
-    [
-        (
-            """
-name = "xyz"
-dbutils.notebook.run(name)
-""",
-            ["xyz"],
-        ),
-        (
-            """
-name = "xyz" + "-" + "abc"
-dbutils.notebook.run(name)
-""",
-            ["xyz-abc"],
-        ),
-        (
-            """
-names = ["abc", "xyz"]
-for name in names:
-    dbutils.notebook.run(name)
-""",
-            ["abc", "xyz"],
-        ),
-    ],
-)
-def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
-    tree = Tree.parse(code)
-    calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
-    actual = functools.reduce(operator.iconcat, list(call.get_notebook_paths() for call in calls), [])
-    assert expected == actual

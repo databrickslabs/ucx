@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import functools
+import operator
+
+import pytest
+
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
@@ -132,3 +137,37 @@ sys.path.append(stuff("relative_path"))
     tree = Tree.parse(code)
     appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        (
+            """
+name = "xyz"
+dbutils.notebook.run(name)
+""",
+            ["xyz"],
+        ),
+        (
+            """
+name = "xyz" + "-" + "abc"
+dbutils.notebook.run(name)
+""",
+            ["xyz-abc"],
+        ),
+        (
+            """
+names = ["abc", "xyz"]
+for name in names:
+    dbutils.notebook.run(name)
+""",
+            ["abc", "xyz"],
+        ),
+    ],
+)
+def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
+    tree = Tree.parse(code)
+    calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+    actual = functools.reduce(operator.iconcat, list(call.get_notebook_paths() for call in calls), [])
+    assert expected == actual
