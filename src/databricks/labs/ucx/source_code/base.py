@@ -5,6 +5,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from typing_extensions import Self
+
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -28,7 +30,7 @@ class Advice:
     end_col: int
 
     def replace(
-        self,
+        self: Self,
         code: str | None = None,
         message: str | None = None,
         start_line: int | None = None,
@@ -36,7 +38,7 @@ class Advice:
         end_line: int | None = None,
         end_col: int | None = None,
     ) -> Self:
-        return self.__class__(
+        return type(self)(
             code=code if code is not None else self.code,
             message=message if message is not None else self.message,
             start_line=start_line if start_line is not None else self.start_line,
