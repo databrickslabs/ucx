@@ -101,7 +101,7 @@ class PythonLibraryResolver(LibraryResolver):
             if len(missing_libraries) > 0:
                 problem = DependencyProblem(
                     "library-install-failed",
-                    f"Missing libraries '{missing_libraries} in installation command '{install_command}'",
+                    f"Missing libraries '{missing_libraries}' in installation command '{install_command}'",
                 )
                 problems.append(problem)
         for install_command in install_commands:
