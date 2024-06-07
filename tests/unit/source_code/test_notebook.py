@@ -230,6 +230,20 @@ def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup):
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
 
 
+def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_lookup):
+    path = "run_notebooks_with_fstring.py"
+    notebook_loader = NotebookLoader()
+    notebook_resolver = NotebookResolver(notebook_loader)
+    import_resolver = ImportFileResolver(FileLoader(), Whitelist())
+    dependency_resolver = DependencyResolver([], notebook_resolver, import_resolver, mock_path_lookup)
+    maybe = dependency_resolver.resolve_notebook(mock_path_lookup, Path(path))
+    graph = DependencyGraph(maybe.dependency, None, dependency_resolver, mock_path_lookup)
+    container = maybe.dependency.load(mock_path_lookup)
+    container.build_dependency_graph(graph)
+    expected_paths = [path, "leaf1.py", "leaf3.py"]
+    assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
+
+
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code():
     sources: list[str] = _load_sources(SourceContainer, "root4.py")
     linter = DbutilsLinter()

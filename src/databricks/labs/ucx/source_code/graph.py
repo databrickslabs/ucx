@@ -183,8 +183,10 @@ class DependencyGraph:
     def _process_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
+            return
         if isinstance(base_node, NotebookRunCall):
             yield from self._register_notebook(base_node)
+            return
         if isinstance(base_node, ImportSource):
             prefix = ""
             if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
