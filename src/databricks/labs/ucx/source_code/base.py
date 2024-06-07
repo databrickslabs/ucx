@@ -35,7 +35,7 @@ class Advice:
         start_col: int | None = None,
         end_line: int | None = None,
         end_col: int | None = None,
-    ) -> 'Advice':
+    ) -> Self:
         return self.__class__(
             code=code if code is not None else self.code,
             message=message if message is not None else self.message,
