@@ -10,7 +10,7 @@ import pytest
 from tests.unit.conftest import MockPathLookup
 
 
-@pytest.mark.parametrize("notebook", ("pip_install_demo_wheel", "pip_install_demo_wheel_newline"))
+@pytest.mark.parametrize("notebook", ("pip_install_demo_wheel_and_pytest", ))
 def test_build_notebook_dependency_graphs_installs_wheel_with_pip_cell_in_notebook(simple_ctx, notebook):
     ctx = simple_ctx.replace(path_lookup=MockPathLookup())
 

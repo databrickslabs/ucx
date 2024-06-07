@@ -4,7 +4,7 @@
 
 # MAGIC %pip install \
 # MAGIC    distribution/dist/thingy-0.0.1-py2.py3-none-any.whl \
-# MAGIC    distribution/dist/thingy-0.0.1.tar.gz
+# MAGIC    pytest
 
 # COMMAND ----------
 
