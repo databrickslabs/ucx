@@ -212,7 +212,7 @@ class PipCell(Cell):
         """Split pip cell code into multiple arguments
 
         Note:
-            PipCell should be a pip command, i.e. single line possible spanning multilines escaped with backslashes (\).
+            PipCell should be a pip command, i.e. single line possible spanning multilines escaped with backslashes.
 
         Sources:
             https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
