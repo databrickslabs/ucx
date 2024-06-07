@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-
-import pytest
-
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
@@ -135,6 +132,17 @@ sys.path.append(stuff("relative_path"))
     tree = Tree.parse(code)
     appended = SysPathChange.extract_from_tree(tree)
     assert "relative_path" in [p.path for p in appended]
+
+
+def test_linter_returns_inferred_paths():
+    code = """
+import sys
+path = "absolute_path_1"
+sys.path.append(path)
+"""
+    tree = Tree.parse(code)
+    appended = SysPathChange.extract_from_tree(tree)
+    assert ["absolute_path_1"] == [p.path for p in appended]
 
 
 @pytest.mark.parametrize(
