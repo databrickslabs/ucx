@@ -42,17 +42,17 @@ for i in range(10):
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
-            start_line=2,
+            start_line=1,
             start_col=0,
-            end_line=2,
+            end_line=1,
             end_col=34,
         ),
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=4,
+            start_line=3,
             start_col=13,
-            end_line=4,
+            end_line=3,
             end_col=50,
         ),
     ] == list(sqf.lint(old_code))
@@ -72,17 +72,17 @@ for i in range(10):
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
-            start_line=2,
+            start_line=1,
             start_col=0,
-            end_line=2,
+            end_line=1,
             end_col=34,
         ),
         Deprecation(
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
-            start_line=4,
+            start_line=3,
             start_col=13,
-            end_line=4,
+            end_line=3,
             end_col=71,
         ),
     ] == list(sqf.lint(old_code))
@@ -128,9 +128,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=34,
                 )
             ],
@@ -142,9 +142,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3n://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=71,
                 )
             ],
@@ -156,9 +156,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=33,
                 )
             ],
@@ -170,9 +170,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: wasb://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=37,
                 )
             ],
@@ -184,9 +184,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: wasbs://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=45,
                 )
             ],
@@ -198,9 +198,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: abfs://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=39,
                 )
             ],
@@ -212,9 +212,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: wasb://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=73,
                 )
             ],
@@ -226,9 +226,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: wasbs://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=38,
                 )
             ],
@@ -240,9 +240,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: abfs://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=36,
                 )
             ],
@@ -260,9 +260,9 @@ for i in range(10):
                     code='direct-filesystem-access',
                     message='The use of direct filesystem references is deprecated: '
                     "s3a://your_bucket_name/your_directory/",
-                    start_line=1,
+                    start_line=0,
                     start_col=1,
-                    end_line=3,
+                    end_line=2,
                     end_col=59,
                 )
             ],
@@ -274,9 +274,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: abfss://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=38,
                 )
             ],
@@ -288,9 +288,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: dbfs://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=36,
                 )
             ],
@@ -302,9 +302,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: hdfs://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=40,
                 )
             ],
@@ -316,9 +316,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: file://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=38,
                 )
             ],
@@ -330,9 +330,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of default dbfs: references is deprecated: /bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=31,
                 )
             ],
@@ -344,9 +344,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=34,
                 )
             ],
@@ -358,9 +358,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=38,
                 )
             ],
@@ -372,9 +372,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=40,
                 )
             ],
@@ -386,9 +386,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=40,
                 )
             ],
@@ -400,9 +400,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=37,
                 )
             ],
@@ -414,9 +414,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=43,
                 )
             ],
@@ -428,9 +428,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=37,
                 )
             ],
@@ -442,9 +442,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=43,
                 )
             ],
@@ -456,9 +456,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=49,
                 )
             ],
@@ -470,9 +470,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=43,
                 )
             ],
@@ -484,9 +484,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=45,
                 )
             ],
@@ -498,9 +498,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=41,
                 )
             ],
@@ -512,9 +512,9 @@ for i in range(10):
                 Deprecation(
                     code='direct-filesystem-access',
                     message="The use of direct filesystem references is deprecated: s3a://bucket/path",
-                    start_line=1,
+                    start_line=0,
                     start_col=0,
-                    end_line=1,
+                    end_line=0,
                     end_col=41,
                 )
             ],

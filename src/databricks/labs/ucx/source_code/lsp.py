@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Position:
+    # LSP uses 0-based line and character positions.
     line: int
     character: int
 
@@ -52,7 +53,7 @@ class Range:
 
     @classmethod
     def make(cls, start_line: int, start_character: int, end_line: int, end_character: int) -> 'Range':
-        return cls(start=Position(start_line - 1, start_character), end=Position(end_line - 1, end_character))
+        return cls(start=Position(start_line, start_character), end=Position(end_line, end_character))
 
     def as_dict(self) -> dict:
         return {"start": self.start.as_dict(), "end": self.end.as_dict()}
