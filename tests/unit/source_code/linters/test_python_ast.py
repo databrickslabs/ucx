@@ -1,4 +1,3 @@
-
 import pytest
 from astroid import Attribute, Call, Const, Expr  # type: ignore
 
