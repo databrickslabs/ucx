@@ -5,6 +5,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from astroid import NodeNG  # type: ignore
+from typing_extensions import Self
+
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -21,21 +24,22 @@ from pathlib import Path
 class Advice:
     code: str
     message: str
+    # Lines and columns are both 0-based: the first line is line 0.
     start_line: int
     start_col: int
     end_line: int
     end_col: int
 
     def replace(
-        self,
+        self: Self,
         code: str | None = None,
         message: str | None = None,
         start_line: int | None = None,
         start_col: int | None = None,
         end_line: int | None = None,
         end_col: int | None = None,
-    ) -> 'Advice':
-        return self.__class__(
+    ) -> Self:
+        return type(self)(
             code=code if code is not None else self.code,
             message=message if message is not None else self.message,
             start_line=start_line if start_line is not None else self.start_line,
@@ -58,6 +62,27 @@ class Advice:
 
     def for_path(self, path: Path) -> LocatedAdvice:
         return LocatedAdvice(self, path)
+
+    @classmethod
+    def from_node(cls, code: str, message: str, node: NodeNG) -> Self:
+        # Astroid lines are 1-based.
+        return cls(
+            code=code,
+            message=message,
+            start_line=(node.lineno or 1) - 1,
+            start_col=node.col_offset or 0,
+            end_line=(node.end_lineno or 1) - 1,
+            end_col=node.end_col_offset,
+        )
+
+    def replace_from_node(self, node: NodeNG) -> Self:
+        # Astroid lines are 1-based.
+        return self.replace(
+            start_line=(node.lineno or 1) - 1,
+            start_col=node.col_offset,
+            end_line=(node.end_lineno or 1) - 1,
+            end_col=node.end_col_offset,
+        )
 
 
 @dataclass

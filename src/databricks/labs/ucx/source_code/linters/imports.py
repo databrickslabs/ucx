@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import logging
-from collections.abc import Iterable, Callable
+from collections.abc import Callable, Iterable
 from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
@@ -21,12 +21,15 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, T
 
 logger = logging.getLogger(__name__)
 
+P = TypeVar("P")
+ProblemFactory = Callable[[str, str, NodeNG], P]
+
 
 class ImportSource(NodeBase):
 
     @classmethod
-    def extract_from_tree(cls, tree: Tree, problem_type: T) -> tuple[list[ImportSource], list[T]]:
-        problems: list[T] = []
+    def extract_from_tree(cls, tree: Tree, problem_factory: ProblemFactory) -> tuple[list[ImportSource], list[P]]:
+        problems: list[P] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
             nodes = tree.locate(Import, [])
@@ -37,11 +40,11 @@ class ImportSource(NodeBase):
                 sources.append(source)
             nodes = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
             nodes.extend(tree.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
-            for source in cls._make_sources_for_import_call_nodes(nodes, problem_type, problems):
+            for source in cls._make_sources_for_import_call_nodes(nodes, problem_factory, problems):
                 sources.append(source)
             return sources, problems
         except Exception as e:  # pylint: disable=broad-except
-            problem = problem_type('internal-error', f"While checking imports: {e}")
+            problem = problem_factory('internal-error', f"While checking imports: {e}", tree.root)
             problems.append(problem)
             return [], problems
 
@@ -58,19 +61,14 @@ class ImportSource(NodeBase):
             yield ImportSource(node, node.modname)
 
     @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_type: T, problems: list[T]):
+    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[P]):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
                 yield ImportSource(node, arg.value)
                 continue
-            problem = problem_type(
-                'dependency-not-constant',
-                "Can't check dependency not provided as a constant",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+            problem = problem_factory(
+                'dependency-not-constant', "Can't check dependency not provided as a constant", node
             )
             problems.append(problem)
 
@@ -103,9 +101,6 @@ class NotebookRunCall(NodeBase):
         return paths
 
 
-T = TypeVar("T", bound=Callable)
-
-
 class DbutilsLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
@@ -119,21 +114,15 @@ class DbutilsLinter(Linter):
         call = NotebookRunCall(cast(Call, node))
         paths = call.get_notebook_paths()
         if None in paths:
-            return Advisory(
+            return Advisory.from_node(
                 'dbutils-notebook-run-dynamic',
                 "Path for 'dbutils.notebook.run' is too complex and requires adjusting the notebook path(s)",
-                node.lineno,
-                node.col_offset,
-                node.end_lineno or 0,
-                node.end_col_offset or 0,
+                node=node,
             )
-        return Advisory(
+        return Advisory.from_node(
             'dbutils-notebook-run-literal',
             "Call to 'dbutils.notebook.run' will be migrated automatically",
-            node.lineno,
-            node.col_offset,
-            node.end_lineno or 0,
-            node.end_col_offset or 0,
+            node=node,
         )
 
     @staticmethod

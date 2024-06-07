@@ -14,6 +14,7 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 @dataclass
 class Position:
+    # Lines and columns are both 0-based.
     line: int
     character: int
 
@@ -63,10 +64,11 @@ class NoFormatPythonMatcher:
             # i.e., found an explicit ".format(...)" call in this chain.
             return None
 
-        # Finally: matched the need for advice, so return the corresponding source range:
+        # Finally: matched the need for advice, so return the corresponding source range.
+        # Note that astroid line numbers are 1-based.
         return Range(
-            Position(node.lineno, node.col_offset),
-            Position(node.end_lineno or 0, node.end_col_offset or 0),
+            Position(node.lineno - 1, node.col_offset),
+            Position((node.end_lineno or 1) - 1, node.end_col_offset or 0),
         )
 
 

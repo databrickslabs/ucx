@@ -228,6 +228,20 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     expected_paths = [path, "leaf1.py", "leaf3.py"]
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
 
+def test_detects_manual_migration_in_dbutils_notebook_run_in_python_code_():
+    sources: list[str] = _load_sources(SourceContainer, "run_notebooks.py")
+    linter = DbutilsLinter()
+    advices = list(linter.lint(sources[0]))
+    assert [
+        Advisory(
+            code='dbutils-notebook-run-dynamic',
+            message="Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
+            start_line=13,
+            start_col=13,
+            end_line=13,
+            end_col=50,
+        )
+    ] == advices
 
 def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code():
     sources: list[str] = _load_sources(SourceContainer, "root4.py")
@@ -237,9 +251,9 @@ def test_detects_automatic_migration_in_dbutils_notebook_run_in_python_code():
         Advisory(
             code='dbutils-notebook-run-literal',
             message="Call to 'dbutils.notebook.run' will be migrated automatically",
-            start_line=2,
+            start_line=1,
             start_col=0,
-            end_line=2,
+            end_line=1,
             end_col=34,
         )
     ] == advices
