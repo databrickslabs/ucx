@@ -192,7 +192,7 @@ class DependencyGraph:
         elif isinstance(base_node, ImportSource):
             yield from self._register_import(base_node)
         else:
-            logger.error(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
+            logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
 
     def _register_import(self, base_node: ImportSource):
         prefix = ""
