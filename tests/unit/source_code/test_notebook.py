@@ -8,6 +8,7 @@ from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContain
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.notebooks.sources import Notebook
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
@@ -236,8 +237,9 @@ stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
     linter = DbutilsLinter()
-    advices = list(linter.lint(source))
-    assert len(advices) == 2
+    tree = Tree.parse(source)
+    nodes = linter.list_dbutils_notebook_run_calls(tree)
+    assert len(nodes) == 2
 
 
 def test_does_not_detect_partial_call_to_dbutils_notebook_run_in_python_code_():
@@ -247,8 +249,9 @@ do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
     linter = DbutilsLinter()
-    advices = list(linter.lint(source))
-    assert len(advices) == 0
+    tree = Tree.parse(source)
+    nodes = linter.list_dbutils_notebook_run_calls(tree)
+    assert len(nodes) == 0
 
 
 def test_raises_advice_when_dbutils_notebook_run_is_too_complex():

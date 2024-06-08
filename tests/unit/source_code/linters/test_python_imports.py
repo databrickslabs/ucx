@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import functools
-import operator
 
 import pytest
 
@@ -164,10 +162,21 @@ for name in names:
 """,
             ["abc", "xyz"],
         ),
+(
+            """
+def foo(): return "bar"
+name = foo()
+dbutils.notebook.run(name)
+""",
+            ["bar"],
+        ),
     ],
 )
 def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
     tree = Tree.parse(code)
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
-    actual = functools.reduce(operator.iconcat, list(call.get_notebook_paths() for call in calls), [])
-    assert expected == actual
+    all_paths: list[str] = []
+    for call in calls:
+        _, paths = call.get_notebook_paths()
+        all_paths.extend(paths)
+    assert all_paths == expected

@@ -82,7 +82,7 @@ class NotebookRunCall(NodeBase):
     def __init__(self, node: Call):
         super().__init__(node)
 
-    def get_notebook_paths(self) -> list[str | None]:
+    def get_notebook_paths(self) -> tuple[bool, list[str]]:
         """we return multiple paths because astroid can infer them in scenarios such as:
         paths = ["p1", "p2"]
         for path in paths:
@@ -93,17 +93,19 @@ class NotebookRunCall(NodeBase):
             return self._get_notebook_paths(node.infer())
         except InferenceError:
             logger.debug(f"Can't infer value(s) of {node.as_string()}")
-            return [None]
+            return True, []
 
     @classmethod
-    def _get_notebook_paths(cls, nodes: Iterable[NodeNG]) -> list[str | None]:
-        paths: list[str | None] = []
+    def _get_notebook_paths(cls, nodes: Iterable[NodeNG]) -> tuple[bool, list[str]]:
+        has_unresolved = False
+        paths: list[str] = []
         for node in nodes:
             if isinstance(node, Const):
                 paths.append(node.as_string().strip("'").strip('"'))
                 continue
-            paths.append(None)
-        return paths
+            logger.debug(f"Can't compute {type(node).__name__}")
+            has_unresolved = True
+        return has_unresolved, paths
 
 
 class DbutilsLinter(Linter):
@@ -111,24 +113,22 @@ class DbutilsLinter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         tree = Tree.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
-        return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
+        for node in nodes:
+            yield from self._raise_advice_if_unresolved(node.node)
 
     @classmethod
-    def _convert_dbutils_notebook_run_to_advice(cls, node: NodeNG) -> Advisory:
+    def _raise_advice_if_unresolved(cls, node: NodeNG) -> Iterable[Advice]:
         assert isinstance(node, Call)
         call = NotebookRunCall(cast(Call, node))
-        paths = call.get_notebook_paths()
-        if None in paths:
-            return Advisory.from_node(
-                'dbutils-notebook-run-dynamic',
-                "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
-                node=node,
-            )
-        return Advisory.from_node(
-            'dbutils-notebook-run-literal',
-            "Call to 'dbutils.notebook.run' will be migrated automatically",
-            node=node,
-        )
+        has_unresolved, _ = call.get_notebook_paths()
+        if has_unresolved:
+            yield from [
+                Advisory.from_node(
+                    'dbutils-notebook-run-dynamic',
+                    "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
+                    node=node,
+                )
+            ]
 
     @staticmethod
     def get_dbutils_notebook_run_path_arg(node: Call):
