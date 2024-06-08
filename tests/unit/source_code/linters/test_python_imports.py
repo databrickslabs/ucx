@@ -162,7 +162,7 @@ for name in names:
 """,
             ["abc", "xyz"],
         ),
-(
+        (
             """
 def foo(): return "bar"
 name = foo()
