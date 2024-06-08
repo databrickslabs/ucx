@@ -191,18 +191,26 @@ class DependencyGraph:
     def _process_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
             self._mutate_path_lookup(base_node)
+            return
         if isinstance(base_node, NotebookRunCall):
-            strpath = base_node.get_notebook_path()
-            if strpath is None:
-                yield DependencyProblem('dependency-not-constant', "Can't check dependency not provided as a constant")
-            else:
-                yield from self.register_notebook(Path(strpath))
+            yield from self._register_notebook(base_node)
+            return
         if isinstance(base_node, ImportSource):
             prefix = ""
             if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
                 prefix = "." * base_node.node.level
             name = base_node.name or ""
             yield from self.register_import(prefix + name)
+
+    def _register_notebook(self, base_node: NotebookRunCall):
+        has_unresolved, paths = base_node.get_notebook_paths()
+        if has_unresolved:
+            yield DependencyProblem(
+                'dependency-cannot-compute',
+                f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
+            )
+        for path in paths:
+            yield from self.register_notebook(Path(path))
 
     def _mutate_path_lookup(self, change: SysPathChange):
         path = Path(change.path)

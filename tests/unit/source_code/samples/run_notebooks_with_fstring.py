@@ -1,9 +1,10 @@
 # Databricks notebook source
 import datetime
 # Updated List of Notebooks
+path = './leaf2.py'
 notebooks_list = [
                   './leaf1.py',
-                  './leaf2.py',
+                  f"{path}",
                   './leaf3.py',
                   ]
 # Execution:
