@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange

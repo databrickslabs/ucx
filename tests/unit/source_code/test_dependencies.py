@@ -204,8 +204,8 @@ def test_dependency_resolver_raises_problem_with_unloadable_root_notebook(mock_p
     notebook_loader = FailingNotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     pip_resolver = PythonLibraryResolver(Whitelist())
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
-    maybe = dependency_resolver.build_notebook_dependency_graph(Path("root5.py"))
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
+    maybe = resolver.build_notebook_dependency_graph(Path("root5.py"))
     assert list(maybe.problems) == [
         DependencyProblem('cannot-load-notebook', 'Could not load notebook root5.py', Path('<MISSING_SOURCE_PATH>'))
     ]
@@ -230,9 +230,9 @@ def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(mock_note
             'sys-path-cannot-compute',
             "Can't update sys.path from f'{name}' because the expression cannot be computed",
             Path('sys-path-with-fstring.py'),
-            3,
+            2,
             16,
-            3,
+            2,
             25,
         )
     ]
