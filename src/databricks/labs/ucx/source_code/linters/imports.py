@@ -233,6 +233,7 @@ class SysPathChangesVisitor(TreeVisitor):
     def _visit_inferred(self, changed: NodeNG, inferred: NodeNG, is_relative: bool, is_append: bool):
         if inferred is Uninferable or not isinstance(inferred, Const):
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
+            return
         if is_relative:
             self.sys_path_changes.append(RelativePath(changed, inferred.value, is_append))
         else:
