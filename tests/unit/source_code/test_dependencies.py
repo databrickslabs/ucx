@@ -227,12 +227,21 @@ def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(mock_note
     maybe = resolver.build_local_file_dependency_graph(Path("sys-path-with-fstring.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
-            'sys-path-cannot-compute',
-            "Can't update sys.path from f'{name}' because the expression cannot be computed",
-            Path('sys-path-with-fstring.py'),
-            2,
-            16,
-            2,
-            25,
-        )
+            code='sys-path-cannot-compute',
+            message="Can't update sys.path from f'{name_1}' because the expression cannot be computed",
+            source_path=Path('sys-path-with-fstring.py'),
+            start_line=2,
+            start_col=16,
+            end_line=2,
+            end_col=27,
+        ),
+        DependencyProblem(
+            code='sys-path-cannot-compute',
+            message="Can't update sys.path from name because the expression cannot be computed",
+            source_path=Path('sys-path-with-fstring.py'),
+            start_line=5,
+            start_col=20,
+            end_line=5,
+            end_col=24,
+        ),
     ]
