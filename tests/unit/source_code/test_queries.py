@@ -58,8 +58,8 @@ def test_use_database_change(migration_index):
     session_state = CurrentSessionState(schema="old")
     ftf = FromTable(migration_index, session_state=session_state)
     query = """
-    USE newcatalog;  
-    SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 
+    USE newcatalog;
+    SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1
     LIMIT 10"""
     _ = list(ftf.lint(query))
     assert ftf.schema == "newcatalog"

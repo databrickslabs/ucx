@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import abc
 import logging
-from collections.abc import Iterable, Callable
+from collections.abc import Callable, Iterable
 from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
     Attribute,
     Call,
     Const,
+    InferenceError,
     Import,
     ImportFrom,
     Name,
@@ -20,12 +21,15 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, T
 
 logger = logging.getLogger(__name__)
 
+P = TypeVar("P")
+ProblemFactory = Callable[[str, str, NodeNG], P]
+
 
 class ImportSource(NodeBase):
 
     @classmethod
-    def extract_from_tree(cls, tree: Tree, problem_type: T) -> tuple[list[ImportSource], list[T]]:
-        problems: list[T] = []
+    def extract_from_tree(cls, tree: Tree, problem_factory: ProblemFactory) -> tuple[list[ImportSource], list[P]]:
+        problems: list[P] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
             nodes = tree.locate(Import, [])
@@ -36,11 +40,11 @@ class ImportSource(NodeBase):
                 sources.append(source)
             nodes = tree.locate(Call, [("import_module", Attribute), ("importlib", Name)])
             nodes.extend(tree.locate(Call, [("__import__", Attribute), ("importlib", Name)]))
-            for source in cls._make_sources_for_import_call_nodes(nodes, problem_type, problems):
+            for source in cls._make_sources_for_import_call_nodes(nodes, problem_factory, problems):
                 sources.append(source)
             return sources, problems
         except Exception as e:  # pylint: disable=broad-except
-            problem = problem_type('internal-error', f"While checking imports: {e}")
+            problem = problem_factory('internal-error', f"While checking imports: {e}", tree.root)
             problems.append(problem)
             return [], problems
 
@@ -57,19 +61,14 @@ class ImportSource(NodeBase):
             yield ImportSource(node, node.modname)
 
     @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_type: T, problems: list[T]):
+    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[P]):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
                 yield ImportSource(node, arg.value)
                 continue
-            problem = problem_type(
-                'dependency-not-constant',
-                "Can't check dependency not provided as a constant",
-                start_line=node.lineno,
-                start_col=node.col_offset,
-                end_line=node.end_lineno or 0,
-                end_col=node.end_col_offset or 0,
+            problem = problem_factory(
+                'dependency-not-constant', "Can't check dependency not provided as a constant", node
             )
             problems.append(problem)
 
@@ -83,15 +82,30 @@ class NotebookRunCall(NodeBase):
     def __init__(self, node: Call):
         super().__init__(node)
 
-    def get_notebook_path(self) -> str | None:
-        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(cast(Call, self.node))
-        inferred = next(node.infer(), None)
-        if isinstance(inferred, Const):
-            return inferred.value.strip().strip("'").strip('"')
-        return None
+    def get_notebook_paths(self) -> tuple[bool, list[str]]:
+        """we return multiple paths because astroid can infer them in scenarios such as:
+        paths = ["p1", "p2"]
+        for path in paths:
+            dbutils.notebook.run(path)
+        """
+        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
+        try:
+            return self._get_notebook_paths(node.infer())
+        except InferenceError:
+            logger.debug(f"Can't infer value(s) of {node.as_string()}")
+            return True, []
 
-
-T = TypeVar("T", bound=Callable)
+    @classmethod
+    def _get_notebook_paths(cls, nodes: Iterable[NodeNG]) -> tuple[bool, list[str]]:
+        has_unresolved = False
+        paths: list[str] = []
+        for node in nodes:
+            if isinstance(node, Const):
+                paths.append(node.as_string().strip("'").strip('"'))
+                continue
+            logger.debug(f"Can't compute {type(node).__name__}")
+            has_unresolved = True
+        return has_unresolved, paths
 
 
 class DbutilsLinter(Linter):
@@ -99,29 +113,22 @@ class DbutilsLinter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         tree = Tree.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
-        return [self._convert_dbutils_notebook_run_to_advice(node.node) for node in nodes]
+        for node in nodes:
+            yield from self._raise_advice_if_unresolved(node.node)
 
     @classmethod
-    def _convert_dbutils_notebook_run_to_advice(cls, node: NodeNG) -> Advisory:
+    def _raise_advice_if_unresolved(cls, node: NodeNG) -> Iterable[Advice]:
         assert isinstance(node, Call)
-        path = cls.get_dbutils_notebook_run_path_arg(node)
-        if isinstance(path, Const):
-            return Advisory(
-                'dbutils-notebook-run-literal',
-                "Call to 'dbutils.notebook.run' will be migrated automatically",
-                node.lineno,
-                node.col_offset,
-                node.end_lineno or 0,
-                node.end_col_offset or 0,
-            )
-        return Advisory(
-            'dbutils-notebook-run-dynamic',
-            "Path for 'dbutils.notebook.run' is not a constant and requires adjusting the notebook path",
-            node.lineno,
-            node.col_offset,
-            node.end_lineno or 0,
-            node.end_col_offset or 0,
-        )
+        call = NotebookRunCall(cast(Call, node))
+        has_unresolved, _ = call.get_notebook_paths()
+        if has_unresolved:
+            yield from [
+                Advisory.from_node(
+                    'dbutils-notebook-run-dynamic',
+                    "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
+                    node=node,
+                )
+            ]
 
     @staticmethod
     def get_dbutils_notebook_run_path_arg(node: Call):
