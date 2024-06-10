@@ -1,6 +1,8 @@
 from pathlib import Path
 from unittest.mock import create_autospec
 
+import pytest
+
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
     DependencyResolver,
@@ -22,46 +24,31 @@ from tests.unit import (
 from tests.unit.conftest import MockPathLookup
 
 
-def dependency_resolver(notebook_resolver, path_lookup):
-    library_resolver = PythonLibraryResolver(Whitelist())
-    import_resolver = ImportFileResolver(FileLoader(), Whitelist())
-    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, path_lookup)
-
-
-def test_dependency_resolver_repr(mock_notebook_resolver, mock_path_lookup):
+def test_dependency_resolver_repr(simple_dependency_resolver):
     """for improving test coverage"""
-    resolver = dependency_resolver(mock_notebook_resolver, mock_path_lookup)
-    assert len(repr(resolver)) > 0
+    assert len(repr(simple_dependency_resolver)) > 0
 
 
-def test_dependency_resolver_visits_workspace_notebook_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_notebook_dependency_graph(Path("root3.run.py"))
+def test_dependency_resolver_visits_workspace_notebook_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root3.run.py"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"}
 
 
-def test_dependency_resolver_visits_local_notebook_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_notebook_dependency_graph(Path("root4.py"))
+def test_dependency_resolver_visits_local_notebook_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root4.py"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root4.py", "leaf3.py"}
 
 
-def test_dependency_resolver_visits_workspace_file_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path('./root8.py'))
+def test_dependency_resolver_visits_workspace_file_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path('./root8.py'))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {'leaf1.py', 'leaf2.py', 'root8.py'}
 
 
-def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_dependency(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_notebook_dependency_graph(Path("root1-no-leaf.run.py"))
+def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_dependency(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root1-no-leaf.run.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
             'notebook-not-found',
@@ -75,10 +62,8 @@ def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_depe
     ]
 
 
-def test_dependency_resolver_raises_problem_with_unfound_local_notebook_dependency(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_notebook_dependency_graph(Path("root4-no-leaf.py"))
+def test_dependency_resolver_raises_problem_with_unfound_local_notebook_dependency(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root4-no-leaf.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
             'notebook-not-found', 'Notebook not found: __NO_LEAF__', Path('root4-no-leaf.py'), 1, 0, 1, 37
@@ -86,44 +71,34 @@ def test_dependency_resolver_raises_problem_with_unfound_local_notebook_dependen
     ]
 
 
-def test_dependency_resolver_raises_problem_with_invalid_run_cell(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_notebook_dependency_graph(Path('leaf6.py'))
+def test_dependency_resolver_raises_problem_with_invalid_run_cell(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path('leaf6.py'))
     assert list(maybe.problems) == [
         DependencyProblem('invalid-run-cell', 'Missing notebook path in %run command', Path('leaf6.py'), 5, 0, 5, 4)
     ]
 
 
-def test_dependency_resolver_visits_recursive_file_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path("root6.py"))
+def test_dependency_resolver_visits_recursive_file_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("root6.py"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root6.py", "root5.py", "leaf4.py"}
 
 
-def test_dependency_resolver_raises_problem_with_unresolved_import(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path('root7.py'))
+def test_dependency_resolver_raises_problem_with_unresolved_import(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path('root7.py'))
     assert list(maybe.problems) == [
         DependencyProblem('import-not-found', 'Could not locate import: some_library', Path("root7.py"), 0, 0, 0, 19)
     ]
 
 
-def test_dependency_resolver_visits_file_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path("root5.py"))
+def test_dependency_resolver_visits_file_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("root5.py"))
     assert not maybe.failed
     assert maybe.graph.all_relative_names() == {"root5.py", "leaf4.py"}
 
 
-def test_dependency_resolver_skips_builtin_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path("python_builtins.py"))
+def test_dependency_resolver_skips_builtin_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py"))
     assert not maybe.failed
     graph = maybe.graph
     maybe = graph.locate_dependency(Path("os"))
@@ -132,10 +107,8 @@ def test_dependency_resolver_skips_builtin_dependencies(mock_path_lookup):
     assert maybe.failed
 
 
-def test_dependency_resolver_ignores_known_dependencies(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path("python_builtins.py"))
+def test_dependency_resolver_ignores_known_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py"))
     assert maybe.graph
     graph = maybe.graph
     maybe_graph = graph.locate_dependency(Path("databricks"))
@@ -158,19 +131,15 @@ def test_dependency_resolver_terminates_at_known_libraries(empty_index, mock_not
     assert maybe.failed
 
 
-def test_dependency_resolver_raises_problem_with_unfound_root_file(mock_path_lookup, mock_notebook_resolver):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path("non-existing.py"))
+def test_dependency_resolver_raises_problem_with_unfound_root_file(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("non-existing.py"))
     assert list(maybe.problems) == [
         DependencyProblem('file-not-found', 'File not found: non-existing.py', Path("non-existing.py"))
     ]
 
 
-def test_dependency_resolver_raises_problem_with_unfound_root_notebook(mock_path_lookup):
-    notebook_resolver = NotebookResolver(NotebookLoader())
-    resolver = dependency_resolver(notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_notebook_dependency_graph(Path("unknown_notebook"))
+def test_dependency_resolver_raises_problem_with_unfound_root_notebook(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("unknown_notebook"))
     assert list(maybe.problems) == [
         DependencyProblem('notebook-not-found', 'Notebook not found: unknown_notebook', Path("unknown_notebook"))
     ]
@@ -222,9 +191,8 @@ def test_dependency_resolver_raises_problem_with_missing_file_loader(mock_notebo
     ]
 
 
-def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(mock_notebook_resolver, mock_path_lookup):
-    resolver = dependency_resolver(mock_notebook_resolver, mock_path_lookup)
-    maybe = resolver.build_local_file_dependency_graph(Path("sys-path-with-fstring.py"))
+def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("sys-path-with-fstring.py"))
     assert list(maybe.problems) == [
         DependencyProblem(
             code='sys-path-cannot-compute',

@@ -4,6 +4,11 @@ from databricks.labs.ucx.hive_metastore.migration_status import (
     MigrationStatus,
 )
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.graph import DependencyResolver
+from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
+from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
+from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 
 
 @pytest.fixture
@@ -40,3 +45,12 @@ def extended_test_index():
             MigrationStatus('whatever', 'numbers', dst_catalog='cata4', dst_schema='counting', dst_table='numbers'),
         ]
     )
+
+
+@pytest.fixture
+def simple_dependency_resolver(mock_path_lookup):
+    whitelist = Whitelist()
+    library_resolver = PythonLibraryResolver(whitelist)
+    notebook_resolver = NotebookResolver(NotebookLoader())
+    import_resolver = ImportFileResolver(FileLoader(), whitelist)
+    return DependencyResolver(library_resolver,  notebook_resolver, import_resolver, mock_path_lookup)
