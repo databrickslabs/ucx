@@ -361,3 +361,42 @@ def test_workflow_linter_dlt_pipeline_task(graph):
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 4
     ws.assert_not_called()
+
+
+def test_xxx(graph):
+    ws = create_autospec(WorkspaceClient)
+    notebook_task = jobs.NotebookTask(
+        notebook_path="test",
+        base_parameters={"a": "b", "c": "dbfs:/mnt/foo"},
+    )
+    task = jobs.Task(
+        task_key="test",
+        job_cluster_key="main",
+        notebook_task=notebook_task,
+    )
+    job = Job(
+        settings=jobs.JobSettings(
+            job_clusters=[
+                jobs.JobCluster(
+                    job_cluster_key="main",
+                    new_cluster=compute.ClusterSpec(
+                        spark_version="15.2.x-photon-scala2.12",
+                        node_type_id="Standard_F4s",
+                        num_workers=2,
+                        data_security_mode=compute.DataSecurityMode.LEGACY_TABLE_ACL,
+                        spark_conf={"spark.databricks.cluster.profile": "singleNode"},
+                    ),
+                ),
+            ],
+        ),
+    )
+
+    workflow_task_container = WorkflowTaskContainer(ws, task, job)
+    _ = workflow_task_container.build_dependency_graph(graph)
+
+    assert workflow_task_container.named_parameters == {'a': 'b', 'c': 'dbfs:/mnt/foo'}
+    assert workflow_task_container.data_security_mode == compute.DataSecurityMode.LEGACY_TABLE_ACL
+    assert workflow_task_container.runtime_version == (15, 2)
+    assert workflow_task_container.spark_conf == {"spark.databricks.cluster.profile": "singleNode"}
+
+    ws.assert_not_called()

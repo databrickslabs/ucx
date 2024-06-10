@@ -73,7 +73,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._named_parameters: dict[str, str] | None = {}
         self._parameters: list[str] | None = []
         self._spark_conf: dict[str, str] | None = {}
-        self._runtime_version: str | None = None
+        self._spark_version: str | None = None
         self._data_security_mode = None
 
     @property
@@ -83,6 +83,13 @@ class WorkflowTaskContainer(SourceContainer):
     @property
     def spark_conf(self) -> dict[str, str]:
         return self._spark_conf or {}
+
+    @property
+    def runtime_version(self) -> tuple[int, int]:
+        version_tuple = runtime_version_tuple(self._spark_version)
+        if not version_tuple:
+            return 0, 0
+        return version_tuple
 
     @property
     def data_security_mode(self) -> compute.DataSecurityMode:
@@ -102,7 +109,6 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_pipeline_task(graph)
         yield from self._register_spark_submit_task(graph)
         yield from self._register_cluster_info()
-        yield from self._check_dbfs_paths()
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
@@ -265,36 +271,9 @@ class WorkflowTaskContainer(SourceContainer):
 
     def _new_job_cluster_metadata(self, new_cluster):
         self._spark_conf = new_cluster.spark_conf
-        self._runtime_version = runtime_version_tuple(new_cluster.spark_version)
+        self._spark_version = new_cluster.spark_version
         self._data_security_mode = new_cluster.data_security_mode
         return []
-
-    def _check_dbfs_paths(self):
-        prefixes = ('/dbfs/mnt', 'dbfs:', '/mnt/')
-        if self._parameters:
-            yield from self._check_dbfs_paths_in_parameters(prefixes)
-        if self._named_parameters:
-            yield from self._check_dbfs_paths_in_named_parameters(prefixes)
-        if self._spark_conf:
-            yield from self._check_dbfs_paths_in_spark_conf(prefixes)
-
-    def _check_dbfs_paths_in_spark_conf(self, prefixes):
-        for key, value in self._spark_conf.items():
-            for prefix in prefixes:
-                if value.startswith(prefix):
-                    yield DependencyProblem('dbfs-usage', f"Deprecated file system path in {key}: {value}")
-
-    def _check_dbfs_paths_in_named_parameters(self, prefixes):
-        for key, value in self._named_parameters.items():
-            for prefix in prefixes:
-                if value.startswith(prefix):
-                    yield DependencyProblem('dbfs-usage', f"Deprecated file system path in {key}: {value}")
-
-    def _check_dbfs_paths_in_parameters(self, prefixes):
-        for parameter in self._parameters:
-            for prefix in prefixes:
-                if parameter.startswith(prefix):
-                    yield DependencyProblem('dbfs-usage', f"Deprecated file system path: {parameter}")
 
 
 class WorkflowLinter:
