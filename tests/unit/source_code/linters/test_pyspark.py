@@ -38,10 +38,10 @@ for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert [
+    assert list(sqf.lint(old_code)) == [
         Deprecation(
             code='direct-filesystem-access',
-            message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
+            message='The use of direct filesystem references is deprecated: s3://bucket/path',
             start_line=1,
             start_col=0,
             end_line=1,
@@ -51,11 +51,11 @@ for i in range(10):
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
-            start_col=13,
+            start_col=23,
             end_line=3,
-            end_col=50,
+            end_col=49,
         ),
-    ] == list(sqf.lint(old_code))
+    ]
 
 
 def test_spark_sql_match_named(migration_index):
@@ -68,7 +68,7 @@ for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert [
+    assert list(sqf.lint(old_code)) == [
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
@@ -81,11 +81,11 @@ for i in range(10):
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
-            start_col=13,
+            start_col=44,
             end_line=3,
-            end_col=71,
+            end_col=70,
         ),
-    ] == list(sqf.lint(old_code))
+    ]
 
 
 def test_spark_table_return_value_apply(migration_index):
