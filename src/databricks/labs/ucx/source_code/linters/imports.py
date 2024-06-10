@@ -224,8 +224,7 @@ class SysPathChangesVisitor(TreeVisitor):
             relative = True
             changed = changed.args[0]
         try:
-            all_inferred = changed.inferred()
-            for inferred in all_inferred:
+            for inferred in changed.inferred():
                 self._visit_inferred(changed, inferred, relative, is_append)
         except InferenceError:
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
