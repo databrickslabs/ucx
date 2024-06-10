@@ -88,15 +88,11 @@ class PythonLibraryResolver(LibraryResolver):
     def _install_pip(self, *libraries: str, installation_arguments: list[str]) -> list[DependencyProblem]:
         problems = []
         venv = self._temporary_virtual_environment
-        install_commands = []
         if len(installation_arguments) == 0:
-            for library in libraries:
-                install_command = f"pip install {shlex.quote(library)} -t {venv}"
-                install_commands.append(install_command)
+            install_command = f"pip install {shlex.join(libraries)} -t {venv}"
         else:
             # pip allows multiple target directories in its call, it uses the last one, thus the one added here
             install_command = f"pip install {shlex.join(installation_arguments)} -t {venv}"
-            install_commands.append(install_command)
             missing_libraries = ",".join([library for library in libraries if library not in installation_arguments])
             if len(missing_libraries) > 0:
                 problem = DependencyProblem(
@@ -104,12 +100,11 @@ class PythonLibraryResolver(LibraryResolver):
                     f"Missing libraries '{missing_libraries}' in installation command '{install_command}'",
                 )
                 problems.append(problem)
-        for install_command in install_commands:
-            return_code, stdout, stderr = self._runner(install_command)
-            logger.debug(f"pip output:\n{stdout}\n{stderr}")
-            if return_code != 0:
-                problem = DependencyProblem("library-install-failed", f"'{install_command}' failed with '{stderr}'")
-                problems.append(problem)
+        return_code, stdout, stderr = self._runner(install_command)
+        logger.debug(f"pip output:\n{stdout}\n{stderr}")
+        if return_code != 0:
+            problem = DependencyProblem("library-install-failed", f"'{install_command}' failed with '{stderr}'")
+            problems.append(problem)
         return problems
 
     def _install_egg(self, *libraries: str) -> list[DependencyProblem]:
