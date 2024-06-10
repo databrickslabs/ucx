@@ -1,7 +1,6 @@
 from pathlib import Path
 from unittest.mock import create_autospec
 
-import pytest
 
 from databricks.labs.ucx.source_code.graph import (
     SourceContainer,
