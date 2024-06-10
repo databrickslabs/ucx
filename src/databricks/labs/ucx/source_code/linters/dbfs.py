@@ -32,8 +32,8 @@ class DetectDbfsVisitor(TreeVisitor):
             for inferred in arg.inferred():
                 if isinstance(inferred, Const) and isinstance(inferred.value, str):
                     self._check_str_constant(arg, inferred)
-        except InferenceError:
-            logger.debug(f"Could not infer value of {str(arg)}")
+        except InferenceError as e:
+            logger.debug(f"Could not infer value of {arg.as_string()}", exc_info=e)
 
     def visit_const(self, node: Const):
         # Constant strings yield Advisories
