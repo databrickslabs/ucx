@@ -21,6 +21,7 @@ pytest.register_assert_rewrite('databricks.labs.blueprint.installation')
 _lock = threading.Lock()
 
 
+@pytest.fixture()
 def mock_installation() -> MockInstallation:
     return MockInstallation(
         {
@@ -47,14 +48,13 @@ def mock_installation() -> MockInstallation:
 
 
 @pytest.fixture
-def run_workflow(mocker):
+def run_workflow(mocker, mock_installation):
     def inner(cb, **replace) -> RuntimeContext:
         with _lock, patch.dict(os.environ, {"DATABRICKS_RUNTIME_VERSION": "14.0"}):
             pyspark_sql_session = mocker.Mock()
             sys.modules["pyspark.sql.session"] = pyspark_sql_session
-            installation = mock_installation()
             if 'installation' not in replace:
-                replace['installation'] = installation
+                replace['installation'] = mock_installation
             if 'workspace_client' not in replace:
                 ws = create_autospec(WorkspaceClient)
                 ws.api_client.do.return_value = {}
@@ -63,7 +63,7 @@ def run_workflow(mocker):
             if 'sql_backend' not in replace:
                 replace['sql_backend'] = MockBackend()
             if 'config' not in replace:
-                replace['config'] = installation.load(WorkspaceConfig)
+                replace['config'] = mock_installation.load(WorkspaceConfig)
 
             module = __import__(cb.__module__, fromlist=[cb.__name__])
             klass, method = cb.__qualname__.split('.', 1)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
@@ -13,9 +14,12 @@ from databricks.labs.ucx.source_code.linters.imports import (
     ImportSource,
     NotebookRunCall,
     SysPathChange,
+    UnresolvedPath,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
+
+logger = logging.Logger(__file__)
 
 
 class DependencyGraph:
@@ -190,17 +194,20 @@ class DependencyGraph:
 
     def _process_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
-            self._mutate_path_lookup(base_node)
-            return
-        if isinstance(base_node, NotebookRunCall):
+            yield from self._mutate_path_lookup(base_node)
+        elif isinstance(base_node, NotebookRunCall):
             yield from self._register_notebook(base_node)
-            return
-        if isinstance(base_node, ImportSource):
-            prefix = ""
-            if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
-                prefix = "." * base_node.node.level
-            name = base_node.name or ""
-            yield from self.register_import(prefix + name)
+        elif isinstance(base_node, ImportSource):
+            yield from self._register_import(base_node)
+        else:
+            logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
+
+    def _register_import(self, base_node: ImportSource):
+        prefix = ""
+        if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
+            prefix = "." * base_node.node.level
+        name = base_node.name or ""
+        yield from self.register_import(prefix + name)
 
     def _register_notebook(self, base_node: NotebookRunCall):
         has_unresolved, paths = base_node.get_notebook_paths()
@@ -213,6 +220,12 @@ class DependencyGraph:
             yield from self.register_notebook(Path(path))
 
     def _mutate_path_lookup(self, change: SysPathChange):
+        if isinstance(change, UnresolvedPath):
+            yield DependencyProblem(
+                'sys-path-cannot-compute',
+                f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
+            )
+            return
         path = Path(change.path)
         if not path.is_absolute():
             path = self._path_lookup.cwd / path
