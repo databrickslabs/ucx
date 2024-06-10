@@ -71,24 +71,24 @@ class QueryMatcher(Matcher):
         table_arg = self._get_table_arg(node)
         try:
             for inferred in table_arg.inferred():
-                yield from self._lint_table_arg(from_table, table_arg, inferred)
-        except InferenceError as e:
+                yield from self._lint_table_arg(from_table, node, inferred)
+        except InferenceError:
             yield Advisory.from_node(
                 code='table-migrate',
-                message=f"Can't migrate '{node}' because its table name argument cannot be computed",
+                message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
                 node=node,
             )
 
     @classmethod
-    def _lint_table_arg(cls, from_table: FromTable, source_node: NodeNG, inferred: NodeNG):
+    def _lint_table_arg(cls, from_table: FromTable, call_node: NodeNG, inferred: NodeNG):
         if isinstance(inferred, Const):
             for advice in from_table.lint(inferred.value):
                 yield advice.replace_from_node(inferred)
         else:
             yield Advisory.from_node(
                 code='table-migrate',
-                message=f"Can't migrate '{source_arg}' because its table name argument is not a constant",
-                node=source_arg,
+                message=f"Can't migrate table_name argument in '{call_node.as_string()}' because its value cannot be computed",
+                node=call_node,
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
