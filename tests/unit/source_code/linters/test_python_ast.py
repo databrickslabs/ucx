@@ -1,4 +1,5 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Iterable
+from typing import cast
 
 import pytest
 from astroid import Assign, Attribute, Call, Const, Expr, FormattedValue, JoinedStr, Name, NodeNG  # type: ignore
@@ -87,9 +88,10 @@ def test_tree_walks_nodes_once():
     assert len(nodes) == count
 
 
-def infer_values_from_node(node: NodeNG) -> Iterator[str]:
+def infer_values_from_node(node: NodeNG) -> Iterator[Iterable[NodeNG]]:
+    # deal with node types that don't implement 'inferred()'
     if isinstance(node, Const):
-        yield str(node.value)
+        yield [node]
     elif isinstance(node, JoinedStr):
         yield from infer_values_from_joined_string(node)
     elif isinstance(node, FormattedValue):
@@ -99,17 +101,25 @@ def infer_values_from_node(node: NodeNG) -> Iterator[str]:
             yield from infer_values_from_node(inferred)
 
 
-def infer_values_from_joined_string(node: JoinedStr) -> Iterator[str]:
+def infer_values_from_joined_string(node: JoinedStr) -> Iterator[Iterable[NodeNG]]:
     yield from infer_values_from_joined_values(node.values)
 
 
-def infer_values_from_joined_values(nodes: list[NodeNG]):
+def infer_values_from_joined_values(nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
     if len(nodes) == 1:
         yield from infer_values_from_node(nodes[0])
         return
     for prefix in infer_values_from_node(nodes[0]):
         for suffix in infer_values_from_joined_values(nodes[1:]):
-            yield prefix + suffix
+            yield list(prefix) + list(suffix)
+
+
+def string_from_consts(nodes: Iterable[NodeNG]) -> str:
+    atoms: list[str] = []
+    for atom in nodes:
+        if isinstance(atom, Const):
+            atoms.append(str(atom.value))
+    return "".join(atoms)
 
 
 def test_infers_fstring_value():
@@ -120,7 +130,8 @@ fstring = f"Hello {value}!"
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     values = list(infer_values_from_node(nodes[1].value))
-    assert values[0] == "Hello abc!"
+    joined = string_from_consts(values[0])
+    assert joined == "Hello abc!"
 
 
 def test_infers_fstring_values():
@@ -134,4 +145,8 @@ for value1 in values_1:
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     values = list(infer_values_from_node(nodes[2].value))
-    assert values == ["Hello abc, ghi!", "Hello abc, jkl!", "Hello def, ghi!", "Hello def, jkl!"]
+    strings: list[str] = []
+    for value in values:
+        joined = string_from_consts(value)
+        strings.append(joined)
+    assert strings == ["Hello abc, ghi!", "Hello abc, jkl!", "Hello def, ghi!", "Hello def, jkl!"]
