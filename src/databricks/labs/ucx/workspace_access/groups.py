@@ -126,7 +126,7 @@ class MigrationState:
                 size=batch_size,
             )
             if not result.permissions_migrated:
-                logger.info("No more permission to migrated.")
+                logger.info("No more permissions to migrate.")
                 return permissions_migrated
             permissions_migrated += result.permissions_migrated
             logger.info(f"Migrated {result.permissions_migrated} permissions to {name_in_account} account group")
