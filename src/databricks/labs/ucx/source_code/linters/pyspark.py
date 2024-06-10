@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, Const, NodeNG  # type: ignore
+from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -69,14 +69,26 @@ class QueryMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        if isinstance(table_arg, Const):
-            for advice in from_table.lint(table_arg.value):
-                yield advice.replace_from_node(node)
+        try:
+            for inferred in table_arg.inferred():
+                yield from self._lint_table_arg(from_table, table_arg, inferred)
+        except InferenceError as e:
+            yield Advisory.from_node(
+                code='table-migrate',
+                message=f"Can't migrate '{node}' because its table name argument cannot be computed",
+                node=node,
+            )
+
+    @classmethod
+    def _lint_table_arg(cls, from_table: FromTable, source_node: NodeNG, inferred: NodeNG):
+        if isinstance(inferred, Const):
+            for advice in from_table.lint(inferred.value):
+                yield advice.replace_from_node(inferred)
         else:
             yield Advisory.from_node(
                 code='table-migrate',
-                message=f"Can't migrate '{node}' because its table name argument is not a constant",
-                node=node,
+                message=f"Can't migrate '{source_arg}' because its table name argument is not a constant",
+                node=source_arg,
             )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
