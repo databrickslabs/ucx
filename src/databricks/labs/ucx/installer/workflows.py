@@ -442,12 +442,12 @@ class WorkflowsDeployment(InstallationMixin):
         return self._product_info.product_name() != "ucx"
 
     @staticmethod
-    def _is_ci():
-        ci_env = os.getenv("CI")
+    def _is_nightly():
+        ci_env = os.getenv("TEST_NIGHTLY")
         return ci_env is not None and ci_env.lower() == "true"
 
     def _get_test_purge_time(self) -> str:
-        timeout = TEST_CI_JOBS_PURGE_TIMEOUT if self._is_ci() else TEST_JOBS_PURGE_TIMEOUT
+        timeout = TEST_CI_JOBS_PURGE_TIMEOUT if self._is_nightly() else TEST_JOBS_PURGE_TIMEOUT
         return (datetime.utcnow() + timeout).strftime("%Y%m%d%H")
 
     def _create_readme(self) -> str:
