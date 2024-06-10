@@ -53,7 +53,7 @@ from databricks.labs.ucx.installer.mixins import InstallationMixin
 logger = logging.getLogger(__name__)
 
 TEST_JOBS_PURGE_TIMEOUT = timedelta(hours=1, minutes=15)
-TEST_CI_JOBS_PURGE_TIMEOUT = timedelta(hours=12)  # Buffer for debugging nightly integration test runs
+TEST_CI_JOBS_PURGE_TIMEOUT = timedelta(hours=3)  # Buffer for debugging nightly integration test runs
 EXTRA_TASK_PARAMS = {
     "job_id": "{{job_id}}",
     "run_id": "{{run_id}}",
