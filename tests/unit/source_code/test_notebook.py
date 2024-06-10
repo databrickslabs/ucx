@@ -75,7 +75,7 @@ PIP_NOTEBOOK_SAMPLE = (
         PIP_NOTEBOOK_SAMPLE,
     ],
 )
-def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]):
+def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str]]) -> None:
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
@@ -95,7 +95,7 @@ def test_notebook_splits_source_into_cells(source: tuple[str, Language, list[str
         SQL_NOTEBOOK_SAMPLE,
     ],
 )
-def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
+def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]) -> None:
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
@@ -118,7 +118,7 @@ def test_notebook_rebuilds_same_code(source: tuple[str, Language, list[str]]):
         SQL_NOTEBOOK_SAMPLE,
     ],
 )
-def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str]]):
+def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str]]) -> None:
     path = source[0]
     sources: list[str] = _load_sources(SourceContainer, path)
     assert len(sources) == 1
@@ -128,7 +128,7 @@ def test_notebook_generates_runnable_cells(source: tuple[str, Language, list[str
         assert cell.is_runnable()
 
 
-def dependency_resolver(mock_path_lookup):
+def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     library_resolver = PythonLibraryResolver(Whitelist())
@@ -136,72 +136,84 @@ def dependency_resolver(mock_path_lookup):
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)
 
 
-def test_notebook_builds_leaf_dependency_graph(mock_path_lookup):
+def test_notebook_builds_leaf_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     problems = container.build_dependency_graph(graph)
     assert not problems
     assert graph.all_paths == {mock_path_lookup.cwd / "leaf1.py"}
 
 
-def get_status_side_effect(*args):
+def get_status_side_effect(*args) -> ObjectInfo:
     path = args[0]
     return ObjectInfo(path=path, object_type=ObjectType.NOTEBOOK, language=Language.PYTHON)
 
 
-def test_notebook_builds_depth1_dependency_graph(mock_path_lookup):
+def test_notebook_builds_depth1_dependency_graph(mock_path_lookup) -> None:
     paths = ["root1.run.py", "leaf1.py", "leaf2.py"]
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     problems = container.build_dependency_graph(graph)
     assert not problems
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_depth2_dependency_graph(mock_path_lookup):
+def test_notebook_builds_depth2_dependency_graph(mock_path_lookup) -> None:
     paths = ["root2.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     problems = container.build_dependency_graph(graph)
     assert not problems
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup):
+def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup) -> None:
     paths = ["root3.run.py", "root1.run.py", "leaf1.py", "leaf2.py"]
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     problems = container.build_dependency_graph(graph)
     assert not problems
     # if visited once only, set and list will have same len
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup):
+def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup) -> None:
     paths = ["cyclical1.run.py", "cyclical2.run.py"]
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     problems = container.build_dependency_graph(graph)
     assert not problems
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
 
 
-def test_notebook_builds_python_dependency_graph(mock_path_lookup):
+def test_notebook_builds_python_dependency_graph(mock_path_lookup) -> None:
     paths = ["root4.py", "leaf3.py"]
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     problems = container.build_dependency_graph(graph)
     assert not problems
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in paths}
@@ -211,8 +223,10 @@ def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> 
     path = "run_notebooks.py"
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(path))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     container.build_dependency_graph(graph)
     expected_paths = [path, "leaf1.py", "leaf2.py", "leaf3.py"]
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
@@ -222,14 +236,16 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     path = "run_notebooks_with_fstring.py"
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(path))
+    assert maybe.dependency is not None
     graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
     container = maybe.dependency.load(mock_path_lookup)
+    assert container is not None
     container.build_dependency_graph(graph)
     expected_paths = [path, "leaf1.py", "leaf3.py"]
     assert graph.all_paths == {mock_path_lookup.cwd / path for path in expected_paths}
 
 
-def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code():
+def test_detects_multiple_calls_to_dbutils_notebook_run_in_python_code() -> None:
     source = """
 import stuff
 do_something_with_stuff(stuff)
@@ -242,7 +258,7 @@ stuff3 = dbutils.notebook.run("where is notebook 2?")
     assert len(nodes) == 2
 
 
-def test_does_not_detect_partial_call_to_dbutils_notebook_run_in_python_code_():
+def test_does_not_detect_partial_call_to_dbutils_notebook_run_in_python_code_() -> None:
     source = """
 import stuff
 do_something_with_stuff(stuff)
@@ -254,7 +270,7 @@ stuff2 = notebook.run("where is notebook 1?")
     assert len(nodes) == 0
 
 
-def test_raises_advice_when_dbutils_notebook_run_is_too_complex():
+def test_raises_advice_when_dbutils_notebook_run_is_too_complex() -> None:
     source = """
 name = "xyz"
 dbutils.notebook.run(f"Hey {name}")
