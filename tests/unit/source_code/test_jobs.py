@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import create_autospec
 
 import pytest
+from databricks.sdk.service.jobs import Job
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
@@ -54,7 +55,7 @@ def test_workflow_task_container_builds_dependency_graph_not_yet_implemented(moc
     library = compute.Library(jar="library.jar")
     task = jobs.Task(task_key="test", libraries=[library], existing_cluster_id="id")
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -66,7 +67,7 @@ def test_workflow_task_container_builds_dependency_graph_empty_task(mock_path_lo
     ws = create_autospec(WorkspaceClient)
     task = jobs.Task(task_key="test")
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 0
@@ -78,7 +79,7 @@ def test_workflow_task_container_builds_dependency_graph_pytest_pypi_library(moc
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="demo-egg"))]  # installs pkgdir
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 0
@@ -91,7 +92,7 @@ def test_workflow_task_container_builds_dependency_graph_unknown_pypi_library(mo
     libraries = [compute.Library(pypi=compute.PythonPyPiLibrary(package="unknown-library-name"))]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -108,7 +109,7 @@ def test_workflow_task_container_builds_dependency_graph_for_python_wheel(mock_p
     libraries = [compute.Library(whl="test.whl")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -144,7 +145,7 @@ def test_workflow_task_container_builds_dependency_graph_for_requirements_txt(mo
     libraries = [compute.Library(requirements="requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -165,7 +166,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
     libraries = [compute.Library(requirements="requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         workflow_task_container.build_dependency_graph(graph)
@@ -185,7 +186,7 @@ def test_workflow_task_container_build_dependency_graph_warns_about_reference_to
     libraries = [compute.Library(requirements="requirements.txt")]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
 
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.jobs"):
         workflow_task_container.build_dependency_graph(graph)
@@ -219,7 +220,7 @@ def test_workflow_task_container_with_existing_cluster_builds_dependency_graph_p
         )
     ]
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 0
     ws.assert_not_called()
@@ -233,7 +234,7 @@ def test_workflow_task_container_builds_dependency_graph_with_unknown_egg_librar
     libraries = [compute.Library(egg=unknown_library)]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -253,7 +254,7 @@ def test_workflow_task_container_builds_dependency_graph_with_known_egg_library(
     libraries = [compute.Library(egg=egg_file.as_posix())]
     task = jobs.Task(task_key="test", libraries=libraries)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 0
@@ -269,7 +270,7 @@ def test_workflow_task_container_builds_dependency_graph_with_missing_distributi
     python_wheel_task = jobs.PythonWheelTask(package_name="databricks_labs_ucx", entry_point="runtime")
     task = jobs.Task(task_key="test", python_wheel_task=python_wheel_task)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -289,7 +290,7 @@ def test_workflow_task_container_builds_dependency_graph_with_missing_entrypoint
     libraries = [compute.Library(whl=whl_file.as_posix())]
     task = jobs.Task(task_key="test", libraries=libraries, python_wheel_task=python_wheel_task)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 1
@@ -309,7 +310,7 @@ def test_workflow_task_container_builds_dependency_graph_for_python_wheel_task(g
     libraries = [compute.Library(whl=whl_file.as_posix())]
     task = jobs.Task(task_key="test", libraries=libraries, python_wheel_task=python_wheel_task)
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
 
     assert len(problems) == 0
@@ -327,7 +328,7 @@ def test_workflow_linter_dlt_pipeline_task(graph):
         name="test-pipeline",
     )
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 0
 
@@ -338,7 +339,7 @@ def test_workflow_linter_dlt_pipeline_task(graph):
         spec=pipelines.PipelineSpec(continuous=False),
     )
 
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 0
 
@@ -356,7 +357,7 @@ def test_workflow_linter_dlt_pipeline_task(graph):
             ]
         ),
     )
-    workflow_task_container = WorkflowTaskContainer(ws, task)
+    workflow_task_container = WorkflowTaskContainer(ws, task, Job())
     problems = workflow_task_container.build_dependency_graph(graph)
     assert len(problems) == 4
     ws.assert_not_called()

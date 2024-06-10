@@ -36,30 +36,37 @@ def azure_sp_conf_present_check(config: dict) -> bool:
     return False
 
 
-def spark_version_compatibility(spark_version: str | None) -> str:
+def runtime_version_tuple(spark_version: str | None) -> tuple[int, int] | None:
     if not spark_version:
-        return "unreported version"
+        return None
     first_comp_custom_rt = 3
     first_comp_custom_x = 2
     dbr_version_components = spark_version.split("-")
     first_components = dbr_version_components[0].split(".")
     if "custom" in spark_version:
         # custom runtime
-        return "unsupported"
+        return None
+    if len(first_components) != first_comp_custom_rt:
+        # custom runtime
+        return None
+    if first_components[first_comp_custom_x] != "x":
+        # custom runtime
+        return None
+    try:
+        return int(first_components[0]), int(first_components[1])
+    except ValueError:
+        return None
+
+
+def spark_version_compatibility(spark_version: str | None) -> str:
+    if not spark_version:
+        return "unreported version"
     if "dlt" in spark_version:
         # shouldn't hit this? Does show up in cluster list
         return "dlt"
-    if len(first_components) != first_comp_custom_rt:
-        # custom runtime
+    version = runtime_version_tuple(spark_version)
+    if version is None:
         return "unsupported"
-    if first_components[first_comp_custom_x] != "x":
-        # custom runtime
-        return "unsupported"
-
-    try:
-        version = int(first_components[0]), int(first_components[1])
-    except ValueError:
-        version = 0, 0
     if version < (10, 0):
         return "unsupported"
     if (10, 0) <= version < (11, 3):
