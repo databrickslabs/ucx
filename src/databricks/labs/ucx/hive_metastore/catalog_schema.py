@@ -45,16 +45,21 @@ class CatalogSchema:
             logger.debug(f"Migrating acls on {grant.this_type_and_key()} using SQL query: {acl_migrate_sql}")
             self._backend.execute(acl_migrate_sql)
 
-    def _get_catalog_schema_grants(self):
-        catalog_grants: set[Grant] = set()
-        new_grants = []
+    def _get_catalog_schema_grants(self) -> list[Grant]:
         src_trg_schema_mapping = self._get_database_source_target_mapping()
         grants = self._principal_grants.get_interactive_cluster_grants()
         # filter on grants to only get database level grants
-        database_grants = [grant for grant in grants if grant.table is None and grant.view is None]
-        for db_grant in database_grants:
-            for schema in src_trg_schema_mapping[db_grant.database]:
-                new_grants.append(replace(db_grant, catalog=schema.catalog_name, database=schema.name))
+        new_grants: list[Grant] = []
+        for grant in grants:
+            # For a database grant the table/view are not set, while the database is.
+            if grant.table is None and grant.view is None:
+                database = grant.database
+                if database is not None:
+                    new_grants.extend(
+                        replace(grant, catalog=schema.catalog_name, database=schema.name)
+                        for schema in src_trg_schema_mapping[database]
+                    )
+        catalog_grants: set[Grant] = set()
         for grant in new_grants:
             catalog_grants.add(replace(grant, database=None))
         new_grants.extend(catalog_grants)

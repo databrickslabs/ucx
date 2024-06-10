@@ -181,7 +181,7 @@ class RelativePath(SysPathChange):
 
 class SysPathChangesVisitor(TreeVisitor):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super()
         self._aliases: dict[str, str] = {}
         self.sys_path_changes: list[SysPathChange] = []
