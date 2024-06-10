@@ -2,7 +2,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory, Advice
+from databricks.labs.ucx.source_code.base import Deprecation, Advice
 from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 
 index = MigrationIndex([])
@@ -41,7 +41,7 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                 ),
                 Deprecation(
                     code='direct-filesystem-access',
-                    message='The use of default dbfs: references is deprecated: ' '/mnt/things/e/f/g',
+                    message='The use of default dbfs: references is deprecated: /mnt/things/e/f/g',
                     start_line=14,
                     start_col=8,
                     end_line=14,
@@ -49,11 +49,11 @@ SELECT * FROM csv.`dbfs:/mnt/whatever`
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: /mnt/things/e/f/g',
+                    message='Deprecated file system path: /mnt/things/e/f/g',
                     start_line=14,
                     start_col=23,
                     end_line=14,
-                    end_col=40,
+                    end_col=42,
                 ),
             ],
         ),
@@ -100,11 +100,11 @@ display(spark.read.csv('/mnt/things/e/f/g'))
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: /mnt/things/e/f/g',
+                    message='Deprecated file system path: /mnt/things/e/f/g',
                     start_line=5,
                     start_col=23,
                     end_line=5,
-                    end_col=40,
+                    end_col=42,
                 ),
                 Deprecation(
                     code='dbfs-query',
@@ -194,77 +194,77 @@ MERGE INTO delta.`/dbfs/...` t USING source ON t.key = source.key WHEN MATCHED T
                     end_line=17,
                     end_col=40,
                 ),
-                Advisory(
+                Deprecation(
                     code='dbfs-usage',
-                    message='Possible deprecated file system path: dbfs:/...',
+                    message='Deprecated file system path: dbfs:/...',
                     start_line=7,
                     start_col=7,
                     end_line=7,
-                    end_col=16,
+                    end_col=18,
                 ),
-                Advisory(
+                Deprecation(
                     code='dbfs-usage',
-                    message='Possible deprecated file system path: /dbfs/mnt',
+                    message='Deprecated file system path: /dbfs/mnt',
                     start_line=8,
                     start_col=7,
                     end_line=8,
-                    end_col=16,
+                    end_col=18,
                 ),
-                Advisory(
+                Deprecation(
                     code='dbfs-usage',
-                    message='Possible deprecated file system path: /mnt/',
+                    message='Deprecated file system path: /mnt/',
                     start_line=9,
                     start_col=7,
                     end_line=9,
-                    end_col=12,
+                    end_col=14,
                 ),
-                Advisory(
+                Deprecation(
                     code='dbfs-usage',
-                    message='Possible deprecated file system path: dbfs:/...',
+                    message='Deprecated file system path: dbfs:/...',
                     start_line=10,
                     start_col=7,
                     end_line=10,
-                    end_col=16,
+                    end_col=18,
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: /dbfs/mnt/data',
+                    message='Deprecated file system path: /dbfs/mnt/data',
                     start_line=11,
                     start_col=10,
                     end_line=11,
-                    end_col=24,
+                    end_col=26,
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: /dbfs/mnt/data',
+                    message='Deprecated file system path: /dbfs/mnt/data',
                     start_line=13,
                     start_col=10,
                     end_line=13,
-                    end_col=24,
+                    end_col=26,
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: /mnt/foo/bar',
+                    message='Deprecated file system path: /mnt/foo/bar',
                     start_line=15,
                     start_col=19,
                     end_line=15,
-                    end_col=31,
+                    end_col=33,
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: dbfs:/mnt/foo/bar',
+                    message='Deprecated file system path: dbfs:/mnt/foo/bar',
                     start_line=16,
                     start_col=19,
                     end_line=16,
-                    end_col=36,
+                    end_col=38,
                 ),
                 Deprecation(
                     code='dbfs-usage',
-                    message='Deprecated file system path in call to: dbfs://mnt/foo/bar',
+                    message='Deprecated file system path: dbfs://mnt/foo/bar',
                     start_line=17,
                     start_col=19,
                     end_line=17,
-                    end_col=37,
+                    end_col=39,
                 ),
                 Deprecation(
                     code='dbfs-query',

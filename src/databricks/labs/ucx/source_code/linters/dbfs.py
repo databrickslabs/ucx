@@ -1,11 +1,15 @@
+import logging
 from collections.abc import Iterable
 
-from astroid import Call, Const  # type: ignore
+from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
 import sqlglot
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Advisory, Deprecation
+from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
+
+
+logger = logging.getLogger(__file__)
 
 
 class DetectDbfsVisitor(TreeVisitor):
@@ -21,30 +25,36 @@ class DetectDbfsVisitor(TreeVisitor):
 
     def visit_call(self, node: Call):
         for arg in node.args:
-            if isinstance(arg, Const) and isinstance(arg.value, str):
-                value = arg.value
-                if any(value.startswith(prefix) for prefix in self._fs_prefixes):
-                    deprecation = Deprecation.from_node(
-                        code='dbfs-usage', message=f"Deprecated file system path in call to: {value}", node=arg
-                    )
-                    self._advices.append(deprecation.replace(end_col=arg.col_offset + len(value)))
-                    # Record the location of the reported constant, so we do not double report
-                    self._reported_locations.add((arg.lineno, arg.col_offset))
+            self._visit_arg(arg)
+
+    def _visit_arg(self, arg: NodeNG):
+        try:
+            for inferred in arg.inferred():
+                if isinstance(inferred, Const) and isinstance(inferred.value, str):
+                    self._check_str_constant(arg, inferred)
+        except InferenceError:
+            logger.debug(f"Could not infer value of {str(arg)}")
 
     def visit_const(self, node: Const):
         # Constant strings yield Advisories
         if isinstance(node.value, str):
-            self._check_str_constant(node)
+            self._check_str_constant(node, node)
 
-    def _check_str_constant(self, node: Const):
-        # Check if the location has been reported before
-        if (node.lineno, node.col_offset) not in self._reported_locations:
-            value = node.value
-            if any(value.startswith(prefix) for prefix in self._fs_prefixes):
-                advisory = Advisory.from_node(
-                    code='dbfs-usage', message=f"Possible deprecated file system path: {value}", node=node
-                )
-                self._advices.append(advisory.replace(end_col=node.col_offset + len(value)))
+    def _check_str_constant(self, source_node, const_node: Const):
+        if self._already_reported(source_node, const_node):
+            return
+        value = const_node.value
+        if any(value.startswith(prefix) for prefix in self._fs_prefixes):
+            advisory = Deprecation.from_node(
+                code='dbfs-usage', message=f"Deprecated file system path: {value}", node=source_node
+            )
+            self._advices.append(advisory)
+
+    def _already_reported(self, *nodes: NodeNG):
+        reported = any((node.lineno, node.col_offset) in self._reported_locations for node in nodes)
+        for node in nodes:
+            self._reported_locations.add((node.lineno, node.col_offset))
+        return reported
 
     def get_advices(self) -> Iterable[Advice]:
         yield from self._advices
