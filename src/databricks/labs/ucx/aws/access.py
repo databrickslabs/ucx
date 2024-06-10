@@ -45,7 +45,11 @@ class AWSResourcePermissions:
         self._kms_key = kms_key
 
     def list_uc_roles(
-        self, *, single_role: bool = True, role_name: str = "UC_ROLE", policy_name: str = "UC_POLICY"
+        self,
+        *,
+        single_role: bool = True,
+        role_name: str = "UC_ROLE",
+        policy_name: str = "UC_POLICY",
     ) -> list[AWSUCRoleCandidate]:
         """
         Get the missing paths
