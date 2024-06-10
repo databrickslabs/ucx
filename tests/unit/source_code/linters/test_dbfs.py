@@ -16,7 +16,7 @@ class TestDetectDBFS:
             ('SOME_CONSTANT = 42; load_data(SOME_CONSTANT)', 0),
         ],
     )
-    def test_detects_dbfs_str_const_paths(self, code, expected):
+    def test_detects_dbfs_paths(self, code, expected):
         linter = DBFSUsageLinter()
         advices = list(linter.lint(code))
         for advice in advices:
@@ -33,8 +33,16 @@ class TestDetectDBFS:
             ('spark.read.parquet("/mnt/foo/bar")', 1),
             ('spark.read.parquet("dbfs:/mnt/foo/bar")', 1),
             ('spark.read.parquet("dbfs://mnt/foo/bar")', 1),
-            # Would need a stateful linter to detect this next one
-            ('DBFS="dbfs:/mnt/foo/bar"; spark.read.parquet(DBFS)', 0),
+            ('DBFS="dbfs:/mnt/foo/bar"; spark.read.parquet(DBFS)', 1),
+            (
+                """
+DBFS1="dbfs:/mnt/foo/bar1"
+systems=[DBFS1, "dbfs:/mnt/foo/bar2"]
+for system in systems:
+    spark.read.parquet(system)
+""",
+                2,
+            ),
         ],
     )
     def test_dbfs_usage_linter(self, code, expected):

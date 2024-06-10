@@ -3,7 +3,7 @@
 
 # COMMAND ----------
 
-# ucx[dbfs-usage:+2:23:+2:40] Deprecated file system path in call to: /mnt/things/e/f/g
+# ucx[dbfs-usage:+2:23:+2:42] Deprecated file system path: /mnt/things/e/f/g
 # ucx[direct-filesystem-access:+1:8:+1:43] The use of default dbfs: references is deprecated: /mnt/things/e/f/g
 display(spark.read.csv('/mnt/things/e/f/g'))
 
