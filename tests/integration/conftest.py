@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 import functools
 import collections
 import os
@@ -15,7 +15,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import AccountClient, WorkspaceClient
-from databricks.sdk.service.catalog import TableInfo, SchemaInfo
+from databricks.sdk.service.catalog import FunctionInfo, SchemaInfo, TableInfo
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.__about__ import __version__
@@ -255,7 +255,7 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         make_group_fixture,
         env_or_skip_fixture,
         ws_fixture,
-    ):
+    ) -> None:
         super().__init__(make_schema_fixture, env_or_skip_fixture, ws_fixture)
         RuntimeContext.__init__(self)
         self._make_table = make_table_fixture
@@ -266,10 +266,10 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         self._tables: list[TableInfo] = []
         self._schemas: list[SchemaInfo] = []
         self._groups: list[Group] = []
-        self._udfs = []
-        self._grants = []
+        self._udfs: list[FunctionInfo] = []
+        self._grants: list[Grant] = []
         # TODO: add methods to pre-populate the following:
-        self._spn_infos = []
+        self._spn_infos: list[AzureServicePrincipalInfo] = []
 
     def with_table_mapping_rules(self, rules):
         self.installation.save(rules, filename=TableMapping.FILENAME)
@@ -409,15 +409,17 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         )
 
     @cached_property
-    def created_databases(self):
+    def created_databases(self) -> list[str]:
         created_databases: set[str] = set()
         for schema_info in self._schemas:
             if schema_info.catalog_name != "hive_metastore":
                 continue
+            assert schema_info.name is not None
             created_databases.add(schema_info.name)
         for table_info in self._tables:
             if table_info.catalog_name != "hive_metastore":
                 continue
+            assert table_info.schema_name is not None
             created_databases.add(table_info.schema_name)
         for grant in self._grants:
             if grant.catalog != "hive_metastore":
@@ -494,13 +496,13 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
             renamed_group_prefix=f'tmp-{self.inventory_database}-',
         )
 
-    def save_locations(self):
+    def save_locations(self) -> None:
         locations: list[ExternalLocation] = []
         if self.workspace_client.config.is_azure:
             locations = [ExternalLocation("abfss://things@labsazurethings.dfs.core.windows.net/a", 1)]
         if self.workspace_client.config.is_aws:
             locations = [ExternalLocation("s3://labs-things/a", 1)]
-        return self.sql_backend.save_table(
+        self.sql_backend.save_table(
             f"{self.inventory_database}.external_locations",
             locations,
             ExternalLocation,
@@ -739,7 +741,7 @@ def installation_ctx(  # pylint: disable=too-many-arguments
     make_random,
     make_acc_group,
     make_user,
-):
+) -> Generator[TestInstallationContext, None, None]:
     ctx = TestInstallationContext(
         make_table, make_schema, make_udf, make_group, env_or_skip, make_random, make_acc_group, make_user, ws
     )
