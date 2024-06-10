@@ -14,6 +14,7 @@ from astroid import (  # type: ignore
     ImportFrom,
     Name,
     NodeNG,
+    Uninferable,
 )
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
@@ -179,6 +180,11 @@ class RelativePath(SysPathChange):
     pass
 
 
+class UnresolvedPath(SysPathChange):
+    # path added to sys.path that cannot be inferred
+    pass
+
+
 class SysPathChangesVisitor(TreeVisitor):
 
     def __init__(self) -> None:
@@ -211,10 +217,26 @@ class SysPathChangesVisitor(TreeVisitor):
             return
         is_append = func.attrname == "append"
         changed = node.args[0] if is_append else node.args[1]
-        if isinstance(changed, Const):
-            self.sys_path_changes.append(AbsolutePath(node, changed.value, is_append))
-        elif isinstance(changed, Call):
-            self._visit_relative_path(changed, is_append)
+        relative = False
+        if isinstance(changed, Call):
+            if not self._match_aliases(changed.func, ["os", "path", "abspath"]):
+                return
+            relative = True
+            changed = changed.args[0]
+        try:
+            for inferred in changed.inferred():
+                self._visit_inferred(changed, inferred, relative, is_append)
+        except InferenceError:
+            self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
+
+    def _visit_inferred(self, changed: NodeNG, inferred: NodeNG, is_relative: bool, is_append: bool):
+        if inferred is Uninferable or not isinstance(inferred, Const):
+            self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
+            return
+        if is_relative:
+            self.sys_path_changes.append(RelativePath(changed, inferred.value, is_append))
+        else:
+            self.sys_path_changes.append(AbsolutePath(changed, inferred.value, is_append))
 
     def _match_aliases(self, node: NodeNG, names: list[str]):
         if isinstance(node, Attribute):
@@ -228,11 +250,3 @@ class SysPathChangesVisitor(TreeVisitor):
             alias = self._aliases.get(full_name, full_name)
             return node.name == alias
         return False
-
-    def _visit_relative_path(self, node: Call, is_append: bool):
-        # check for 'os.path.abspath'
-        if not self._match_aliases(node.func, ["os", "path", "abspath"]):
-            return
-        changed = node.args[0]
-        if isinstance(changed, Const):
-            self.sys_path_changes.append(RelativePath(changed, changed.value, is_append))
