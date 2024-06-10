@@ -8,6 +8,8 @@ from pathlib import Path
 from astroid import NodeNG  # type: ignore
 from typing_extensions import Self
 
+from databricks.sdk.service import compute
+
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -140,6 +142,9 @@ class CurrentSessionState:
 
     schema: str = DEFAULT_SCHEMA
     catalog: str = DEFAULT_CATALOG
+    spark_conf: dict[str, str] | None = None
+    named_parameters: dict[str, str] | None = None
+    data_security_mode: compute.DataSecurityMode | None = None
 
 
 class SequentialLinter(Linter):

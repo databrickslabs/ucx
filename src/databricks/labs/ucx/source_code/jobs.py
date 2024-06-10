@@ -13,6 +13,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.service import compute, jobs
 from databricks.sdk.service.workspace import ExportFormat
 
+from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
@@ -52,7 +53,7 @@ class JobProblem:
 
 class WorkflowTask(Dependency):
     def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
-        loader = WrappingLoader(WorkflowTaskContainer(ws, task))
+        loader = WrappingLoader(WorkflowTaskContainer(ws, task, job))
         super().__init__(loader, Path(f'/jobs/{task.task_key}'))
         self._task = task
         self._job = job
@@ -65,9 +66,34 @@ class WorkflowTask(Dependency):
 
 
 class WorkflowTaskContainer(SourceContainer):
-    def __init__(self, ws: WorkspaceClient, task: jobs.Task):
+    def __init__(self, ws: WorkspaceClient, task: jobs.Task, job: jobs.Job):
         self._task = task
+        self._job = job
         self._ws = ws
+        self._named_parameters: dict[str, str] | None = {}
+        self._parameters: list[str] | None = []
+        self._spark_conf: dict[str, str] | None = {}
+        self._spark_version: str | None = None
+        self._data_security_mode = None
+
+    @property
+    def named_parameters(self) -> dict[str, str]:
+        return self._named_parameters or {}
+
+    @property
+    def spark_conf(self) -> dict[str, str]:
+        return self._spark_conf or {}
+
+    @property
+    def runtime_version(self) -> tuple[int, int]:
+        version_tuple = runtime_version_tuple(self._spark_version)
+        if not version_tuple:
+            return 0, 0
+        return version_tuple
+
+    @property
+    def data_security_mode(self) -> compute.DataSecurityMode:
+        return self._data_security_mode or compute.DataSecurityMode.NONE
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         return list(self._register_task_dependencies(parent))
@@ -82,6 +108,7 @@ class WorkflowTaskContainer(SourceContainer):
         yield from self._register_run_job_task(graph)
         yield from self._register_pipeline_task(graph)
         yield from self._register_spark_submit_task(graph)
+        yield from self._register_cluster_info()
 
     def _register_libraries(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.libraries:
@@ -127,6 +154,7 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_notebook(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.notebook_task:
             return []
+        self._named_parameters = self._task.notebook_task.base_parameters
         notebook_path = self._task.notebook_task.notebook_path
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
@@ -135,6 +163,7 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_spark_python_task(self, graph: DependencyGraph):
         if not self._task.spark_python_task:
             return []
+        self._parameters = self._task.spark_python_task.parameters
         notebook_path = self._task.spark_python_task.python_file
         logger.info(f'Discovering {self._task.task_key} entrypoint: {notebook_path}')
         path = WorkspacePath(self._ws, notebook_path)
@@ -155,7 +184,8 @@ class WorkflowTaskContainer(SourceContainer):
     def _register_python_wheel_task(self, graph: DependencyGraph) -> Iterable[DependencyProblem]:
         if not self._task.python_wheel_task:
             return []
-
+        self._named_parameters = self._task.python_wheel_task.named_parameters
+        self._parameters = self._task.python_wheel_task.parameters
         distribution_name = self._task.python_wheel_task.package_name
         distribution = self._find_first_matching_distribution(graph.path_lookup, distribution_name)
         if distribution is None:
@@ -176,6 +206,7 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.spark_jar_task:
             return
         # TODO: https://github.com/databrickslabs/ucx/issues/1641
+        self._parameters = self._task.spark_jar_task.parameters
         yield DependencyProblem('not-yet-implemented', 'Spark Jar task is not yet implemented')
 
     def _register_run_job_task(self, graph: DependencyGraph):  # pylint: disable=unused-argument
@@ -224,6 +255,25 @@ class WorkflowTaskContainer(SourceContainer):
         if not self._task.spark_submit_task:
             return
         yield DependencyProblem('not-yet-implemented', 'Spark submit task is not yet implemented')
+
+    def _register_cluster_info(self):
+        if self._task.existing_cluster_id:
+            cluster_info = self._ws.clusters.get(self._task.existing_cluster_id)
+            return self._new_job_cluster_metadata(cluster_info)
+        if self._task.new_cluster:
+            return self._new_job_cluster_metadata(self._task.new_cluster)
+        if self._task.job_cluster_key:
+            for job_cluster in self._job.settings.job_clusters:
+                if job_cluster.job_cluster_key != self._task.job_cluster_key:
+                    continue
+                return self._new_job_cluster_metadata(job_cluster.new_cluster)
+        return []
+
+    def _new_job_cluster_metadata(self, new_cluster):
+        self._spark_conf = new_cluster.spark_conf
+        self._spark_version = new_cluster.spark_version
+        self._data_security_mode = new_cluster.data_security_mode
+        return []
 
 
 class WorkflowLinter:
@@ -296,13 +346,18 @@ class WorkflowLinter:
         graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
+        assert isinstance(container, WorkflowTaskContainer)
         problems = container.build_dependency_graph(graph)
         if problems:
             for problem in problems:
                 source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
                 yield source_path, problem
             return
-        session_state = CurrentSessionState()
+        session_state = CurrentSessionState(
+            data_security_mode=container.data_security_mode,
+            named_parameters=container.named_parameters,
+            spark_conf=container.spark_conf,
+        )
         ctx = LinterContext(self._migration_index, session_state)
         for dependency in graph.all_dependencies:
             logger.info(f'Linting {task.task_key} dependency: {dependency}')
