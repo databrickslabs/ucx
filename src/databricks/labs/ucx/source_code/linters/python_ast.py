@@ -5,7 +5,7 @@ import logging
 from collections.abc import Iterable
 from typing import TypeVar
 
-from astroid import Attribute, Call, Name, parse, Module, NodeNG, Const, Import, ImportFrom  # type: ignore
+from astroid import Assign, Attribute, Call, Name, parse, Module, NodeNG, Const, Import, ImportFrom  # type: ignore
 
 logger = logging.getLogger(__file__)
 
@@ -161,6 +161,11 @@ class MatchingVisitor(TreeVisitor):
     @property
     def matched_nodes(self):
         return self._matched_nodes
+
+    def visit_assign(self, node: Assign):
+        if self._node_type is not Assign:
+            return
+        self._matched_nodes.append(node)
 
     def visit_call(self, node: Call):
         if self._node_type is not Call:

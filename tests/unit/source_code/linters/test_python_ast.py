@@ -1,5 +1,7 @@
+from collections.abc import Iterator
+
 import pytest
-from astroid import Attribute, Call, Const, Expr  # type: ignore
+from astroid import Assign, Attribute, Call, Const, Expr, FormattedValue, JoinedStr, Name, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -83,3 +85,53 @@ def test_tree_walks_nodes_once():
         nodes.add(node)
         count += 1
     assert len(nodes) == count
+
+
+def infer_values_from_node(node: NodeNG) -> Iterator[str]:
+    if isinstance(node, Const):
+        yield str(node.value)
+    elif isinstance(node, JoinedStr):
+        yield from infer_values_from_joined_string(node)
+    elif isinstance(node, FormattedValue):
+        yield from infer_values_from_node(node.value)
+    else:
+        for inferred in node.inferred():
+            yield from infer_values_from_node(inferred)
+
+
+def infer_values_from_joined_string(node: JoinedStr) -> Iterator[str]:
+    yield from infer_values_from_joined_values(node.values)
+
+
+def infer_values_from_joined_values(nodes: list[NodeNG]):
+    if len(nodes) == 1:
+        yield from infer_values_from_node(nodes[0])
+        return
+    for prefix in infer_values_from_node(nodes[0]):
+        for suffix in infer_values_from_joined_values(nodes[1:]):
+            yield prefix + suffix
+
+
+def test_infers_fstring_value():
+    source = """
+value = "abc"
+fstring = f"Hello {value}!"
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    values = list(infer_values_from_node(nodes[1].value))
+    assert values[0] == "Hello abc!"
+
+
+def test_infers_fstring_values():
+    source = """
+values_1 = ["abc", "def"]
+for value1 in values_1:
+    values_2 = ["ghi", "jkl"]
+    for value2 in values_2:
+        fstring = f"Hello {value1}, {value2}!"
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    values = list(infer_values_from_node(nodes[2].value))
+    assert values == ["Hello abc, ghi!", "Hello abc, jkl!", "Hello def, ghi!", "Hello def, jkl!"]
