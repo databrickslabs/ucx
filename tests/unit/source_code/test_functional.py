@@ -1,4 +1,5 @@
 import re
+import sys
 import tokenize
 from collections.abc import Iterable, Generator
 
@@ -6,12 +7,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from typing_extensions import Self
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)

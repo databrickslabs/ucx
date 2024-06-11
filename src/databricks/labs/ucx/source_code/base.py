@@ -11,7 +11,7 @@ from astroid import NodeNG  # type: ignore
 
 from databricks.sdk.service import compute
 
-if sys.version_info >= (3, 11):
+if sys.version_info < (3, 11):
     from typing_extensions import Self
 else:
     from typing import Self
