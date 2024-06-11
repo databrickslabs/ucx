@@ -88,40 +88,6 @@ def test_tree_walks_nodes_once():
     assert len(nodes) == count
 
 
-def infer_values_from_node(node: NodeNG) -> Iterator[Iterable[NodeNG]]:
-    # deal with node types that don't implement 'inferred()'
-    if isinstance(node, Const):
-        yield [node]
-    elif isinstance(node, JoinedStr):
-        yield from infer_values_from_joined_string(node)
-    elif isinstance(node, FormattedValue):
-        yield from infer_values_from_node(node.value)
-    else:
-        for inferred in node.inferred():
-            yield from infer_values_from_node(inferred)
-
-
-def infer_values_from_joined_string(node: JoinedStr) -> Iterator[Iterable[NodeNG]]:
-    yield from infer_values_from_joined_values(node.values)
-
-
-def infer_values_from_joined_values(nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
-    if len(nodes) == 1:
-        yield from infer_values_from_node(nodes[0])
-        return
-    for prefix in infer_values_from_node(nodes[0]):
-        for suffix in infer_values_from_joined_values(nodes[1:]):
-            yield list(prefix) + list(suffix)
-
-
-def string_from_consts(nodes: Iterable[NodeNG]) -> str:
-    atoms: list[str] = []
-    for atom in nodes:
-        if isinstance(atom, Const):
-            atoms.append(str(atom.value))
-    return "".join(atoms)
-
-
 def test_infers_fstring_value():
     source = """
 value = "abc"
@@ -129,8 +95,10 @@ fstring = f"Hello {value}!"
 """
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
-    values = list(infer_values_from_node(nodes[1].value))
-    joined = string_from_consts(values[0])
+    tree = Tree(nodes[1].value) # value of fstring = ...
+    unresolved, values = tree.infer_values()
+    assert not unresolved
+    joined = Tree.string_from_consts(values[0])
     assert joined == "Hello abc!"
 
 
@@ -144,9 +112,26 @@ for value1 in values_1:
 """
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
-    values = list(infer_values_from_node(nodes[2].value))
+    tree = Tree(nodes[2].value)  # value of fstring = ...
+    unresolved, values = tree.infer_values()
+    assert not unresolved
     strings: list[str] = []
     for value in values:
-        joined = string_from_consts(value)
+        joined = Tree.string_from_consts(value)
         strings.append(joined)
     assert strings == ["Hello abc, ghi!", "Hello abc, jkl!", "Hello def, ghi!", "Hello def, jkl!"]
+
+
+def test_fails_to_infer_cascading_fstring_values():
+    source = """
+    value1 = "John"
+    value2 = f"Hello {value1}"
+    value3 = f"{value2}, how are you today?"
+    """
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[2].value)  # value of value3 = ...
+    unresolved, values = tree.infer_values()
+    assert unresolved
+    joined = Tree.string_from_consts(values[0])
+    # assert joined == "Hello John, how are you today?"

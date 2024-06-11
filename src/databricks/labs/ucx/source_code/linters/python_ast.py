@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import abc
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import TypeVar
 
-from astroid import Assign, Attribute, Call, Name, parse, Module, NodeNG, Const, Import, ImportFrom  # type: ignore
+from astroid import Assign, Attribute, Call, Const, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
 
 logger = logging.getLogger(__file__)
 
@@ -130,6 +130,49 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
+    def infer_values(self) -> tuple[bool, list[list[NodeNG]]]:
+        result: list[list[NodeNG]] = []
+        unresolved = 0
+        all_inferred = self._infer_values()
+        for one_inferred in all_inferred:
+            atoms = list(one_inferred)
+            result.append(atoms)
+            unresolved += any(atom is Uninferable for atom in atoms)
+        return unresolved > 0, result
+
+    def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
+        # deal with node types that don't implement 'inferred()'
+        if self._root is Uninferable or isinstance(self._root, Const):
+            yield [self._root]
+        elif isinstance(self._root, JoinedStr):
+            yield from self._infer_values_from_joined_string()
+        elif isinstance(self._root, FormattedValue):
+            yield from Tree(self._root.value)._infer_values()
+        else:
+            for inferred in self._root.inferred():
+                yield from Tree(inferred)._infer_values()
+
+    def _infer_values_from_joined_string(self) -> Iterator[Iterable[NodeNG]]:
+        assert isinstance(self._root, JoinedStr)
+        yield from self._infer_values_from_joined_values(self._root.values)
+
+    @classmethod
+    def _infer_values_from_joined_values(cls, nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
+        if len(nodes) == 1:
+            yield from Tree(nodes[0])._infer_values()
+            return
+        for firsts in Tree(nodes[0])._infer_values():
+            for remains in cls._infer_values_from_joined_values(nodes[1:]):
+                yield list(firsts) + list(remains)
+
+    @classmethod
+    def string_from_consts(cls, nodes: Iterable[NodeNG]) -> str:
+        atoms: list[str] = []
+        for atom in nodes:
+            if isinstance(atom, Const):
+                atoms.append(str(atom.value))
+        return "".join(atoms)
+
 
 class TreeVisitor:
 
@@ -219,3 +262,4 @@ class NodeBase(abc.ABC):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {repr(self._node)}>"
+
