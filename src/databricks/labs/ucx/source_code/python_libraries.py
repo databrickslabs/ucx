@@ -29,25 +29,17 @@ class PythonLibraryResolver(LibraryResolver):
         self._whitelist = whitelist
         self._runner = runner
 
-    def register_library(
-        self, path_lookup: PathLookup, *libraries: str, installation_arguments: list[str] | None = None
-    ) -> list[DependencyProblem]:
+    def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
         This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
         bother about parsing cross-version dependencies in our code."""
-        compatibility_problems, install_libraries = [], []
-        for library in libraries:
-            compatibility = self._whitelist.distribution_compatibility(library)
+        if len(libraries) == 0:
+            return []
+        if len(libraries) == 1:  # Multiple libraries might be installation flags
+            compatibility = self._whitelist.distribution_compatibility(libraries[0])
             if compatibility.known:
-                compatibility_problems.extend(compatibility.problems)
-            else:
-                install_libraries.append(library)
-        install_problems = []
-        if len(install_libraries) > 0:
-            install_problems = self._install_library(
-                path_lookup, *install_libraries, installation_arguments=installation_arguments or []
-            )
-        return compatibility_problems + install_problems
+                return compatibility.problems
+        return self._install_library(path_lookup, *libraries)
 
     @cached_property
     def _temporary_virtual_environment(self):
@@ -58,54 +50,34 @@ class PythonLibraryResolver(LibraryResolver):
         lib_install_folder = tempfile.mkdtemp(prefix='ucx-')
         return Path(lib_install_folder).resolve()
 
-    def _install_library(
-        self, path_lookup: PathLookup, *libraries: str, installation_arguments: list[str]
-    ) -> list[DependencyProblem]:
+    def _install_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
         path_lookup.append_path(self._temporary_virtual_environment)
-        resolved_libraries, resolved_installation_arguments = self._resolve_libraries(
-            path_lookup, *libraries, installation_arguments=installation_arguments
-        )
+        resolved_libraries = self._resolve_libraries(path_lookup, *libraries)
         if libraries[0].endswith(".egg"):
             return self._install_egg(*resolved_libraries)
-        return self._install_pip(*resolved_libraries, installation_arguments=resolved_installation_arguments)
+        return self._install_pip(*resolved_libraries)
 
     @staticmethod
-    def _resolve_libraries(
-        path_lookup: PathLookup, *libraries: str, installation_arguments: list[str]
-    ) -> tuple[list[str], list[str]]:
+    def _resolve_libraries(path_lookup: PathLookup, *libraries: str) -> list[str]:
         # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
-        libs, args = [], installation_arguments.copy()
+        libs = []
         for library in libraries:
             maybe_library = path_lookup.resolve(Path(library))
             if maybe_library is None:
                 libs.append(library)
             else:
-                args = [maybe_library.as_posix() if arg == library else arg for arg in args]
                 libs.append(maybe_library.as_posix())
-        return libs, args
+        return libs
 
-    def _install_pip(self, *libraries: str, installation_arguments: list[str]) -> list[DependencyProblem]:
-        problems = []
-        venv = self._temporary_virtual_environment
-        if len(installation_arguments) == 0:
-            install_command = f"pip install {shlex.join(libraries)} -t {venv}"
-        else:
-            # pip allows multiple target directories in its call, it uses the last one, thus the one added here
-            install_command = f"pip install {shlex.join(installation_arguments)} -t {venv}"
-            missing_libraries = ",".join([library for library in libraries if library not in installation_arguments])
-            if len(missing_libraries) > 0:
-                problem = DependencyProblem(
-                    "library-install-failed",
-                    f"Missing libraries '{missing_libraries}' in installation command '{install_command}'",
-                )
-                problems.append(problem)
+    def _install_pip(self, *libraries: str) -> list[DependencyProblem]:
+        install_command = f"pip install {shlex.join(libraries)} -t {self._temporary_virtual_environment}"
         return_code, stdout, stderr = self._runner(install_command)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
             problem = DependencyProblem("library-install-failed", f"'{install_command}' failed with '{stderr}'")
-            problems.append(problem)
-        return problems
+            return [problem]
+        return []
 
     def _install_egg(self, *libraries: str) -> list[DependencyProblem]:
         """Install eggs using easy_install.

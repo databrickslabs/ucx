@@ -62,27 +62,9 @@ def test_python_library_resolver_installs_with_command(mock_path_lookup):
         return 0, "", ""
 
     python_library_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
-    problems = python_library_resolver.register_library(
-        mock_path_lookup, "library.whl", installation_arguments=["library.whl", "--verbose"]
-    )
+    problems = python_library_resolver.register_library(mock_path_lookup, "library.whl", "--verbose")
 
     assert len(problems) == 0
-
-
-def test_python_library_resolver_warns_when_install_command_misses_library(mock_path_lookup):
-    def mock_pip_install(_):
-        return 0, "", ""
-
-    python_library_resolver = PythonLibraryResolver(Whitelist(), mock_pip_install)
-    problems = python_library_resolver.register_library(
-        mock_path_lookup, "library.whl", installation_arguments=["other_library.whl", "--verbose"]
-    )
-
-    assert len(problems) == 1
-    assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith(
-        "Missing libraries 'library.whl' in installation command 'pip install other_library.whl --verbose"
-    )
 
 
 def test_python_library_resolver_installs_multiple_eggs(mock_path_lookup):

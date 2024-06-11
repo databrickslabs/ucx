@@ -53,7 +53,7 @@ def test_pip_cell_build_dependency_graph_invokes_register_library():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.register_library.assert_called_once_with("databricks", installation_arguments=[])
+    graph.register_library.assert_called_once_with("databricks")
 
 
 def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
@@ -66,7 +66,7 @@ def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Missing arguments in '%pip install'"
+    assert problems[0].message == "Missing arguments after '%pip install'"
     graph.register_library.assert_not_called()
 
 
@@ -88,13 +88,27 @@ def test_pip_cell_build_dependency_graph_reports_unsupported_command():
     graph = create_autospec(DependencyGraph)
 
     code = "%pip freeze"
-    cell = PipCell(code)
+    cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
     assert problems[0].message == "Unsupported %pip command: freeze"
+    graph.register_library.assert_not_called()
+
+
+def test_pip_cell_build_dependency_graph_reports_missing_command():
+    graph = create_autospec(DependencyGraph)
+
+    code = "%pip"
+    cell = PipCell(code, original_offset=1)
+
+    problems = cell.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message == "Missing command after '%pip'"
     graph.register_library.assert_not_called()
 
 
@@ -147,7 +161,7 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 0
-    graph.register_library.assert_called_once_with("databricks", installation_arguments=[])
+    graph.register_library.assert_called_once_with("databricks")
 
 
 @pytest.mark.parametrize(
