@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import sys
+
 from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import NodeNG  # type: ignore
-from typing_extensions import Self
 
 from databricks.sdk.service import compute
 
+if sys.version_info[1] < 11:
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
