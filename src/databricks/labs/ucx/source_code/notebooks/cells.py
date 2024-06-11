@@ -36,7 +36,7 @@ class Cell(ABC):
     def original_offset(self) -> int:
         """Line offset of this cell within the original notebook file.
 
-        Example: if the line offset is 5, then line 5 within this cell corresponds to line 10 of the original file.
+        Example: if the line offset is 5, then line 4 within this cell corresponds to line 9 of the original file.
         """
         return self._original_offset
 
