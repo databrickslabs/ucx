@@ -12,7 +12,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
 
 
 @dataclass
@@ -69,21 +69,22 @@ class QueryMatcher(Matcher):
 
     def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-        try:
-            for inferred in table_arg.inferred():
-                yield from self._lint_table_arg(from_table, node, inferred)
-        except InferenceError:
-            yield Advisory.from_node(
-                code='table-migrate',
-                message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
-                node=node,
-            )
+        if table_arg:
+            try:
+                for inferred in Tree(table_arg).infer_values():
+                    yield from self._lint_table_arg(from_table, node, inferred)
+            except InferenceError:
+                yield Advisory.from_node(
+                    code='table-migrate',
+                    message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
+                    node=node,
+                )
 
     @classmethod
-    def _lint_table_arg(cls, from_table: FromTable, call_node: NodeNG, inferred: NodeNG):
-        if isinstance(inferred, Const):
-            for advice in from_table.lint(inferred.value):
-                yield advice.replace_from_node(inferred)
+    def _lint_table_arg(cls, from_table: FromTable, call_node: NodeNG, inferred: InferredValue):
+        if inferred.is_inferred():
+            for advice in from_table.lint(inferred.as_string()):
+                yield advice.replace_from_node(call_node)
         else:
             yield Advisory.from_node(
                 code='table-migrate',

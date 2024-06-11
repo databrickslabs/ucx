@@ -1,6 +1,7 @@
 import sys
 name_1 = "whatever"
-sys.path.append(f"{name_1}")
-names = [ f"{name_1}", name_1 ]
+name_2 = f"{name_1}"
+sys.path.append(f"{name_2}")
+names = [ f"{name_2}", name_2 ]
 for name in names:
     sys.path.append(name)

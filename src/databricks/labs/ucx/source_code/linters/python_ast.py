@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import abc
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import TypeVar
 
-from astroid import Attribute, Call, Name, parse, Module, NodeNG, Const, Import, ImportFrom  # type: ignore
+from astroid import Assign, Attribute, Call, Const, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
 
 logger = logging.getLogger(__file__)
 
@@ -130,6 +130,64 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
+    def infer_values(self) -> Iterable[InferredValue]:
+        for inferred_atoms in self._infer_values():
+            yield InferredValue(inferred_atoms)
+
+    def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
+        # deal with node types that don't implement 'inferred()'
+        if self._root is Uninferable or isinstance(self._root, Const):
+            yield [self._root]
+        elif isinstance(self._root, JoinedStr):
+            yield from self._infer_values_from_joined_string()
+        elif isinstance(self._root, FormattedValue):
+            yield from _LocalTree(self._root.value).do_infer_values()
+        else:
+            for inferred in self._root.inferred():
+                # work around infinite recursion of empty lists
+                if inferred == self._root:
+                    continue
+                yield from _LocalTree(inferred).do_infer_values()
+
+    def _infer_values_from_joined_string(self) -> Iterator[Iterable[NodeNG]]:
+        assert isinstance(self._root, JoinedStr)
+        yield from self._infer_values_from_joined_values(self._root.values)
+
+    @classmethod
+    def _infer_values_from_joined_values(cls, nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
+        if len(nodes) == 1:
+            yield from _LocalTree(nodes[0]).do_infer_values()
+            return
+        for firsts in _LocalTree(nodes[0]).do_infer_values():
+            for remains in cls._infer_values_from_joined_values(nodes[1:]):
+                yield list(firsts) + list(remains)
+
+
+class _LocalTree(Tree):
+    """class that avoids pylint W0212 protected-access warning"""
+
+    def do_infer_values(self):
+        return self._infer_values()
+
+
+class InferredValue:
+    """Represents 1 or more nodes that together represent the value.
+    The list of nodes typically holds one Const element, but for f-strings it
+    can hold multiple ones, including Uninferable nodes."""
+
+    def __init__(self, atoms: Iterable[NodeNG]):
+        self._atoms = list(atoms)
+
+    def nodes(self):
+        return self._atoms
+
+    def is_inferred(self):
+        return all(atom is not Uninferable for atom in self._atoms)
+
+    def as_string(self):
+        strings = [str(const.value) for const in filter(lambda atom: isinstance(atom, Const), self._atoms)]
+        return "".join(strings)
+
 
 class TreeVisitor:
 
@@ -161,6 +219,11 @@ class MatchingVisitor(TreeVisitor):
     @property
     def matched_nodes(self):
         return self._matched_nodes
+
+    def visit_assign(self, node: Assign):
+        if self._node_type is not Assign:
+            return
+        self._matched_nodes.append(node)
 
     def visit_call(self, node: Call):
         if self._node_type is not Call:

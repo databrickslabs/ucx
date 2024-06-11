@@ -1,5 +1,5 @@
 import pytest
-from astroid import Attribute, Call, Const, Expr  # type: ignore
+from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
 
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -83,3 +83,74 @@ def test_tree_walks_nodes_once():
         nodes.add(node)
         count += 1
     assert len(nodes) == count
+
+
+def test_infers_empty_list():
+    tree = Tree.parse("a=[]")
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)
+    values = list(tree.infer_values())
+    assert not values
+
+
+def test_infers_empty_tuple():
+    tree = Tree.parse("a=tuple()")
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)
+    values = list(tree.infer_values())
+    assert not values
+
+
+def test_infers_empty_set():
+    tree = Tree.parse("a={}")
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)
+    values = list(tree.infer_values())
+    assert not values
+
+
+def test_infers_fstring_value():
+    source = """
+value = "abc"
+fstring = f"Hello {value}!"
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of fstring = ...
+    values = list(tree.infer_values())
+    assert all(value.is_inferred() for value in values)
+    strings = list(value.as_string() for value in values)
+    assert strings == ["Hello abc!"]
+
+
+def test_infers_fstring_values():
+    source = """
+values_1 = ["abc", "def"]
+for value1 in values_1:
+    values_2 = ["ghi", "jkl"]
+    for value2 in values_2:
+        fstring = f"Hello {value1}, {value2}!"
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[2].value)  # value of fstring = ...
+    values = list(tree.infer_values())
+    assert all(value.is_inferred() for value in values)
+    strings = list(value.as_string() for value in values)
+    assert strings == ["Hello abc, ghi!", "Hello abc, jkl!", "Hello def, ghi!", "Hello def, jkl!"]
+
+
+def test_fails_to_infer_cascading_fstring_values():
+    # The purpose of this test s to detect a change in astroid support for f-strings
+    source = """
+    value1 = "John"
+    value2 = f"Hello {value1}"
+    value3 = f"{value2}, how are you today?"
+    """
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[2].value)  # value of value3 = ...
+    values = list(tree.infer_values())
+    # for now, we simply check failure to infer!
+    assert any(not value.is_inferred() for value in values)
+    # the expected value would be ["Hello John, how are you today?"]

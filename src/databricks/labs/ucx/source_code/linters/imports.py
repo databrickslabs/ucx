@@ -14,11 +14,10 @@ from astroid import (  # type: ignore
     ImportFrom,
     Name,
     NodeNG,
-    Uninferable,
 )
 
 from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor, InferredValue
 
 logger = logging.getLogger(__name__)
 
@@ -224,19 +223,19 @@ class SysPathChangesVisitor(TreeVisitor):
             relative = True
             changed = changed.args[0]
         try:
-            for inferred in changed.inferred():
+            for inferred in Tree(changed).infer_values():
                 self._visit_inferred(changed, inferred, relative, is_append)
         except InferenceError:
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
 
-    def _visit_inferred(self, changed: NodeNG, inferred: NodeNG, is_relative: bool, is_append: bool):
-        if inferred is Uninferable or not isinstance(inferred, Const):
+    def _visit_inferred(self, changed: NodeNG, inferred: InferredValue, is_relative: bool, is_append: bool):
+        if not inferred.is_inferred():
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))
             return
         if is_relative:
-            self.sys_path_changes.append(RelativePath(changed, inferred.value, is_append))
+            self.sys_path_changes.append(RelativePath(changed, inferred.as_string(), is_append))
         else:
-            self.sys_path_changes.append(AbsolutePath(changed, inferred.value, is_append))
+            self.sys_path_changes.append(AbsolutePath(changed, inferred.as_string(), is_append))
 
     def _match_aliases(self, node: NodeNG, names: list[str]):
         if isinstance(node, Attribute):
