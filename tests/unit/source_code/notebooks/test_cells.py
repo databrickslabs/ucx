@@ -2,6 +2,8 @@ from pathlib import Path
 from unittest.mock import create_autospec
 import yaml
 
+import pytest
+
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
@@ -64,7 +66,7 @@ def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Missing arguments in '%pip install'"
+    assert problems[0].message == "Missing arguments after '%pip install'"
     graph.register_library.assert_not_called()
 
 
@@ -78,7 +80,35 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Unsupported %pip command: installl"
+    assert "installl" in problems[0].message  # Message coming directly from pip
+    graph.register_library.assert_not_called()
+
+
+def test_pip_cell_build_dependency_graph_reports_unsupported_command():
+    graph = create_autospec(DependencyGraph)
+
+    code = "%pip freeze"
+    cell = PipCell(code, original_offset=1)
+
+    problems = cell.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message == "Unsupported %pip command: freeze"
+    graph.register_library.assert_not_called()
+
+
+def test_pip_cell_build_dependency_graph_reports_missing_command():
+    graph = create_autospec(DependencyGraph)
+
+    code = "%pip"
+    cell = PipCell(code, original_offset=1)
+
+    problems = cell.build_dependency_graph(graph)
+
+    assert len(problems) == 1
+    assert problems[0].code == "library-install-failed"
+    assert problems[0].message == "Missing command after '%pip'"
     graph.register_library.assert_not_called()
 
 
@@ -97,7 +127,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message.startswith("Failed to install unknown-library-name")
+    assert problems[0].message.startswith("'pip install unknown-library-name")
 
 
 def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lookup):
@@ -132,3 +162,32 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
 
     assert len(problems) == 0
     graph.register_library.assert_called_once_with("databricks")
+
+
+@pytest.mark.parametrize(
+    "code,split",
+    [
+        ("%pip install foo", ["%pip", "install", "foo"]),
+        ("%pip install", ["%pip", "install"]),
+        ("%pip installl foo", ["%pip", "installl", "foo"]),
+        ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        ("%pip install foo --index-url bar\nmore code", ["%pip", "install", "foo", "--index-url", "bar"]),
+        (
+            "%pip install foo --index-url bar\\\n -t /tmp/",
+            ["%pip", "install", "foo", "--index-url", "bar", "-t", "/tmp/"],
+        ),
+        ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
+        (
+            "%pip install ./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl",
+            ["%pip", "install", "./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"],
+        ),
+        (
+            "%pip install distribution/dist/thingy-0.0.1-py2.py3-none-any.whl",
+            ["%pip", "install", "distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"],
+        ),
+    ],
+)
+def test_pip_cell_split(code, split):
+    assert PipCell._split(code) == split  # pylint: disable=protected-access

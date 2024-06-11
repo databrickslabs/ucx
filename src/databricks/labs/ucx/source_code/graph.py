@@ -49,8 +49,8 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_library(self, library: str) -> list[DependencyProblem]:
-        return self._resolver.register_library(self.path_lookup, library)
+    def register_library(self, *libraries: str) -> list[DependencyProblem]:
+        return self._resolver.register_library(self.path_lookup, *libraries)
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -288,7 +288,7 @@ class WrappingLoader(DependencyLoader):
 
 class LibraryResolver(abc.ABC):
     @abc.abstractmethod
-    def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
+    def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         pass
 
 
@@ -349,8 +349,8 @@ class DependencyResolver:
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
 
-    def register_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
-        return self._library_resolver.register_library(path_lookup, Path(library))
+    def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
+        return self._library_resolver.register_library(path_lookup, *libraries)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.

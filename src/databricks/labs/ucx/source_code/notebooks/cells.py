@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shlex
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
@@ -202,16 +203,32 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
+    @staticmethod
+    def _split(code) -> list[str]:
+        """Split pip cell code into multiple arguments
+
+        Note:
+            PipCell should be a pip command, i.e. single line possible spanning multilines escaped with backslashes.
+
+        Sources:
+            https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
+        """
+        match = re.search(r"(?<!\\)\n", code)
+        if match:
+            code = code[: match.start()]  # Remove code after non-escaped newline
+        code = code.replace("\\\n", " ")
+        lexer = shlex.split(code, posix=True)
+        return list(lexer)
+
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        # TODO: this is very basic code, we need to improve it
-        splits = re.split(r" |\n", self.original_code)
-        if len(splits) < 3:
-            return [DependencyProblem("library-install-failed", f"Missing arguments in '{self.original_code}'")]
-        if splits[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {splits[1]}")]
-        # TODO: we need to support different formats of the library name and etc
-        library = splits[2]
-        return graph.register_library(library)
+        argv = self._split(self.original_code)
+        if len(argv) == 1:
+            return [DependencyProblem("library-install-failed", "Missing command after '%pip'")]
+        if argv[1] != "install":
+            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {argv[1]}")]
+        if len(argv) == 2:
+            return [DependencyProblem("library-install-failed", "Missing arguments after '%pip install'")]
+        return graph.register_library(*argv[2:])  # Skipping %pip install
 
 
 class CellLanguage(Enum):
