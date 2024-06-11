@@ -51,9 +51,9 @@ for i in range(10):
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
-            start_col=23,
+            start_col=13,
             end_line=3,
-            end_col=49,
+            end_col=50,
         ),
     ]
 
@@ -81,9 +81,9 @@ for i in range(10):
             code='table-migrate',
             message='Table old.things is migrated to brand.new.stuff in Unity Catalog',
             start_line=3,
-            start_col=44,
+            start_col=13,
             end_line=3,
-            end_col=70,
+            end_col=71,
         ),
     ]
 
