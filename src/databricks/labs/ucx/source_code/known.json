@@ -404,7 +404,7 @@
     "fsspec.utils": []
   },
   "gast": {
-    "gast": [],
+    "gast": []
   },
   "gitdb": {
     "gitdb": []
