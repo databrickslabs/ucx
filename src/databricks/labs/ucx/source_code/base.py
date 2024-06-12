@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import NodeNG  # type: ignore
-from typing_extensions import Self
 
 from databricks.sdk.service import compute
 
@@ -36,14 +35,14 @@ class Advice:
     end_col: int
 
     def replace(
-        self: Self,
+        self,
         code: str | None = None,
         message: str | None = None,
         start_line: int | None = None,
         start_col: int | None = None,
         end_line: int | None = None,
         end_col: int | None = None,
-    ) -> Self:
+    ) -> Advice:
         return type(self)(
             code=code if code is not None else self.code,
             message=message if message is not None else self.message,
@@ -69,7 +68,7 @@ class Advice:
         return LocatedAdvice(self, path)
 
     @classmethod
-    def from_node(cls, code: str, message: str, node: NodeNG) -> Self:
+    def from_node(cls, code: str, message: str, node: NodeNG) -> Advice:
         # Astroid lines are 1-based.
         return cls(
             code=code,
@@ -80,7 +79,7 @@ class Advice:
             end_col=node.end_col_offset,
         )
 
-    def replace_from_node(self, node: NodeNG) -> Self:
+    def replace_from_node(self, node: NodeNG) -> Advice:
         # Astroid lines are 1-based.
         return self.replace(
             start_line=(node.lineno or 1) - 1,

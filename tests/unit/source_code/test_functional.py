@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import tokenize
 from collections.abc import Iterable, Generator
@@ -6,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from typing_extensions import Self
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
 from databricks.labs.ucx.source_code.base import Advice
@@ -22,7 +23,7 @@ class Comment:
     end_line: int
 
     @classmethod
-    def from_token(cls, token: tokenize.TokenInfo) -> Self:
+    def from_token(cls, token: tokenize.TokenInfo) -> Comment:
         # Python's tokenizer uses 1-based line numbers.
         return cls(text=token.string, start_line=token.start[0] - 1, end_line=token.end[0] - 1)
 
@@ -43,7 +44,7 @@ class Expectation:
         return f"# ucx[{self.code}:{self.start_line}:{self.start_col}:{self.end_line}:{self.end_col}] {self.message}"
 
     @classmethod
-    def from_advice(cls, advice: Advice) -> Self:
+    def from_advice(cls, advice: Advice) -> Expectation:
         """Convenience conversion factory."""
         return cls(
             code=advice.code,
