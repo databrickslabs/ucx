@@ -1,9 +1,14 @@
 import pytest
 from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
 
-from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
+
+def test_extracts_root():
+    tree = Tree.parse("o.m1().m2().m3()")
+    stmt = tree.first_statement()
+    root = Tree(stmt).root
+    assert root == tree.node
 
 def test_extract_call_by_name():
     tree = Tree.parse("o.m1().m2().m3()")
@@ -155,5 +160,4 @@ value3 = f"{value2}, how are you today?"
     # for now, we simply check failure to infer!
     assert any(not value.is_inferred() for value in values)
     # the expected value would be ["Hello John, how are you today?"]
-
 

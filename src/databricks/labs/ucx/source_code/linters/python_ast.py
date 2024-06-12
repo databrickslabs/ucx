@@ -29,6 +29,13 @@ class Tree:
     def node(self):
         return self._node
 
+    @property
+    def root(self):
+        node = self._node
+        while node.parent:
+            node = node.parent
+        return node
+
     def walk(self) -> Iterable[NodeNG]:
         yield from self._walk(self._node)
 
