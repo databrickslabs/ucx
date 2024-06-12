@@ -21,7 +21,7 @@ class LinterContext:
             Language.PYTHON: SequentialLinter(
                 [
                     SparkSql(from_table, index),
-                    DBFSUsageLinter(),
+                    DBFSUsageLinter(session_state),
                     DBRv8d0Linter(dbr_version=None),
                     SparkConnectLinter(is_serverless=False),
                     DbutilsLinter(),

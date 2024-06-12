@@ -11,6 +11,7 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
     Failure,
+    CurrentSessionState,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
@@ -24,6 +25,7 @@ class Matcher(ABC):
     table_arg_index: int
     table_arg_name: str | None = None
     call_context: dict[str, set[str]] | None = None
+    session_state: CurrentSessionState | None = None
 
     def matches(self, node: NodeNG):
         return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
@@ -72,7 +74,7 @@ class QueryMatcher(Matcher):
         table_arg = self._get_table_arg(node)
         if table_arg:
             try:
-                for inferred in Tree(table_arg).infer_values():
+                for inferred in Tree(table_arg).infer_values(self.session_state):
                     yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(

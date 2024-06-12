@@ -16,7 +16,7 @@ from astroid import (  # type: ignore
     NodeNG,
 )
 
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory
+from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor, InferredValue
 
 logger = logging.getLogger(__name__)
@@ -146,8 +146,8 @@ class DbutilsLinter(Linter):
 class SysPathChange(NodeBase, abc.ABC):
 
     @staticmethod
-    def extract_from_tree(tree: Tree) -> list[SysPathChange]:
-        visitor = SysPathChangesVisitor()
+    def extract_from_tree(session_state: CurrentSessionState, tree: Tree) -> list[SysPathChange]:
+        visitor = SysPathChangesVisitor(session_state)
         visitor.visit(tree.node)
         return visitor.sys_path_changes
 
@@ -186,8 +186,9 @@ class UnresolvedPath(SysPathChange):
 
 class SysPathChangesVisitor(TreeVisitor):
 
-    def __init__(self) -> None:
+    def __init__(self, session_state: CurrentSessionState) -> None:
         super()
+        self._session_state = session_state
         self._aliases: dict[str, str] = {}
         self.sys_path_changes: list[SysPathChange] = []
 
@@ -223,7 +224,7 @@ class SysPathChangesVisitor(TreeVisitor):
             relative = True
             changed = changed.args[0]
         try:
-            for inferred in Tree(changed).infer_values():
+            for inferred in Tree(changed).infer_values(self._session_state):
                 self._visit_inferred(changed, inferred, relative, is_append)
         except InferenceError:
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))

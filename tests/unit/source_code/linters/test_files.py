@@ -4,6 +4,8 @@ from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
+
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
@@ -95,16 +97,18 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     folder_loader = FolderLoader(file_loader)
     whitelist = Whitelist()
     pip_resolver = PythonLibraryResolver(whitelist)
+    session_state = CurrentSessionState()
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
+        session_state,
     )
     path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
     prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
     linter = LocalCodeLinter(
-        file_loader, folder_loader, mock_path_lookup, resolver, lambda: LinterContext(migration_index)
+        file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
     advices = linter.lint(prompts, None)
     assert not advices
@@ -149,10 +153,18 @@ def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
+    session_state = CurrentSessionState()
     whitelist = Whitelist()
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, whitelist)
     pip_resolver = PythonLibraryResolver(whitelist)
-    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
-    linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: LinterContext(migration_index))
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup, session_state)
+    linter = LocalCodeLinter(
+        file_loader,
+        folder_loader,
+        path_lookup,
+        session_state,
+        resolver,
+        lambda: LinterContext(migration_index, session_state),
+    )
     linter.lint(MockPrompts({}), path)

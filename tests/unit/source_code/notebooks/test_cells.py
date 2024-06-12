@@ -4,6 +4,7 @@ import yaml
 
 import pytest
 
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
@@ -117,8 +118,10 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
     pip_resolver = PythonLibraryResolver(Whitelist())
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
-    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
+    dependency_resolver = DependencyResolver(
+        pip_resolver, notebook_resolver, [], mock_path_lookup, CurrentSessionState()
+    )
+    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
     code = "%pip install unknown-library-name"
     cell = PipCell(code, original_offset=1)
@@ -138,8 +141,10 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     file_loader = FileLoader()
     pip_resolver = PythonLibraryResolver(whitelist)
     import_resolver = ImportFileResolver(file_loader, whitelist)
-    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
-    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
+    dependency_resolver = DependencyResolver(
+        pip_resolver, notebook_resolver, import_resolver, mock_path_lookup, CurrentSessionState()
+    )
+    graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
     whl = Path(__file__).parent / '../samples/distribution/dist/thingy-0.0.1-py2.py3-none-any.whl'
 

@@ -7,6 +7,7 @@ import pytest
 from databricks.sdk.service.jobs import Job
 from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineResponse, PipelineLibrary, FileLibrary
 
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.sdk import WorkspaceClient
@@ -38,6 +39,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
+        CurrentSessionState(),
     )
     return resolver
 
@@ -45,7 +47,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
 @pytest.fixture
 def graph(mock_path_lookup, dependency_resolver) -> DependencyGraph:
     dependency = Dependency(FileLoader(), Path("test"))
-    dependency_graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup)
+    dependency_graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
     return dependency_graph
 
 

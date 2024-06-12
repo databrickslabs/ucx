@@ -4,6 +4,7 @@ import re
 import pytest
 from databricks.sdk.service.workspace import Language, ObjectType, ObjectInfo
 
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyGraph, SourceContainer, DependencyResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
@@ -133,14 +134,16 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     notebook_resolver = NotebookResolver(notebook_loader)
     library_resolver = PythonLibraryResolver(Whitelist())
     import_resolver = ImportFileResolver(FileLoader(), Whitelist())
-    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)
+    return DependencyResolver(
+        library_resolver, notebook_resolver, import_resolver, mock_path_lookup, CurrentSessionState()
+    )
 
 
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path("leaf1.py"))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     problems = container.build_dependency_graph(graph)
@@ -158,7 +161,7 @@ def test_notebook_builds_depth1_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     problems = container.build_dependency_graph(graph)
@@ -171,7 +174,7 @@ def test_notebook_builds_depth2_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     problems = container.build_dependency_graph(graph)
@@ -184,7 +187,7 @@ def test_notebook_builds_dependency_graph_avoiding_duplicates(mock_path_lookup) 
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     problems = container.build_dependency_graph(graph)
@@ -198,7 +201,7 @@ def test_notebook_builds_cyclical_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     problems = container.build_dependency_graph(graph)
@@ -211,7 +214,7 @@ def test_notebook_builds_python_dependency_graph(mock_path_lookup) -> None:
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     problems = container.build_dependency_graph(graph)
@@ -224,7 +227,7 @@ def test_notebook_builds_python_dependency_graph_with_loop(mock_path_lookup) -> 
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(path))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     container.build_dependency_graph(graph)
@@ -237,7 +240,7 @@ def test_notebook_builds_python_dependency_graph_with_fstring_loop(mock_path_loo
     resolver = dependency_resolver(mock_path_lookup)
     maybe = resolver.resolve_notebook(mock_path_lookup, Path(path))
     assert maybe.dependency is not None
-    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup)
+    graph = DependencyGraph(maybe.dependency, None, resolver, mock_path_lookup, CurrentSessionState())
     container = maybe.dependency.load(mock_path_lookup)
     assert container is not None
     container.build_dependency_graph(graph)

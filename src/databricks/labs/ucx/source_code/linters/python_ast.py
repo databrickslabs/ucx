@@ -190,7 +190,7 @@ class _LocalTree(Tree):
 
 class _ContextualCall(NodeNG):
 
-    def __init__(self, state: CurrentSessionState, node: NodeNG):
+    def __init__(self, session_state: CurrentSessionState, node: NodeNG):
         super().__init__(
             lineno=node.lineno,
             col_offset=node.col_offset,
@@ -198,7 +198,7 @@ class _ContextualCall(NodeNG):
             end_col_offset=node.end_col_offset,
             parent=node.parent,
         )
-        self._state = state
+        self._session_state = session_state
 
     @decorators.raise_if_nothing_inferred
     def _infer(
@@ -213,12 +213,12 @@ class _ContextualCall(NodeNG):
             yield Uninferable
             return
         arg = call_context.args[0]
-        for inferred in Tree(arg).infer_values():
+        for inferred in Tree(arg).infer_values(self._session_state):
             if not inferred.is_inferred():
                 yield Uninferable
                 continue
             name = inferred.as_string()
-            named_parameters = self._state.named_parameters
+            named_parameters = self._session_state.named_parameters
             if not named_parameters or name not in named_parameters:
                 yield Uninferable
                 continue

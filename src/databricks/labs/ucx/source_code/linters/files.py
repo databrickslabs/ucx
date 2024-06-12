@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import TextIO
 
-from databricks.labs.ucx.source_code.base import LocatedAdvice
+from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.known import Whitelist
@@ -88,12 +88,14 @@ class LocalCodeLinter:
         file_loader: FileLoader,
         folder_loader: FolderLoader,
         path_lookup: PathLookup,
+        session_state: CurrentSessionState,
         dependency_resolver: DependencyResolver,
         languages_factory: Callable[[], LinterContext],
     ) -> None:
         self._file_loader = file_loader
         self._folder_loader = folder_loader
         self._path_lookup = path_lookup
+        self._session_state = session_state
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._new_linter_context = languages_factory
@@ -116,7 +118,7 @@ class LocalCodeLinter:
     def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
         loader = self._folder_loader if path.is_dir() else self._file_loader
         dependency = Dependency(loader, path)
-        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)
+        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, self._session_state)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)

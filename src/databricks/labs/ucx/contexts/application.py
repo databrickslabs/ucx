@@ -15,6 +15,7 @@ from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
 from databricks.labs.ucx.recon.migration_recon import MigrationRecon
 from databricks.labs.ucx.recon.schema_comparator import StandardSchemaComparator
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.sdk import AccountClient, WorkspaceClient, core
 from databricks.sdk.errors import ResourceDoesNotExist
@@ -376,6 +377,10 @@ class GlobalContext(abc.ABC):
         return PathLookup.from_sys_path(Path.cwd())
 
     @cached_property
+    def session_state(self):
+        return CurrentSessionState()
+
+    @cached_property
     def file_loader(self):
         return FileLoader()
 
@@ -393,7 +398,9 @@ class GlobalContext(abc.ABC):
 
     @cached_property
     def dependency_resolver(self):
-        return DependencyResolver(self.pip_resolver, self.notebook_resolver, self.file_resolver, self.path_lookup)
+        return DependencyResolver(
+            self.pip_resolver, self.notebook_resolver, self.file_resolver, self.path_lookup, self.session_state
+        )
 
     @cached_property
     def workflow_linter(self):
