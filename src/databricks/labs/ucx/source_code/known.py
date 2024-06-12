@@ -135,7 +135,11 @@ class Whitelist:
                 continue
             if module_path.name in {'__main__.py', '__version__.py', '__about__.py'}:
                 continue
-            cls._analyze_file(known_distributions, library_root, dist_info, module_path)
+            try:
+                cls._analyze_file(known_distributions, library_root, dist_info, module_path)
+            except RecursionError:
+                logger.error(f"Recursion error in {module_path}")
+                continue
 
     @classmethod
     def _analyze_file(cls, known_distributions, library_root, dist_info, module_path):
