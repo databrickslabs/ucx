@@ -9,14 +9,16 @@ from databricks.labs.ucx.source_code.queries import FromTable
 
 
 def test_spark_no_sql(empty_index):
-    ftf = FromTable(empty_index, CurrentSessionState())
+    session_state = CurrentSessionState()
+    ftf = FromTable(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index)
 
-    assert not list(sqf.lint("print(1)"))
+    assert not list(sqf.lint("print(1)", session_state))
 
 
 def test_spark_sql_no_match(empty_index):
-    ftf = FromTable(empty_index, CurrentSessionState())
+    session_state = CurrentSessionState()
+    ftf = FromTable(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index)
 
     old_code = """
@@ -25,11 +27,12 @@ for i in range(10):
     print(len(result))
 """
 
-    assert not list(sqf.lint(old_code))
+    assert not list(sqf.lint(old_code, session_state))
 
 
 def test_spark_sql_match(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
+    session_state = CurrentSessionState()
+    ftf = FromTable(migration_index, session_state)
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
@@ -38,7 +41,7 @@ for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert list(sqf.lint(old_code)) == [
+    assert list(sqf.lint(old_code, session_state)) == [
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: s3://bucket/path',
@@ -59,7 +62,8 @@ for i in range(10):
 
 
 def test_spark_sql_match_named(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
+    session_state = CurrentSessionState()
+    ftf = FromTable(migration_index, session_state)
     sqf = SparkSql(ftf, migration_index)
 
     old_code = """
@@ -68,7 +72,7 @@ for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert list(sqf.lint(old_code)) == [
+    assert list(sqf.lint(old_code, session_state)) == [
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
@@ -522,9 +526,10 @@ for i in range(10):
     ],
 )
 def test_spark_cloud_direct_access(empty_index, code, expected):
-    ftf = FromTable(empty_index, CurrentSessionState())
+    session_state = CurrentSessionState()
+    ftf = FromTable(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index)
-    advisories = list(sqf.lint(code))
+    advisories = list(sqf.lint(code, session_state))
     assert advisories == expected
 
 
@@ -541,11 +546,12 @@ FS_FUNCTIONS = [
 
 @pytest.mark.parametrize("fs_function", FS_FUNCTIONS)
 def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
-    ftf = FromTable(empty_index, CurrentSessionState())
+    session_state = CurrentSessionState()
+    ftf = FromTable(empty_index, session_state)
     sqf = SparkSql(ftf, empty_index)
     # ls function calls have to be from dbutils.fs, or we ignore them
     code = f"""spark.{fs_function}("/bucket/path")"""
-    advisories = list(sqf.lint(code))
+    advisories = list(sqf.lint(code, session_state))
     assert not advisories
 
 

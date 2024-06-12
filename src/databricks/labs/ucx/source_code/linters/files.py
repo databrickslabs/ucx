@@ -88,19 +88,23 @@ class LocalCodeLinter:
         file_loader: FileLoader,
         folder_loader: FolderLoader,
         path_lookup: PathLookup,
-        session_state: CurrentSessionState,
         dependency_resolver: DependencyResolver,
         languages_factory: Callable[[], LinterContext],
     ) -> None:
         self._file_loader = file_loader
         self._folder_loader = folder_loader
         self._path_lookup = path_lookup
-        self._session_state = session_state
         self._dependency_resolver = dependency_resolver
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._new_linter_context = languages_factory
 
-    def lint(self, prompts: Prompts, path: Path | None, stdout: TextIO = sys.stdout) -> list[LocatedAdvice]:
+    def lint(
+        self,
+        prompts: Prompts,
+        path: Path | None,
+        session_state: CurrentSessionState | None = None,
+        stdout: TextIO = sys.stdout,
+    ) -> list[LocatedAdvice]:
         """Lint local code files looking for problems in notebooks and python files."""
         if path is None:
             response = prompts.question(
@@ -109,16 +113,18 @@ class LocalCodeLinter:
                 validate=lambda p_: Path(p_).exists(),
             )
             path = Path(response)
-        located_advices = list(self.lint_path(path))
+        if session_state is None:
+            session_state = CurrentSessionState()
+        located_advices = list(self.lint_path(path, session_state))
         for located in located_advices:
             message = located.message_relative_to(path)
             stdout.write(f"{message}\n")
         return located_advices
 
-    def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
+    def lint_path(self, path: Path, session_state: CurrentSessionState) -> Iterable[LocatedAdvice]:
         loader = self._folder_loader if path.is_dir() else self._file_loader
         dependency = Dependency(loader, path)
-        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, self._session_state)
+        graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, session_state)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
         problems = container.build_dependency_graph(graph)
@@ -126,14 +132,14 @@ class LocalCodeLinter:
             problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
             yield problem.as_advisory().for_path(problem_path)
         for child_path in graph.all_paths:
-            yield from self._lint_one(child_path)
+            yield from self._lint_one(child_path, session_state)
 
-    def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
+    def _lint_one(self, path: Path, session_state: CurrentSessionState) -> Iterable[LocatedAdvice]:
         if path.is_dir():
             return []
         ctx = self._new_linter_context()
         linter = FileLinter(ctx, path)
-        return [advice.for_path(path) for advice in linter.lint()]
+        return [advice.for_path(path) for advice in linter.lint(session_state)]
 
 
 class LocalFileMigrator:
@@ -143,14 +149,16 @@ class LocalFileMigrator:
         self._extensions = {".py": Language.PYTHON, ".sql": Language.SQL}
         self._languages_factory = languages_factory
 
-    def apply(self, path: Path) -> bool:
+    def apply(self, path: Path, session_state: CurrentSessionState | None = None) -> bool:
+        if session_state is None:
+            session_state = CurrentSessionState()
         if path.is_dir():
             for child_path in path.iterdir():
-                self.apply(child_path)
+                self.apply(child_path, session_state)
             return True
-        return self._apply_file_fix(path)
+        return self._apply_file_fix(path, session_state)
 
-    def _apply_file_fix(self, path):
+    def _apply_file_fix(self, path: Path, session_state: CurrentSessionState):
         """
         The fix method reads a file, lints it, applies fixes, and writes the fixed code back to the file.
         """
@@ -175,7 +183,7 @@ class LocalFileMigrator:
                 return False
             applied = False
             # Lint the code and apply fixes
-            for advice in linter.lint(code):
+            for advice in linter.lint(code, session_state):
                 logger.info(f"Found: {advice}")
                 fixer = languages.fixer(language, advice.code)
                 if not fixer:

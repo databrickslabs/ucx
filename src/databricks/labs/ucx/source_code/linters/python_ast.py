@@ -148,7 +148,7 @@ class Tree:
             yield InferredValue(inferred_atoms)
 
     def contextualize(self, state: CurrentSessionState):
-        calls = self.locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
+        calls = Tree(self.root).locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
         for call in calls:
             call.func = _ContextualCall(state, call)
 
@@ -241,6 +241,7 @@ class InferredValue:
     def __init__(self, atoms: Iterable[NodeNG]):
         self._atoms = list(atoms)
 
+    @property
     def nodes(self):
         return self._atoms
 

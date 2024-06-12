@@ -7,7 +7,7 @@ def test_not_migrated_tables_trigger_nothing(empty_index):
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
 
-    assert not list(ftf.lint(old_query))
+    assert not list(ftf.lint(old_query, CurrentSessionState()))
 
 
 def test_migrated_tables_trigger_messages(migration_index):
@@ -32,7 +32,7 @@ def test_migrated_tables_trigger_messages(migration_index):
             end_line=0,
             end_col=1024,
         ),
-    ] == list(ftf.lint(old_query))
+    ] == list(ftf.lint(old_query, CurrentSessionState()))
 
 
 def test_fully_migrated_queries_match(migration_index):
@@ -61,7 +61,7 @@ def test_use_database_change(migration_index):
     USE newcatalog;
     SELECT * FROM things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1
     LIMIT 10"""
-    _ = list(ftf.lint(query))
+    _ = list(ftf.lint(query, CurrentSessionState()))
     assert ftf.schema == "newcatalog"
 
 

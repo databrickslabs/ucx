@@ -17,8 +17,8 @@ class TestDetectDBFS:
         ],
     )
     def test_detects_dbfs_paths(self, code, expected):
-        linter = DBFSUsageLinter(CurrentSessionState())
-        advices = list(linter.lint(code))
+        linter = DBFSUsageLinter()
+        advices = list(linter.lint(code, CurrentSessionState()))
         for advice in advices:
             assert isinstance(advice, Advisory)
         assert len(advices) == expected
@@ -46,8 +46,8 @@ for system in systems:
         ],
     )
     def test_dbfs_usage_linter(self, code, expected):
-        linter = DBFSUsageLinter(CurrentSessionState())
-        advices = linter.lint(code)
+        linter = DBFSUsageLinter()
+        advices = linter.lint(code, CurrentSessionState())
         count = 0
         for advice in advices:
             if isinstance(advice, Deprecation):
@@ -55,7 +55,7 @@ for system in systems:
         assert count == expected
 
     def test_dbfs_name(self):
-        linter = DBFSUsageLinter(CurrentSessionState())
+        linter = DBFSUsageLinter()
         assert linter.name() == "dbfs-usage"
 
 
@@ -73,7 +73,7 @@ for system in systems:
 )
 def test_non_dbfs_trigger_nothing(query):
     ftf = FromDbfsFolder()
-    assert not list(ftf.lint(query))
+    assert not list(ftf.lint(query, CurrentSessionState()))
 
 
 @pytest.mark.parametrize(
@@ -100,7 +100,7 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
             end_line=0,
             end_col=1024,
         ),
-    ] == list(ftf.lint(query))
+    ] == list(ftf.lint(query, CurrentSessionState()))
 
 
 def test_dbfs_queries_name():

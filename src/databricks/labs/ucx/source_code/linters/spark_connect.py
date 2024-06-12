@@ -7,6 +7,7 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
     Linter,
+    CurrentSessionState,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -181,7 +182,7 @@ class SparkConnectLinter(Linter):
             LoggingMatcher(is_serverless=is_serverless),
         ]
 
-    def lint(self, code: str) -> Iterator[Advice]:
+    def lint(self, code: str, session_state: CurrentSessionState) -> Iterator[Advice]:
         tree = Tree.parse(code)
         for matcher in self._matchers:
             yield from matcher.lint_tree(tree.node)

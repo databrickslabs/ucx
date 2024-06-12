@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.cells import RunCell
@@ -30,9 +30,9 @@ class NotebookMigrator:
         lookup = PathLookup.from_sys_path(Path.cwd())
         container = dependency.load(lookup)
         assert isinstance(container, Notebook)
-        return self._apply(container)
+        return self._apply(container, CurrentSessionState())
 
-    def _apply(self, notebook: Notebook) -> bool:
+    def _apply(self, notebook: Notebook, session_state) -> bool:
         changed = False
         for cell in notebook.cells:
             # %run is not a supported language, so this needs to come first
@@ -43,7 +43,7 @@ class NotebookMigrator:
                 continue
             if not self._languages.is_supported(cell.language.language):
                 continue
-            migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code)
+            migrated_code = self._languages.apply_fixes(cell.language.language, cell.original_code, session_state)
             if migrated_code != cell.original_code:
                 cell.migrated_code = migrated_code
                 changed = True

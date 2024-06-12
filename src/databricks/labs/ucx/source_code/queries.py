@@ -42,7 +42,7 @@ class FromTable(Linter, Fixer):
     def schema(self):
         return self._session_state.schema
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
         for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue

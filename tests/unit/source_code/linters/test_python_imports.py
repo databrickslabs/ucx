@@ -188,6 +188,6 @@ def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
     all_paths: list[str] = []
     for call in calls:
-        _, paths = call.get_notebook_paths()
+        _, paths = call.get_notebook_paths(CurrentSessionState())
         all_paths.extend(paths)
     assert all_paths == expected

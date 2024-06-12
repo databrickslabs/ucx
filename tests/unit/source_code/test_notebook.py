@@ -275,10 +275,11 @@ stuff2 = notebook.run("where is notebook 1?")
 
 def test_raises_advice_when_dbutils_notebook_run_is_too_complex() -> None:
     source = """
-name = "xyz"
-dbutils.notebook.run(f"Hey {name}")
+name1 = "John"
+name2 = f"{name1}"
+dbutils.notebook.run(f"Hey {name2}")
     """
     linter = DbutilsLinter()
-    advices = list(linter.lint(source))
+    advices = list(linter.lint(source, CurrentSessionState()))
     assert len(advices) == 1
     assert advices[0].code == "dbutils-notebook-run-dynamic"

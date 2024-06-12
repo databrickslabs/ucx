@@ -217,7 +217,7 @@ class DependencyGraph:
         yield from self.register_import(prefix + name)
 
     def _register_notebook(self, base_node: NotebookRunCall):
-        has_unresolved, paths = base_node.get_notebook_paths()
+        has_unresolved, paths = base_node.get_notebook_paths(self._session_state)
         if has_unresolved:
             yield DependencyProblem(
                 'dependency-cannot-compute',

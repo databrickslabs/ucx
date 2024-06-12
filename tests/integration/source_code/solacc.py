@@ -9,6 +9,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 logger = logging.getLogger("verify-accelerators")
@@ -50,10 +51,11 @@ def lint_all():
     ctx = LocalCheckoutContext(ws).replace(linter_context_factory=lambda: LinterContext(MigrationIndex([])))
     parseable = 0
     missing_imports = 0
+    session_state = CurrentSessionState()
     all_files = list(dist.glob('**/*.py'))
     for file in all_files:
         try:
-            for located_advice in ctx.local_code_linter.lint_path(file):
+            for located_advice in ctx.local_code_linter.lint_path(file, session_state):
                 if located_advice.advice.code == 'import-not-found':
                     missing_imports += 1
                 message = located_advice.message_relative_to(dist.parent, default=file)

@@ -2,7 +2,7 @@ import pytest
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Deprecation, Advice
+from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.notebooks.sources import NotebookLinter
 
 index = MigrationIndex([])
@@ -317,7 +317,7 @@ def test_notebook_linter(lang, source, expected):
     # over multiple lines.
     linter = NotebookLinter.from_source(index, source, lang)
     assert linter is not None
-    gathered = list(linter.lint())
+    gathered = list(linter.lint(CurrentSessionState()))
     assert gathered == expected
 
 
@@ -545,5 +545,5 @@ spark.range(10).saveAsTable('numbers') # we are saving to whatever.numbers table
 def test_notebook_linter_tracks_use(extended_test_index, lang, source, expected):
     linter = NotebookLinter.from_source(extended_test_index, source, lang)
     assert linter is not None
-    advices = list(linter.lint())
+    advices = list(linter.lint(CurrentSessionState()))
     assert advices == expected

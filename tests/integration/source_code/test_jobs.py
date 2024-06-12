@@ -187,11 +187,10 @@ def test_lint_local_code(simple_ctx):
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,
-        light_ctx.session_state,
         light_ctx.dependency_resolver,
         lambda: linter_context,
     )
-    problems = linter.lint(Prompts(), path_to_scan, StringIO())
+    problems = linter.lint(Prompts(), path_to_scan, light_ctx.session_state, StringIO())
     assert len(problems) > 0
 
 

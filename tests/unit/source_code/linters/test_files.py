@@ -108,9 +108,9 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
     prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
     linter = LocalCodeLinter(
-        file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
+        file_loader, folder_loader, mock_path_lookup, resolver, lambda: LinterContext(migration_index)
     )
-    advices = linter.lint(prompts, None)
+    advices = linter.lint(prompts, None, session_state)
     assert not advices
 
 
@@ -163,8 +163,7 @@ def test_known_issues(path: Path, migration_index):
         file_loader,
         folder_loader,
         path_lookup,
-        session_state,
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    linter.lint(MockPrompts({}), path)
+    linter.lint(MockPrompts({}), path, session_state)

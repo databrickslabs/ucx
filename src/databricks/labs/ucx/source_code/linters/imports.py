@@ -82,45 +82,47 @@ class NotebookRunCall(NodeBase):
     def __init__(self, node: Call):
         super().__init__(node)
 
-    def get_notebook_paths(self) -> tuple[bool, list[str]]:
+    def get_notebook_paths(self, session_state: CurrentSessionState) -> tuple[bool, list[str]]:
         """we return multiple paths because astroid can infer them in scenarios such as:
         paths = ["p1", "p2"]
         for path in paths:
             dbutils.notebook.run(path)
         """
-        node = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
+        arg = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
         try:
-            return self._get_notebook_paths(node.infer())
+            all_inferred = Tree(arg).infer_values(session_state)
+            return self._get_notebook_paths(all_inferred)
         except InferenceError:
-            logger.debug(f"Can't infer value(s) of {node.as_string()}")
+            logger.debug(f"Can't infer value(s) of {arg.as_string()}")
             return True, []
 
     @classmethod
-    def _get_notebook_paths(cls, nodes: Iterable[NodeNG]) -> tuple[bool, list[str]]:
+    def _get_notebook_paths(cls, all_inferred: Iterable[InferredValue]) -> tuple[bool, list[str]]:
         has_unresolved = False
         paths: list[str] = []
-        for node in nodes:
-            if isinstance(node, Const):
-                paths.append(node.as_string().strip("'").strip('"'))
+        for inferred in all_inferred:
+            if inferred.is_inferred():
+                paths.append(inferred.as_string().strip("'").strip('"'))
                 continue
-            logger.debug(f"Can't compute {type(node).__name__}")
+            typenames = [type(node).__name__ for node in inferred.nodes]
+            logger.debug(f"Can't compute nodes [{','.join(typenames)}]")
             has_unresolved = True
         return has_unresolved, paths
 
 
 class DbutilsLinter(Linter):
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
         tree = Tree.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:
-            yield from self._raise_advice_if_unresolved(node.node)
+            yield from self._raise_advice_if_unresolved(node.node, session_state)
 
     @classmethod
-    def _raise_advice_if_unresolved(cls, node: NodeNG) -> Iterable[Advice]:
+    def _raise_advice_if_unresolved(cls, node: NodeNG, session_state: CurrentSessionState) -> Iterable[Advice]:
         assert isinstance(node, Call)
         call = NotebookRunCall(cast(Call, node))
-        has_unresolved, _ = call.get_notebook_paths()
+        has_unresolved, _ = call.get_notebook_paths(session_state)
         if has_unresolved:
             yield from [
                 Advisory.from_node(
