@@ -7,7 +7,7 @@ from typing import TypeVar
 
 from astroid import Assign, Attribute, Call, Const, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 missing_handlers: set[str] = set()
 

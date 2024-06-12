@@ -8,7 +8,7 @@ from sqlglot.expressions import Table
 from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 class DetectDbfsVisitor(TreeVisitor):
