@@ -8,6 +8,18 @@
   "aiosignal": {
     "aiosignal": []
   },
+  "alembic": {
+    "alembic": [],
+    "alembic.command": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ]
+  },
+  "aniso8601": {
+    "aniso8601": []
+  },
   "anyio": {
     "anyio": []
   },
@@ -244,6 +256,11 @@
   "click": {
     "click": []
   },
+  "cloudpickle": {
+    "cloudpickle": [],
+    "cloudpickle.cloudpickle": [],
+    "cloudpickle.cloudpickle_fast": []
+  },
   "contourpy": {
     "contourpy": []
   },
@@ -268,8 +285,16 @@
   "databricks-sdk": {
     "databricks.sdk": []
   },
+  "deprecated": {
+    "deprecated": [],
+    "deprecated.classic": [],
+    "deprecated.sphinx": []
+  },
   "dill": {
     "dill": []
+  },
+  "docker": {
+    "docker": []
   },
   "docker-pycreds": {
     "dockerpycreds": [],
@@ -278,6 +303,9 @@
     "dockerpycreds.store": [],
     "dockerpycreds.utils": [],
     "dockerpycreds.version": []
+  },
+  "entrypoints": {
+    "entrypoints": []
   },
   "eradicate": {
     "eradicate": []
@@ -297,6 +325,9 @@
     "filelock._util": [],
     "filelock._windows": [],
     "filelock.version": []
+  },
+  "flask": {
+    "flask": []
   },
   "fonttools": {
     "fontTools": []
@@ -370,6 +401,18 @@
     "google.auth": [],
     "google.oauth2": []
   },
+  "graphene": {
+    "graphene": []
+  },
+  "graphql-core": {
+    "graphql": []
+  },
+  "graphql-relay": {
+    "graphql_relay": []
+  },
+  "gunicorn": {
+    "gunicorn": []
+  },
   "html5lib": {
     "html5lib": []
   },
@@ -398,6 +441,12 @@
   "isort": {
     "isort": []
   },
+  "itsdangerous": {
+    "itsdangerous": []
+  },
+  "jinja2": {
+    "jinja2": []
+  },
   "jmespath": {
     "jmespath": []
   },
@@ -411,6 +460,16 @@
   "lxml": {
     "lxml": []
   },
+  "mako": {
+    "mako": []
+  },
+  "markdown": {
+    "markdown": []
+  },
+  "markupsafe": {
+    "markupsafe": [],
+    "markupsafe._native": []
+  },
   "matplotlib": {
     "matplotlib": [],
     "mpl_toolkits": [],
@@ -418,6 +477,103 @@
   },
   "mccabe": {
     "mccabe": []
+  },
+  "mlflow": {
+    "mlflow": [],
+    "mlflow.data.delta_dataset_source": [
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "mlflow.data.spark_dataset": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "mlflow.data.spark_delta_utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "mlflow.pyspark.ml": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext and _conf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      }
+    ],
+    "mlflow.recipes.steps.predict": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "mlflow.recipes.steps.train": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "mlflow.spark": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "mlflow.spark.autologging": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "mlflow.store.artifact.databricks_artifact_repo": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs://profile@databricks/<path>"
+      }
+    ],
+    "mlflow.store.artifact.dbfs_artifact_repo": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs://profile@databricks/<path>"
+      }
+    ],
+    "mlflow.tracking.artifact_utils": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/databricks/mlflow/tmp-external-source/"
+      }
+    ],
+    "mlflow.utils._spark_utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "mlflow.utils.uri": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ]
   },
   "multidict": {
     "multidict": []
@@ -434,6 +590,155 @@
   },
   "numpy": {
     "numpy": []
+  },
+  "opentelemetry-api": {
+    "opentelemetry._logs": [],
+    "opentelemetry._logs._internal": [],
+    "opentelemetry._logs.severity": [],
+    "opentelemetry.attributes": [],
+    "opentelemetry.baggage": [],
+    "opentelemetry.baggage.propagation": [],
+    "opentelemetry.context": [],
+    "opentelemetry.context.context": [],
+    "opentelemetry.context.contextvars_context": [],
+    "opentelemetry.environment_variables": [],
+    "opentelemetry.metrics": [],
+    "opentelemetry.metrics._internal": [],
+    "opentelemetry.metrics._internal.instrument": [],
+    "opentelemetry.metrics._internal.observation": [],
+    "opentelemetry.propagate": [],
+    "opentelemetry.propagators.composite": [],
+    "opentelemetry.propagators.textmap": [],
+    "opentelemetry.trace": [],
+    "opentelemetry.trace.propagation": [],
+    "opentelemetry.trace.propagation.tracecontext": [],
+    "opentelemetry.trace.span": [],
+    "opentelemetry.trace.status": [],
+    "opentelemetry.util._decorator": [],
+    "opentelemetry.util._importlib_metadata": [],
+    "opentelemetry.util._once": [],
+    "opentelemetry.util._providers": [],
+    "opentelemetry.util.re": [],
+    "opentelemetry.util.types": [],
+    "opentelemetry.version": []
+  },
+  "opentelemetry-sdk": {
+    "opentelemetry.sdk._configuration": [],
+    "opentelemetry.sdk._logs": [],
+    "opentelemetry.sdk._logs._internal": [],
+    "opentelemetry.sdk._logs._internal.export": [],
+    "opentelemetry.sdk._logs._internal.export.in_memory_log_exporter": [],
+    "opentelemetry.sdk._logs.export": [],
+    "opentelemetry.sdk.environment_variables": [],
+    "opentelemetry.sdk.error_handler": [],
+    "opentelemetry.sdk.metrics": [],
+    "opentelemetry.sdk.metrics._internal": [],
+    "opentelemetry.sdk.metrics._internal._view_instrument_match": [],
+    "opentelemetry.sdk.metrics._internal.aggregation": [],
+    "opentelemetry.sdk.metrics._internal.exceptions": [],
+    "opentelemetry.sdk.metrics._internal.exponential_histogram.buckets": [],
+    "opentelemetry.sdk.metrics._internal.exponential_histogram.mapping": [],
+    "opentelemetry.sdk.metrics._internal.exponential_histogram.mapping.errors": [],
+    "opentelemetry.sdk.metrics._internal.exponential_histogram.mapping.exponent_mapping": [],
+    "opentelemetry.sdk.metrics._internal.exponential_histogram.mapping.ieee_754": [],
+    "opentelemetry.sdk.metrics._internal.exponential_histogram.mapping.logarithm_mapping": [],
+    "opentelemetry.sdk.metrics._internal.export": [],
+    "opentelemetry.sdk.metrics._internal.instrument": [],
+    "opentelemetry.sdk.metrics._internal.measurement": [],
+    "opentelemetry.sdk.metrics._internal.measurement_consumer": [],
+    "opentelemetry.sdk.metrics._internal.metric_reader_storage": [],
+    "opentelemetry.sdk.metrics._internal.point": [],
+    "opentelemetry.sdk.metrics._internal.sdk_configuration": [],
+    "opentelemetry.sdk.metrics._internal.view": [],
+    "opentelemetry.sdk.metrics.export": [],
+    "opentelemetry.sdk.metrics.view": [],
+    "opentelemetry.sdk.resources": [],
+    "opentelemetry.sdk.trace": [],
+    "opentelemetry.sdk.trace.export": [],
+    "opentelemetry.sdk.trace.export.in_memory_span_exporter": [],
+    "opentelemetry.sdk.trace.id_generator": [],
+    "opentelemetry.sdk.trace.sampling": [],
+    "opentelemetry.sdk.util": [],
+    "opentelemetry.sdk.util.instrumentation": [],
+    "opentelemetry.sdk.version": []
+  },
+  "opentelemetry-semantic-conventions": {
+    "opentelemetry.semconv": [],
+    "opentelemetry.semconv._incubating.attributes.aws_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.browser_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.client_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.cloud_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.cloudevents_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.code_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.container_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.db_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.deployment_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.destination_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.device_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.disk_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.dns_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.enduser_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.error_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.event_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.exception_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.faas_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.feature_flag_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.file_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.gcp_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.graphql_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.heroku_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.host_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.http_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.k8s_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.log_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.message_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.messaging_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.network_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.oci_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.opentracing_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.otel_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.other_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.peer_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.pool_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.process_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.rpc_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.server_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.service_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.session_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.source_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.system_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.telemetry_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.thread_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.tls_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.url_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.user_agent_attributes": [],
+    "opentelemetry.semconv._incubating.attributes.webengine_attributes": [],
+    "opentelemetry.semconv._incubating.metrics.container_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.db_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.dns_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.faas_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.http_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.messaging_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.process_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.rpc_metrics": [],
+    "opentelemetry.semconv._incubating.metrics.system_metrics": [],
+    "opentelemetry.semconv.attributes.client_attributes": [],
+    "opentelemetry.semconv.attributes.error_attributes": [],
+    "opentelemetry.semconv.attributes.exception_attributes": [],
+    "opentelemetry.semconv.attributes.http_attributes": [],
+    "opentelemetry.semconv.attributes.network_attributes": [],
+    "opentelemetry.semconv.attributes.otel_attributes": [],
+    "opentelemetry.semconv.attributes.server_attributes": [],
+    "opentelemetry.semconv.attributes.service_attributes": [],
+    "opentelemetry.semconv.attributes.telemetry_attributes": [],
+    "opentelemetry.semconv.attributes.url_attributes": [],
+    "opentelemetry.semconv.attributes.user_agent_attributes": [],
+    "opentelemetry.semconv.metrics": [],
+    "opentelemetry.semconv.metrics.http_metrics": [],
+    "opentelemetry.semconv.resource": [],
+    "opentelemetry.semconv.schemas": [],
+    "opentelemetry.semconv.trace": [],
+    "opentelemetry.semconv.version": []
   },
   "packaging": {
     "packaging": []
@@ -550,6 +855,9 @@
         "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
       }
     ]
+  },
+  "pyarrow": {
+    "pyarrow": []
   },
   "pyasn1": {
     "pyasn1": []
@@ -1438,6 +1746,12 @@
     "_yaml": [],
     "yaml": []
   },
+  "querystring-parser": {
+    "querystring_parser": [],
+    "querystring_parser.builder": [],
+    "querystring_parser.parser": [],
+    "querystring_parser.tests": []
+  },
   "regex": {
     "regex": [],
     "regex._regex_core": [],
@@ -1523,8 +1837,14 @@
     "soupsieve.pretty": [],
     "soupsieve.util": []
   },
+  "sqlalchemy": {
+    "sqlalchemy": []
+  },
   "sqlglot": {
     "sqlglot": []
+  },
+  "sqlparse": {
+    "sqlparse": []
   },
   "threadpoolctl": {
     "threadpoolctl": []
@@ -1580,6 +1900,9 @@
     "webencodings.tests": [],
     "webencodings.x_user_defined": []
   },
+  "werkzeug": {
+    "werkzeug": []
+  },
   "wheel": {
     "wheel": []
   },
@@ -1590,6 +1913,9 @@
     "wordcloud.tokenization": [],
     "wordcloud.wordcloud": [],
     "wordcloud.wordcloud_cli": []
+  },
+  "wrapt": {
+    "wrapt": []
   },
   "xgboost": {
     "xgboost": [],
