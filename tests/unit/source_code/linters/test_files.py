@@ -8,6 +8,7 @@ from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
@@ -27,14 +28,21 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_migrator_fix_ignores_unsupported_extensions():
+def test_notebook_migrator_ignores_unsupported_extensions():
+    languages = LinterContext(MigrationIndex([]))
+    migrator = NotebookMigrator(languages)
+    path = Path('unsupported.ext')
+    assert not migrator.apply(path)
+
+
+def test_file_migrator_fix_ignores_unsupported_extensions():
     languages = LinterContext(MigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
-def test_migrator_fix_ignores_unsupported_language():
+def test_file_migrator_fix_ignores_unsupported_language():
     languages = LinterContext(MigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     migrator._extensions[".py"] = None  # pylint: disable=protected-access
@@ -42,20 +50,29 @@ def test_migrator_fix_ignores_unsupported_language():
     assert not migrator.apply(path)
 
 
-def test_migrator_fix_reads_supported_extensions(migration_index):
+def test_file_migrator_fix_reads_supported_extensions(migration_index):
     languages = LinterContext(migration_index)
     migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
     assert not migrator.apply(path)
 
 
-def test_migrator_supported_language_no_diagnostics():
+def test_file_migrator_supported_language_no_diagnostics():
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = []
     migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
     migrator.apply(path)
     languages.fixer.assert_not_called()
+
+
+def test_notebook_migrator_supported_language_no_diagnostics(simple_dependency_resolver, mock_path_lookup):
+    paths = ["root1.run.py"]
+    resolver = simple_dependency_resolver
+    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+    languages = LinterContext(MigrationIndex([]))
+    migrator = NotebookMigrator(languages)
+    assert not migrator.apply(maybe.dependency.path)
 
 
 def test_migrator_supported_language_no_fixer():
