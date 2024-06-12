@@ -10,7 +10,12 @@ def test_extracts_root():
     stmt = tree.first_statement()
     root = Tree(stmt).root
     assert root == tree.node
-    assert repr(tree)  # for test coverqge
+    assert repr(tree)  # for test coverage
+
+
+def test_no_first_statement():
+    tree = Tree.parse("")
+    assert not tree.first_statement()
 
 
 def test_extract_call_by_name():

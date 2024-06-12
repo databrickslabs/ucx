@@ -56,7 +56,9 @@ class Tree:
 
     def first_statement(self):
         if isinstance(self._node, Module):
-            return self._node.body[0]
+            if len(self._node.body) > 0:
+                return self._node.body[0]
+        return None
 
     @classmethod
     def extract_call_by_name(cls, call: Call, name: str) -> Call | None:
