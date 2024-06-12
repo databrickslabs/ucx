@@ -9,7 +9,7 @@ from astroid import Assign, Attribute, Call, Const, decorators, FormattedValue, 
 from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
 from astroid.typing import InferenceErrorInfo  # type: ignore
 
-from databricks.labs.ucx.contexts.base import BaseContext
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 
 logger = logging.getLogger(__name__)
 
@@ -141,16 +141,16 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
-    def infer_values(self, ctx: BaseContext | None = None) -> Iterable[InferredValue]:
-        if ctx is not None:
-            self.contextualize(ctx)
+    def infer_values(self, state: CurrentSessionState | None = None) -> Iterable[InferredValue]:
+        if state is not None:
+            self.contextualize(state)
         for inferred_atoms in self._infer_values():
             yield InferredValue(inferred_atoms)
 
-    def contextualize(self, ctx: BaseContext):
+    def contextualize(self, state: CurrentSessionState):
         calls = self.locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
         for call in calls:
-            call.func = _ContextualCall(ctx, call)
+            call.func = _ContextualCall(state, call)
 
     def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
         # deal with node types that don't implement 'inferred()'
@@ -190,7 +190,7 @@ class _LocalTree(Tree):
 
 class _ContextualCall(NodeNG):
 
-    def __init__(self, ctx: BaseContext, node: NodeNG):
+    def __init__(self, state: CurrentSessionState, node: NodeNG):
         super().__init__(
             lineno=node.lineno,
             col_offset=node.col_offset,
@@ -198,7 +198,7 @@ class _ContextualCall(NodeNG):
             end_col_offset=node.end_col_offset,
             parent=node.parent,
         )
-        self._ctx = ctx
+        self._state = state
 
     @decorators.raise_if_nothing_inferred
     def _infer(
@@ -218,10 +218,11 @@ class _ContextualCall(NodeNG):
                 yield Uninferable
                 continue
             name = inferred.as_string()
-            if name not in self._ctx.named_parameters:
+            named_parameters = self._state.named_parameters
+            if not named_parameters or name not in named_parameters:
                 yield Uninferable
                 continue
-            value = self._ctx.named_parameters[name]
+            value = named_parameters[name]
             yield Const(
                 value,
                 lineno=self.lineno,

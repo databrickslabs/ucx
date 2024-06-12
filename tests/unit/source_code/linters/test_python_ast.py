@@ -1,7 +1,7 @@
 import pytest
 from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
 
-from databricks.labs.ucx.contexts.application import GlobalContext
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
@@ -165,8 +165,8 @@ value3 = f"{value2}, how are you today?"
 
 
 def test_infers_externally_defined_value():
-    ctx = GlobalContext()
-    ctx.named_parameters["my-widget"] = "my-value"
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget": "my-value"}
     source = """
 name = "my-widget"
 value = dbutils.widgets.get(name)
@@ -174,15 +174,14 @@ value = dbutils.widgets.get(name)
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
-    values = list(tree.infer_values(ctx))
+    values = list(tree.infer_values(state))
     strings = list(value.as_string() for value in values)
     assert strings == ["my-value"]
 
 
 def test_infers_externally_defined_values():
-    ctx = GlobalContext()
-    ctx.named_parameters["my-widget-1"] = "my-value-1"
-    ctx.named_parameters["my-widget-2"] = "my-value-2"
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget-1": "my-value-1", "my-widget-2": "my-value-2"}
     source = """
 for name in ["my-widget-1", "my-widget-2"]:
     value = dbutils.widgets.get(name)
@@ -190,7 +189,7 @@ for name in ["my-widget-1", "my-widget-2"]:
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[0].value)  # value of value = ...
-    values = list(tree.infer_values(ctx))
+    values = list(tree.infer_values(state))
     strings = list(value.as_string() for value in values)
     assert strings == ["my-value-1", "my-value-2"]
 
@@ -203,5 +202,5 @@ value = dbutils.widgets.get(name)
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...
-    values = tree.infer_values(GlobalContext())
+    values = tree.infer_values(CurrentSessionState())
     assert all(not value.is_inferred() for value in values)
