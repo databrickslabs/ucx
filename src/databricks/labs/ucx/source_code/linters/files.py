@@ -107,17 +107,13 @@ class LocalCodeLinter:
                 validate=lambda p_: Path(p_).exists(),
             )
             path = Path(response)
-        located_advices = list(self._lint(path))
+        located_advices = list(self.lint_path(path))
         for located in located_advices:
-            advice_path = located.path.relative_to(path)
-            advice = located.advice
-            message = (
-                f"{advice_path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}\n"
-            )
-            stdout.write(message)
+            message = located.message_relative_to(path)
+            stdout.write(f"{message}\n")
         return located_advices
 
-    def _lint(self, path: Path) -> Iterable[LocatedAdvice]:
+    def lint_path(self, path: Path) -> Iterable[LocatedAdvice]:
         loader = self._folder_loader if path.is_dir() else self._file_loader
         dependency = Dependency(loader, path)
         graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup)

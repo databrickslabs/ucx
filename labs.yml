@@ -194,6 +194,9 @@ commands:
 
   - name:  lint-local-code
     description: (Experimental) Lint files in the current directory to highlight incompatibilities with Unity Catalog.
+    flags:
+      - name: path
+        description: Path to the file or directory to lint
 
   - name: show-all-metastores
     is_account_level: true

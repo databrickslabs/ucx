@@ -6,10 +6,9 @@ import sqlglot
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
 
-
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 class DetectDbfsVisitor(TreeVisitor):
@@ -29,30 +28,34 @@ class DetectDbfsVisitor(TreeVisitor):
 
     def _visit_arg(self, arg: NodeNG):
         try:
-            for inferred in arg.inferred():
-                if isinstance(inferred, Const) and isinstance(inferred.value, str):
-                    self._check_str_constant(arg, inferred)
+            for inferred in Tree(arg).infer_values():
+                if not inferred.is_inferred():
+                    logger.debug(f"Could not infer value of {arg.as_string()}")
+                    continue
+                self._check_str_constant(arg, inferred)
         except InferenceError as e:
             logger.debug(f"Could not infer value of {arg.as_string()}", exc_info=e)
 
     def visit_const(self, node: Const):
         # Constant strings yield Advisories
         if isinstance(node.value, str):
-            self._check_str_constant(node, node)
+            self._check_str_constant(node, InferredValue([node]))
 
-    def _check_str_constant(self, source_node, const_node: Const):
-        if self._already_reported(source_node, const_node):
+    def _check_str_constant(self, source_node, inferred: InferredValue):
+        if self._already_reported(source_node, inferred):
             return
-        value = const_node.value
+        value = inferred.as_string()
         if any(value.startswith(prefix) for prefix in self._fs_prefixes):
             advisory = Deprecation.from_node(
                 code='dbfs-usage', message=f"Deprecated file system path: {value}", node=source_node
             )
             self._advices.append(advisory)
 
-    def _already_reported(self, *nodes: NodeNG):
-        reported = any((node.lineno, node.col_offset) in self._reported_locations for node in nodes)
-        for node in nodes:
+    def _already_reported(self, source_node: NodeNG, inferred: InferredValue):
+        all_nodes = [source_node]
+        all_nodes.extend(inferred.nodes())
+        reported = any((node.lineno, node.col_offset) in self._reported_locations for node in all_nodes)
+        for node in all_nodes:
             self._reported_locations.add((node.lineno, node.col_offset))
         return reported
 

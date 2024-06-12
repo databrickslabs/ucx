@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Create portfolio
-# MAGIC In this notebook, we will use `yfinance` to download stock data for 40 equities in an equal weighted hypothetical Latin America portfolio. We show how to use pandas UDFs to better distribute this process efficiently and store all of our output data as a Delta table. 
+# MAGIC In this notebook, we will use `yfinance` to download stock data for 40 equities in an equal weighted hypothetical Latin America portfolio. We show how to use pandas UDFs to better distribute this process efficiently and store all of our output data as a Delta table.
 
 # COMMAND ----------
 
@@ -25,6 +25,7 @@ display(portfolio_df)
 # COMMAND ----------
 
 import datetime as dt
+
 y_min_date = dt.datetime.strptime(config['yfinance']['mindate'], "%Y-%m-%d").date()
 y_max_date = dt.datetime.strptime(config['yfinance']['maxdate'], "%Y-%m-%d").date()
 
@@ -35,30 +36,31 @@ from pyspark.sql.functions import pandas_udf, PandasUDFType
 from utils.var_utils import download_market_data
 
 schema = StructType(
-  [
-    StructField('ticker', StringType(), True), 
-    StructField('date', TimestampType(), True),
-    StructField('open', DoubleType(), True),
-    StructField('high', DoubleType(), True),
-    StructField('low', DoubleType(), True),
-    StructField('close', DoubleType(), True),
-    StructField('volume', DoubleType(), True),
-  ]
+    [
+        StructField('ticker', StringType(), True),
+        StructField('date', TimestampType(), True),
+        StructField('open', DoubleType(), True),
+        StructField('high', DoubleType(), True),
+        StructField('low', DoubleType(), True),
+        StructField('close', DoubleType(), True),
+        StructField('volume', DoubleType(), True),
+    ]
 )
+
 
 @pandas_udf(schema, PandasUDFType.GROUPED_MAP)
 def download_market_data_udf(group, pdf):
-  tick = group[0]
-  return download_market_data(tick, y_min_date, y_max_date)
+    tick = group[0]
+    return download_market_data(tick, y_min_date, y_max_date)
+
 
 # COMMAND ----------
 
 _ = (
-  spark.createDataFrame(portfolio_df)
+    spark.createDataFrame(portfolio_df)
     .groupBy('ticker')
     .apply(download_market_data_udf)
-    .write
-    .format('delta')
+    .write.format('delta')
     .mode('overwrite')
     .saveAsTable(config['database']['tables']['stocks'])
 )
@@ -77,9 +79,7 @@ display(spark.read.table(config['database']['tables']['stocks']))
 from pyspark.sql import functions as F
 
 stock_df = (
-  spark
-    .read
-    .table(config['database']['tables']['stocks'])
+    spark.read.table(config['database']['tables']['stocks'])
     .filter(F.col('ticker') == portfolio_df.iloc[0].ticker)
     .orderBy(F.asc('date'))
     .toPandas()
@@ -88,6 +88,7 @@ stock_df = (
 # COMMAND ----------
 
 from utils.var_viz import plot_candlesticks
+
 plot_candlesticks(stock_df)
 
 # COMMAND ----------
@@ -100,20 +101,18 @@ plot_candlesticks(stock_df)
 
 # Create a pandas dataframe where each column contain close index
 market_indicators_df = pd.DataFrame()
-for indicator in market_indicators.keys():    
+for indicator in market_indicators.keys():
     close_df = download_market_data(indicator, y_min_date, y_max_date)['close'].copy()
     market_indicators_df[market_indicators[indicator]] = close_df
-        
+
 # Pandas does not keep index (date) when converted into spark dataframe
 market_indicators_df['date'] = market_indicators_df.index
 
 # COMMAND ----------
 
 _ = (
-  spark
-    .createDataFrame(market_indicators_df)
-    .write
-    .format("delta")
+    spark.createDataFrame(market_indicators_df)
+    .write.format("delta")
     .mode("overwrite")
     .saveAsTable(config['database']['tables']['indicators'])
 )
@@ -132,26 +131,26 @@ display(spark.read.table(config['database']['tables']['indicators']))
 
 import numpy as np
 
+
 def get_market_returns():
-  
-  f_ret_pdf = spark.table(config['database']['tables']['indicators']).orderBy('date').toPandas()
 
-  # add date column as pandas index for sliding window
-  f_ret_pdf.index = f_ret_pdf['date']
-  f_ret_pdf = f_ret_pdf.drop(columns = ['date'])
+    f_ret_pdf = spark.table(config['database']['tables']['indicators']).orderBy('date').toPandas()
 
-  # compute daily log returns
-  f_ret_pdf = np.log(f_ret_pdf.shift(1)/f_ret_pdf)
+    # add date column as pandas index for sliding window
+    f_ret_pdf.index = f_ret_pdf['date']
+    f_ret_pdf = f_ret_pdf.drop(columns=['date'])
 
-  # add date columns
-  f_ret_pdf['date'] = f_ret_pdf.index
-  f_ret_pdf = f_ret_pdf.dropna()
-  
-  return (
-    spark
-      .createDataFrame(f_ret_pdf)
-      .select(F.array(list(market_indicators.values())).alias('features'), F.col('date'))
-  )
+    # compute daily log returns
+    f_ret_pdf = np.log(f_ret_pdf.shift(1) / f_ret_pdf)
+
+    # add date columns
+    f_ret_pdf['date'] = f_ret_pdf.index
+    f_ret_pdf = f_ret_pdf.dropna()
+
+    return spark.createDataFrame(f_ret_pdf).select(
+        F.array(list(market_indicators.values())).alias('features'), F.col('date')
+    )
+
 
 # COMMAND ----------
 
@@ -164,22 +163,20 @@ from pyspark.sql import Window
 from pyspark.sql import functions as F
 from utils.var_udf import *
 
-days = lambda i: i * 86400 
-volatility_window = Window.orderBy(F.col('date').cast('long')).rangeBetween(-days(config['monte-carlo']['volatility']), 0)
+days = lambda i: i * 86400
+volatility_window = Window.orderBy(F.col('date').cast('long')).rangeBetween(
+    -days(config['monte-carlo']['volatility']), 0
+)
 
 volatility_df = (
-  get_market_returns()
-    .select(
-      F.col('date'),
-      F.col('features'),
-      F.collect_list('features').over(volatility_window).alias('volatility')
-    )
+    get_market_returns()
+    .select(F.col('date'), F.col('features'), F.collect_list('features').over(volatility_window).alias('volatility'))
     .filter(F.size('volatility') > 1)
     .select(
-      F.col('date'),
-      F.col('features'),
-      compute_avg(F.col('volatility')).alias('vol_avg'),
-      compute_cov(F.col('volatility')).alias('vol_cov')
+        F.col('date'),
+        F.col('features'),
+        compute_avg(F.col('volatility')).alias('vol_avg'),
+        compute_cov(F.col('volatility')).alias('vol_cov'),
     )
 )
 

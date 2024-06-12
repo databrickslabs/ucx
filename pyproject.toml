@@ -89,13 +89,13 @@ path = ".venv"
 test        = "pytest -n 4 --cov src --cov-report=xml --timeout 30 tests/unit --durations 20"
 coverage    = "pytest -n auto --cov src tests/unit --timeout 30 --cov-report=html --durations 20"
 integration = "pytest -n 10 --cov src tests/integration --durations 20"
-fmt         = ["black . --extend-exclude 'tests/unit/source_code/samples/*'",
+fmt         = ["black . --extend-exclude 'tests/unit/source_code/samples/*' --extend-exclude dist",
                "ruff check . --fix",
-               "mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' .",
+               "mypy --disable-error-code 'annotation-unchecked' --exclude 'tests/unit/source_code/samples/*' --exclude dist .",
                "pylint --output-format=colorized -j 0 src tests"]
-verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples/*'",
+verify      = ["black --check . --extend-exclude 'tests/unit/source_code/samples/*' --extend-exclude dist",
                "ruff check .",
-               "mypy --exclude 'tests/unit/source_code/samples/*' .",
+               "mypy --exclude 'tests/unit/source_code/samples/*' --exclude dist .",
                "pylint --output-format=colorized -j 0 src tests"]
 lint         = ["pylint --output-format=colorized -j 0 src tests"]
 

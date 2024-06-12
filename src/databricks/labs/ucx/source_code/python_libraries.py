@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import shlex
 import tempfile
 import zipfile
 from collections.abc import Callable
@@ -28,14 +29,17 @@ class PythonLibraryResolver(LibraryResolver):
         self._whitelist = whitelist
         self._runner = runner
 
-    def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
+    def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
         This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
         bother about parsing cross-version dependencies in our code."""
-        compatibility = self._whitelist.distribution_compatibility(library.name)
-        if compatibility.known:
-            return compatibility.problems
-        return self._install_library(path_lookup, library)
+        if len(libraries) == 0:
+            return []
+        if len(libraries) == 1:  # Multiple libraries might be installation flags
+            compatibility = self._whitelist.distribution_compatibility(libraries[0])
+            if compatibility.known:
+                return compatibility.problems
+        return self._install_library(path_lookup, *libraries)
 
     @cached_property
     def _temporary_virtual_environment(self):
@@ -46,33 +50,48 @@ class PythonLibraryResolver(LibraryResolver):
         lib_install_folder = tempfile.mkdtemp(prefix='ucx-')
         return Path(lib_install_folder).resolve()
 
-    def _install_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
+    def _install_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         """Pip install library and augment path look-up to resolve the library at import"""
         path_lookup.append_path(self._temporary_virtual_environment)
+        resolved_libraries = self._resolve_libraries(path_lookup, *libraries)
+        if libraries[0].endswith(".egg"):
+            return self._install_egg(*resolved_libraries)
+        return self._install_pip(*resolved_libraries)
 
+    @staticmethod
+    def _resolve_libraries(path_lookup: PathLookup, *libraries: str) -> list[str]:
         # Resolve relative pip installs from notebooks: %pip install ../../foo.whl
-        maybe_library = path_lookup.resolve(library)
-        if maybe_library is not None:
-            library = maybe_library
+        libs = []
+        for library in libraries:
+            maybe_library = path_lookup.resolve(Path(library))
+            if maybe_library is None:
+                libs.append(library)
+            else:
+                libs.append(maybe_library.as_posix())
+        return libs
 
-        if library.suffix == ".egg":
-            return self._install_egg(library)
-        return self._install_pip(library)
-
-    def _install_pip(self, library: Path) -> list[DependencyProblem]:
-        return_code, stdout, stderr = self._runner(f"pip install {library} -t {self._temporary_virtual_environment}")
+    def _install_pip(self, *libraries: str) -> list[DependencyProblem]:
+        install_command = f"pip install {shlex.join(libraries)} -t {self._temporary_virtual_environment}"
+        return_code, stdout, stderr = self._runner(install_command)
         logger.debug(f"pip output:\n{stdout}\n{stderr}")
         if return_code != 0:
-            problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {stderr}")
+            problem = DependencyProblem("library-install-failed", f"'{install_command}' failed with '{stderr}'")
             return [problem]
         return []
 
-    def _install_egg(self, library: Path) -> list[DependencyProblem]:
-        """Install egss using easy_install.
+    def _install_egg(self, *libraries: str) -> list[DependencyProblem]:
+        """Install eggs using easy_install.
 
         Sources:
             See easy_install in setuptools.command.easy_install
         """
+        if len(libraries) > 1:
+            problems = []
+            for library in libraries:
+                problems.extend(self._install_egg(library))
+            return problems
+        library = libraries[0]
+
         verbosity = "--verbose" if is_in_debug() else "--quiet"
         easy_install_arguments = [
             "easy_install",
@@ -80,7 +99,7 @@ class PythonLibraryResolver(LibraryResolver):
             "--always-unzip",
             "--install-dir",
             self._temporary_virtual_environment.as_posix(),
-            library.as_posix(),
+            library,
         ]
         setup = self._get_setup()
         if callable(setup):
@@ -89,13 +108,13 @@ class PythonLibraryResolver(LibraryResolver):
                 return []
             except (SystemExit, ImportError, ValueError) as e:
                 logger.warning(f"Failed to install {library} with (setuptools|distutils).setup, unzipping instead: {e}")
-        library_folder = self._temporary_virtual_environment / library.name
+        library_folder = self._temporary_virtual_environment / Path(library).name
         library_folder.mkdir(parents=True, exist_ok=True)
         try:
             # Not a "real" install, though, the best effort to still lint eggs without dependencies
             with zipfile.ZipFile(library, "r") as zip_ref:
                 zip_ref.extractall(library_folder)
-        except zipfile.BadZipfile as e:
+        except (zipfile.BadZipfile, FileNotFoundError) as e:
             problem = DependencyProblem("library-install-failed", f"Failed to install {library}: {e}")
             return [problem]
         return []
@@ -105,7 +124,7 @@ class PythonLibraryResolver(LibraryResolver):
         try:
             # Mypy can't analyze setuptools due to missing type hints
             from setuptools import setup  # type: ignore
-        except ImportError:
+        except (ImportError, AssertionError):
             try:
                 from distutils.core import setup  # pylint: disable=deprecated-module
             except ImportError:
@@ -114,4 +133,4 @@ class PythonLibraryResolver(LibraryResolver):
         return setup
 
     def __str__(self) -> str:
-        return f"PipResolver(whitelist={self._whitelist})"
+        return f"PythonLibraryResolver(whitelist={self._whitelist})"

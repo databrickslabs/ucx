@@ -19,7 +19,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
-logger = logging.Logger(__file__)
+logger = logging.Logger(__name__)
 
 
 class DependencyGraph:
@@ -49,8 +49,8 @@ class DependencyGraph:
     def path(self):
         return self._dependency.path
 
-    def register_library(self, library: str) -> list[DependencyProblem]:
-        return self._resolver.register_library(self.path_lookup, library)
+    def register_library(self, *libraries: str) -> list[DependencyProblem]:
+        return self._resolver.register_library(self.path_lookup, *libraries)
 
     def register_notebook(self, path: Path) -> list[DependencyProblem]:
         maybe = self._resolver.resolve_notebook(self.path_lookup, path)
@@ -72,6 +72,7 @@ class DependencyGraph:
         # TODO: this has to be a private method, because we don't want to allow free-form dependencies.
         # the only case we have for this method to be used outside of this class is for DistInfoPackage
         # See databricks.labs.ucx.source_code.python_libraries.DistInfoContainer.build_dependency_graph for reference
+        logger.debug(f"Registering dependency {dependency}")
         maybe = self.locate_dependency(dependency.path)
         if maybe.graph is not None:
             self._dependencies[dependency] = maybe.graph
@@ -171,7 +172,11 @@ class DependencyGraph:
             A list of dependency problems; position information is relative to the python code itself.
         """
         problems: list[DependencyProblem] = []
-        tree = Tree.parse(python_code)
+        try:
+            tree = Tree.parse(python_code)
+        except Exception as e:  # pylint: disable=broad-except
+            problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
+            return problems
         syspath_changes = SysPathChange.extract_from_tree(tree)
         run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
         import_sources: list[ImportSource]
@@ -288,7 +293,7 @@ class WrappingLoader(DependencyLoader):
 
 class LibraryResolver(abc.ABC):
     @abc.abstractmethod
-    def register_library(self, path_lookup: PathLookup, library: Path) -> list[DependencyProblem]:
+    def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         pass
 
 
@@ -349,8 +354,8 @@ class DependencyResolver:
     def resolve_import(self, path_lookup: PathLookup, name: str) -> MaybeDependency:
         return self._import_resolver.resolve_import(path_lookup, name)
 
-    def register_library(self, path_lookup: PathLookup, library: str) -> list[DependencyProblem]:
-        return self._library_resolver.register_library(path_lookup, Path(library))
+    def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
+        return self._library_resolver.register_library(path_lookup, *libraries)
 
     def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.

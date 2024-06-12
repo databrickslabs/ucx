@@ -1,20 +1,17 @@
 from __future__ import annotations
 
+import logging
 import sys
-
 from abc import abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from astroid import NodeNG  # type: ignore
+from typing_extensions import Self
 
 from databricks.sdk.service import compute
 
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -25,6 +22,8 @@ else:
 # | Severity.INFO             | Info       | Advice()       |
 # | Severity.HINT             | Convention | Convention()   |
 # | DiagnosticTag.UNNECESSARY | Refactor   | Convention()   |
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -96,6 +95,20 @@ class Advice:
 class LocatedAdvice:
     advice: Advice
     path: Path
+
+    @property
+    def is_unknown(self):
+        return self.path == Path('UNKNOWN')
+
+    def message_relative_to(self, base: Path, *, default: Path | None = None) -> str:
+        advice = self.advice
+        path = self.path
+        if self.is_unknown:
+            logger.debug(f'THIS IS A BUG! {advice.code}:{advice.message} has unknown path')
+        if default is not None:
+            path = default
+        path = path.relative_to(base)
+        return f"{path.as_posix()}:{advice.start_line}:{advice.start_col}: [{advice.code}] {advice.message}"
 
 
 class Advisory(Advice):
