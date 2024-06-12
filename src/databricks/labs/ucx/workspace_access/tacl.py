@@ -128,6 +128,8 @@ class TableAclSupport(AclSupport):
         grant_dict = dataclasses.asdict(acl)
         del grant_dict["action_type"]
         del grant_dict["principal"]
+        del grant_dict["success"]
+        del grant_dict["failures"]
         grants_on_object = self._grants_crawler.grants(**grant_dict)
 
         if grants_on_object:
