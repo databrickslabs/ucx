@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import abc
+from abc import ABC
 import logging
-from collections.abc import Iterable, Iterator
-from typing import TypeVar
+from collections.abc import Iterable, Iterator, Generator
+from typing import Any, TypeVar
 
-from astroid import Assign, Attribute, Call, Const, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
+from astroid import Assign, Attribute, Call, Const, decorators, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
+from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
+from astroid.typing import InferenceErrorInfo  # type: ignore
+
+from databricks.labs.ucx.contexts.base import BaseContext
 
 logger = logging.getLogger(__name__)
 
@@ -137,14 +141,16 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
-    def infer_values(self): # , ctx: RuntimeContext | None = None) -> Iterable[InferredValue]:
-        # if ctx is not None:
-        #     self.contextualize(ctx)
+    def infer_values(self, ctx: BaseContext | None = None) -> Iterable[InferredValue]:
+        if ctx is not None:
+            self.contextualize(ctx)
         for inferred_atoms in self._infer_values():
             yield InferredValue(inferred_atoms)
 
-    # def contextualize(self, ctx: RuntimeContext):
-    #     pass  # parent = self.parent
+    def contextualize(self, ctx: BaseContext):
+        calls = self.locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
+        for call in calls:
+            call.func = _ContextualCall(ctx, call)
 
     def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
         # deal with node types that don't implement 'inferred()'
@@ -180,6 +186,50 @@ class _LocalTree(Tree):
 
     def do_infer_values(self):
         return self._infer_values()
+
+
+class _ContextualCall(NodeNG):
+
+    def __init__(self, ctx: BaseContext, node: NodeNG):
+        super().__init__(
+            lineno=node.lineno,
+            col_offset=node.col_offset,
+            end_lineno=node.end_lineno,
+            end_col_offset=node.end_col_offset,
+            parent=node.parent,
+        )
+        self._ctx = ctx
+
+    @decorators.raise_if_nothing_inferred
+    def _infer(
+        self, context: InferenceContext | None = None, **kwargs: Any
+    ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
+        yield self
+        return InferenceErrorInfo(node=self, context=context)
+
+    def infer_call_result(self, context: InferenceContext | None = None, **_):  # caller needs unused kwargs
+        call_context = getattr(context, "callcontext", None)
+        if not isinstance(call_context, CallContext):
+            yield Uninferable
+            return
+        arg = call_context.args[0]
+        for inferred in Tree(arg).infer_values():
+            if not inferred.is_inferred():
+                yield Uninferable
+                continue
+            name = inferred.as_string()
+            if name not in self._ctx.named_parameters:
+                yield Uninferable
+                continue
+            value = self._ctx.named_parameters[name]
+            yield Const(
+                value,
+                lineno=self.lineno,
+                col_offset=self.col_offset,
+                end_lineno=self.end_lineno,
+                end_col_offset=self.end_col_offset,
+                parent=self,
+            )
 
 
 class InferredValue:
@@ -278,7 +328,7 @@ class MatchingVisitor(TreeVisitor):
         return self._matches(next_node, depth + 1)
 
 
-class NodeBase(abc.ABC):
+class NodeBase(ABC):
 
     def __init__(self, node: NodeNG):
         self._node = node

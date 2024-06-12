@@ -10,6 +10,7 @@ from databricks.labs.blueprint.tui import Prompts
 from databricks.labs.blueprint.wheels import ProductInfo, WheelsV2
 from databricks.labs.lsql.backends import SqlBackend
 
+from databricks.labs.ucx.contexts.base import BaseContext
 from databricks.labs.ucx.recon.data_comparator import StandardDataComparator
 from databricks.labs.ucx.recon.data_profiler import StandardDataProfiler
 from databricks.labs.ucx.recon.metadata_retriever import DatabricksTableMetadataRetriever
@@ -69,17 +70,7 @@ from databricks.labs.ucx.workspace_access.tacl import TableAclSupport
 logger = logging.getLogger(__name__)
 
 
-class GlobalContext(abc.ABC):
-    def __init__(self, named_parameters: dict[str, str] | None = None):
-        if not named_parameters:
-            named_parameters = {}
-        self._named_parameters = named_parameters
-
-    def replace(self, **kwargs):
-        """Replace cached properties for unit testing purposes."""
-        for key, value in kwargs.items():
-            self.__dict__[key] = value
-        return self
+class GlobalContext(BaseContext, abc.ABC):
 
     @cached_property
     def workspace_client(self) -> WorkspaceClient:
@@ -92,10 +83,6 @@ class GlobalContext(abc.ABC):
     @cached_property
     def account_client(self) -> AccountClient:
         raise ValueError("Account client not set")
-
-    @cached_property
-    def named_parameters(self) -> dict[str, str]:
-        return self._named_parameters
 
     @cached_property
     def product_info(self):

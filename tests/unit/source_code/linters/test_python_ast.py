@@ -1,6 +1,7 @@
 import pytest
 from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
 
+from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
@@ -9,6 +10,7 @@ def test_extracts_root():
     stmt = tree.first_statement()
     root = Tree(stmt).root
     assert root == tree.node
+
 
 def test_extract_call_by_name():
     tree = Tree.parse("o.m1().m2().m3()")
@@ -147,7 +149,7 @@ for value1 in values_1:
 
 
 def test_fails_to_infer_cascading_fstring_values():
-    # The purpose of this test s to detect a change in astroid support for f-strings
+    # The purpose of this test is to detect a change in astroid support for f-strings
     source = """
 value1 = "John"
 value2 = f"Hello {value1}"
@@ -161,3 +163,45 @@ value3 = f"{value2}, how are you today?"
     assert any(not value.is_inferred() for value in values)
     # the expected value would be ["Hello John, how are you today?"]
 
+
+def test_infers_externally_defined_value():
+    ctx = GlobalContext()
+    ctx.named_parameters["my-widget"] = "my-value"
+    source = """
+name = "my-widget"
+value = dbutils.widgets.get(name)
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of value = ...
+    values = list(tree.infer_values(ctx))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["my-value"]
+
+
+def test_infers_externally_defined_values():
+    ctx = GlobalContext()
+    ctx.named_parameters["my-widget-1"] = "my-value-1"
+    ctx.named_parameters["my-widget-2"] = "my-value-2"
+    source = """
+for name in ["my-widget-1", "my-widget-2"]:
+    value = dbutils.widgets.get(name)
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # value of value = ...
+    values = list(tree.infer_values(ctx))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["my-value-1", "my-value-2"]
+
+
+def test_fails_to_infer_missing_externally_defined_value():
+    source = """
+name = "my-widget"
+value = dbutils.widgets.get(name)
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of value = ...
+    values = tree.infer_values(GlobalContext())
+    assert all(not value.is_inferred() for value in values)
