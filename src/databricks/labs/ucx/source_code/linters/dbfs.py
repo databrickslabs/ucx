@@ -80,7 +80,7 @@ class DBFSUsageLinter(Linter):
         """
         tree = Tree.parse(code)
         visitor = DetectDbfsVisitor()
-        visitor.visit(tree.root)
+        visitor.visit(tree.node)
         yield from visitor.get_advices()
 
 

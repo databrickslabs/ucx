@@ -339,7 +339,7 @@ class SparkSql(Linter, Fixer):
                 continue
             assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return tree.root.as_string()
+        return tree.node.as_string()
 
     def _find_matcher(self, node: NodeNG):
         if not isinstance(node, Call):

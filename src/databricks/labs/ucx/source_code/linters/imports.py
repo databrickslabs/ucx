@@ -44,7 +44,7 @@ class ImportSource(NodeBase):
                 sources.append(source)
             return sources, problems
         except Exception as e:  # pylint: disable=broad-except
-            problem = problem_factory('internal-error', f"While checking imports: {e}", tree.root)
+            problem = problem_factory('internal-error', f"While checking imports: {e}", tree.node)
             problems.append(problem)
             return [], problems
 
@@ -148,7 +148,7 @@ class SysPathChange(NodeBase, abc.ABC):
     @staticmethod
     def extract_from_tree(tree: Tree) -> list[SysPathChange]:
         visitor = SysPathChangesVisitor()
-        visitor.visit(tree.root)
+        visitor.visit(tree.node)
         return visitor.sys_path_changes
 
     def __init__(self, node: NodeNG, path: str, is_append: bool):

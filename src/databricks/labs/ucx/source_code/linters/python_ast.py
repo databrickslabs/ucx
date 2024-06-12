@@ -22,15 +22,15 @@ class Tree:
         root = parse(code)
         return Tree(root)
 
-    def __init__(self, root: NodeNG):
-        self._root: NodeNG = root
+    def __init__(self, node: NodeNG):
+        self._node: NodeNG = node
 
     @property
-    def root(self):
-        return self._root
+    def node(self):
+        return self._node
 
     def walk(self) -> Iterable[NodeNG]:
-        yield from self._walk(self._root)
+        yield from self._walk(self._node)
 
     @classmethod
     def _walk(cls, node: NodeNG) -> Iterable[NodeNG]:
@@ -40,12 +40,12 @@ class Tree:
 
     def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
-        visitor.visit(self._root)
+        visitor.visit(self._node)
         return visitor.matched_nodes
 
     def first_statement(self):
-        if isinstance(self._root, Module):
-            return self._root.body[0]
+        if isinstance(self._node, Module):
+            return self._node.body[0]
         return None
 
     @classmethod
@@ -95,7 +95,7 @@ class Tree:
 
     def __repr__(self):
         truncate_after = 32
-        code = repr(self._root)
+        code = repr(self._node)
         if len(code) > truncate_after:
             code = code[0:truncate_after] + "..."
         return f"<Tree: {code}>"
@@ -130,28 +130,33 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
-    def infer_values(self) -> Iterable[InferredValue]:
+    def infer_values(self): # , ctx: RuntimeContext | None = None) -> Iterable[InferredValue]:
+        # if ctx is not None:
+        #     self.contextualize(ctx)
         for inferred_atoms in self._infer_values():
             yield InferredValue(inferred_atoms)
 
+    # def contextualize(self, ctx: RuntimeContext):
+    #     pass  # parent = self.parent
+
     def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
         # deal with node types that don't implement 'inferred()'
-        if self._root is Uninferable or isinstance(self._root, Const):
-            yield [self._root]
-        elif isinstance(self._root, JoinedStr):
+        if self._node is Uninferable or isinstance(self._node, Const):
+            yield [self._node]
+        elif isinstance(self._node, JoinedStr):
             yield from self._infer_values_from_joined_string()
-        elif isinstance(self._root, FormattedValue):
-            yield from _LocalTree(self._root.value).do_infer_values()
+        elif isinstance(self._node, FormattedValue):
+            yield from _LocalTree(self._node.value).do_infer_values()
         else:
-            for inferred in self._root.inferred():
+            for inferred in self._node.inferred():
                 # work around infinite recursion of empty lists
-                if inferred == self._root:
+                if inferred == self._node:
                     continue
                 yield from _LocalTree(inferred).do_infer_values()
 
     def _infer_values_from_joined_string(self) -> Iterator[Iterable[NodeNG]]:
-        assert isinstance(self._root, JoinedStr)
-        yield from self._infer_values_from_joined_values(self._root.values)
+        assert isinstance(self._node, JoinedStr)
+        yield from self._infer_values_from_joined_values(self._node.values)
 
     @classmethod
     def _infer_values_from_joined_values(cls, nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:

@@ -1,6 +1,7 @@
 import pytest
 from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
 
+from databricks.labs.ucx.contexts.application import GlobalContext
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
@@ -143,10 +144,10 @@ for value1 in values_1:
 def test_fails_to_infer_cascading_fstring_values():
     # The purpose of this test s to detect a change in astroid support for f-strings
     source = """
-    value1 = "John"
-    value2 = f"Hello {value1}"
-    value3 = f"{value2}, how are you today?"
-    """
+value1 = "John"
+value2 = f"Hello {value1}"
+value3 = f"{value2}, how are you today?"
+"""
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[2].value)  # value of value3 = ...
@@ -154,3 +155,5 @@ def test_fails_to_infer_cascading_fstring_values():
     # for now, we simply check failure to infer!
     assert any(not value.is_inferred() for value in values)
     # the expected value would be ["Hello John, how are you today?"]
+
+
