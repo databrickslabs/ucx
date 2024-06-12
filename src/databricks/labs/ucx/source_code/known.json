@@ -575,6 +575,9 @@
       }
     ]
   },
+  "mpmath": {
+    "mpmath": []
+  },
   "multidict": {
     "multidict": []
   },
@@ -587,6 +590,9 @@
   },
   "mypy-extensions": {
     "mypy_extensions": []
+  },
+  "networkx": {
+    "networkx": []
   },
   "numpy": {
     "numpy": []
@@ -1846,6 +1852,10 @@
   "sqlparse": {
     "sqlparse": []
   },
+  "sympy": {
+    "isympy": [],
+    "sympy": []
+  },
   "threadpoolctl": {
     "threadpoolctl": []
   },
@@ -1857,6 +1867,10 @@
   },
   "tomlkit": {
     "tomlkit": []
+  },
+  "torch": {
+    "functorch": [],
+    "torch": []
   },
   "tqdm": {
     "tqdm": []
