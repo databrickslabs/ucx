@@ -244,8 +244,14 @@
   "click": {
     "click": []
   },
+  "contourpy": {
+    "contourpy": []
+  },
   "coverage": {
     "coverage": []
+  },
+  "cycler": {
+    "cycler": []
   },
   "databricks-labs-blueprint": {
     "databricks.labs.blueprint": []
@@ -265,6 +271,14 @@
   "dill": {
     "dill": []
   },
+  "docker-pycreds": {
+    "dockerpycreds": [],
+    "dockerpycreds.constants": [],
+    "dockerpycreds.errors": [],
+    "dockerpycreds.store": [],
+    "dockerpycreds.utils": [],
+    "dockerpycreds.version": []
+  },
   "eradicate": {
     "eradicate": []
   },
@@ -274,12 +288,93 @@
   "execnet": {
     "execnet": []
   },
+  "filelock": {
+    "filelock": [],
+    "filelock._api": [],
+    "filelock._error": [],
+    "filelock._soft": [],
+    "filelock._unix": [],
+    "filelock._util": [],
+    "filelock._windows": [],
+    "filelock.version": []
+  },
+  "fonttools": {
+    "fontTools": []
+  },
+  "frozendict": {
+    "frozendict": []
+  },
   "frozenlist": {
     "frozenlist": []
+  },
+  "fsspec": {
+    "fsspec": [],
+    "fsspec._version": [],
+    "fsspec.archive": [],
+    "fsspec.asyn": [],
+    "fsspec.caching": [],
+    "fsspec.callbacks": [],
+    "fsspec.compression": [],
+    "fsspec.config": [],
+    "fsspec.conftest": [],
+    "fsspec.core": [],
+    "fsspec.dircache": [],
+    "fsspec.exceptions": [],
+    "fsspec.fuse": [],
+    "fsspec.generic": [],
+    "fsspec.gui": [],
+    "fsspec.implementations": [],
+    "fsspec.implementations.arrow": [],
+    "fsspec.implementations.cache_mapper": [],
+    "fsspec.implementations.cache_metadata": [],
+    "fsspec.implementations.cached": [],
+    "fsspec.implementations.dask": [],
+    "fsspec.implementations.data": [],
+    "fsspec.implementations.dbfs": [],
+    "fsspec.implementations.dirfs": [],
+    "fsspec.implementations.ftp": [],
+    "fsspec.implementations.git": [],
+    "fsspec.implementations.github": [],
+    "fsspec.implementations.http": [],
+    "fsspec.implementations.jupyter": [],
+    "fsspec.implementations.libarchive": [],
+    "fsspec.implementations.local": [],
+    "fsspec.implementations.memory": [],
+    "fsspec.implementations.reference": [],
+    "fsspec.implementations.sftp": [],
+    "fsspec.implementations.smb": [],
+    "fsspec.implementations.tar": [],
+    "fsspec.implementations.webhdfs": [],
+    "fsspec.implementations.zip": [],
+    "fsspec.json": [],
+    "fsspec.mapping": [],
+    "fsspec.parquet": [],
+    "fsspec.registry": [],
+    "fsspec.spec": [],
+    "fsspec.tests.abstract": [],
+    "fsspec.tests.abstract.common": [],
+    "fsspec.tests.abstract.copy": [],
+    "fsspec.tests.abstract.get": [],
+    "fsspec.tests.abstract.mv": [],
+    "fsspec.tests.abstract.put": [],
+    "fsspec.transaction": [],
+    "fsspec.utils": []
+  },
+  "gitdb": {
+    "gitdb": []
+  },
+  "gitpython": {
+    "git": []
   },
   "google-auth": {
     "google.auth": [],
     "google.oauth2": []
+  },
+  "html5lib": {
+    "html5lib": []
+  },
+  "huggingface-hub": {
+    "huggingface_hub": []
   },
   "idna": {
     "idna": []
@@ -309,11 +404,26 @@
   "joblib": {
     "joblib": []
   },
+  "kiwisolver": {
+    "kiwisolver": [],
+    "kiwisolver.exceptions": []
+  },
+  "lxml": {
+    "lxml": []
+  },
+  "matplotlib": {
+    "matplotlib": [],
+    "mpl_toolkits": [],
+    "pylab": []
+  },
   "mccabe": {
     "mccabe": []
   },
   "multidict": {
     "multidict": []
+  },
+  "multitasking": {
+    "multitasking": []
   },
   "mypy": {
     "mypy": [],
@@ -334,6 +444,14 @@
   "pathspec": {
     "pathspec": []
   },
+  "peewee": {
+    "peewee": [],
+    "playhouse": [],
+    "pwiz": []
+  },
+  "pillow": {
+    "PIL": []
+  },
   "pip": {
     "pip": []
   },
@@ -342,6 +460,88 @@
   },
   "pluggy": {
     "pluggy": []
+  },
+  "protobuf": {
+    "google.protobuf": [],
+    "google.protobuf.any_pb2": [],
+    "google.protobuf.api_pb2": [],
+    "google.protobuf.compiler": [],
+    "google.protobuf.compiler.plugin_pb2": [],
+    "google.protobuf.descriptor": [],
+    "google.protobuf.descriptor_database": [],
+    "google.protobuf.descriptor_pb2": [],
+    "google.protobuf.descriptor_pool": [],
+    "google.protobuf.duration_pb2": [],
+    "google.protobuf.empty_pb2": [],
+    "google.protobuf.field_mask_pb2": [],
+    "google.protobuf.internal": [],
+    "google.protobuf.internal._parameterized": [],
+    "google.protobuf.internal.api_implementation": [],
+    "google.protobuf.internal.builder": [],
+    "google.protobuf.internal.containers": [],
+    "google.protobuf.internal.decoder": [],
+    "google.protobuf.internal.encoder": [],
+    "google.protobuf.internal.enum_type_wrapper": [],
+    "google.protobuf.internal.extension_dict": [],
+    "google.protobuf.internal.field_mask": [],
+    "google.protobuf.internal.message_listener": [],
+    "google.protobuf.internal.python_edition_defaults": [],
+    "google.protobuf.internal.python_message": [],
+    "google.protobuf.internal.testing_refleaks": [],
+    "google.protobuf.internal.type_checkers": [],
+    "google.protobuf.internal.well_known_types": [],
+    "google.protobuf.internal.wire_format": [],
+    "google.protobuf.json_format": [],
+    "google.protobuf.message": [],
+    "google.protobuf.message_factory": [],
+    "google.protobuf.proto_builder": [],
+    "google.protobuf.pyext": [],
+    "google.protobuf.pyext.cpp_message": [],
+    "google.protobuf.reflection": [],
+    "google.protobuf.runtime_version": [],
+    "google.protobuf.service": [],
+    "google.protobuf.service_reflection": [],
+    "google.protobuf.source_context_pb2": [],
+    "google.protobuf.struct_pb2": [],
+    "google.protobuf.symbol_database": [],
+    "google.protobuf.testdata": [],
+    "google.protobuf.text_encoding": [],
+    "google.protobuf.text_format": [],
+    "google.protobuf.timestamp_pb2": [],
+    "google.protobuf.type_pb2": [],
+    "google.protobuf.unknown_fields": [],
+    "google.protobuf.util": [],
+    "google.protobuf.wrappers_pb2": []
+  },
+  "psutil": {
+    "psutil": [],
+    "psutil._common": [],
+    "psutil._compat": [],
+    "psutil._psaix": [],
+    "psutil._psbsd": [],
+    "psutil._pslinux": [],
+    "psutil._psosx": [],
+    "psutil._psposix": [],
+    "psutil._pssunos": [],
+    "psutil._pswindows": [],
+    "psutil.tests": [],
+    "psutil.tests.runner": [],
+    "psutil.tests.test_aix": [],
+    "psutil.tests.test_bsd": [],
+    "psutil.tests.test_connections": [],
+    "psutil.tests.test_contracts": [],
+    "psutil.tests.test_linux": [],
+    "psutil.tests.test_memleaks": [],
+    "psutil.tests.test_misc": [],
+    "psutil.tests.test_osx": [],
+    "psutil.tests.test_posix": [],
+    "psutil.tests.test_process": [],
+    "psutil.tests.test_process_all": [],
+    "psutil.tests.test_sunos": [],
+    "psutil.tests.test_system": [],
+    "psutil.tests.test_testutils": [],
+    "psutil.tests.test_unicode": [],
+    "psutil.tests.test_windows": []
   },
   "py4j": {
     "py4j": [
@@ -362,6 +562,19 @@
   },
   "pylint-pytest": {
     "pylint_pytest": []
+  },
+  "pyparsing": {
+    "pyparsing": [],
+    "pyparsing.actions": [],
+    "pyparsing.common": [],
+    "pyparsing.core": [],
+    "pyparsing.diagram": [],
+    "pyparsing.exceptions": [],
+    "pyparsing.helpers": [],
+    "pyparsing.results": [],
+    "pyparsing.testing": [],
+    "pyparsing.unicode": [],
+    "pyparsing.util": []
   },
   "pyspark": {
     "pyspark": [],
@@ -1225,6 +1438,12 @@
     "_yaml": [],
     "yaml": []
   },
+  "regex": {
+    "regex": [],
+    "regex._regex_core": [],
+    "regex.regex": [],
+    "regex.test_regex": []
+  },
   "requests": {
     "requests": []
   },
@@ -1250,11 +1469,32 @@
       }
     ]
   },
+  "safetensors": {
+    "safetensors": [],
+    "safetensors.flax": [],
+    "safetensors.mlx": [],
+    "safetensors.numpy": [],
+    "safetensors.paddle": [],
+    "safetensors.tensorflow": [],
+    "safetensors.torch": []
+  },
   "scikit-learn": {
     "sklearn": []
   },
   "scipy": {
     "scipy": []
+  },
+  "sentry-sdk": {
+    "sentry_sdk": [],
+    "sentry_sdk.integrations.spark.spark_driver": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ]
+  },
+  "setproctitle": {
+    "setproctitle": []
   },
   "setuptools": {
     "_distutils_hack": [],
@@ -1263,6 +1503,9 @@
   },
   "six": {
     "six": []
+  },
+  "smmap": {
+    "smmap": []
   },
   "sniffio": {
     "sniffio": [],
@@ -1286,11 +1529,20 @@
   "threadpoolctl": {
     "threadpoolctl": []
   },
+  "tokenizers": {
+    "tokenizers": []
+  },
   "tomli": {
     "tomli": []
   },
   "tomlkit": {
     "tomlkit": []
+  },
+  "tqdm": {
+    "tqdm": []
+  },
+  "transformers": {
+    "transformers": []
   },
   "types-pyyaml": {},
   "types-requests": {},
@@ -1300,8 +1552,26 @@
   "tzdata": {
     "tzdata": []
   },
+  "umap": {
+    "umap": [],
+    "umap.get": []
+  },
+  "unicorn": {
+    "unicorn": []
+  },
+  "unidecode": {
+    "unidecode": []
+  },
   "urllib3": {
     "urllib3": []
+  },
+  "wandb": {
+    "wandb": []
+  },
+  "waterbear": {
+    "waterbear": [],
+    "waterbear.test_waterbear": [],
+    "waterbear.waterbear": []
   },
   "webencodings": {
     "webencodings": [],
@@ -1312,6 +1582,72 @@
   },
   "wheel": {
     "wheel": []
+  },
+  "wordcloud": {
+    "wordcloud": [],
+    "wordcloud._version": [],
+    "wordcloud.color_from_image": [],
+    "wordcloud.tokenization": [],
+    "wordcloud.wordcloud": [],
+    "wordcloud.wordcloud_cli": []
+  },
+  "xgboost": {
+    "xgboost": [],
+    "xgboost._typing": [],
+    "xgboost.callback": [],
+    "xgboost.collective": [],
+    "xgboost.compat": [],
+    "xgboost.config": [],
+    "xgboost.core": [],
+    "xgboost.dask": [],
+    "xgboost.data": [],
+    "xgboost.federated": [],
+    "xgboost.libpath": [],
+    "xgboost.plotting": [],
+    "xgboost.rabit": [],
+    "xgboost.sklearn": [],
+    "xgboost.spark": [],
+    "xgboost.spark.core": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "xgboost.spark.data": [],
+    "xgboost.spark.estimator": [],
+    "xgboost.spark.params": [],
+    "xgboost.spark.utils": [],
+    "xgboost.testing": [],
+    "xgboost.testing.dask": [],
+    "xgboost.testing.data": [],
+    "xgboost.testing.data_iter": [],
+    "xgboost.testing.metrics": [],
+    "xgboost.testing.params": [],
+    "xgboost.testing.ranking": [],
+    "xgboost.testing.shared": [],
+    "xgboost.testing.updater": [],
+    "xgboost.tracker": [],
+    "xgboost.training": []
   },
   "yapf": {
     "yapf": [],
@@ -1387,6 +1723,64 @@
   },
   "yarl": {
     "yarl": []
+  },
+  "yfinance": {
+    "yfinance": [],
+    "yfinance.base": [],
+    "yfinance.cache": [],
+    "yfinance.const": [],
+    "yfinance.data": [],
+    "yfinance.exceptions": [],
+    "yfinance.multi": [],
+    "yfinance.scrapers": [],
+    "yfinance.scrapers.analysis": [],
+    "yfinance.scrapers.fundamentals": [],
+    "yfinance.scrapers.history": [],
+    "yfinance.scrapers.holders": [],
+    "yfinance.scrapers.quote": [],
+    "yfinance.shared": [],
+    "yfinance.ticker": [],
+    "yfinance.tickers": [],
+    "yfinance.utils": [],
+    "yfinance.version": []
+  },
+  "zingg": {
+    "zingg": [],
+    "zingg.client": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "zingg.databricks": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/FileStore/"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/FileStore/jars/zingg_0_4_0.jar"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/FileStore/py/zingg-0.4.0-py2.py3-none-any.whl"
+      },
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "zingg.examples.amazon-google.AmazonGoogle": [],
+    "zingg.examples.febrl.FebrlExample": [],
+    "zingg.examples.febrl.postgres": [],
+    "zingg.phases.assessModel": [],
+    "zingg.phases.exportModel": [],
+    "zingg.pipes": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ]
   },
   "zipp": {
     "zipp": [],
