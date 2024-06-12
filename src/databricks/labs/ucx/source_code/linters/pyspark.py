@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
+from astroid import Attribute, Call, Const, InferenceError, NodeNG, AstroidSyntaxError  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -10,6 +10,7 @@ from databricks.labs.ucx.source_code.base import (
     Deprecation,
     Fixer,
     Linter,
+    Failure,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
@@ -317,7 +318,11 @@ class SparkSql(Linter, Fixer):
         return self._from_table.name()
 
     def lint(self, code: str) -> Iterable[Advice]:
-        tree = Tree.parse(code)
+        try:
+            tree = Tree.parse(code)
+        except AstroidSyntaxError as e:
+            yield Failure('syntax-error', str(e), 0, 0, 0, 0)
+            return
         for node in tree.walk():
             matcher = self._find_matcher(node)
             if matcher is None:

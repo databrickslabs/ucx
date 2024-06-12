@@ -19,7 +19,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
-logger = logging.Logger(__file__)
+logger = logging.Logger(__name__)
 
 
 class DependencyGraph:
@@ -72,6 +72,7 @@ class DependencyGraph:
         # TODO: this has to be a private method, because we don't want to allow free-form dependencies.
         # the only case we have for this method to be used outside of this class is for DistInfoPackage
         # See databricks.labs.ucx.source_code.python_libraries.DistInfoContainer.build_dependency_graph for reference
+        logger.debug(f"Registering dependency {dependency}")
         maybe = self.locate_dependency(dependency.path)
         if maybe.graph is not None:
             self._dependencies[dependency] = maybe.graph
@@ -171,7 +172,11 @@ class DependencyGraph:
             A list of dependency problems; position information is relative to the python code itself.
         """
         problems: list[DependencyProblem] = []
-        tree = Tree.parse(python_code)
+        try:
+            tree = Tree.parse(python_code)
+        except Exception as e:  # pylint: disable=broad-except
+            problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
+            return problems
         syspath_changes = SysPathChange.extract_from_tree(tree)
         run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
         import_sources: list[ImportSource]

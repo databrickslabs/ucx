@@ -28,4 +28,7 @@ coverage:
 known:
 	hatch run python src/databricks/labs/ucx/source_code/known.py
 
-.PHONY: all clean dev lint fmt test integration coverage known
+solacc:
+	hatch run python tests/integration/source_code/solacc.py
+
+.PHONY: all clean dev lint fmt test integration coverage known solacc

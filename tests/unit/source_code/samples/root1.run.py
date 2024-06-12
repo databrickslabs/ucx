@@ -18,4 +18,3 @@ start_price = 10
 # COMMAND ----------
 
 # MAGIC %run "./leaf2.py"
-

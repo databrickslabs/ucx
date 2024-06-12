@@ -4,4 +4,3 @@ days = 300
 # COMMAND ----------
 
 # MAGIC %run
-
