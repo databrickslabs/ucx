@@ -66,13 +66,11 @@ def test_file_migrator_supported_language_no_diagnostics():
     languages.fixer.assert_not_called()
 
 
-def test_notebook_migrator_supported_language_no_diagnostics(simple_dependency_resolver, mock_path_lookup):
-    paths = ["root1.run.py"]
-    resolver = simple_dependency_resolver
-    maybe = resolver.resolve_notebook(mock_path_lookup, Path(paths[0]))
+def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup):
     languages = LinterContext(MigrationIndex([]))
     migrator = NotebookMigrator(languages)
-    assert not migrator.apply(maybe.dependency.path)
+    path = mock_path_lookup.resolve(Path("root1.run.py"))
+    assert not migrator.apply(path)
 
 
 def test_migrator_supported_language_no_fixer():
