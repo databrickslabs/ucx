@@ -64,6 +64,8 @@ def lint_all():
             logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
     parseable_pct = int(parseable / len(all_files) * 100)
     logger.info(f"Parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}")
+    if parseable_pct < 100:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
