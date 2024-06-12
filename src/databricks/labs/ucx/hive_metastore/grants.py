@@ -59,6 +59,8 @@ class Grant:
     udf: str | None = None
     any_file: bool = False
     anonymous_function: bool = False
+    success: int = 1
+    failures: str = "[]"
 
     @staticmethod
     def type_and_key(
