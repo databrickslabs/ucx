@@ -1,5 +1,10 @@
 # Version changelog
 
+## 0.27.1
+
+* Fixed typo in `known.json` ([#1899](https://github.com/databrickslabs/ucx/issues/1899)). A fix has been implemented to correct a typo in the `known.json` file, an essential configuration file that specifies dependencies for various components of the project. The typo was identified in the `gast` dependency, which was promptly rectified by modifying an incorrect character. This adjustment guarantees precise specification of dependencies, thereby ensuring the correct functioning of affected components and maintaining the overall reliability of the open-source library.
+
+
 ## 0.27.0
 
 * Added `mlflow` to known packages ([#1895](https://github.com/databrickslabs/ucx/issues/1895)). The `mlflow` package has been incorporated into the project and is now recognized as a known package. This integration includes modifications to the use of `mlflow` in the context of UC Shared Clusters, providing recommendations to modify or rewrite certain functionalities related to `sparkContext`, `_conf`, and `RDD` APIs. Additionally, the artifact storage system of `mlflow` in Databricks and DBFS has undergone changes. The `known.json` file has also been updated with several new packages, such as `alembic`, `aniso8601`, `cloudpickle`, `docker`, `entrypoints`, `flask`, `graphene`, `graphql-core`, `graphql-relay`, `gunicorn`, `html5lib`, `isort`, `jinja2`, `markdown`, `markupsafe`, `mccabe`, `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-semantic-conventions`, `packaging`, `pyarrow`, `pyasn1`, `pygments`, `pyrsistent`, `python-dateutil`, `pytz`, `pyyaml`, `regex`, `requests`, and more. These packages are now acknowledged and incorporated into the project's functionality.
