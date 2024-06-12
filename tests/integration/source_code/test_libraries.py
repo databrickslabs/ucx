@@ -28,9 +28,10 @@ def test_build_notebook_dependency_graphs_installs_wheel_with_pip_cell_in_notebo
     assert maybe.graph.all_relative_names() == {f"{notebook}.py", "thingy/__init__.py"}
 
 
-def test_build_notebook_dependency_graphs_installs_pytest_from_index_url(simple_ctx):
+@pytest.mark.parametrize("notebook", ["pip_install_pytest_with_index_url", "pip_install_multiple_packages"])
+def test_build_notebook_dependency_graphs_installs_pypi_packages(simple_ctx, notebook):
     ctx = simple_ctx.replace(path_lookup=MockPathLookup())
-    maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path("pip_install_pytest_with_index_url"))
+    maybe = ctx.dependency_resolver.build_notebook_dependency_graph(Path(notebook))
     assert not maybe.problems
 
 
