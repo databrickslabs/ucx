@@ -201,10 +201,24 @@ for name in ["my-widget-1", "my-widget-2"]:
 
 
 def test_fails_to_infer_missing_externally_defined_value():
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget-1": "my-value-1", "my-widget-2": "my-value-2"}
     source = """
 name = "my-widget"
 value = dbutils.widgets.get(name)
 """
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of value = ...
+    values = tree.infer_values(state)
+    assert all(not value.is_inferred() for value in values)
+
+
+def test_survives_absence_of_externally_defined_values():
+    source = """
+    name = "my-widget"
+    value = dbutils.widgets.get(name)
+    """
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[1].value)  # value of value = ...

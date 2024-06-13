@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 from astroid import Assign, Attribute, Call, Const, decorators, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
 from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
 from astroid.typing import InferenceErrorInfo  # type: ignore
+from astroid.exceptions import InferenceError  # type: ignore
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 
@@ -163,11 +164,18 @@ class Tree:
         elif isinstance(self._node, FormattedValue):
             yield from _LocalTree(self._node.value).do_infer_values()
         else:
+            yield from self._infer_internal()
+
+    def _infer_internal(self):
+        try:
             for inferred in self._node.inferred():
                 # work around infinite recursion of empty lists
                 if inferred == self._node:
                     continue
                 yield from _LocalTree(inferred).do_infer_values()
+        except InferenceError as e:
+            logger.debug(f"When inferring {self._node}", exc_info=e)
+            yield [Uninferable]
 
     def _infer_values_from_joined_string(self) -> Iterator[Iterable[NodeNG]]:
         assert isinstance(self._node, JoinedStr)
