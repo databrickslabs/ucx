@@ -271,6 +271,12 @@ The final row includes "Incompatible Delta Live Tables" and "Incompatible Global
 
 [[back to top](#migration-assessment-report)]
 
+## Incompatible Object Privileges
+
+These are permissions on objects that are not supported by Unit Catalog.
+
+[[back to top](#migration-assessment-report)]
+
 ## Incompatible Delta Live Tables
 
 These are Delta Live Table jobs that may be incompatible with Unity Catalog.
