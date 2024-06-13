@@ -31,3 +31,5 @@ SELECT object_type, object_id, failures FROM (
 UNION ALL
 SELECT "databases" AS object_type, CONCAT(catalog, '.', database) AS object_id, TO_JSON(ARRAY(error)) AS failures
 FROM $inventory.table_failures WHERE name IS NULL
+UNION ALL
+SELECT "permissions" AS object_type, object_id, failures FROM $inventory.grant_detail
