@@ -1,4 +1,4 @@
--- viz type=table, name=Grants, columns=finding, principal,action_type,object_type,object_id,principal
+-- viz type=table, name=Grants, columns=finding,action_type,object_type,object_id,principal,principal_type
 -- widget title=Incompatible Object Privileges, row=41, col=0, size_x=6, size_y=8
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
