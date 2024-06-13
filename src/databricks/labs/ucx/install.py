@@ -110,8 +110,8 @@ def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
             functools.partial(table, "recon_results", ReconResult),
         ],
     )
-    deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("grant_detail", "queries/views/grant_detail.sql")
+    deployer.deploy_view("objects", "queries/views/objects.sql")
     deployer.deploy_view("table_estimates", "queries/views/table_estimates.sql")
     deployer.deploy_view("misc_patterns", "queries/views/misc_patterns.sql")
     deployer.deploy_view("code_patterns", "queries/views/code_patterns.sql")
