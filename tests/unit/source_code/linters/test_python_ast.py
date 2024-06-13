@@ -224,3 +224,19 @@ def test_survives_absence_of_externally_defined_values():
     tree = Tree(nodes[1].value)  # value of value = ...
     values = tree.infer_values(CurrentSessionState())
     assert all(not value.is_inferred() for value in values)
+
+
+def test_infers_externally_defined_value_set():
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget": "my-value"}
+    source = """
+values = dbutils.widgets.getAll()
+name = "my-widget"
+value = values[name]
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[2].value)  # value of value = ...
+    values = list(tree.infer_values(state))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["my-value"]

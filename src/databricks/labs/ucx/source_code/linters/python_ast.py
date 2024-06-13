@@ -5,7 +5,7 @@ import logging
 from collections.abc import Iterable, Iterator, Generator
 from typing import Any, TypeVar
 
-from astroid import Assign, Attribute, Call, Const, decorators, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
+from astroid import Assign, Attribute, Call, Const, decorators, Dict, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
 from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
 from astroid.typing import InferenceErrorInfo  # type: ignore
 from astroid.exceptions import InferenceError  # type: ignore
@@ -151,9 +151,18 @@ class Tree:
     def _contextualize(self, state: CurrentSessionState | None):
         if state is None or state.named_parameters is None or len(state.named_parameters) == 0:
             return
+        self._contextualize_dbutils_widgets_get(state)
+        self._contextualize_dbutils_widgets_get_all(state)
+
+    def _contextualize_dbutils_widgets_get(self, state: CurrentSessionState):
         calls = Tree(self.root).locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
         for call in calls:
-            call.func = _GetWidgetValueCall(state, call)
+            call.func = _DbUtilsWidgetsGetCall(state, call)
+
+    def _contextualize_dbutils_widgets_get_all(self, state: CurrentSessionState):
+        calls = Tree(self.root).locate(Call, [("getAll", Attribute), ("widgets", Attribute), ("dbutils", Name)])
+        for call in calls:
+            call.func = _DbUtilsWidgetsGetAllCall(state, call)
 
     def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
         # deal with node types that don't implement 'inferred()'
@@ -198,7 +207,7 @@ class _LocalTree(Tree):
         return self._infer_values()
 
 
-class _GetWidgetValueCall(NodeNG):
+class _DbUtilsWidgetsGetCall(NodeNG):
 
     def __init__(self, session_state: CurrentSessionState, node: NodeNG):
         super().__init__(
@@ -241,6 +250,64 @@ class _GetWidgetValueCall(NodeNG):
                 end_col_offset=self.end_col_offset,
                 parent=self,
             )
+
+
+class _DbUtilsWidgetsGetAllCall(NodeNG):
+
+    def __init__(self, session_state: CurrentSessionState, node: NodeNG):
+        super().__init__(
+            lineno=node.lineno,
+            col_offset=node.col_offset,
+            end_lineno=node.end_lineno,
+            end_col_offset=node.end_col_offset,
+            parent=node.parent,
+        )
+        self._session_state = session_state
+
+    @decorators.raise_if_nothing_inferred
+    def _infer(
+        self, context: InferenceContext | None = None, **kwargs: Any
+    ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
+        yield self
+        return InferenceErrorInfo(node=self, context=context)
+
+    def infer_call_result(self, **_):  # caller needs unused kwargs
+        named_parameters = self._session_state.named_parameters
+        if not named_parameters:
+            yield Uninferable
+            return
+        items = self._populate_items(named_parameters)
+        result = Dict(
+            lineno=self.lineno,
+            col_offset=self.col_offset,
+            end_lineno=self.end_lineno,
+            end_col_offset=self.end_col_offset,
+            parent=self,
+        )
+        result.postinit(items)
+        yield result
+
+    def _populate_items(self, values: dict[str, str]):
+        items: list[tuple[InferenceResult, InferenceResult]] = []
+        for key, value in values.items():
+            item_key = Const(
+                key,
+                lineno=self.lineno,
+                col_offset=self.col_offset,
+                end_lineno=self.end_lineno,
+                end_col_offset=self.end_col_offset,
+                parent=self,
+            )
+            item_value = Const(
+                value,
+                lineno=self.lineno,
+                col_offset=self.col_offset,
+                end_lineno=self.end_lineno,
+                end_col_offset=self.end_col_offset,
+                parent=self,
+            )
+            items.append((item_key, item_value))
+        return items
 
 
 class InferredValue:
