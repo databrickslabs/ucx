@@ -57,15 +57,17 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
-    group = make_group()
+    group_a = make_group()
+    group_b = make_group()
     schema = runtime_ctx.make_schema()
     udf_a = runtime_ctx.make_udf(schema_name=schema.name)
     udf_b = runtime_ctx.make_udf(schema_name=schema.name)
 
-    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_a.full_name} TO `{group.display_name}`")
-    sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group.display_name}`")
-    sql_backend.execute(f"GRANT ALL PRIVILEGES ON FUNCTION {udf_b.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf_a.full_name} TO `{group_a.display_name}`")
+    sql_backend.execute(f"GRANT READ_METADATA ON FUNCTION {udf_a.full_name} TO `{group_a.display_name}`")
+    sql_backend.execute(f"ALTER FUNCTION {udf_a.full_name} OWNER TO `{group_a.display_name}`")
+    sql_backend.execute(f"GRANT ALL PRIVILEGES ON FUNCTION {udf_b.full_name} TO `{group_a.display_name}`")
+    sql_backend.execute(f"DENY READ_METADATA ON FUNCTION {udf_b.full_name} to `{group_b.display_name}`")
 
     grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
 
@@ -73,5 +75,6 @@ def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
     for grant in grants.snapshot():
         actual_grants[f"{grant.principal}.{grant.object_key}"].add(grant.action_type)
 
-    assert {"SELECT", "READ_METADATA", "OWN"} == actual_grants[f"{group.display_name}.{udf_a.full_name}"]
-    assert {"SELECT", "READ_METADATA"} == actual_grants[f"{group.display_name}.{udf_b.full_name}"]
+    assert {"SELECT", "READ_METADATA", "OWN"} == actual_grants[f"{group_a.display_name}.{udf_a.full_name}"]
+    assert {"SELECT", "READ_METADATA"} == actual_grants[f"{group_a.display_name}.{udf_b.full_name}"]
+    assert {"DENIED_READ_METADATA"} == actual_grants[f"{group_b.display_name}.{udf_b.full_name}"]
