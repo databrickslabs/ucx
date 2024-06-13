@@ -26,10 +26,10 @@ for i in range(10):
         pass
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:7:+1:38] Can't migrate 'tableExists' because its table name argument is not a constant
+    # ucx[table-migrate:+1:7:+1:38] Can't migrate 'spark.catalog.tableExists(name)' because its table name argument cannot be computed
     if spark.catalog.tableExists(name):
         pass
-    # ucx[table-migrate:+1:7:+1:48] Can't migrate 'tableExists' because its table name argument is not a constant
+    # ucx[table-migrate:+1:7:+1:48] Can't migrate 'spark.catalog.tableExists(f'boot{stuff}')' because its table name argument cannot be computed
     if spark.catalog.tableExists(f"boot{stuff}"):
         pass
 
