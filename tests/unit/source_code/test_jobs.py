@@ -39,7 +39,6 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
-        CurrentSessionState(),
     )
     return resolver
 

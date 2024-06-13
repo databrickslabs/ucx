@@ -48,10 +48,8 @@ def test_locates_notebooks(source: list[str], expected: int, mock_path_lookup):
     whitelist = Whitelist()
     import_resolver = ImportFileResolver(file_loader, whitelist)
     pip_resolver = PythonLibraryResolver(whitelist)
-    dependency_resolver = DependencyResolver(
-        pip_resolver, notebook_resolver, import_resolver, mock_path_lookup, CurrentSessionState()
-    )
-    maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path)
+    dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
+    maybe = dependency_resolver.build_notebook_dependency_graph(notebook_path, CurrentSessionState())
     assert not maybe.problems
     assert maybe.graph is not None
     assert len(maybe.graph.all_paths) == expected
@@ -76,8 +74,8 @@ def test_locates_files(source: list[str], expected: int):
     notebook_resolver = NotebookResolver(notebook_loader)
     import_resolver = ImportFileResolver(file_loader, whitelist)
     pip_resolver = PythonLibraryResolver(whitelist)
-    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup, CurrentSessionState())
-    maybe = resolver.build_local_file_dependency_graph(file_path)
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
+    maybe = resolver.build_local_file_dependency_graph(file_path, CurrentSessionState())
     assert not maybe.problems
     assert maybe.graph is not None
     assert len(maybe.graph.all_dependencies) == expected
@@ -115,8 +113,8 @@ sys.path.append('{child_dir_path.as_posix()}')
         whitelist = Whitelist()
         import_resolver = ImportFileResolver(file_loader, whitelist)
         pip_resolver = PythonLibraryResolver(whitelist)
-        resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup, CurrentSessionState())
-        maybe = resolver.build_notebook_dependency_graph(parent_file_path)
+        resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
+        maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
         assert maybe.graph is not None
         assert len(maybe.graph.all_paths) == 2
@@ -154,8 +152,8 @@ def func():
         file_loader = FileLoader()
         import_resolver = ImportFileResolver(file_loader, whitelist)
         pip_resolver = PythonLibraryResolver(whitelist)
-        resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup, CurrentSessionState())
-        maybe = resolver.build_notebook_dependency_graph(parent_file_path)
+        resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, lookup)
+        maybe = resolver.build_notebook_dependency_graph(parent_file_path, CurrentSessionState())
         assert not maybe.problems
         assert maybe.graph is not None
         assert maybe.graph.all_relative_names() == {"some_file.py", "import_file.py"}

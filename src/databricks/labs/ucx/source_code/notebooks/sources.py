@@ -8,7 +8,7 @@ from pathlib import Path
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Failure, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice, Failure
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -94,12 +94,12 @@ class NotebookLinter:
         assert notebook is not None
         return cls(ctx, notebook)
 
-    def lint(self, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
             if not self._languages.is_supported(cell.language.language):
                 continue
             linter = self._languages.linter(cell.language.language)
-            for advice in linter.lint(cell.original_code, session_state):
+            for advice in linter.lint(cell.original_code):
                 yield advice.replace(
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
@@ -179,7 +179,7 @@ class FileLinter:
             return False
         return self._source_code.startswith(CellLanguage.of_language(language).file_magic_header)
 
-    def lint(self, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self) -> Iterable[Advice]:
         encoding = locale.getpreferredencoding(False)
         try:
             is_notebook = self._is_notebook()
@@ -189,11 +189,11 @@ class FileLinter:
             return
 
         if is_notebook:
-            yield from self._lint_notebook(session_state)
+            yield from self._lint_notebook()
         else:
-            yield from self._lint_file(session_state)
+            yield from self._lint_file()
 
-    def _lint_file(self, session_state: CurrentSessionState):
+    def _lint_file(self):
         language = self._file_language()
         if not language:
             suffix = self._path.suffix.lower()
@@ -206,13 +206,13 @@ class FileLinter:
         else:
             try:
                 linter = self._ctx.linter(language)
-                yield from linter.lint(self._source_code, session_state)
+                yield from linter.lint(self._source_code)
             except ValueError as err:
                 yield Failure(
                     "unsupported-content", f"Error while parsing content of {self._path.as_posix()}: {err}", 0, 0, 1, 1
                 )
 
-    def _lint_notebook(self, session_state: CurrentSessionState):
+    def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
         notebook_linter = NotebookLinter(self._ctx, notebook)
-        yield from notebook_linter.lint(session_state)
+        yield from notebook_linter.lint()

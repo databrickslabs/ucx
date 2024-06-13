@@ -79,7 +79,7 @@ class QueryMatcher(Matcher):
         if table_arg:
             try:
                 for inferred in Tree(table_arg).infer_values(self.session_state):
-                    yield from self._lint_table_arg(from_table, node, inferred, session_state)
+                    yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(
                     code='table-migrate',
@@ -88,11 +88,9 @@ class QueryMatcher(Matcher):
                 )
 
     @classmethod
-    def _lint_table_arg(
-        cls, from_table: FromTable, call_node: NodeNG, inferred: InferredValue, session_state: CurrentSessionState
-    ):
+    def _lint_table_arg(cls, from_table: FromTable, call_node: NodeNG, inferred: InferredValue):
         if inferred.is_inferred():
-            for advice in from_table.lint(inferred.as_string(), session_state):
+            for advice in from_table.lint(inferred.as_string()):
                 yield advice.replace_from_node(call_node)
         else:
             yield Advisory.from_node(
@@ -323,15 +321,16 @@ class SparkSql(Linter, Fixer):
 
     _spark_matchers = SparkMatchers()
 
-    def __init__(self, from_table: FromTable, index: MigrationIndex):
+    def __init__(self, from_table: FromTable, index: MigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
+        self._session_state = session_state
 
     def name(self) -> str:
         # this is the same fixer, just in a different language context
         return self._from_table.name()
 
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self, code: str) -> Iterable[Advice]:
         try:
             tree = Tree.parse(code)
         except AstroidSyntaxError as e:
@@ -342,7 +341,7 @@ class SparkSql(Linter, Fixer):
             if matcher is None:
                 continue
             assert isinstance(node, Call)
-            yield from matcher.lint(self._from_table, self._index, session_state, node)
+            yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
     def apply(self, code: str) -> str:
         tree = Tree.parse(code)

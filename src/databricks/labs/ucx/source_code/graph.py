@@ -344,13 +344,11 @@ class DependencyResolver:
         notebook_resolver: BaseNotebookResolver,
         import_resolver: BaseImportResolver,
         path_lookup: PathLookup,
-        session_state: CurrentSessionState,
     ):
         self._library_resolver = library_resolver
         self._notebook_resolver = notebook_resolver
         self._import_resolver = import_resolver
         self._path_lookup = path_lookup
-        self._session_state = session_state
 
     def resolve_notebook(self, path_lookup: PathLookup, path: Path) -> MaybeDependency:
         return self._notebook_resolver.resolve_notebook(path_lookup, path)
@@ -361,7 +359,7 @@ class DependencyResolver:
     def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         return self._library_resolver.register_library(path_lookup, *libraries)
 
-    def build_local_file_dependency_graph(self, path: Path) -> MaybeGraph:
+    def build_local_file_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a file. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
         resolver = self._local_file_resolver
@@ -371,7 +369,7 @@ class DependencyResolver:
         maybe = resolver.resolve_local_file(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, self._session_state)
+        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, session_state)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
             problem = DependencyProblem('cannot-load-file', f"Could not load file {path}")
@@ -387,13 +385,13 @@ class DependencyResolver:
             return self._import_resolver
         return None
 
-    def build_notebook_dependency_graph(self, path: Path) -> MaybeGraph:
+    def build_notebook_dependency_graph(self, path: Path, session_state: CurrentSessionState) -> MaybeGraph:
         """Builds a dependency graph starting from a notebook. This method is mainly intended for testing purposes.
         In case of problems, the paths in the problems will be relative to the starting path lookup."""
         maybe = self._notebook_resolver.resolve_notebook(self._path_lookup, path)
         if not maybe.dependency:
             return MaybeGraph(None, self._make_relative_paths(maybe.problems, path))
-        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, self._session_state)
+        graph = DependencyGraph(maybe.dependency, None, self, self._path_lookup, session_state)
         container = maybe.dependency.load(graph.path_lookup)
         if container is None:
             problem = DependencyProblem('cannot-load-notebook', f"Could not load notebook {path}")

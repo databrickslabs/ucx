@@ -11,15 +11,15 @@ from databricks.labs.ucx.source_code.queries import FromTable
 def test_spark_no_sql(empty_index):
     session_state = CurrentSessionState()
     ftf = FromTable(empty_index, session_state)
-    sqf = SparkSql(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index, session_state)
 
-    assert not list(sqf.lint("print(1)", session_state))
+    assert not list(sqf.lint("print(1)"))
 
 
 def test_spark_sql_no_match(empty_index):
     session_state = CurrentSessionState()
     ftf = FromTable(empty_index, session_state)
-    sqf = SparkSql(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index, session_state)
 
     old_code = """
 for i in range(10):
@@ -27,13 +27,13 @@ for i in range(10):
     print(len(result))
 """
 
-    assert not list(sqf.lint(old_code, session_state))
+    assert not list(sqf.lint(old_code))
 
 
 def test_spark_sql_match(migration_index):
     session_state = CurrentSessionState()
     ftf = FromTable(migration_index, session_state)
-    sqf = SparkSql(ftf, migration_index)
+    sqf = SparkSql(ftf, migration_index, session_state)
 
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -41,7 +41,7 @@ for i in range(10):
     result = spark.sql("SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert list(sqf.lint(old_code, session_state)) == [
+    assert list(sqf.lint(old_code)) == [
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: s3://bucket/path',
@@ -64,7 +64,7 @@ for i in range(10):
 def test_spark_sql_match_named(migration_index):
     session_state = CurrentSessionState()
     ftf = FromTable(migration_index, session_state)
-    sqf = SparkSql(ftf, migration_index)
+    sqf = SparkSql(ftf, migration_index, session_state)
 
     old_code = """
 spark.read.csv("s3://bucket/path")
@@ -72,7 +72,7 @@ for i in range(10):
     result = spark.sql(args=[1], sqlQuery = "SELECT * FROM old.things").collect()
     print(len(result))
 """
-    assert list(sqf.lint(old_code, session_state)) == [
+    assert list(sqf.lint(old_code)) == [
         Deprecation(
             code='direct-filesystem-access',
             message='The use of direct filesystem references is deprecated: ' 's3://bucket/path',
@@ -93,8 +93,9 @@ for i in range(10):
 
 
 def test_spark_table_return_value_apply(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSql(ftf, migration_index)
+    session_state = CurrentSessionState()
+    ftf = FromTable(migration_index, session_state)
+    sqf = SparkSql(ftf, migration_index, session_state)
     old_code = """spark.read.csv('s3://bucket/path')
 for table in spark.catalog.listTables():
     do_stuff_with_table(table)"""
@@ -104,8 +105,9 @@ for table in spark.catalog.listTables():
 
 
 def test_spark_sql_fix(migration_index):
-    ftf = FromTable(migration_index, CurrentSessionState())
-    sqf = SparkSql(ftf, migration_index)
+    session_state = CurrentSessionState()
+    ftf = FromTable(migration_index, session_state)
+    sqf = SparkSql(ftf, migration_index, session_state)
 
     old_code = """spark.read.csv("s3://bucket/path")
 for i in range(10):
@@ -528,8 +530,8 @@ for i in range(10):
 def test_spark_cloud_direct_access(empty_index, code, expected):
     session_state = CurrentSessionState()
     ftf = FromTable(empty_index, session_state)
-    sqf = SparkSql(ftf, empty_index)
-    advisories = list(sqf.lint(code, session_state))
+    sqf = SparkSql(ftf, empty_index, session_state)
+    advisories = list(sqf.lint(code))
     assert advisories == expected
 
 
@@ -548,10 +550,10 @@ FS_FUNCTIONS = [
 def test_direct_cloud_access_reports_nothing(empty_index, fs_function):
     session_state = CurrentSessionState()
     ftf = FromTable(empty_index, session_state)
-    sqf = SparkSql(ftf, empty_index)
+    sqf = SparkSql(ftf, empty_index, session_state)
     # ls function calls have to be from dbutils.fs, or we ignore them
     code = f"""spark.{fs_function}("/bucket/path")"""
-    advisories = list(sqf.lint(code, session_state))
+    advisories = list(sqf.lint(code))
     assert not advisories
 
 

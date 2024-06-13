@@ -1,6 +1,6 @@
 from itertools import chain
 
-from databricks.labs.ucx.source_code.base import Failure, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Failure
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.linters.spark_connect import LoggingMatcher, SparkConnectLinter
 
@@ -21,7 +21,7 @@ spark._jspark._jvm.com.my.custom.Name()
             end_col=18,
         ),
     ]
-    actual = list(linter.lint(code, CurrentSessionState()))
+    actual = list(linter.lint(code))
     assert actual == expected
 
 
@@ -42,7 +42,7 @@ spark._jspark._jvm.com.my.custom.Name()
             end_col=18,
         ),
     ]
-    actual = list(linter.lint(code, CurrentSessionState()))
+    actual = list(linter.lint(code))
     assert actual == expected
 
 
@@ -86,7 +86,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_col=40,
         ),
     ]
-    actual = list(linter.lint(code, CurrentSessionState()))
+    actual = list(linter.lint(code))
     assert actual == expected
 
 
@@ -129,7 +129,7 @@ rdd2 = spark.createDataFrame(sc.emptyRDD(), schema)
             end_line=2,
             end_col=40,
         ),
-    ] == list(linter.lint(code, CurrentSessionState()))
+    ] == list(linter.lint(code))
 
 
 def test_rdd_map_partitions():
@@ -148,7 +148,7 @@ df.rdd.mapPartitions(myUdf)
             end_col=27,
         ),
     ]
-    actual = list(linter.lint(code, CurrentSessionState()))
+    actual = list(linter.lint(code))
     assert actual == expected
 
 
@@ -164,7 +164,7 @@ def test_conf_shared():
             end_line=0,
             end_col=23,
         ),
-    ] == list(linter.lint(code, CurrentSessionState()))
+    ] == list(linter.lint(code))
 
 
 def test_conf_serverless():
@@ -180,7 +180,7 @@ def test_conf_serverless():
             end_col=8,
         ),
     ]
-    actual = list(linter.lint(code, CurrentSessionState()))
+    actual = list(linter.lint(code))
     assert actual == expected
 
 
@@ -260,4 +260,4 @@ def test_valid_code():
 df = spark.range(10)
 df.collect()
     """
-    assert not list(linter.lint(code, CurrentSessionState()))
+    assert not list(linter.lint(code))

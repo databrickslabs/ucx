@@ -112,11 +112,14 @@ class NotebookRunCall(NodeBase):
 
 class DbutilsLinter(Linter):
 
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def __init__(self, session_state: CurrentSessionState):
+        self._session_state = session_state
+
+    def lint(self, code: str) -> Iterable[Advice]:
         tree = Tree.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:
-            yield from self._raise_advice_if_unresolved(node.node, session_state)
+            yield from self._raise_advice_if_unresolved(node.node, self._session_state)
 
     @classmethod
     def _raise_advice_if_unresolved(cls, node: NodeNG, session_state: CurrentSessionState) -> Iterable[Advice]:

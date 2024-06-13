@@ -18,7 +18,6 @@ def test_dependency_graph_registers_library(mock_path_lookup):
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
-        session_state,
     )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)
 
@@ -38,7 +37,6 @@ def test_folder_loads_content(mock_path_lookup):
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
-        session_state,
     )
     dependency = Dependency(FolderLoader(file_loader), path)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)

@@ -143,15 +143,16 @@ class Tree:
         return None
 
     def infer_values(self, state: CurrentSessionState | None = None) -> Iterable[InferredValue]:
-        if state is not None:
-            self.contextualize(state)
+        self._contextualize(state)
         for inferred_atoms in self._infer_values():
             yield InferredValue(inferred_atoms)
 
-    def contextualize(self, state: CurrentSessionState):
+    def _contextualize(self, state: CurrentSessionState | None):
+        if state is None or state.named_parameters is None or len(state.named_parameters) == 0:
+            return
         calls = Tree(self.root).locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
         for call in calls:
-            call.func = _ContextualCall(state, call)
+            call.func = _GetWidgetValueCall(state, call)
 
     def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
         # deal with node types that don't implement 'inferred()'
@@ -189,7 +190,7 @@ class _LocalTree(Tree):
         return self._infer_values()
 
 
-class _ContextualCall(NodeNG):
+class _GetWidgetValueCall(NodeNG):
 
     def __init__(self, session_state: CurrentSessionState, node: NodeNG):
         super().__init__(

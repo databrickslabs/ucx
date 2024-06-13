@@ -118,14 +118,13 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
         NotebookResolver(NotebookLoader()),
         ImportFileResolver(file_loader, whitelist),
         mock_path_lookup,
-        session_state,
     )
     path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
     prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
     linter = LocalCodeLinter(
-        file_loader, folder_loader, mock_path_lookup, resolver, lambda: LinterContext(migration_index)
+        file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
-    advices = linter.lint(prompts, None, session_state)
+    advices = linter.lint(prompts, None)
     assert not advices
 
 
@@ -173,12 +172,13 @@ def test_known_issues(path: Path, migration_index):
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, whitelist)
     pip_resolver = PythonLibraryResolver(whitelist)
-    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup, session_state)
+    resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         file_loader,
         folder_loader,
         path_lookup,
+        session_state,
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    linter.lint(MockPrompts({}), path, session_state)
+    linter.lint(MockPrompts({}), path)

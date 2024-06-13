@@ -134,9 +134,7 @@ def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     notebook_resolver = NotebookResolver(notebook_loader)
     library_resolver = PythonLibraryResolver(Whitelist())
     import_resolver = ImportFileResolver(FileLoader(), Whitelist())
-    return DependencyResolver(
-        library_resolver, notebook_resolver, import_resolver, mock_path_lookup, CurrentSessionState()
-    )
+    return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)
 
 
 def test_notebook_builds_leaf_dependency_graph(mock_path_lookup) -> None:
@@ -255,7 +253,7 @@ do_something_with_stuff(stuff)
 stuff2 = dbutils.notebook.run("where is notebook 1?")
 stuff3 = dbutils.notebook.run("where is notebook 2?")
 """
-    linter = DbutilsLinter()
+    linter = DbutilsLinter(CurrentSessionState())
     tree = Tree.parse(source)
     nodes = linter.list_dbutils_notebook_run_calls(tree)
     assert len(nodes) == 2
@@ -267,7 +265,7 @@ import stuff
 do_something_with_stuff(stuff)
 stuff2 = notebook.run("where is notebook 1?")
 """
-    linter = DbutilsLinter()
+    linter = DbutilsLinter(CurrentSessionState())
     tree = Tree.parse(source)
     nodes = linter.list_dbutils_notebook_run_calls(tree)
     assert len(nodes) == 0
@@ -279,7 +277,7 @@ name1 = "John"
 name2 = f"{name1}"
 dbutils.notebook.run(f"Hey {name2}")
     """
-    linter = DbutilsLinter()
-    advices = list(linter.lint(source, CurrentSessionState()))
+    linter = DbutilsLinter(CurrentSessionState())
+    advices = list(linter.lint(source))
     assert len(advices) == 1
     assert advices[0].code == "dbutils-notebook-run-dynamic"

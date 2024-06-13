@@ -8,7 +8,6 @@ from astroid import Attribute, Call, NodeNG  # type: ignore
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Linter,
-    CurrentSessionState,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -112,7 +111,7 @@ class DBRv8d0Linter(Linter):
             ]
         )
 
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self, code: str) -> Iterable[Advice]:
         if self._skip_dbr:
             return
 

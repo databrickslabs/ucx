@@ -20,17 +20,17 @@ class LinterContext:
         self._linters = {
             Language.PYTHON: SequentialLinter(
                 [
-                    SparkSql(from_table, index),
-                    DBFSUsageLinter(),
+                    SparkSql(from_table, index, session_state),
+                    DBFSUsageLinter(session_state),
                     DBRv8d0Linter(dbr_version=None),
                     SparkConnectLinter(is_serverless=False),
-                    DbutilsLinter(),
+                    DbutilsLinter(session_state),
                 ]
             ),
             Language.SQL: SequentialLinter([from_table, dbfs_from_folder]),
         }
         self._fixers: dict[Language, list[Fixer]] = {
-            Language.PYTHON: [SparkSql(from_table, index)],
+            Language.PYTHON: [SparkSql(from_table, index, session_state)],
             Language.SQL: [from_table],
         }
 
@@ -50,9 +50,9 @@ class LinterContext:
                 return fixer
         return None
 
-    def apply_fixes(self, language: Language, code: str, session_state: CurrentSessionState) -> str:
+    def apply_fixes(self, language: Language, code: str) -> str:
         linter = self.linter(language)
-        for advice in linter.lint(code, session_state):
+        for advice in linter.lint(code):
             fixer = self.fixer(language, advice.code)
             if fixer:
                 code = fixer.apply(code)

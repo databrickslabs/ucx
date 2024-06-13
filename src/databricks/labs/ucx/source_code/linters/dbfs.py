@@ -65,6 +65,10 @@ class DetectDbfsVisitor(TreeVisitor):
 
 
 class DBFSUsageLinter(Linter):
+
+    def __init__(self, session_state: CurrentSessionState):
+        self._session_state = session_state
+
     @staticmethod
     def name() -> str:
         """
@@ -72,12 +76,12 @@ class DBFSUsageLinter(Linter):
         """
         return 'dbfs-usage'
 
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self, code: str) -> Iterable[Advice]:
         """
         Lints the code looking for file system paths that are deprecated
         """
         tree = Tree.parse(code)
-        visitor = DetectDbfsVisitor(session_state)
+        visitor = DetectDbfsVisitor(self._session_state)
         visitor.visit(tree.node)
         yield from visitor.get_advices()
 
@@ -90,7 +94,7 @@ class FromDbfsFolder(Linter):
     def name() -> str:
         return 'dbfs-query'
 
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self, code: str) -> Iterable[Advice]:
         for statement in sqlglot.parse(code, read='databricks'):
             if not statement:
                 continue

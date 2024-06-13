@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice
 from databricks.labs.ucx.source_code.linters.table_creation import DBRv8d0Linter
 
 
@@ -60,7 +60,7 @@ def lint(
     dbr_version: tuple[int, int] | None = (7, 9),
 ) -> list[Advice]:
     """Invoke linting for the given dbr version"""
-    return list(DBRv8d0Linter(dbr_version).lint(code, CurrentSessionState()))
+    return list(DBRv8d0Linter(dbr_version).lint(code))
 
 
 @pytest.mark.parametrize("method_name", METHOD_NAMES)

@@ -22,7 +22,6 @@ from databricks.labs.ucx.source_code.base import (
     Convention,
     Deprecation,
     Failure,
-    CurrentSessionState,
 )
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
@@ -244,7 +243,7 @@ class LspServer:
     def lint(self, file_uri: str):
         code, language = self._read(file_uri)
         analyser = self._languages.linter(language)
-        diagnostics = [Diagnostic.from_advice(_) for _ in analyser.lint(code, CurrentSessionState())]
+        diagnostics = [Diagnostic.from_advice(_) for _ in analyser.lint(code)]
         return AnalyseResponse(diagnostics)
 
     def quickfix(self, file_uri: str, code_range: Range, diagnostic_code: str):

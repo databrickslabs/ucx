@@ -127,7 +127,7 @@ class Convention(Advice):
 
 class Linter:
     @abstractmethod
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]: ...
+    def lint(self, code: str) -> Iterable[Advice]: ...
 
 
 class Fixer:
@@ -167,6 +167,6 @@ class SequentialLinter(Linter):
     def __init__(self, linters: list[Linter]):
         self._linters = linters
 
-    def lint(self, code: str, session_state: CurrentSessionState) -> Iterable[Advice]:
+    def lint(self, code: str) -> Iterable[Advice]:
         for linter in self._linters:
-            yield from linter.lint(code, session_state)
+            yield from linter.lint(code)
