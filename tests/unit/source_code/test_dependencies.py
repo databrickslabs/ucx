@@ -47,7 +47,9 @@ def test_dependency_resolver_visits_workspace_file_dependencies(simple_dependenc
 
 
 def test_dependency_resolver_raises_problem_with_unfound_workspace_notebook_dependency(simple_dependency_resolver):
-    maybe = simple_dependency_resolver.build_notebook_dependency_graph(Path("root1-no-leaf.run.py"), CurrentSessionState())
+    maybe = simple_dependency_resolver.build_notebook_dependency_graph(
+        Path("root1-no-leaf.run.py"), CurrentSessionState()
+    )
     assert list(maybe.problems) == [
         DependencyProblem(
             'notebook-not-found',
@@ -97,7 +99,9 @@ def test_dependency_resolver_visits_file_dependencies(simple_dependency_resolver
 
 
 def test_dependency_resolver_skips_builtin_dependencies(simple_dependency_resolver):
-    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py"), CurrentSessionState())
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(
+        Path("python_builtins.py"), CurrentSessionState()
+    )
     assert not maybe.failed
     graph = maybe.graph
     maybe = graph.locate_dependency(Path("os"))
@@ -107,7 +111,9 @@ def test_dependency_resolver_skips_builtin_dependencies(simple_dependency_resolv
 
 
 def test_dependency_resolver_ignores_known_dependencies(simple_dependency_resolver):
-    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("python_builtins.py"), CurrentSessionState())
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(
+        Path("python_builtins.py"), CurrentSessionState()
+    )
     assert maybe.graph
     graph = maybe.graph
     maybe_graph = graph.locate_dependency(Path("databricks"))
@@ -191,7 +197,9 @@ def test_dependency_resolver_raises_problem_with_missing_file_loader(mock_notebo
 
 
 def test_dependency_resolver_raises_problem_for_non_inferable_sys_path(simple_dependency_resolver):
-    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("sys-path-with-fstring.py"), CurrentSessionState())
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(
+        Path("sys-path-with-fstring.py"), CurrentSessionState()
+    )
     assert list(maybe.problems) == [
         DependencyProblem(
             code='sys-path-cannot-compute',
