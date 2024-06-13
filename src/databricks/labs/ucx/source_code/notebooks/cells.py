@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import logging
-import re
-import shlex
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
 from enum import Enum
 from pathlib import Path
+
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
+from databricks.labs.ucx.source_code.notebooks.commands import PipCommand
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
@@ -203,32 +203,8 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    @staticmethod
-    def _split(code) -> list[str]:
-        """Split pip cell code into multiple arguments
-
-        Note:
-            PipCell should be a pip command, i.e. single line possible spanning multilines escaped with backslashes.
-
-        Sources:
-            https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
-        """
-        match = re.search(r"(?<!\\)\n", code)
-        if match:
-            code = code[: match.start()]  # Remove code after non-escaped newline
-        code = code.replace("\\\n", " ")
-        lexer = shlex.split(code, posix=True)
-        return list(lexer)
-
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        argv = self._split(self.original_code)
-        if len(argv) == 1:
-            return [DependencyProblem("library-install-failed", "Missing command after '%pip'")]
-        if argv[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {argv[1]}")]
-        if len(argv) == 2:
-            return [DependencyProblem("library-install-failed", "Missing arguments after '%pip install'")]
-        return graph.register_library(*argv[2:])  # Skipping %pip install
+        return PipCommand(self.original_code).build_dependency_graph(graph)
 
 
 class CellLanguage(Enum):

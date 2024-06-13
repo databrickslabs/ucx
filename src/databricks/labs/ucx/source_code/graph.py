@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import abc
+import base64
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
+from typing import TypeVar, cast
 
-from astroid import ImportFrom, NodeNG  # type: ignore
-
+from astroid import (  # type: ignore
+    Call,
+    Const,
+    ImportFrom,
+    Name,
+    NodeNG,
+)
 from databricks.labs.ucx.source_code.base import Advisory
 from databricks.labs.ucx.source_code.linters.imports import (
     DbutilsLinter,
@@ -15,6 +22,7 @@ from databricks.labs.ucx.source_code.linters.imports import (
     NotebookRunCall,
     SysPathChange,
     UnresolvedPath,
+    ProblemFactory,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
@@ -171,6 +179,7 @@ class DependencyGraph:
         Returns:
             A list of dependency problems; position information is relative to the python code itself.
         """
+        python_code = self.convert_magic_commands(python_code)
         problems: list[DependencyProblem] = []
         try:
             tree = Tree.parse(python_code)
@@ -183,7 +192,9 @@ class DependencyGraph:
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(import_problems)
-        nodes = syspath_changes + run_calls + import_sources
+        magic_commands, command_problems = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(command_problems)
+        nodes = syspath_changes + run_calls + import_sources + magic_commands
         # need to execute things in intertwined sequence so concat and sort
         for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             for problem in self._process_node(base_node):
@@ -197,6 +208,16 @@ class DependencyGraph:
                 problems.append(problem)
         return problems
 
+    @classmethod
+    def convert_magic_commands(cls, python_code: str):
+        lines = python_code.split("\n")
+        for i, line in enumerate(lines):
+            if not line.startswith("%"):
+                continue
+            content = base64.b64encode(line.encode())  # use base64 to simplify escaping
+            lines[i] = f"magic_command('{content.decode('ascii')}')"
+        return "\n".join(lines)
+
     def _process_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
@@ -204,8 +225,13 @@ class DependencyGraph:
             yield from self._register_notebook(base_node)
         elif isinstance(base_node, ImportSource):
             yield from self._register_import(base_node)
+        elif isinstance(base_node, MagicCommand):
+            yield from self._execute_command(base_node)
         else:
             logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
+
+    def _execute_command(self, base_node: MagicCommand):
+        return base_node.execute(return_type=list[DependencyProblem], command="build_dependency_graph", graph=self)
 
     def _register_import(self, base_node: ImportSource):
         prefix = ""
@@ -480,3 +506,49 @@ class MaybeGraph:
     @property
     def failed(self):
         return len(self.problems) > 0
+
+
+T = TypeVar("T")
+
+# non-top-level import is required to avoid cyclic dependency
+# pylint: disable=wrong-import-position, cyclic-import
+from databricks.labs.ucx.source_code.notebooks.commands import PipCommand  # noqa: E402
+
+
+class MagicCommand(NodeBase):
+
+    @classmethod
+    def extract_from_tree(
+        cls, tree: Tree, problem_factory: ProblemFactory
+    ) -> tuple[list[MagicCommand], list[DependencyProblem]]:
+        problems: list[DependencyProblem] = []
+        commands: list[MagicCommand] = []
+        try:
+            nodes = tree.locate(Call, [("magic_command", Name)])
+            for command in cls._make_commands_for_magic_command_call_nodes(nodes):
+                commands.append(command)
+            return commands, problems
+        except Exception as e:  # pylint: disable=broad-except
+            problem = problem_factory('internal-error', f"While checking magic commands: {e}", tree.root)
+            problems.append(problem)
+            return [], problems
+
+    @classmethod
+    def _make_commands_for_magic_command_call_nodes(cls, nodes: list[Call]):
+        for node in nodes:
+            arg = node.args[0]
+            if isinstance(arg, Const):
+                yield MagicCommand(node, arg.value)
+
+    def __init__(self, node: NodeNG, command: str):
+        super().__init__(node)
+        data = base64.b64decode(command)
+        self._command = data.decode("ascii")
+
+    def execute(self, return_type: T, **kwargs) -> T:
+        """so many different things can happen here that we give up type hints"""
+        if self._command.startswith("%pip"):
+            cmd = PipCommand(self._command)
+            return cmd.execute(return_type, **kwargs)
+        logger.debug(f"Unsupported magic command {self._command[:self._command.index(' ')]}")
+        return cast(T, None)

@@ -2,11 +2,10 @@ from pathlib import Path
 from unittest.mock import create_autospec
 import yaml
 
-import pytest
 
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell, PythonCell
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
@@ -164,30 +163,14 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     graph.register_library.assert_called_once_with("databricks")
 
 
-@pytest.mark.parametrize(
-    "code,split",
-    [
-        ("%pip install foo", ["%pip", "install", "foo"]),
-        ("%pip install", ["%pip", "install"]),
-        ("%pip installl foo", ["%pip", "installl", "foo"]),
-        ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
-        ("%pip install foo --index-url bar", ["%pip", "install", "foo", "--index-url", "bar"]),
-        ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
-        ("%pip install foo --index-url bar\nmore code", ["%pip", "install", "foo", "--index-url", "bar"]),
-        (
-            "%pip install foo --index-url bar\\\n -t /tmp/",
-            ["%pip", "install", "foo", "--index-url", "bar", "-t", "/tmp/"],
-        ),
-        ("%pip install foo --index-url \\\n bar", ["%pip", "install", "foo", "--index-url", "bar"]),
-        (
-            "%pip install ./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl",
-            ["%pip", "install", "./distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"],
-        ),
-        (
-            "%pip install distribution/dist/thingy-0.0.1-py2.py3-none-any.whl",
-            ["%pip", "install", "distribution/dist/thingy-0.0.1-py2.py3-none-any.whl"],
-        ),
-    ],
-)
-def test_pip_cell_split(code, split):
-    assert PipCell._split(code) == split  # pylint: disable=protected-access
+def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup):
+    code = """
+a = 'something'
+%pip install databricks
+b = 'else'
+"""
+    cell = PythonCell(code, original_offset=1)
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup)
+    problems = cell.build_dependency_graph(graph)
+    assert not problems
