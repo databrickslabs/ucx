@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import (
     DependencyResolver,
     DependencyProblem,
@@ -122,7 +123,7 @@ def test_detect_s3fs_import(empty_index, source: str, expected: list[DependencyP
     import_resolver = ImportFileResolver(file_loader, whitelist)
     pip_resolver = PythonLibraryResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
-    maybe = dependency_resolver.build_local_file_dependency_graph(sample)
+    maybe = dependency_resolver.build_local_file_dependency_graph(sample, CurrentSessionState())
     assert maybe.problems == [_.replace(source_path=sample) for _ in expected]
 
 
@@ -153,5 +154,5 @@ def test_detect_s3fs_import_in_dependencies(
     pip_resolver = PythonLibraryResolver(whitelist)
     dependency_resolver = DependencyResolver(pip_resolver, mock_notebook_resolver, import_resolver, mock_path_lookup)
     sample = mock_path_lookup.cwd / "root9.py"
-    maybe = dependency_resolver.build_local_file_dependency_graph(sample)
+    maybe = dependency_resolver.build_local_file_dependency_graph(sample, CurrentSessionState())
     assert maybe.problems == expected

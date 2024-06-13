@@ -1,7 +1,21 @@
 import pytest
 from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
 
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
+
+
+def test_extracts_root():
+    tree = Tree.parse("o.m1().m2().m3()")
+    stmt = tree.first_statement()
+    root = Tree(stmt).root
+    assert root == tree.node
+    assert repr(tree)  # for test coverage
+
+
+def test_no_first_statement():
+    tree = Tree.parse("")
+    assert not tree.first_statement()
 
 
 def test_extract_call_by_name():
@@ -141,12 +155,12 @@ for value1 in values_1:
 
 
 def test_fails_to_infer_cascading_fstring_values():
-    # The purpose of this test s to detect a change in astroid support for f-strings
+    # The purpose of this test is to detect a change in astroid support for f-strings
     source = """
-    value1 = "John"
-    value2 = f"Hello {value1}"
-    value3 = f"{value2}, how are you today?"
-    """
+value1 = "John"
+value2 = f"Hello {value1}"
+value3 = f"{value2}, how are you today?"
+"""
     tree = Tree.parse(source)
     nodes = tree.locate(Assign, [])
     tree = Tree(nodes[2].value)  # value of value3 = ...
@@ -154,3 +168,75 @@ def test_fails_to_infer_cascading_fstring_values():
     # for now, we simply check failure to infer!
     assert any(not value.is_inferred() for value in values)
     # the expected value would be ["Hello John, how are you today?"]
+
+
+def test_infers_externally_defined_value():
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget": "my-value"}
+    source = """
+name = "my-widget"
+value = dbutils.widgets.get(name)
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of value = ...
+    values = list(tree.infer_values(state))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["my-value"]
+
+
+def test_infers_externally_defined_values():
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget-1": "my-value-1", "my-widget-2": "my-value-2"}
+    source = """
+for name in ["my-widget-1", "my-widget-2"]:
+    value = dbutils.widgets.get(name)
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[0].value)  # value of value = ...
+    values = list(tree.infer_values(state))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["my-value-1", "my-value-2"]
+
+
+def test_fails_to_infer_missing_externally_defined_value():
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget-1": "my-value-1", "my-widget-2": "my-value-2"}
+    source = """
+name = "my-widget"
+value = dbutils.widgets.get(name)
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of value = ...
+    values = tree.infer_values(state)
+    assert all(not value.is_inferred() for value in values)
+
+
+def test_survives_absence_of_externally_defined_values():
+    source = """
+    name = "my-widget"
+    value = dbutils.widgets.get(name)
+    """
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of value = ...
+    values = tree.infer_values(CurrentSessionState())
+    assert all(not value.is_inferred() for value in values)
+
+
+def test_infers_externally_defined_value_set():
+    state = CurrentSessionState()
+    state.named_parameters = {"my-widget": "my-value"}
+    source = """
+values = dbutils.widgets.getAll()
+name = "my-widget"
+value = values[name]
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[2].value)  # value of value = ...
+    values = list(tree.infer_values(state))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["my-value"]

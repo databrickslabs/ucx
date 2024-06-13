@@ -343,21 +343,21 @@ class WorkflowLinter:
 
     def _lint_task(self, task: jobs.Task, job: jobs.Job):
         dependency: Dependency = WorkflowTask(self._ws, task, job)
-        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup)
+        # we can load it without further preparation since the WorkflowTask is merely a wrapper
         container = dependency.load(self._path_lookup)
-        assert container is not None  # because we just created it
         assert isinstance(container, WorkflowTaskContainer)
+        session_state = CurrentSessionState(
+            data_security_mode=container.data_security_mode,
+            named_parameters=container.named_parameters,
+            spark_conf=container.spark_conf,
+        )
+        graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)
         if problems:
             for problem in problems:
                 source_path = self._UNKNOWN if problem.is_path_missing() else problem.source_path
                 yield source_path, problem
             return
-        session_state = CurrentSessionState(
-            data_security_mode=container.data_security_mode,
-            named_parameters=container.named_parameters,
-            spark_conf=container.spark_conf,
-        )
         ctx = LinterContext(self._migration_index, session_state)
         for dependency in graph.all_dependencies:
             logger.info(f'Linting {task.task_key} dependency: {dependency}')

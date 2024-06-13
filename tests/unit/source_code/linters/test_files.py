@@ -4,8 +4,11 @@ from unittest.mock import Mock, create_autospec
 
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
+
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceContainer
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
+from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
@@ -25,14 +28,21 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from tests.unit import locate_site_packages, _samples_path
 
 
-def test_migrator_fix_ignores_unsupported_extensions():
+def test_notebook_migrator_ignores_unsupported_extensions():
+    languages = LinterContext(MigrationIndex([]))
+    migrator = NotebookMigrator(languages)
+    path = Path('unsupported.ext')
+    assert not migrator.apply(path)
+
+
+def test_file_migrator_fix_ignores_unsupported_extensions():
     languages = LinterContext(MigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     path = Path('unsupported.ext')
     assert not migrator.apply(path)
 
 
-def test_migrator_fix_ignores_unsupported_language():
+def test_file_migrator_fix_ignores_unsupported_language():
     languages = LinterContext(MigrationIndex([]))
     migrator = LocalFileMigrator(lambda: languages)
     migrator._extensions[".py"] = None  # pylint: disable=protected-access
@@ -40,20 +50,27 @@ def test_migrator_fix_ignores_unsupported_language():
     assert not migrator.apply(path)
 
 
-def test_migrator_fix_reads_supported_extensions(migration_index):
+def test_file_migrator_fix_reads_supported_extensions(migration_index):
     languages = LinterContext(migration_index)
     migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
     assert not migrator.apply(path)
 
 
-def test_migrator_supported_language_no_diagnostics():
+def test_file_migrator_supported_language_no_diagnostics():
     languages = create_autospec(LinterContext)
     languages.linter(Language.PYTHON).lint.return_value = []
     migrator = LocalFileMigrator(lambda: languages)
     path = Path(__file__)
     migrator.apply(path)
     languages.fixer.assert_not_called()
+
+
+def test_notebook_migrator_supported_language_no_diagnostics(mock_path_lookup):
+    languages = LinterContext(MigrationIndex([]))
+    migrator = NotebookMigrator(languages)
+    path = mock_path_lookup.resolve(Path("root1.run.py"))
+    assert not migrator.apply(path)
 
 
 def test_migrator_supported_language_no_fixer():
@@ -95,6 +112,7 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     folder_loader = FolderLoader(file_loader)
     whitelist = Whitelist()
     pip_resolver = PythonLibraryResolver(whitelist)
+    session_state = CurrentSessionState()
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
@@ -104,7 +122,7 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
     prompts = MockPrompts({"Which file or directory do you want to lint ?": path.as_posix()})
     linter = LocalCodeLinter(
-        file_loader, folder_loader, mock_path_lookup, resolver, lambda: LinterContext(migration_index)
+        file_loader, folder_loader, mock_path_lookup, session_state, resolver, lambda: LinterContext(migration_index)
     )
     advices = linter.lint(prompts, None)
     assert not advices
@@ -149,10 +167,18 @@ def test_known_issues(path: Path, migration_index):
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
+    session_state = CurrentSessionState()
     whitelist = Whitelist()
     notebook_resolver = NotebookResolver(NotebookLoader())
     import_resolver = ImportFileResolver(file_loader, whitelist)
     pip_resolver = PythonLibraryResolver(whitelist)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
-    linter = LocalCodeLinter(file_loader, folder_loader, path_lookup, resolver, lambda: LinterContext(migration_index))
+    linter = LocalCodeLinter(
+        file_loader,
+        folder_loader,
+        path_lookup,
+        session_state,
+        resolver,
+        lambda: LinterContext(migration_index, session_state),
+    )
     linter.lint(MockPrompts({}), path)

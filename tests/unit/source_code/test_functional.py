@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex, MigrationStatus
-from databricks.labs.ucx.source_code.base import Advice
+from databricks.labs.ucx.source_code.base import Advice, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 
@@ -75,9 +75,9 @@ class Functional:
 
     def verify(self) -> None:
         expected_problems = list(self._expected_problems())
-        actual_advice = list(self._lint())
+        actual_advices = list(self._lint())
         # Convert the actual problems to the same type as our expected problems for easier comparison.
-        actual_problems = [Expectation.from_advice(advice) for advice in actual_advice]
+        actual_problems = [Expectation.from_advice(advice) for advice in actual_advices]
 
         # Fail the test if the comments don't match reality.
         expected_but_missing = sorted(set(expected_problems).difference(actual_problems))
@@ -102,7 +102,9 @@ class Functional:
                 MigrationStatus('other', 'matters', dst_catalog='some', dst_schema='certain', dst_table='issues'),
             ]
         )
-        ctx = LinterContext(migration_index)
+        session_state = CurrentSessionState()
+        session_state.named_parameters = {"my-widget": "my-path.py"}
+        ctx = LinterContext(migration_index, session_state)
         linter = FileLinter(ctx, self.path)
         return linter.lint()
 
