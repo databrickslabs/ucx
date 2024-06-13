@@ -33,12 +33,12 @@ for table in spark.catalog.listTables(pattern="st*", dbName="old"):
 ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated database.
 # ucx[table-migrate:+3:13:+3:43] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
 ## TODO: The following isn't yet implemented:
-## ucx[table-migrate:+1:13:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
+## ucx[table-migrate:+1:13:+1:0] Can't migrate 'listTables' because its database name argument cannot be computed
 for table in spark.catalog.listTables(name):
     do_stuff_with_table(table)
 # ucx[table-migrate:+3:13:+3:53] Call to 'listTables' will return a list of <catalog>.<database>.<table> instead of <database>.<table>.
 ## TODO: The following isn't yet implemented:
-## ucx[table-migrate:+1:13:+1:0] Can't migrate 'listTables' because its database name argument is not a constant
+## ucx[table-migrate:+1:13:+1:0] Can't migrate 'listTables' because its database name argument cannot be computed
 for table in spark.catalog.listTables(f"boop{stuff}"):
     do_stuff_with_table(table)
 

@@ -16,6 +16,17 @@ def test_spark_no_sql(empty_index):
     assert not list(sqf.lint("print(1)"))
 
 
+def test_spark_dynamic_sql(empty_index):
+    source = """
+schema="some_schema"
+df4.write.saveAsTable(f"{schema}.member_measure")
+"""
+    session_state = CurrentSessionState()
+    ftf = FromTable(empty_index, session_state)
+    sqf = SparkSql(ftf, empty_index, session_state)
+    assert not list(sqf.lint(source))
+
+
 def test_spark_sql_no_match(empty_index):
     session_state = CurrentSessionState()
     ftf = FromTable(empty_index, session_state)
