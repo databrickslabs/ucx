@@ -47,7 +47,9 @@ def clone_all():
 def lint_all():
     # pylint: disable=too-many-nested-blocks
     ws = WorkspaceClient(host='...', token='...')
-    ctx = LocalCheckoutContext(ws).replace(linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state))
+    ctx = LocalCheckoutContext(ws).replace(
+        linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
+    )
     parseable = 0
     missing_imports = 0
     all_files = list(dist.glob('**/*.py'))
