@@ -448,6 +448,12 @@ CREATE TABLE [IF NOT EXISTS] table_name
 
 [[back to top](#migration-assessment-report)]
 
+### AF222 - Explicitly DENYing privileges is not supported in UC
+
+Unity Catalog does not support `DENY` permissions on securable objects. These permissions will be updated during group migration, but won't be transferred during catalog migration.
+
+[[back to top](#migration-assessment-report)]
+
 ## AF300 - AF399
 The 300 series findings relate to [Compute Access mode limitations for Unity Catalog](https://docs.databricks.com/en/compute/access-mode-limitations.html#spark-api-limitations-for-unity-catalog-shared-access-mode)
 
