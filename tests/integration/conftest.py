@@ -472,7 +472,7 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> TestRuntimeContext:
     ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
