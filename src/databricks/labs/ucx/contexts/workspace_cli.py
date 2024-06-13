@@ -179,7 +179,7 @@ class LocalCheckoutContext(WorkspaceContext):
     """Local context extends Workspace context to provide extra properties
     for running local operations."""
 
-    def _linter_context_factory(self, session_state: CurrentSessionState | None = None):
+    def linter_context_factory(self, session_state: CurrentSessionState | None = None):
         index = self.tables_migrator.index()
         if session_state is None:
             session_state = CurrentSessionState()
@@ -187,7 +187,7 @@ class LocalCheckoutContext(WorkspaceContext):
 
     @cached_property
     def local_file_migrator(self):
-        return LocalFileMigrator(lambda: self._linter_context_factory(CurrentSessionState()))
+        return LocalFileMigrator(lambda: self.linter_context_factory(CurrentSessionState()))
 
     @cached_property
     def local_code_linter(self):
@@ -198,5 +198,5 @@ class LocalCheckoutContext(WorkspaceContext):
             self.path_lookup,
             session_state,
             self.dependency_resolver,
-            lambda: self._linter_context_factory(session_state),
+            lambda: self.linter_context_factory(session_state),
         )
