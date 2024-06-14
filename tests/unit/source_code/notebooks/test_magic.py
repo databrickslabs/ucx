@@ -1,6 +1,12 @@
+from pathlib import Path
+
 import pytest
 
-from databricks.labs.ucx.source_code.notebooks.magic import PipMagic
+from databricks.labs.ucx.source_code.base import CurrentSessionState
+from databricks.labs.ucx.source_code.graph import DependencyProblem, DependencyGraph, Dependency
+from databricks.labs.ucx.source_code.linters.files import FileLoader
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.magic import PipMagic, MagicCommand
 
 
 @pytest.mark.parametrize(
@@ -30,3 +36,16 @@ from databricks.labs.ucx.source_code.notebooks.magic import PipMagic
 )
 def test_pip_command_split(code, split):
     assert PipMagic._split(code) == split  # pylint: disable=protected-access
+
+
+def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup):
+    source = """
+%unsupported stuff '"%#@!
+"""
+    converted = MagicCommand.convert_magic_lines_to_magic_commands(source)
+    tree = Tree.parse(converted)
+    commands, _ = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    problems = commands[0].build_dependency_graph(graph)
+    assert problems[0].code == "unsupported-magic-line"

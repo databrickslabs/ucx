@@ -5,12 +5,21 @@ import shlex
 
 from astroid import Call, Name, Const, NodeNG  # type: ignore
 
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, logger
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.imports import ProblemFactory
 from databricks.labs.ucx.source_code.linters.python_ast import NodeBase, Tree
 
 
 class MagicCommand(NodeBase):
+
+    @classmethod
+    def convert_magic_lines_to_magic_commands(cls, python_code: str):
+        lines = python_code.split("\n")
+        for i, line in enumerate(lines):
+            if not line.startswith("%"):
+                continue
+            lines[i] = f"magic_command({line.encode()!r})"
+        return "\n".join(lines)
 
     @classmethod
     def extract_from_tree(
@@ -43,8 +52,12 @@ class MagicCommand(NodeBase):
         if self._command.startswith("%pip"):
             cmd = PipMagic(self._command)
             return cmd.build_dependency_graph(graph)
-        logger.debug(f"Unsupported magic command {self._command[:self._command.index(' ')]}")
-        return []
+        problem = DependencyProblem.from_node(
+            code='unsupported-magic-line',
+            message=f"magic line '{self._command}' is not supported yet",
+            node=self.node
+        )
+        return [problem]
 
 
 class PipMagic:

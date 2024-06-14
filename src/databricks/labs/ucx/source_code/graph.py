@@ -175,7 +175,7 @@ class DependencyGraph:
         Returns:
             A list of dependency problems; position information is relative to the python code itself.
         """
-        python_code = self._convert_magic_commands(python_code)
+        python_code = MagicCommand.convert_magic_lines_to_magic_commands(python_code)
         problems: list[DependencyProblem] = []
         try:
             tree = Tree.parse(python_code)
@@ -203,15 +203,6 @@ class DependencyGraph:
                 )
                 problems.append(problem)
         return problems
-
-    @classmethod
-    def _convert_magic_commands(cls, python_code: str):
-        lines = python_code.split("\n")
-        for i, line in enumerate(lines):
-            if not line.startswith("%"):
-                continue
-            lines[i] = f"magic_command({line.encode()!r})"
-        return "\n".join(lines)
 
     def _process_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
