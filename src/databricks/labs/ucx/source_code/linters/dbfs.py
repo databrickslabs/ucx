@@ -5,7 +5,7 @@ from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
 import sqlglot
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation
+from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,8 @@ class DetectDbfsVisitor(TreeVisitor):
     against a list of known deprecated paths.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, session_state: CurrentSessionState) -> None:
+        self._session_state = session_state
         self._advices: list[Advice] = []
         self._fs_prefixes = ["/dbfs/mnt", "dbfs:/", "/mnt/"]
         self._reported_locations: set[tuple[int, int]] = set()  # Set to store reported locations; astroid coordinates!
@@ -28,7 +29,7 @@ class DetectDbfsVisitor(TreeVisitor):
 
     def _visit_arg(self, arg: NodeNG):
         try:
-            for inferred in Tree(arg).infer_values():
+            for inferred in Tree(arg).infer_values(self._session_state):
                 if not inferred.is_inferred():
                     logger.debug(f"Could not infer value of {arg.as_string()}")
                     continue
@@ -53,7 +54,7 @@ class DetectDbfsVisitor(TreeVisitor):
 
     def _already_reported(self, source_node: NodeNG, inferred: InferredValue):
         all_nodes = [source_node]
-        all_nodes.extend(inferred.nodes())
+        all_nodes.extend(inferred.nodes)
         reported = any((node.lineno, node.col_offset) in self._reported_locations for node in all_nodes)
         for node in all_nodes:
             self._reported_locations.add((node.lineno, node.col_offset))
@@ -64,8 +65,9 @@ class DetectDbfsVisitor(TreeVisitor):
 
 
 class DBFSUsageLinter(Linter):
-    def __init__(self):
-        pass
+
+    def __init__(self, session_state: CurrentSessionState):
+        self._session_state = session_state
 
     @staticmethod
     def name() -> str:
@@ -79,8 +81,8 @@ class DBFSUsageLinter(Linter):
         Lints the code looking for file system paths that are deprecated
         """
         tree = Tree.parse(code)
-        visitor = DetectDbfsVisitor()
-        visitor.visit(tree.root)
+        visitor = DetectDbfsVisitor(self._session_state)
+        visitor.visit(tree.node)
         yield from visitor.get_advices()
 
 
