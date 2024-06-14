@@ -23,9 +23,9 @@ for i in range(10):
     columns = spark.catalog.listColumns(dbName="old", name="things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:14:+1:45] Can't migrate 'listColumns' because its table name argument is not a constant
+    # ucx[table-migrate:+1:14:+1:45] Can't migrate 'spark.catalog.listColumns(name)' because its table name argument cannot be computed
     columns = spark.catalog.listColumns(name)
-    # ucx[table-migrate:+1:14:+1:55] Can't migrate 'listColumns' because its table name argument is not a constant
+    # ucx[table-migrate:+1:14:+1:55] Can't migrate 'spark.catalog.listColumns(f'boop{stuff}')' because its table name argument cannot be computed
     columns = spark.catalog.listColumns(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.

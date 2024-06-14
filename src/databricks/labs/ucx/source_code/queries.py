@@ -2,7 +2,7 @@ from collections.abc import Iterable
 
 import logging
 import sqlglot
-from sqlglot.expressions import Table, Expression, Use
+from sqlglot.expressions import Table, Expression, Use, Create
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState
 
@@ -51,6 +51,11 @@ class FromTable(Linter, Fixer):
                     # Sqlglot captures the database name in the Use statement as a Table, with
                     # the schema  as the table name.
                     self._session_state.schema = table.name
+                    continue
+                if isinstance(statement, Create) and statement.kind == "SCHEMA":
+                    # Sqlglot captures the schema name in the Create statement as a Table, with
+                    # the schema  as the db name.
+                    self._session_state.schema = table.db
                     continue
 
                 # we only migrate tables in the hive_metastore catalog

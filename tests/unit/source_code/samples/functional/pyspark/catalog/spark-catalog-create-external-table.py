@@ -27,10 +27,10 @@ for i in range(10):
     do_stuff_with(df)
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:9:+1:48] Can't migrate 'createExternalTable' because its table name argument is not a constant
+    # ucx[table-migrate:+1:9:+1:48] Can't migrate 'spark.catalog.createExternalTable(name)' because its table name argument cannot be computed
     df = spark.catalog.createExternalTable(name)
     do_stuff_with(df)
-    # ucx[table-migrate:+1:9:+1:58] Can't migrate 'createExternalTable' because its table name argument is not a constant
+    # ucx[table-migrate:+1:9:+1:58] Can't migrate 'spark.catalog.createExternalTable(f'boop{stuff}')' because its table name argument cannot be computed
     df = spark.catalog.createExternalTable(f"boop{stuff}")
     do_stuff_with(df)
 
