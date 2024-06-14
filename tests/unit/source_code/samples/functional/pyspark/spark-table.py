@@ -20,12 +20,12 @@ for i in range(10):
     do_stuff_with(df)
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+3:9:+3:26] Can't migrate 'table' because its table name argument is not a constant
+    # ucx[table-migrate:+3:9:+3:26] Can't migrate 'spark.table(name)' because its table name argument cannot be computed
     # TODO: Fix false positive:
     # ucx[table-migrate:+1:9:+1:26] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table(name)
     do_stuff_with(df)
-    # ucx[table-migrate:+3:9:+3:36] Can't migrate 'table' because its table name argument is not a constant
+    # ucx[table-migrate:+3:9:+3:36] Can't migrate 'spark.table(f'boop{stuff}')' because its table name argument cannot be computed
     # TODO: Fix false positive:
     # ucx[table-migrate:+1:9:+1:36] The default format changed in Databricks Runtime 8.0, from Parquet to Delta
     df = spark.table(f"boop{stuff}")
