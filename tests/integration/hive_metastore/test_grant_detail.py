@@ -23,6 +23,54 @@ def _deployed_schema(runtime_ctx) -> None:
 
 
 @retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
+def test_all_grant_types(
+    runtime_ctx: TestRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
+):
+    """Test that all types of grants are properly handled by the view when reporting the object type and identifier."""
+
+    # Fixture: a group and schema to hold all the objects, the objects themselves and a grant on each to the group.
+    group = runtime_ctx.make_group()
+    schema = runtime_ctx.make_schema()
+    table = runtime_ctx.make_table(schema_name=schema.name)
+    view = runtime_ctx.make_table(schema_name=schema.name, view=True, ctas="select 1")
+    udf = runtime_ctx.make_udf(schema_name=schema.name)
+    sql_backend.execute(f"GRANT SELECT ON CATALOG {schema.catalog_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON SCHEMA {schema.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON TABLE {table.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON VIEW {view.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON FUNCTION {udf.full_name} TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON ANY FILE TO `{group.display_name}`")
+    sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group.display_name}`")
+
+    # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
+    GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
+
+    rows = sql_backend.fetch(
+        f"""
+        SELECT object_type, object_id
+        FROM {runtime_ctx.inventory_database}.grant_detail
+        WHERE principal_type='group' AND principal='{group.display_name}' and action_type='SELECT'
+        """
+    )
+    grants = {(row.object_type, row.object_id) for row in rows}
+
+    # TODO: Catalog-level grants are being dropped by grant_detail; this needs to be fixed.
+    # TODO: The types of objects targeted by grants is missclassified; this needs to be fixed.
+
+    # Test the results.
+    expected_grants = {
+        ("TABLE", table.full_name),
+        ("VIEW", view.full_name),
+        ("SCHEMA", schema.name),
+        ("CATALOG", schema.catalog_name),
+        ("FUNCTION", udf.name),
+        ("ANY FILE", None),
+        ("ANONYMOUS FUNCTION", None),
+    }
+    assert grants == expected_grants
+
+
+@retried(on=[NotFound, TimeoutError], timeout=dt.timedelta(minutes=3))
 def test_grant_findings(
     runtime_ctx: TestRuntimeContext, sql_backend: StatementExecutionBackend, _deployed_schema: None
 ) -> None:
