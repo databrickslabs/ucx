@@ -85,7 +85,9 @@ def lint_all(file_to_lint: str | None):
                     f.write(file.relative_to(dist).as_posix())
                     f.write("\n")
     parseable_pct = int(parseable / len(all_files) * 100)
-    logger.info(f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}")
+    logger.info(
+        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}"
+    )
     if parseable_pct < 100:
         sys.exit(1)
 
@@ -104,4 +106,3 @@ def main(args: list[str]):
 
 if __name__ == "__main__":
     main(sys.argv)
-
