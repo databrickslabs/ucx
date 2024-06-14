@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.notebooks.commands import PipMagic
+from databricks.labs.ucx.source_code.notebooks.magic import PipMagic
 
 
 @pytest.mark.parametrize(

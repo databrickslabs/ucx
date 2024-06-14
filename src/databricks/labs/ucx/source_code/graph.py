@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import base64
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -209,8 +208,7 @@ class DependencyGraph:
         for i, line in enumerate(lines):
             if not line.startswith("%"):
                 continue
-            data = base64.b64encode(line.encode())
-            lines[i] = f"magic_command(b'{data.decode('ascii')}')"
+            lines[i] = f"magic_command({line.encode()!r})"
         return "\n".join(lines)
 
     def _process_node(self, base_node: NodeBase):
@@ -502,4 +500,4 @@ class MaybeGraph:
 
 # non-top-level import is required to avoid cyclic dependency
 # pylint: disable=wrong-import-position, cyclic-import
-from databricks.labs.ucx.source_code.notebooks.commands import MagicCommand  # noqa: E402
+from databricks.labs.ucx.source_code.notebooks.magic import MagicCommand  # noqa: E402

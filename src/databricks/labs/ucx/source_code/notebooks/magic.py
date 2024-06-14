@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import re
 import shlex
 
@@ -36,10 +35,9 @@ class MagicCommand(NodeBase):
             if isinstance(arg, Const):
                 yield MagicCommand(node, arg.value)
 
-    def __init__(self, node: NodeNG, command: str):
+    def __init__(self, node: NodeNG, command: bytes):
         super().__init__(node)
-        data = base64.b64decode(command)
-        self._command = data.decode("ascii")
+        self._command = command.decode()
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         if self._command.startswith("%pip"):

@@ -10,7 +10,7 @@ from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.notebooks.commands import PipMagic
+from databricks.labs.ucx.source_code.notebooks.magic import PipMagic
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
