@@ -11,6 +11,7 @@ from databricks.labs.ucx.source_code.base import (
     Fixer,
     Linter,
     Failure,
+    CurrentSessionState,
 )
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
@@ -24,12 +25,15 @@ class Matcher(ABC):
     table_arg_index: int
     table_arg_name: str | None = None
     call_context: dict[str, set[str]] | None = None
+    session_state: CurrentSessionState | None = None
 
     def matches(self, node: NodeNG):
         return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
 
     @abstractmethod
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
+    def lint(
+        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterator[Advice]:
         """raises Advices by linting the code"""
 
     @abstractmethod
@@ -68,11 +72,13 @@ class Matcher(ABC):
 @dataclass
 class QueryMatcher(Matcher):
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
+    def lint(
+        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if table_arg:
             try:
-                for inferred in Tree(table_arg).infer_values():
+                for inferred in Tree(table_arg).infer_values(self.session_state):
                     yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(
@@ -103,7 +109,9 @@ class QueryMatcher(Matcher):
 @dataclass
 class TableNameMatcher(Matcher):
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
+    def lint(
+        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
 
         if not isinstance(table_arg, Const):
@@ -148,7 +156,9 @@ class ReturnValueMatcher(Matcher):
     def matches(self, node: NodeNG):
         return isinstance(node, Call) and isinstance(node.func, Attribute)
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: Call) -> Iterator[Advice]:
+    def lint(
+        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
+    ) -> Iterator[Advice]:
         assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
         yield Advisory.from_node(
             code='table-migrate',
@@ -179,7 +189,9 @@ class DirectFilesystemAccessMatcher(Matcher):
     def matches(self, node: NodeNG):
         return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
 
-    def lint(self, from_table: FromTable, index: MigrationIndex, node: NodeNG) -> Iterator[Advice]:
+    def lint(
+        self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: NodeNG
+    ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         if not isinstance(table_arg, Const):
             return
@@ -309,9 +321,10 @@ class SparkSql(Linter, Fixer):
 
     _spark_matchers = SparkMatchers()
 
-    def __init__(self, from_table: FromTable, index: MigrationIndex):
+    def __init__(self, from_table: FromTable, index: MigrationIndex, session_state):
         self._from_table = from_table
         self._index = index
+        self._session_state = session_state
 
     def name(self) -> str:
         # this is the same fixer, just in a different language context
@@ -328,7 +341,7 @@ class SparkSql(Linter, Fixer):
             if matcher is None:
                 continue
             assert isinstance(node, Call)
-            yield from matcher.lint(self._from_table, self._index, node)
+            yield from matcher.lint(self._from_table, self._index, self._session_state, node)
 
     def apply(self, code: str) -> str:
         tree = Tree.parse(code)
@@ -339,7 +352,7 @@ class SparkSql(Linter, Fixer):
                 continue
             assert isinstance(node, Call)
             matcher.apply(self._from_table, self._index, node)
-        return tree.root.as_string()
+        return tree.node.as_string()
 
     def _find_matcher(self, node: NodeNG):
         if not isinstance(node, Call):

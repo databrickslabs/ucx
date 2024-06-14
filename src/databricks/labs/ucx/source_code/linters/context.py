@@ -20,17 +20,17 @@ class LinterContext:
         self._linters = {
             Language.PYTHON: SequentialLinter(
                 [
-                    SparkSql(from_table, index),
-                    DBFSUsageLinter(),
+                    SparkSql(from_table, index, session_state),
+                    DBFSUsageLinter(session_state),
                     DBRv8d0Linter(dbr_version=None),
                     SparkConnectLinter(is_serverless=False),
-                    DbutilsLinter(),
+                    DbutilsLinter(session_state),
                 ]
             ),
             Language.SQL: SequentialLinter([from_table, dbfs_from_folder]),
         }
         self._fixers: dict[Language, list[Fixer]] = {
-            Language.PYTHON: [SparkSql(from_table, index)],
+            Language.PYTHON: [SparkSql(from_table, index, session_state)],
             Language.SQL: [from_table],
         }
 

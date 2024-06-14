@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter, ImportSource, SysPathChange
@@ -56,7 +57,7 @@ sys.path.append("absolute_path_1")
 sys.path.append("absolute_path_2")
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
 
@@ -67,7 +68,7 @@ stuff.path.append("absolute_path_1")
 stuff.path.append("absolute_path_2")
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert ["absolute_path_1", "absolute_path_2"] == [p.path for p in appended]
 
 
@@ -77,7 +78,7 @@ from sys import path as stuff
 stuff.append("absolute_path")
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert "absolute_path" in [p.path for p in appended]
 
 
@@ -88,7 +89,7 @@ import os
 sys.path.append(os.path.abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -99,7 +100,7 @@ import os as stuff
 sys.path.append(stuff.path.abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -110,7 +111,7 @@ from os import path as stuff
 sys.path.append(stuff.abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -121,7 +122,7 @@ from os.path import abspath
 sys.path.append(abspath("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -132,7 +133,7 @@ from os.path import abspath as stuff
 sys.path.append(stuff("relative_path"))
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert "relative_path" in [p.path for p in appended]
 
 
@@ -143,7 +144,7 @@ path = "absolute_path_1"
 sys.path.append(path)
 """
     tree = Tree.parse(code)
-    appended = SysPathChange.extract_from_tree(tree)
+    appended = SysPathChange.extract_from_tree(CurrentSessionState(), tree)
     assert ["absolute_path_1"] == [p.path for p in appended]
 
 
@@ -187,6 +188,6 @@ def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
     all_paths: list[str] = []
     for call in calls:
-        _, paths = call.get_notebook_paths()
+        _, paths = call.get_notebook_paths(CurrentSessionState())
         all_paths.extend(paths)
     assert all_paths == expected

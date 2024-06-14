@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-import abc
+from abc import ABC
 import logging
-from collections.abc import Iterable, Iterator
-from typing import TypeVar
+from collections.abc import Iterable, Iterator, Generator
+from typing import Any, TypeVar
 
-from astroid import Assign, Attribute, Call, Const, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
+from astroid import Assign, Attribute, Call, Const, decorators, Dict, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
+from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
+from astroid.typing import InferenceErrorInfo  # type: ignore
+from astroid.exceptions import InferenceError  # type: ignore
+
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +27,22 @@ class Tree:
         root = parse(code)
         return Tree(root)
 
-    def __init__(self, root: NodeNG):
-        self._root: NodeNG = root
+    def __init__(self, node: NodeNG):
+        self._node: NodeNG = node
+
+    @property
+    def node(self):
+        return self._node
 
     @property
     def root(self):
-        return self._root
+        node = self._node
+        while node.parent:
+            node = node.parent
+        return node
 
     def walk(self) -> Iterable[NodeNG]:
-        yield from self._walk(self._root)
+        yield from self._walk(self._node)
 
     @classmethod
     def _walk(cls, node: NodeNG) -> Iterable[NodeNG]:
@@ -40,12 +52,13 @@ class Tree:
 
     def locate(self, node_type: type[T], match_nodes: list[tuple[str, type]]) -> list[T]:
         visitor = MatchingVisitor(node_type, match_nodes)
-        visitor.visit(self._root)
+        visitor.visit(self._node)
         return visitor.matched_nodes
 
     def first_statement(self):
-        if isinstance(self._root, Module):
-            return self._root.body[0]
+        if isinstance(self._node, Module):
+            if len(self._node.body) > 0:
+                return self._node.body[0]
         return None
 
     @classmethod
@@ -95,7 +108,7 @@ class Tree:
 
     def __repr__(self):
         truncate_after = 32
-        code = repr(self._root)
+        code = repr(self._node)
         if len(code) > truncate_after:
             code = code[0:truncate_after] + "..."
         return f"<Tree: {code}>"
@@ -130,28 +143,52 @@ class Tree:
             logger.debug(f"Missing handler for {name}")
         return None
 
-    def infer_values(self) -> Iterable[InferredValue]:
+    def infer_values(self, state: CurrentSessionState | None = None) -> Iterable[InferredValue]:
+        self._contextualize(state)
         for inferred_atoms in self._infer_values():
             yield InferredValue(inferred_atoms)
 
+    def _contextualize(self, state: CurrentSessionState | None):
+        if state is None or state.named_parameters is None or len(state.named_parameters) == 0:
+            return
+        self._contextualize_dbutils_widgets_get(state)
+        self._contextualize_dbutils_widgets_get_all(state)
+
+    def _contextualize_dbutils_widgets_get(self, state: CurrentSessionState):
+        calls = Tree(self.root).locate(Call, [("get", Attribute), ("widgets", Attribute), ("dbutils", Name)])
+        for call in calls:
+            call.func = _DbUtilsWidgetsGetCall(state, call)
+
+    def _contextualize_dbutils_widgets_get_all(self, state: CurrentSessionState):
+        calls = Tree(self.root).locate(Call, [("getAll", Attribute), ("widgets", Attribute), ("dbutils", Name)])
+        for call in calls:
+            call.func = _DbUtilsWidgetsGetAllCall(state, call)
+
     def _infer_values(self) -> Iterator[Iterable[NodeNG]]:
         # deal with node types that don't implement 'inferred()'
-        if self._root is Uninferable or isinstance(self._root, Const):
-            yield [self._root]
-        elif isinstance(self._root, JoinedStr):
+        if self._node is Uninferable or isinstance(self._node, Const):
+            yield [self._node]
+        elif isinstance(self._node, JoinedStr):
             yield from self._infer_values_from_joined_string()
-        elif isinstance(self._root, FormattedValue):
-            yield from _LocalTree(self._root.value).do_infer_values()
+        elif isinstance(self._node, FormattedValue):
+            yield from _LocalTree(self._node.value).do_infer_values()
         else:
-            for inferred in self._root.inferred():
+            yield from self._infer_internal()
+
+    def _infer_internal(self):
+        try:
+            for inferred in self._node.inferred():
                 # work around infinite recursion of empty lists
-                if inferred == self._root:
+                if inferred == self._node:
                     continue
                 yield from _LocalTree(inferred).do_infer_values()
+        except InferenceError as e:
+            logger.debug(f"When inferring {self._node}", exc_info=e)
+            yield [Uninferable]
 
     def _infer_values_from_joined_string(self) -> Iterator[Iterable[NodeNG]]:
-        assert isinstance(self._root, JoinedStr)
-        yield from self._infer_values_from_joined_values(self._root.values)
+        assert isinstance(self._node, JoinedStr)
+        yield from self._infer_values_from_joined_values(self._node.values)
 
     @classmethod
     def _infer_values_from_joined_values(cls, nodes: list[NodeNG]) -> Iterator[Iterable[NodeNG]]:
@@ -170,6 +207,109 @@ class _LocalTree(Tree):
         return self._infer_values()
 
 
+class _DbUtilsWidgetsGetCall(NodeNG):
+
+    def __init__(self, session_state: CurrentSessionState, node: NodeNG):
+        super().__init__(
+            lineno=node.lineno,
+            col_offset=node.col_offset,
+            end_lineno=node.end_lineno,
+            end_col_offset=node.end_col_offset,
+            parent=node.parent,
+        )
+        self._session_state = session_state
+
+    @decorators.raise_if_nothing_inferred
+    def _infer(
+        self, context: InferenceContext | None = None, **kwargs: Any
+    ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
+        yield self
+        return InferenceErrorInfo(node=self, context=context)
+
+    def infer_call_result(self, context: InferenceContext | None = None, **_):  # caller needs unused kwargs
+        call_context = getattr(context, "callcontext", None)
+        if not isinstance(call_context, CallContext):
+            yield Uninferable
+            return
+        arg = call_context.args[0]
+        for inferred in Tree(arg).infer_values(self._session_state):
+            if not inferred.is_inferred():
+                yield Uninferable
+                continue
+            name = inferred.as_string()
+            named_parameters = self._session_state.named_parameters
+            if not named_parameters or name not in named_parameters:
+                yield Uninferable
+                continue
+            value = named_parameters[name]
+            yield Const(
+                value,
+                lineno=self.lineno,
+                col_offset=self.col_offset,
+                end_lineno=self.end_lineno,
+                end_col_offset=self.end_col_offset,
+                parent=self,
+            )
+
+
+class _DbUtilsWidgetsGetAllCall(NodeNG):
+
+    def __init__(self, session_state: CurrentSessionState, node: NodeNG):
+        super().__init__(
+            lineno=node.lineno,
+            col_offset=node.col_offset,
+            end_lineno=node.end_lineno,
+            end_col_offset=node.end_col_offset,
+            parent=node.parent,
+        )
+        self._session_state = session_state
+
+    @decorators.raise_if_nothing_inferred
+    def _infer(
+        self, context: InferenceContext | None = None, **kwargs: Any
+    ) -> Generator[InferenceResult, None, InferenceErrorInfo | None]:
+        yield self
+        return InferenceErrorInfo(node=self, context=context)
+
+    def infer_call_result(self, **_):  # caller needs unused kwargs
+        named_parameters = self._session_state.named_parameters
+        if not named_parameters:
+            yield Uninferable
+            return
+        items = self._populate_items(named_parameters)
+        result = Dict(
+            lineno=self.lineno,
+            col_offset=self.col_offset,
+            end_lineno=self.end_lineno,
+            end_col_offset=self.end_col_offset,
+            parent=self,
+        )
+        result.postinit(items)
+        yield result
+
+    def _populate_items(self, values: dict[str, str]):
+        items: list[tuple[InferenceResult, InferenceResult]] = []
+        for key, value in values.items():
+            item_key = Const(
+                key,
+                lineno=self.lineno,
+                col_offset=self.col_offset,
+                end_lineno=self.end_lineno,
+                end_col_offset=self.end_col_offset,
+                parent=self,
+            )
+            item_value = Const(
+                value,
+                lineno=self.lineno,
+                col_offset=self.col_offset,
+                end_lineno=self.end_lineno,
+                end_col_offset=self.end_col_offset,
+                parent=self,
+            )
+            items.append((item_key, item_value))
+        return items
+
+
 class InferredValue:
     """Represents 1 or more nodes that together represent the value.
     The list of nodes typically holds one Const element, but for f-strings it
@@ -178,6 +318,7 @@ class InferredValue:
     def __init__(self, atoms: Iterable[NodeNG]):
         self._atoms = list(atoms)
 
+    @property
     def nodes(self):
         return self._atoms
 
@@ -266,7 +407,7 @@ class MatchingVisitor(TreeVisitor):
         return self._matches(next_node, depth + 1)
 
 
-class NodeBase(abc.ABC):
+class NodeBase(ABC):
 
     def __init__(self, node: NodeNG):
         self._node = node

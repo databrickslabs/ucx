@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsageLinter, FromDbfsFolder
 
 
@@ -17,7 +17,7 @@ class TestDetectDBFS:
         ],
     )
     def test_detects_dbfs_paths(self, code, expected):
-        linter = DBFSUsageLinter()
+        linter = DBFSUsageLinter(CurrentSessionState())
         advices = list(linter.lint(code))
         for advice in advices:
             assert isinstance(advice, Advisory)
@@ -46,7 +46,7 @@ for system in systems:
         ],
     )
     def test_dbfs_usage_linter(self, code, expected):
-        linter = DBFSUsageLinter()
+        linter = DBFSUsageLinter(CurrentSessionState())
         advices = linter.lint(code)
         count = 0
         for advice in advices:
@@ -55,7 +55,7 @@ for system in systems:
         assert count == expected
 
     def test_dbfs_name(self):
-        linter = DBFSUsageLinter()
+        linter = DBFSUsageLinter(CurrentSessionState())
         assert linter.name() == "dbfs-usage"
 
 
