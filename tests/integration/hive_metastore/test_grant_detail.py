@@ -61,7 +61,7 @@ def test_all_grant_types(
     expected_grants = {
         ("TABLE", table.full_name),
         ("VIEW", view.full_name),
-        ("SCHEMA", schema.name),
+        ("DATABASE", schema.full_name),
         ("CATALOG", schema.catalog_name),
         ("FUNCTION", udf.name),
         ("ANY FILE", None),
