@@ -172,6 +172,6 @@ b = 'else'
 """
     cell = PythonCell(code, original_offset=1)
     dependency = Dependency(FileLoader(), Path(""))
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup)
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
     problems = cell.build_dependency_graph(graph)
     assert not problems
