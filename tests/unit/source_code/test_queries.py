@@ -77,3 +77,11 @@ def test_use_database_stops_migration(migration_index):
     )
     transformed_query = ftf.apply(old_query)
     assert transformed_query == new_query
+
+
+def test_parses_create_schema(migration_index):
+    query = "CREATE SCHEMA xyz"
+    session_state = CurrentSessionState(schema="old")
+    ftf = FromTable(migration_index, session_state=session_state)
+    advices = ftf.lint(query)
+    assert not list(advices)
