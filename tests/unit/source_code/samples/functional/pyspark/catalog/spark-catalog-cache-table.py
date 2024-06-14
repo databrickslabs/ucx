@@ -13,9 +13,9 @@ spark.catalog.cacheTable("old.things", None, "extra-argument")
 spark.catalog.cacheTable(storageLevel=None, tableName="old.things")
 
 ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-# ucx[table-migrate:+1:0:+1:30] Can't migrate 'cacheTable' because its table name argument is not a constant
+# ucx[table-migrate:+1:0:+1:30] Can't migrate 'spark.catalog.cacheTable(name)' because its table name argument cannot be computed
 spark.catalog.cacheTable(name)
-# ucx[table-migrate:+1:0:+1:40] Can't migrate 'cacheTable' because its table name argument is not a constant
+# ucx[table-migrate:+1:0:+1:40] Can't migrate 'spark.catalog.cacheTable(f'boop{stuff}')' because its table name argument cannot be computed
 spark.catalog.cacheTable(f"boop{stuff}")
 
 ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.

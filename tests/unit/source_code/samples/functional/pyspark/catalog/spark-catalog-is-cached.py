@@ -13,9 +13,9 @@ for i in range(10):
     cached_previously = spark.catalog.isCached("old.things", "extra-argument")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:24:+1:52] Can't migrate 'isCached' because its table name argument is not a constant
+    # ucx[table-migrate:+1:24:+1:52] Can't migrate 'spark.catalog.isCached(name)' because its table name argument cannot be computed
     cached_previously = spark.catalog.isCached(name)
-    # ucx[table-migrate:+1:24:+1:62] Can't migrate 'isCached' because its table name argument is not a constant
+    # ucx[table-migrate:+1:24:+1:62] Can't migrate 'spark.catalog.isCached(f'boop{stuff}')' because its table name argument cannot be computed
     cached_previously = spark.catalog.isCached(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
