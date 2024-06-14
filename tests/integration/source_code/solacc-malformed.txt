@@ -1,0 +1,11 @@
+redkite-pricing/01_Data_Prep_Analysis.py
+user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/0 - Ingest and Explore Raw User Data.py
+user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/Full Data Engineering Pipeline/Train Anomaly Model on Historical Data.py
+user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/Full Data Engineering Pipeline/Run Inference on Active Batch.py
+product-er-with-images/01_Prep_Data.py
+fsi-mrm-generation/templates/Credit Adjudication - Example.py
+lr-recommender/03_Train_Model.py
+dist/multi-touch-attribution/04_markov_chains.py
+security-analysis-tool/notebooks/Utils/workspace_bootstrap.py
+# the following fails to parse due to module dependency azure/devops/v5_1/client_factory.py
+edge-ml-for-manufacturing/03_Trigger_AzureDevOps_Job.py

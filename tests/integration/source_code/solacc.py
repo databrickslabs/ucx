@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -44,7 +45,7 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
-def lint_all():
+def lint_all(file_to_lint: str | None):
     # pylint: disable=too-many-nested-blocks
     ws = WorkspaceClient(host='...', token='...')
     ctx = LocalCheckoutContext(ws).replace(
@@ -52,8 +53,19 @@ def lint_all():
     )
     parseable = 0
     missing_imports = 0
-    all_files = list(dist.glob('**/*.py'))
+    all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
+    if file_to_lint is None:
+        unparsed = Path(Path(__file__).parent, "solacc-unparsed.txt")
+        if unparsed.exists():
+            os.remove(unparsed)
+    skipped: set[str] | None = None
+    malformed = Path(Path(__file__).parent, "solacc-malformed.txt")
+    if file_to_lint is None and malformed.exists():
+        text = malformed.read_text()
+        skipped = set(text.split("\n"))
     for file in all_files:
+        if skipped and file.relative_to(dist).as_posix() in skipped:
+            continue
         try:
             for located_advice in ctx.local_code_linter.lint_path(file):
                 if located_advice.advice.code == 'import-not-found':
@@ -63,17 +75,33 @@ def lint_all():
             parseable += 1
         except Exception as e:  # pylint: disable=broad-except
             # here we're most likely catching astroid & sqlglot errors
-            logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e)
+            if file_to_lint:
+                logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e)
+            else:
+                logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
+            if file_to_lint is None:
+                # populate solacc-unparsed.txt
+                with unparsed.open(mode="a") as f:
+                    f.write(file.relative_to(dist).as_posix())
+                    f.write("\n")
     parseable_pct = int(parseable / len(all_files) * 100)
-    logger.info(f"Parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}")
+    logger.info(f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}")
     if parseable_pct < 100:
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def main(args: list[str]):
     install_logger()
     logging.root.setLevel(logging.INFO)
-    logger.info("Cloning...")
-    clone_all()
+    file_to_lint = args[1] if len(args) > 1 else None
+    if not file_to_lint:
+        # don't clone if linting just one file, assumption is we're troubleshooting
+        logger.info("Cloning...")
+        clone_all()
     logger.info("Linting...")
-    lint_all()
+    lint_all(file_to_lint)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
+
