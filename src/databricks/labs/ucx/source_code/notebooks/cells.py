@@ -10,7 +10,7 @@ from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
 from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
-from databricks.labs.ucx.source_code.notebooks.commands import PipCommand
+from databricks.labs.ucx.source_code.notebooks.commands import PipMagic
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
@@ -204,7 +204,7 @@ class PipCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        return PipCommand(self.original_code).build_dependency_graph(graph)
+        return PipMagic(self.original_code).build_dependency_graph(graph)
 
 
 class CellLanguage(Enum):

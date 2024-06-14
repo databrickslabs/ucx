@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.notebooks.commands import PipCommand
+from databricks.labs.ucx.source_code.notebooks.commands import PipMagic
 
 
 @pytest.mark.parametrize(
@@ -29,4 +29,4 @@ from databricks.labs.ucx.source_code.notebooks.commands import PipCommand
     ],
 )
 def test_pip_command_split(code, split):
-    assert PipCommand._split(code) == split  # pylint: disable=protected-access
+    assert PipMagic._split(code) == split  # pylint: disable=protected-access
