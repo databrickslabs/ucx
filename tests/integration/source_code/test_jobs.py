@@ -14,6 +14,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.known import UNKNOWN, Whitelist
 from databricks.labs.ucx.source_code.linters.files import LocalCodeLinter
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -178,7 +179,8 @@ def test_workflow_linter_lints_job_with_import_pypi_library(
 
 def test_lint_local_code(simple_ctx):
     # no need to connect
-    linter_context = LinterContext(MigrationIndex([]), simple_ctx.session_state)
+    session_state = CurrentSessionState()
+    linter_context = LinterContext(MigrationIndex([]), session_state)
     light_ctx = simple_ctx
     ucx_path = Path(__file__).parent.parent.parent.parent
     path_to_scan = Path(ucx_path, "src")
@@ -187,7 +189,7 @@ def test_lint_local_code(simple_ctx):
         light_ctx.file_loader,
         light_ctx.folder_loader,
         light_ctx.path_lookup,
-        light_ctx.session_state,
+        session_state,
         light_ctx.dependency_resolver,
         lambda: linter_context,
     )
