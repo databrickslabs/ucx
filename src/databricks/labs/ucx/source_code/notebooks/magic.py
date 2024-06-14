@@ -53,9 +53,7 @@ class MagicCommand(NodeBase):
             cmd = PipMagic(self._command)
             return cmd.build_dependency_graph(graph)
         problem = DependencyProblem.from_node(
-            code='unsupported-magic-line',
-            message=f"magic line '{self._command}' is not supported yet",
-            node=self.node
+            code='unsupported-magic-line', message=f"magic line '{self._command}' is not supported yet", node=self.node
         )
         return [problem]
 

@@ -10,6 +10,7 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.magic import MagicCommand
 
 
 @dataclass
@@ -114,7 +115,7 @@ class DBRv8d0Linter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         if self._skip_dbr:
             return
-
+        code = MagicCommand.convert_magic_lines_to_magic_commands(code)
         tree = Tree.parse(code)
         for node in tree.walk():
             yield from self._linter.lint(node)

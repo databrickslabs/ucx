@@ -7,6 +7,7 @@ from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
+from databricks.labs.ucx.source_code.notebooks.magic import MagicCommand
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ class DBFSUsageLinter(Linter):
         """
         Lints the code looking for file system paths that are deprecated
         """
+        code = MagicCommand.convert_magic_lines_to_magic_commands(code)
         tree = Tree.parse(code)
         visitor = DetectDbfsVisitor(self._session_state)
         visitor.visit(tree.node)
