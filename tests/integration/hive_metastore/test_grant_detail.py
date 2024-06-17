@@ -60,7 +60,7 @@ def test_all_grant_types(
         ("VIEW", view.full_name),
         ("DATABASE", schema.full_name),
         ("CATALOG", schema.catalog_name),
-        ("FUNCTION", udf.name),
+        ("UDF", udf.full_name),
         ("ANY FILE", None),
         ("ANONYMOUS FUNCTION", None),
     }
