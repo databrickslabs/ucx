@@ -9,7 +9,7 @@ UNION ALL
 SELECT "pipelines" AS object_type, pipeline_id AS object_id, failures FROM $inventory.pipelines
 UNION ALL
 SELECT object_type, object_id, failures FROM (
-  SELECT "tables" as object_type, CONCAT(t.catalog, '.', t.database, '.', t.name) AS object_id, 
+  SELECT "tables" as object_type, CONCAT(t.catalog, '.', t.database, '.', t.name) AS object_id,
   TO_JSON(
     FILTER(ARRAY(
       IF(NOT STARTSWITH(t.table_format, "DELTA"), CONCAT("Non-DELTA format: ", t.table_format), NULL),
@@ -31,3 +31,5 @@ SELECT object_type, object_id, failures FROM (
 UNION ALL
 SELECT "databases" AS object_type, CONCAT(catalog, '.', database) AS object_id, TO_JSON(ARRAY(error)) AS failures
 FROM $inventory.table_failures WHERE name IS NULL
+UNION ALL
+SELECT "permissions" AS object_type, object_id, failures FROM $inventory.grant_detail

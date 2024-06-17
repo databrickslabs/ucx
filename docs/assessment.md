@@ -207,7 +207,7 @@ This is a summary count of Hive Metastore tables, per storage type (DBFS Root, D
 
 ## Table counts by schema and format
 
-This is a summary count by Hive Metastore (HMS) table formats (Delta and Non Delta) for each HMS schema    
+This is a summary count by Hive Metastore (HMS) table formats (Delta and Non Delta) for each HMS schema
 
 The third row continues with "Database Summary"
 <img width="1220" alt="image" src="https://github.com/databrickslabs/ucx/assets/1122251/28742e33-d3e3-4eb8-832f-1edd34999fa2">
@@ -232,7 +232,7 @@ Tables were scanned for `LOCATION` attributes and that list was distilled down t
 
 ## Mount Points
 
-Mount points are popular means to provide access to external buckets / storage accounts. A more secure form in Unity Catalog are EXTERNAL LOCATIONs and VOLUMES. EXTERNAL LOCATIONs are the basis for EXTERNAL Tables, Schemas, Catalogs and VOLUMES. VOLUMES are the basis for managing files. 
+Mount points are popular means to provide access to external buckets / storage accounts. A more secure form in Unity Catalog are EXTERNAL LOCATIONs and VOLUMES. EXTERNAL LOCATIONs are the basis for EXTERNAL Tables, Schemas, Catalogs and VOLUMES. VOLUMES are the basis for managing files.
 The recommendation is to migrate Mountpoints to Either EXTERNAL LOCATIONS or VOLUMEs. The Unity Catalog Create External Location UI will prompt for mount points to assist in creating EXTERNAL LOCATIONS.
 
 Unfortunately, as of January 2024, cross cloud external locations are not supported. Databricks to Databricks delta sharing may assist in upgrading cross cloud mounts.
@@ -271,6 +271,12 @@ The final row includes "Incompatible Delta Live Tables" and "Incompatible Global
 
 [[back to top](#migration-assessment-report)]
 
+## Incompatible Object Privileges
+
+These are permissions on objects that are not supported by Unit Catalog.
+
+[[back to top](#migration-assessment-report)]
+
 ## Incompatible Delta Live Tables
 
 These are Delta Live Table jobs that may be incompatible with Unity Catalog.
@@ -296,7 +302,7 @@ The assessment finding index is grouped by:
 ### AF101 - not supported DBR: ##.#.x-scala2.12
 
 Short description: The compute runtime does not meet the requirements to use Unity Catalog.
-Explanation: Unity Catalog capabilities are fully enabled on Databricks Runtime 13.3 LTS. This is the current recommended runtime for production interactive clusters and jobs. This finding is noting the cluster or job compute configuration does not meet this threshold. 
+Explanation: Unity Catalog capabilities are fully enabled on Databricks Runtime 13.3 LTS. This is the current recommended runtime for production interactive clusters and jobs. This finding is noting the cluster or job compute configuration does not meet this threshold.
 recommendation: Upgrade the DBR version to 13.3 LTS or later.
 
 [[back to top](#migration-assessment-report)]
@@ -376,10 +382,10 @@ How: Run the SYNC command on the table or schema.  If the tables (or source data
 ### AF202 - Asset Replication Required
 
 We found that the table or database needs to have the data copied into a Unity Catalog managed location or table.
-Recommendation: Perform a 'deep clone' operation on the table to copy the files 
+Recommendation: Perform a 'deep clone' operation on the table to copy the files
 ```sql
 CREATE TABLE [IF NOT EXISTS] table_name
-   [SHALLOW | DEEP] CLONE source_table_name [TBLPROPERTIES clause] [LOCATION path]   
+   [SHALLOW | DEEP] CLONE source_table_name [TBLPROPERTIES clause] [LOCATION path]
 ```
 
 [[back to top](#migration-assessment-report)]
@@ -437,8 +443,14 @@ where storage type can be any of `adl://`, `wasb://`, or `wasbs://`.
 ADLS Gen 2 (`abfss://`) is the only Azure native storage type supported. Use a Deep Clone process to copy the table data.
 ```sql
 CREATE TABLE [IF NOT EXISTS] table_name
-   [SHALLOW | DEEP] CLONE source_table_name [TBLPROPERTIES clause] [LOCATION path]   
+   [SHALLOW | DEEP] CLONE source_table_name [TBLPROPERTIES clause] [LOCATION path]
 ```
+
+[[back to top](#migration-assessment-report)]
+
+### AF222 - Explicitly DENYing privileges is not supported in UC
+
+Unity Catalog does not support `DENY` permissions on securable objects. These permissions will be updated during group migration, but won't be transferred during catalog migration.
 
 [[back to top](#migration-assessment-report)]
 
@@ -595,7 +607,7 @@ The `boto3` library is used.
 Instance profiles (AWS) are not supported from the Python/Scala REPL or UDFs, e.g. using boto3 or s3fs, Instance profiles are only set from init scripts and (internally) from Spark. To access S3 objects the recommendation is to use EXTERNAL VOLUMES mapped to the fixed s3 storage location.
 
 **Workarounds**
-For accessing cloud storage (S3), use storage credentials and external locations. 
+For accessing cloud storage (S3), use storage credentials and external locations.
 
 (AWS) Consider other ways to authenticate with boto3, e.g., by passing credentials from Databricks secrets directly to boto3 as a parameter, or loading them as environment variables. This page contains more information. Please note that unlike instance profiles, those methods do not provide short-lived credentials out of the box, and customers are responsible for rotating secrets according to their security needs.
 
@@ -640,7 +652,7 @@ The `dbutils.credentials.` is used for credential passthrough. This is not suppo
 
 ## AF311.x - dbutils (`dbutils`)
 
-DBUtils and other clients that directly read the data from cloud storage are not supported. 
+DBUtils and other clients that directly read the data from cloud storage are not supported.
 Use [Volumes](https://docs.databricks.com/en/connect/unity-catalog/volumes.html) or use Assigned clusters.
 
 ### AF311.1 - dbutils.fs (`dbutils.fs.`)
@@ -711,7 +723,7 @@ The `from pyspark.sql import SQLContext` and `import org.apache.spark.sql.SQLCon
 
 ### AF313.3 - SparkContext (`.binaryFiles`)
 
-The `.binaryFiles` pattern was found, this is not supported by Unity Catalog. 
+The `.binaryFiles` pattern was found, this is not supported by Unity Catalog.
 Instead, please consider using `spark.read.format('binaryFiles')`.
 
 [[back to top](#migration-assessment-report)]
@@ -793,7 +805,7 @@ display(df)
 use:
 ```python
 from pyspark.sql import Row
-import json 
+import json
 # Sample JSON data as a list of dictionaries (similar to JSON objects)
 json_data_str = response.text
 json_data = [json.loads(json_data_str)]
@@ -976,7 +988,7 @@ The `mapInPandas` pattern was found. Use "Assigned" access mode compute.
 
 
 ## AF330.x - Streaming
-Streaming limitations for Unity Catalog shared access mode [documentation](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-limitations-for-unity-catalog-shared-access-mode) should be consulted for more details. 
+Streaming limitations for Unity Catalog shared access mode [documentation](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-limitations-for-unity-catalog-shared-access-mode) should be consulted for more details.
 
 See also [Streaming limitations for Unity Catalog single user access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-single) and [Streaming limitations for Unity Catalog shared access mode](https://docs.databricks.com/en/compute/access-mode-limitations.html#streaming-shared).
 
