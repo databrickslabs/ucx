@@ -39,9 +39,8 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     # 20 seconds less than TablesCrawler(sql_backend, inventory_schema)
     grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
 
-    crawler_snapshot = list(grants.snapshot())
     all_grants = {}
-    for grant in crawler_snapshot:
+    for grant in list(grants.snapshot()):
         logging.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
         object_type, object_key = grant.this_type_and_key()
         all_grants[f"{grant.principal}.{object_type}.{object_key}"] = grant.action_type
