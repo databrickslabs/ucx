@@ -1,3 +1,13 @@
+WITH
+    raw as (
+        select
+            *,
+            if(startswith(action_type, 'DENIED_'),
+                array('Explicitly DENYing privileges is not supported in UC.'),
+                array()
+            ) as failures
+        from $inventory.grants where database <> split("$inventory",'[.]')[1]
+    )
 SELECT
     CASE
         WHEN anonymous_function THEN 'ANONYMOUS FUNCTION'
@@ -31,5 +41,7 @@ SELECT
     catalog,
     database,
     table,
-    udf
-FROM $inventory.grants where database != split("$inventory",'[.]')[1]
+    udf,
+    if(size(failures) < 1, 1, 0) as success,
+    to_json(failures) as failures
+FROM raw

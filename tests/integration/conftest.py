@@ -277,22 +277,22 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
     def with_workspace_info(self, workspace_info):
         self.installation.save(workspace_info, filename=AccountWorkspaces.SYNC_FILE_NAME)
 
-    def make_schema(self, **kwargs):
+    def make_schema(self, **kwargs) -> SchemaInfo:
         schema_info = self._make_schema(**kwargs)
         self._schemas.append(schema_info)
         return schema_info
 
-    def make_group(self, **kwargs):
+    def make_group(self, **kwargs) -> Group:
         group_info = self._make_group(**kwargs)
         self._groups.append(group_info)
         return group_info
 
-    def make_table(self, **kwargs):
+    def make_table(self, **kwargs) -> TableInfo:
         table_info = self._make_table(**kwargs)
         self._tables.append(table_info)
         return table_info
 
-    def make_udf(self, **kwargs):
+    def make_udf(self, **kwargs) -> FunctionInfo:
         udf_info = self._make_udf(**kwargs)
         self._udfs.append(udf_info)
         return udf_info
@@ -310,7 +310,7 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
         udf: str | None = None,
         any_file: bool = False,
         anonymous_function: bool = False,
-    ):
+    ) -> Grant:
         if table_info:
             catalog = table_info.catalog_name
             database = table_info.schema_name
@@ -472,7 +472,7 @@ class TestRuntimeContext(CommonUtils, RuntimeContext):
 
 
 @pytest.fixture
-def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip):
+def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, env_or_skip) -> TestRuntimeContext:
     ctx = TestRuntimeContext(make_table, make_schema, make_udf, make_group, env_or_skip, ws)
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
