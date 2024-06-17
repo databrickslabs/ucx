@@ -673,13 +673,35 @@ class AccountInstaller(AccountContext):
             msg = "Current workspace is not known, Please run as account-admin: databricks labs ucx sync-workspace-info"
             raise KeyError(msg) from None
 
-    def _get_workspace_info(self, current_workspace_id: int):
+    def get_workspace_info(self, current_workspace_id: int):
         account_client = self._get_safe_account_client()
         workspace = account_client.workspaces.get(current_workspace_id)
         current_workspace_client = account_client.get_workspace_client(workspace)
         installation = Installation.current(current_workspace_client, self.product_info.product_name())
         workspace_info = WorkspaceInfo(installation, current_workspace_client)
         return workspace_info.load_workspace_info()
+
+    def get_workspaces_context(self, collection_workspace_id: int) -> list[WorkspaceContext]:
+        workspace_contexts = []
+        account_client = self._get_safe_account_client()
+        acct_ctx = AccountContext(account_client)
+        collection_workspace = account_client.workspaces.get(collection_workspace_id)
+        if not acct_ctx.account_workspaces.can_administer(collection_workspace):
+            logger.error(f"User is not workspace admin of collection workspace {collection_workspace_id}")
+            return []
+        installer = self._get_installer(collection_workspace)
+        if installer.config.installed_workspace_ids is None:
+            logger.error(f"No collection info found in the workspace {collection_workspace_id}")
+            return []
+        for workspace_id in installer.config.installed_workspace_ids:
+            workspace = account_client.workspaces.get(workspace_id)
+            if not acct_ctx.account_workspaces.can_administer(workspace):
+                logger.error(f"User is not workspace admin of workspace {workspace_id}")
+                return []
+            workspace_client = account_client.get_workspace_client(workspace)
+            ctx = WorkspaceContext(workspace_client)
+            workspace_contexts.append(ctx)
+        return workspace_contexts
 
     def join_collection(
         self,
@@ -692,7 +714,7 @@ class AccountInstaller(AccountContext):
         collection_workspace: Workspace
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
-        ids_to_workspace = self._get_workspace_info(current_workspace_id)
+        ids_to_workspace = self.get_workspace_info(current_workspace_id)
         if target_workspace_id is None:
             if self.prompts.confirm("Do you want to join the current installation to an existing collection?"):
                 # If joining a collection as part of the installation then collection_workspace_id would be empty

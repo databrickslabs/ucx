@@ -59,6 +59,9 @@ commands:
 
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace
+    flags:
+      - name: collection_workspace_id
+        description: id of the collection workspace, the cmd will run for all workspaces in this collection.
 
   - name: validate-external-locations
     description: validates and provides mapping to external table to external location and shared generation tf scripts
