@@ -45,13 +45,11 @@ def test_all_grant_types(
     # Ensure the view is populated (it's based on the crawled grants) and fetch the content.
     GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler).snapshot()
 
-    rows = sql_backend.fetch(
-        f"""
+    rows = list(sql_backend.fetch(f"""
         SELECT object_type, object_id
         FROM {runtime_ctx.inventory_database}.grant_detail
         WHERE principal_type='group' AND principal='{group.display_name}' and action_type='SELECT'
-        """
-    )
+    """))
     grants = {(row.object_type, row.object_id) for row in rows}
 
     # TODO: The types of objects targeted by grants is missclassified; this needs to be fixed.

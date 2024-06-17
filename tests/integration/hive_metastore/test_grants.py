@@ -39,8 +39,9 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     # 20 seconds less than TablesCrawler(sql_backend, inventory_schema)
     grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
 
+    crawler_snapshot = list(grants.snapshot())
     all_grants = {}
-    for grant in grants.snapshot():
+    for grant in crawler_snapshot:
         logging.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
         all_grants[f"{grant.principal}.{grant.object_key}"] = grant.action_type
 
@@ -72,8 +73,9 @@ def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
 
     grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
 
+    crawler_snapshot = list(grants.snapshot())
     actual_grants = defaultdict(set)
-    for grant in grants.snapshot():
+    for grant in crawler_snapshot:
         actual_grants[f"{grant.principal}.{grant.object_key}"].add(grant.action_type)
 
     assert {"SELECT", "READ_METADATA", "OWN"} == actual_grants[f"{group_a.display_name}.{udf_a.full_name}"]
@@ -97,7 +99,7 @@ def test_all_grants_for_other_objects(
     sql_backend.execute(f"DENY SELECT ON ANONYMOUS FUNCTION TO `{group_d.display_name}`")
 
     crawler = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
-    all_found_grants = crawler.snapshot()
+    all_found_grants = list(crawler.snapshot())
 
     found_any_file_grants = defaultdict(set)
     found_anonymous_function_grants = defaultdict(set)
