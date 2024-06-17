@@ -113,26 +113,24 @@ class TableNameMatcher(Matcher):
         self, from_table: FromTable, index: MigrationIndex, session_state: CurrentSessionState, node: Call
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
-
-        if not isinstance(table_arg, Const):
-            assert isinstance(node.func, Attribute)  # always true, avoids a pylint warning
-            yield Advisory.from_node(
+        table_name = table_arg.as_string().strip("'").strip('"')
+        for inferred in Tree(table_arg).infer_values(session_state):
+            if not inferred.is_inferred():
+                yield Advisory.from_node(
+                    code='table-migrate',
+                    message=f"Can't migrate '{node.as_string()}' because its table name argument cannot be computed",
+                    node=node,
+                )
+                continue
+            dst = self._find_dest(index, inferred.as_string(), from_table.schema)
+            if dst is None:
+                continue
+            yield Deprecation.from_node(
                 code='table-migrate',
-                message=f"Can't migrate '{node.func.attrname}' because its table name argument is not a constant",
+                message=f"Table {table_name} is migrated to {dst.destination()} in Unity Catalog",
+                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 node=node,
             )
-            return
-
-        dst = self._find_dest(index, table_arg.value, from_table.schema)
-        if dst is None:
-            return
-
-        yield Deprecation.from_node(
-            code='table-migrate',
-            message=f"Table {table_arg.value} is migrated to {dst.destination()} in Unity Catalog",
-            # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-            node=node,
-        )
 
     def apply(self, from_table: FromTable, index: MigrationIndex, node: Call) -> None:
         table_arg = self._get_table_arg(node)
