@@ -59,7 +59,7 @@ def lint_all(file_to_lint: str | None):
         if unparsed.exists():
             os.remove(unparsed)
     skipped: set[str] | None = None
-    malformed = Path(Path(__file__).parent, "solacc-malformed.txt")
+    malformed = Path(__file__).parent / "solacc-malformed.txt"
     if file_to_lint is None and malformed.exists():
         text = malformed.read_text()
         skipped = set(text.split("\n"))
