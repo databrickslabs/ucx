@@ -45,7 +45,7 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
         object_type, object_key = grant.this_type_and_key()
         all_grants[f"{grant.principal}.{object_type}.{object_key}"] = grant.action_type
 
-    assert len(all_grants) >= 8, "must have at least three grants"
+    assert len(all_grants) >= 9, "must have at least nine grants"
     assert all_grants[f"{group_a.display_name}.DATABASE.hive_metastore.{schema_c.name}"] == "USAGE"
     assert all_grants[f"{group_b.display_name}.DATABASE.hive_metastore.{schema_c.name}"] == "USAGE"
     assert all_grants[f"{group_a.display_name}.TABLE.{table_a.full_name}"] == "SELECT"
