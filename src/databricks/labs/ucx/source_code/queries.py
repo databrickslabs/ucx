@@ -1,10 +1,10 @@
 from collections.abc import Iterable
 
 import logging
-import sqlglot
+from sqlglot import parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table, Expression, Use, Create
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice, Deprecation, Fixer, Linter, CurrentSessionState, Failure
 
 logger = logging.getLogger(__name__)
 
@@ -43,41 +43,56 @@ class FromTable(Linter, Fixer):
         return self._session_state.schema
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code, read='databricks'):
-            if not statement:
-                continue
-            for table in statement.find_all(Table):
-                if isinstance(statement, Use):
-                    # Sqlglot captures the database name in the Use statement as a Table, with
-                    # the schema  as the table name.
-                    self._session_state.schema = table.name
+        try:
+            statements = parse_sql(code, read='databricks')
+            for statement in statements:
+                if not statement:
                     continue
-                if isinstance(statement, Create) and statement.kind == "SCHEMA":
-                    # Sqlglot captures the schema name in the Create statement as a Table, with
-                    # the schema  as the db name.
-                    self._session_state.schema = table.db
-                    continue
+                yield from self._lint_statement(statement)
+        except SqlParseError:
+            yield Failure(
+                code='table-migrate',
+                message=f"SQL query {code} is not supported yet",
+                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                start_line=0,
+                start_col=0,
+                end_line=0,
+                end_col=1024,
+            )
 
-                # we only migrate tables in the hive_metastore catalog
-                if self._catalog(table) != 'hive_metastore':
-                    continue
-                # Sqlglot uses db instead of schema, watch out for that
-                src_schema = table.db if table.db else self._session_state.schema
-                if not src_schema:
-                    logger.error(f"Could not determine schema for table {table.name}")
-                    continue
-                dst = self._index.get(src_schema, table.name)
-                if not dst:
-                    continue
-                yield Deprecation(
-                    code='table-migrate',
-                    message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
-                    # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=1024,
-                )
+    def _lint_statement(self, statement: Expression):
+        for table in statement.find_all(Table):
+            if isinstance(statement, Use):
+                # Sqlglot captures the database name in the Use statement as a Table, with
+                # the schema  as the table name.
+                self._session_state.schema = table.name
+                continue
+            if isinstance(statement, Create) and statement.kind == "SCHEMA":
+                # Sqlglot captures the schema name in the Create statement as a Table, with
+                # the schema  as the db name.
+                self._session_state.schema = table.db
+                continue
+
+            # we only migrate tables in the hive_metastore catalog
+            if self._catalog(table) != 'hive_metastore':
+                continue
+            # Sqlglot uses db instead of schema, watch out for that
+            src_schema = table.db if table.db else self._session_state.schema
+            if not src_schema:
+                logger.error(f"Could not determine schema for table {table.name}")
+                continue
+            dst = self._index.get(src_schema, table.name)
+            if not dst:
+                continue
+            yield Deprecation(
+                code='table-migrate',
+                message=f"Table {src_schema}.{table.name} is migrated to {dst.destination()} in Unity Catalog",
+                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                start_line=0,
+                start_col=0,
+                end_line=0,
+                end_col=1024,
+            )
 
     @staticmethod
     def _catalog(table):
@@ -87,7 +102,7 @@ class FromTable(Linter, Fixer):
 
     def apply(self, code: str) -> str:
         new_statements = []
-        for statement in sqlglot.parse(code, read='databricks'):
+        for statement in parse_sql(code, read='databricks'):
             if not statement:
                 continue
             if isinstance(statement, Use):
