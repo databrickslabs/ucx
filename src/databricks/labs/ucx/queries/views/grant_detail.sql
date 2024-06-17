@@ -23,8 +23,8 @@ SELECT
         WHEN anonymous_function THEN NULL
         WHEN any_file THEN NULL
         WHEN view IS NOT NULL THEN CONCAT(catalog, '.', database, '.', view)
-        WHEN udf IS NOT NULL THEN CONCAT(catalog, '.', database, '.', udf)
         WHEN table IS NOT NULL THEN  CONCAT(catalog, '.', database, '.', table)
+        WHEN udf IS NOT NULL THEN CONCAT(catalog, '.', database, '.', udf)
         WHEN database IS NOT NULL THEN  CONCAT(catalog, '.', database)
         WHEN catalog IS NOT NULL THEN catalog
         ELSE 'UNKNOWN'
