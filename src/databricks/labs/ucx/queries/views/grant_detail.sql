@@ -14,19 +14,19 @@ SELECT
         WHEN any_file THEN 'ANY FILE'
         WHEN view IS NOT NULL THEN 'VIEW'
         WHEN table IS NOT NULL THEN 'TABLE'
+        WHEN udf IS NOT NULL THEN 'UDF'
         WHEN database IS NOT NULL THEN 'DATABASE'
         WHEN catalog IS NOT NULL THEN 'CATALOG'
-        WHEN udf IS NOT NULL THEN 'UDF'
         ELSE 'UNKNOWN'
     END AS object_type,
     CASE
         WHEN anonymous_function THEN NULL
         WHEN any_file THEN NULL
         WHEN view IS NOT NULL THEN CONCAT(catalog, '.', database, '.', view)
+        WHEN udf IS NOT NULL THEN CONCAT(catalog, '.', database, '.', udf)
         WHEN table IS NOT NULL THEN  CONCAT(catalog, '.', database, '.', table)
         WHEN database IS NOT NULL THEN  CONCAT(catalog, '.', database)
         WHEN catalog IS NOT NULL THEN catalog
-        WHEN udf IS NOT NULL THEN CONCAT(catalog, '.', database, '.', udf)
         ELSE 'UNKNOWN'
     END AS object_id,
     action_type,
