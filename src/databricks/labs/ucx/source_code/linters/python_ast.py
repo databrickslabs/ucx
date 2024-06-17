@@ -27,6 +27,15 @@ class Tree:
         root = parse(code)
         return Tree(root)
 
+    @classmethod
+    def convert_magic_lines_to_magic_commands(cls, python_code: str):
+        lines = python_code.split("\n")
+        for i, line in enumerate(lines):
+            if not line.startswith("%"):
+                continue
+            lines[i] = f"magic_command({line.encode()!r})"
+        return "\n".join(lines)
+
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
 

@@ -116,11 +116,7 @@ class DbutilsLinter(Linter):
         self._session_state = session_state
 
     def lint(self, code: str) -> Iterable[Advice]:
-        # can't find a way to avoid this cyclic import
-        # pylint: disable=import-outside-toplevel, cyclic-import
-        from databricks.labs.ucx.source_code.notebooks.magic import MagicCommand
-
-        code = MagicCommand.convert_magic_lines_to_magic_commands(code)
+        code = Tree.convert_magic_lines_to_magic_commands(code)
         tree = Tree.parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:

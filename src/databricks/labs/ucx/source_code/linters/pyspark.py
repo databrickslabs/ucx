@@ -13,7 +13,6 @@ from databricks.labs.ucx.source_code.base import (
     Failure,
     CurrentSessionState,
 )
-from databricks.labs.ucx.source_code.notebooks.magic import MagicCommand
 from databricks.labs.ucx.source_code.queries import FromTable
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
 
@@ -333,7 +332,7 @@ class SparkSql(Linter, Fixer):
 
     def lint(self, code: str) -> Iterable[Advice]:
         try:
-            code = MagicCommand.convert_magic_lines_to_magic_commands(code)
+            code = Tree.convert_magic_lines_to_magic_commands(code)
             tree = Tree.parse(code)
         except AstroidSyntaxError as e:
             yield Failure('syntax-error', str(e), 0, 0, 0, 0)

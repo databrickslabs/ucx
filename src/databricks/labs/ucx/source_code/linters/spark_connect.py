@@ -9,7 +9,6 @@ from databricks.labs.ucx.source_code.base import (
     Linter,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.magic import MagicCommand
 
 
 @dataclass
@@ -183,7 +182,7 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
-        code = MagicCommand.convert_magic_lines_to_magic_commands(code)
+        code = Tree.convert_magic_lines_to_magic_commands(code)
         tree = Tree.parse(code)
         for matcher in self._matchers:
             yield from matcher.lint_tree(tree.node)
