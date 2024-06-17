@@ -54,7 +54,6 @@ def test_all_grant_types(
     )
     grants = {(row.object_type, row.object_id) for row in rows}
 
-    # TODO: Catalog-level grants are being dropped by grant_detail; this needs to be fixed.
     # TODO: The types of objects targeted by grants is missclassified; this needs to be fixed.
 
     # Test the results.
