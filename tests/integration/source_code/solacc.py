@@ -45,8 +45,29 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
+def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[int, int]:
+    try:
+        missing_imports = 0
+        for located_advice in ctx.local_code_linter.lint_path(file):
+            if located_advice.advice.code == 'import-not-found':
+                missing_imports += 1
+            message = located_advice.message_relative_to(dist.parent, default=file)
+            sys.stdout.write(f"{message}\n")
+        return missing_imports, 1
+    except Exception as e:  # pylint: disable=broad-except
+        # here we're most likely catching astroid & sqlglot errors
+        if unparsed is None:  # linting single file, log exception detqils
+            logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e)
+        else:
+            logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
+            # populate solacc-unparsed.txt
+            with unparsed.open(mode="a", encoding="utf-8") as f:
+                f.write(file.relative_to(dist).as_posix())
+                f.write("\n")
+        return 0, 0
+
+
 def lint_all(file_to_lint: str | None):
-    # pylint: disable=too-many-nested-blocks
     ws = WorkspaceClient(host='...', token='...')
     ctx = LocalCheckoutContext(ws).replace(
         linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
@@ -54,6 +75,7 @@ def lint_all(file_to_lint: str | None):
     parseable = 0
     missing_imports = 0
     all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
+    unparsed: Path | None = None
     if file_to_lint is None:
         unparsed = Path(Path(__file__).parent, "solacc-unparsed.txt")
         if unparsed.exists():
@@ -61,29 +83,14 @@ def lint_all(file_to_lint: str | None):
     skipped: set[str] | None = None
     malformed = Path(Path(__file__).parent, "solacc-malformed.txt")
     if file_to_lint is None and malformed.exists():
-        text = malformed.read_text()
+        text = malformed.read_text(encoding="utf-8")
         skipped = set(text.split("\n"))
     for file in all_files:
         if skipped and file.relative_to(dist).as_posix() in skipped:
             continue
-        try:
-            for located_advice in ctx.local_code_linter.lint_path(file):
-                if located_advice.advice.code == 'import-not-found':
-                    missing_imports += 1
-                message = located_advice.message_relative_to(dist.parent, default=file)
-                sys.stdout.write(f"{message}\n")
-            parseable += 1
-        except Exception as e:  # pylint: disable=broad-except
-            # here we're most likely catching astroid & sqlglot errors
-            if file_to_lint:
-                logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e)
-            else:
-                logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
-            if file_to_lint is None:
-                # populate solacc-unparsed.txt
-                with unparsed.open(mode="a") as f:
-                    f.write(file.relative_to(dist).as_posix())
-                    f.write("\n")
+        _missing_imports, _parseable = lint_one(file, ctx, unparsed)
+        missing_imports += _missing_imports
+        parseable += _parseable
     parseable_pct = int(parseable / len(all_files) * 100)
     logger.info(
         f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}"
