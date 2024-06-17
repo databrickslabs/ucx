@@ -41,7 +41,10 @@ SELECT
     catalog,
     database,
     table,
+    view,
     udf,
+    any_file,
+    anonymous_function,
     if(size(failures) < 1, 1, 0) as success,
     to_json(failures) as failures
 FROM raw
