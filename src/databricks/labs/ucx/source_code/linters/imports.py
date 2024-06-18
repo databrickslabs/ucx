@@ -116,8 +116,7 @@ class DbutilsLinter(Linter):
         self._session_state = session_state
 
     def lint(self, code: str) -> Iterable[Advice]:
-        code = Tree.convert_magic_lines_to_magic_commands(code)
-        tree = Tree.parse(code)
+        tree = Tree.normalize_and_parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:
             yield from self._raise_advice_if_unresolved(node.node, self._session_state)

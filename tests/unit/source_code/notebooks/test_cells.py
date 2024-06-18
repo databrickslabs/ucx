@@ -213,8 +213,7 @@ def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_
     source = """
 %unsupported stuff '"%#@!
 """
-    converted = Tree.convert_magic_lines_to_magic_commands(source)
-    tree = Tree.parse(converted)
+    tree = Tree.normalize_and_parse(source)
     commands, _ = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
     dependency = Dependency(FileLoader(), Path(""))
     graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())

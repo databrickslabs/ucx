@@ -330,8 +330,7 @@ class SparkSql(Linter, Fixer):
 
     def lint(self, code: str) -> Iterable[Advice]:
         try:
-            code = Tree.convert_magic_lines_to_magic_commands(code)
-            tree = Tree.parse(code)
+            tree = Tree.normalize_and_parse(code)
         except AstroidSyntaxError as e:
             yield Failure('syntax-error', str(e), 0, 0, 0, 0)
             return
