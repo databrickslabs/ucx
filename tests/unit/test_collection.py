@@ -257,3 +257,63 @@ def test_join_collection_join_existing_collection_sync_not_upto_date():
 
     with pytest.raises(KeyError):
         account_installer.join_collection(789, 123)
+
+
+def test_get_workspaces_context_not_collection_admin(caplog):
+    ws = mock_workspace_client()
+    ws.current_user.me = lambda: iam.User(user_name="me@example.com")
+    account_client = create_autospec(AccountClient)
+    account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
+    workspaces_ctx = account_installer.get_workspaces_context(123)
+    assert len(workspaces_ctx) == 0
+    assert 'User is not workspace admin of collection workspace 123' in caplog.text
+
+
+def test_get_workspaces_context_empty_collection(caplog):
+    ws = mock_workspace_client()
+    download_yaml = {
+        'config.yml': yaml.dump(
+            {
+                'version': 1,
+                'inventory_database': 'ucx',
+                'connect': {
+                    'host': '...',
+                    'token': '...',
+                },
+            }
+        ),
+        'workspaces.json': None,
+    }
+    ws.workspace.download.side_effect = lambda file_name: io.StringIO(download_yaml[os.path.basename(file_name)])
+    account_client = create_autospec(AccountClient)
+    account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
+    workspaces_ctx = account_installer.get_workspaces_context(123)
+    assert len(workspaces_ctx) == 0
+    assert 'No collection info found in the workspace 123' in caplog.text
+
+
+def test_get_workspaces_context_not_workspace_admin(caplog):
+    ws = mock_workspace_client()
+    ws.current_user.me.side_effect = [
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]),
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]),
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="admins")]),
+        iam.User(user_name="me@example.com", groups=[iam.ComplexValue(display="notadmin")]),
+    ]
+    account_client = create_autospec(AccountClient)
+    account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
+    workspaces_ctx = account_installer.get_workspaces_context(123)
+    assert len(workspaces_ctx) == 0
+    assert 'User is not workspace admin of workspace 456' in caplog.text
+
+
+def test_get_workspaces_context():
+    ws = mock_workspace_client()
+    account_client = create_autospec(AccountClient)
+    account_client.get_workspace_client.return_value = ws
+    account_installer = AccountInstaller(account_client)
+    workspaces_ctx = account_installer.get_workspaces_context(123)
+    assert len(workspaces_ctx) == 2
