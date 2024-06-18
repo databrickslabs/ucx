@@ -52,7 +52,7 @@ class FromTable(Linter, Fixer):
         except SqlParseError:
             yield Failure(
                 code='table-migrate',
-                message=f"SQL query {code} is not supported yet",
+                message=f"SQL query is not supported yet: {code}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
                 start_col=0,
