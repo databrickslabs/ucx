@@ -2,10 +2,10 @@ import logging
 from collections.abc import Iterable
 
 from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
-import sqlglot
+from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
 
 logger = logging.getLogger(__name__)
@@ -96,12 +96,28 @@ class FromDbfsFolder(Linter):
         return 'dbfs-query'
 
     def lint(self, code: str) -> Iterable[Advice]:
-        for statement in sqlglot.parse(code, read='databricks'):
-            if not statement:
-                continue
-            for table in statement.find_all(Table):
-                # Check table names for deprecated DBFS table names
-                yield from self._check_dbfs_folder(table)
+        try:
+            queries = parse_sql(code, read='databricks')
+            for query in queries:
+                if not query:
+                    continue
+                yield from self._lint_query(query)
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
+            yield Failure(
+                code='dbfs-query',
+                message=f"SQL query is not supported yet: {code}",
+                # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
+                start_line=0,
+                start_col=0,
+                end_line=0,
+                end_col=1024,
+            )
+
+    def _lint_query(self, query: Expression):
+        for table in query.find_all(Table):
+            # Check table names for deprecated DBFS table names
+            yield from self._check_dbfs_folder(table)
 
     def _check_dbfs_folder(self, table: Table) -> Iterable[Advice]:
         """
