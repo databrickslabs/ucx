@@ -49,7 +49,8 @@ class FromTable(Linter, Fixer):
                 if not statement:
                     continue
                 yield from self._lint_statement(statement)
-        except SqlParseError:
+        except SqlParseError as e:
+            logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
             yield Failure(
                 code='table-migrate',
                 message=f"SQL query is not supported yet: {code}",
