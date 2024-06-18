@@ -495,7 +495,7 @@ class MagicCommand(NodeBase):
         self._command = command.decode()
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        if self._command.startswith("%pip"):
+        if self._command.startswith("%pip") or self._command.startswith("!pip"):
             cmd = PipMagic(self._command)
             return cmd.build_dependency_graph(graph)
         problem = DependencyProblem.from_node(
@@ -512,11 +512,11 @@ class PipMagic:
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         argv = self._split(self._code)
         if len(argv) == 1:
-            return [DependencyProblem("library-install-failed", "Missing command after '%pip'")]
+            return [DependencyProblem("library-install-failed", "Missing command after 'pip'")]
         if argv[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {argv[1]}")]
+            return [DependencyProblem("library-install-failed", f"Unsupported 'pip' command: {argv[1]}")]
         if len(argv) == 2:
-            return [DependencyProblem("library-install-failed", "Missing arguments after '%pip install'")]
+            return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
         return graph.register_library(*argv[2:])  # Skipping %pip install
 
     @staticmethod
