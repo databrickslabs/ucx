@@ -44,7 +44,7 @@ class Tree:
         lines = python_code.split("\n")
         for line in lines:
             # skip leading ws and comments
-            if len(line) == 0 or line.startswith('#'):
+            if len(line.strip()) == 0 or line.startswith('#'):
                 continue
             if not line.startswith(' '):
                 # first line of code is correctly indented
