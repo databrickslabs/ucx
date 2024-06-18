@@ -1,11 +1,16 @@
-redkite-pricing/01_Data_Prep_Analysis.py
-user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/0 - Ingest and Explore Raw User Data.py
-user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/Full Data Engineering Pipeline/Train Anomaly Model on Historical Data.py
-user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/Full Data Engineering Pipeline/Run Inference on Active Batch.py
-product-er-with-images/01_Prep_Data.py
-fsi-mrm-generation/templates/Credit Adjudication - Example.py
-lr-recommender/03_Train_Model.py
-dist/multi-touch-attribution/04_markov_chains.py
-security-analysis-tool/notebooks/Utils/workspace_bootstrap.py
+# the following fails because of unsupported automagic line: pip install git+https://github.com/databricks-industry-solutions/dbignite.git@feature-FHIR-schema-dbignite-HLSSA-294
+dbignite-forked/notebooks/fhir-mapping-demo.py
 # the following fails to parse due to module dependency azure/devops/v5_1/client_factory.py
 edge-ml-for-manufacturing/03_Trigger_AzureDevOps_Job.py
+# the following fails to parse due to incomplete assignment 'fhir_file_location='
+hls-interop-workshop-jan23/fhir.py
+# the following fails because of unsupported automagic line: sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+hls-llm-doc-qa/util/install-llm-libraries.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/Setup/3. test_connections.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/Setup/gcp/configure_sa_auth_tokens.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/Setup/gcp/configure_tokens_for_worksaces.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/diagnosis/sat_diagnosis_gcp.py
