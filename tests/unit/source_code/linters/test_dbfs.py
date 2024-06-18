@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Deprecation, Advisory, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsageLinter, FromDbfsFolder
 
 
@@ -91,7 +91,8 @@ def test_non_dbfs_trigger_nothing(query):
 )
 def test_dbfs_tables_trigger_messages_param(query: str, table: str):
     ftf = FromDbfsFolder()
-    assert [
+    actual = list(ftf.lint(query))
+    assert actual == [
         Deprecation(
             code='dbfs-query',
             message=f'The use of DBFS is deprecated: {table}',
@@ -100,7 +101,28 @@ def test_dbfs_tables_trigger_messages_param(query: str, table: str):
             end_line=0,
             end_col=1024,
         ),
-    ] == list(ftf.lint(query))
+    ]
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        'SELECT * FROM {{some_db.some_table}}',
+    ],
+)
+def test_dbfs_queries_failure(query: str):
+    ftf = FromDbfsFolder()
+    actual = list(ftf.lint(query))
+    assert actual == [
+        Failure(
+            code='dbfs-query',
+            message=f'SQL query is not supported yet: {query}',
+            start_line=0,
+            start_col=0,
+            end_line=0,
+            end_col=1024,
+        ),
+    ]
 
 
 def test_dbfs_queries_name():
