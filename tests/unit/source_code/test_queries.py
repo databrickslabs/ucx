@@ -1,4 +1,4 @@
-from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Deprecation, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.queries import FromTable
 
 
@@ -6,8 +6,8 @@ def test_not_migrated_tables_trigger_nothing(empty_index):
     ftf = FromTable(empty_index, CurrentSessionState())
 
     old_query = "SELECT * FROM old.things LEFT JOIN hive_metastore.other.matters USING (x) WHERE state > 1 LIMIT 10"
-
-    assert not list(ftf.lint(old_query))
+    actual = list(ftf.lint(old_query))
+    assert not actual
 
 
 def test_migrated_tables_trigger_messages(migration_index):
@@ -85,3 +85,12 @@ def test_parses_create_schema(migration_index):
     ftf = FromTable(migration_index, session_state=session_state)
     advices = ftf.lint(query)
     assert not list(advices)
+
+
+def test_raises_advice_when_parsing_unsupported_sql(migration_index):
+    query = "DESCRIBE DETAIL xyz"
+    session_state = CurrentSessionState(schema="old")
+    ftf = FromTable(migration_index, session_state=session_state)
+    advices = list(ftf.lint(query))
+    assert isinstance(advices[0], Failure)
+    assert 'not supported' in advices[0].message
