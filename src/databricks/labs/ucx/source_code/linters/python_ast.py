@@ -27,6 +27,47 @@ class Tree:
         root = parse(code)
         return Tree(root)
 
+    @classmethod
+    def normalize_and_parse(cls, code: str):
+        code = cls.normalize(code)
+        root = parse(code)
+        return Tree(root)
+
+    @classmethod
+    def normalize(cls, code: str):
+        code = cls._normalize_indents(code)
+        code = cls._convert_magic_lines_to_magic_commands(code)
+        return code
+
+    @classmethod
+    def _normalize_indents(cls, python_code: str):
+        lines = python_code.split("\n")
+        for line in lines:
+            # skip leading ws and comments
+            if len(line) == 0 or line.startswith('#'):
+                continue
+            if not line.startswith(' '):
+                # first line of code is correctly indented
+                return python_code
+            # first line of code is indented when it shouldn't
+            prefix_count = len(line) - len(line.lstrip(' '))
+            prefix_str = ' ' * prefix_count
+            for i, line_to_fix in enumerate(lines):
+                if line_to_fix.startswith(prefix_str):
+                    lines[i] = line_to_fix[prefix_count:]
+            return "\n".join(lines)
+        return python_code
+
+    @classmethod
+    def _convert_magic_lines_to_magic_commands(cls, python_code: str):
+        lines = python_code.split("\n")
+        magic_markers = {"%", "!"}
+        for i, line in enumerate(lines):
+            if len(line) == 0 or line[0] not in magic_markers:
+                continue
+            lines[i] = f"magic_command({line.encode()!r})"
+        return "\n".join(lines)
+
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
 
