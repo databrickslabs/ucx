@@ -1,5 +1,4 @@
 -- --title 'Grants'
--- --title Incompatible Object Privileges, row=41, col=0, size_x=6, size_y=8
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     action_type,

@@ -1,5 +1,4 @@
 -- --title 'Table estimates'
--- --title Table estimates, row=3, col=2, size_x=3, size_y=8
 SELECT
   table_name,
   object_type,

@@ -1,4 +1,4 @@
--- --title Assessment overview, row=40, col=2, size_x=8, size_y=3
+-- --title 'Assessment overview'
 
 ## Other
 - Object permissions

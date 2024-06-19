@@ -1,5 +1,4 @@
 -- --title 'Workspace UC readiness'
--- widget row=1, col=0, size_x=1, size_y=3
 WITH raw AS (
   SELECT object_type, object_id, IF(failures == '[]', 1, 0) AS ready
   FROM inventory.objects

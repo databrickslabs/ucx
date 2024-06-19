@@ -1,4 +1,4 @@
--- --title Metastore assignment, row=0, col=0, size_x=2, size_y=8
+-- --title 'Metastore assignment'
 
 ## 1 - Metastore assignment
 

@@ -1,5 +1,4 @@
 -- --title 'Group migration complexity'
--- widget row=1, col=5, size_x=1, size_y=8
 select
 case when total_groups = 0 then NULL
 when total_groups between 1 and 50 then "S"

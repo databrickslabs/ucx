@@ -1,5 +1,4 @@
--- --title Database Summary, search_by=database, columns=database,upgrade,tables,views,dbfs_root,delta_tables,total_grants,granted_principals,database_grants,table_grants,service_principal_grants,user_grants,group_grants
--- --title Database Summary, row=12, col=0, size_x=8, size_y=8
+-- --title Database Summary, search_by=database,
 WITH table_stats AS (
   SELECT
     `database`,
@@ -49,5 +48,19 @@ WITH table_stats AS (
   FROM inventory.grant_detail
   GROUP BY `database`
 )
-SELECT * FROM database_stats FULL JOIN grant_stats USING (`database`)
+SELECT
+  database,
+  upgrade,
+  tables,
+  views,
+  dbfs_root,
+  delta_tables,
+  total_grants,
+  granted_principals,
+  database_grants,
+  table_grants,
+  service_principal_grants,
+  user_grants,
+  group_grants
+FROM database_stats FULL JOIN grant_stats USING (`database`)
 ORDER BY tables DESC

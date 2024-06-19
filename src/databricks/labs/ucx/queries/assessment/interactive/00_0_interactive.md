@@ -1,4 +1,4 @@
--- --title Metastore assignment, row=0, col=0, size_x=6, size_y=9
+-- --title 'Metastore assignment'
 
 ## Compute Access Mode Limitations
 

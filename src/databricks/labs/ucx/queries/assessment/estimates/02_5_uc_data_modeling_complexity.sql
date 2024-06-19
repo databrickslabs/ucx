@@ -1,5 +1,4 @@
 -- --title 'Data modeling complexity'
--- widget row=2, col=5, size_x=1, size_y=8
 select
 case when distinct_tables = 0 then NULL
 when distinct_tables between 1 and 100 then "S"

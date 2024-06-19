@@ -1,5 +1,4 @@
 -- --title 'Global Init Scripts'
--- --title Incompatible Global Init Scripts, row=42, col=3, size_x=3, size_y=8
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     script_name,

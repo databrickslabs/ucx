@@ -1,4 +1,4 @@
--- --title Assessment overview, row=15, col=0, size_x=8, size_y=4
+-- --title 'Assessment overview'
 
 ## Storage Summary
 -  External Locations
