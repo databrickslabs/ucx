@@ -1,4 +1,4 @@
--- --title UDF Summary, search_by=name,
+-- --title 'UDF Summary' --filter name
 SELECT *
   catalog,
   database,

@@ -1,4 +1,4 @@
--- --title Database Summary, search_by=database,
+-- --title 'Database Summary' --filter database
 WITH table_stats AS (
   SELECT
     `database`,
