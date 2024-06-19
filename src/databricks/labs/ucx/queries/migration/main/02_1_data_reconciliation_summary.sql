@@ -1,5 +1,4 @@
 -- --title 'Data Reconciliation Results'
--- widget row=2, col=4, size_x=2, size_y=4
 SELECT
   COUNT(
     CASE

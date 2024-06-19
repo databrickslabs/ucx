@@ -1,5 +1,4 @@
 -- --title 'Object Type Readiness'
--- --title Readiness, row=7, col=0, size_x=2, size_y=8
 WITH raw AS (
   SELECT object_type, object_id, IF(failures == '[]', 1, 0) AS ready
   FROM inventory.objects

@@ -1,4 +1,4 @@
--- --title Assessment overview, row=30, col=0, size_x=8, size_y=2
+-- --title 'Assessment overview'
 
 ## Job Assessment Summary
 [documentation](https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md)

@@ -1,5 +1,4 @@
 -- --title 'Table counts by storage'
--- --title Table counts by storage, row=2, col=2, size_x=2, size_y=5
 SELECT storage, COUNT(*) count
 FROM (
 SELECT

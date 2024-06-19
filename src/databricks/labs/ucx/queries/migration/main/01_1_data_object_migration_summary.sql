@@ -1,5 +1,4 @@
 -- --title 'Data Migration Progress'
--- widget row=1, col=4, size_x=2, size_y=4
 SELECT
   COUNT(
     CASE
