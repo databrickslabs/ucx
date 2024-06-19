@@ -1,6 +1,6 @@
---- 
-title: 'Compute Summary'
----
+## Storage Summary
+-  External Locations
 
-## Compute summary
+-  Mount Points
+
 [documentation](https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md)

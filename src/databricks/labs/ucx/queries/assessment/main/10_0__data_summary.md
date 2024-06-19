@@ -1,7 +1,3 @@
---- 
-title: 'Assessment overview'
----
-
 ## Data summary
 
 - "Asset Replication Required" means that data must be copied into Unity Catalog tables (CTAS or DEEP CLONE)

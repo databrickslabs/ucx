@@ -1,4 +1,4 @@
--- --title 'Submit Runs Failures'
+-- --title 'Incompatible Submit Runs Failures' --width 3 --height 6
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     COUNT(DISTINCT hashed_id) AS submit_runs,

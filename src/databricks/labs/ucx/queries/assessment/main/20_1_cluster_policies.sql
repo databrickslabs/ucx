@@ -1,4 +1,4 @@
--- --title 'Cluster Policies'
+-- --title 'Cluster Policies' --width 3 --height 6
 SELECT
     distinct policy_name,
     cluster.spark_version as cluster_dbr_version,

@@ -1,7 +1,3 @@
---- 
-title: 'Assessment overview'
----
-
 ## Assessment summary
 
 - Readiness is based on # objects having one or more issues divided by total # of objects

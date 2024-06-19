@@ -1,3 +1,3 @@
--- --title 'Total Table Scan Failure Count'
+-- --title 'Metastore Crawl Failures'
 SELECT COUNT(*) AS count_failures
 FROM inventory.table_failures

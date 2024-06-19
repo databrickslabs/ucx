@@ -1,4 +1,4 @@
--- --title 'Submit Runs'
+-- --title 'Incompatible Submit Runs' --width 3 --height 6
 SELECT
     hashed_id,
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,

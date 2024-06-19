@@ -1,4 +1,4 @@
--- --title 'Assessment Summary'
+-- --title 'Assessment Summary' --width 4 --height 6
 WITH raw AS (
   SELECT EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding
   FROM inventory.objects WHERE failures <> '[]'

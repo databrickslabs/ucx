@@ -1,4 +1,4 @@
--- --title 'Grants'
+-- --title 'Incompatible Object Privileges'
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     action_type,
