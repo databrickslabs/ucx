@@ -1,4 +1,4 @@
--- --title 'UC readiness'
+-- --title 'UC readiness' --width 2 --height 4
 WITH raw AS (
   SELECT object_type, object_id, IF(failures == '[]', 1, 0) AS ready
   FROM inventory.objects
