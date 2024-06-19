@@ -1,4 +1,4 @@
--- --title Data modeling complexity, counter_label=Data modeling complexity, value_column=uc_model_complexity
+-- --title 'Data modeling complexity'
 -- widget row=2, col=5, size_x=1, size_y=8
 select
 case when distinct_tables = 0 then NULL
