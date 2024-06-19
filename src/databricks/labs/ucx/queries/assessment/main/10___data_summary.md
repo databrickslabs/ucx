@@ -1,4 +1,4 @@
--- widget title=Assessment overview, row=10, col=0, size_x=8, size_y=3
+-- --title Assessment overview, row=10, col=0, size_x=8, size_y=3
 
 ## Data summary
 

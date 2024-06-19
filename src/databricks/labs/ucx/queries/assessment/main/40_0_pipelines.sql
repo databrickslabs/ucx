@@ -1,5 +1,5 @@
 -- --title 'Pipelines'
--- widget title=Incompatible Delta Live Tables, row=42, col=0, size_x=3, size_y=8
+-- --title Incompatible Delta Live Tables, row=42, col=0, size_x=3, size_y=8
 SELECT
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     pipeline_name,

@@ -1,4 +1,4 @@
--- widget title=Table migration status, row=1, col=0, size_x=4, size_y=8
+-- --title Table migration status, row=1, col=0, size_x=4, size_y=8
 
 ## Table migration status
 

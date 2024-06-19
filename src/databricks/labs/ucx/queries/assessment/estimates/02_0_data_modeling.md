@@ -1,4 +1,4 @@
--- widget title=Table estimates, row=2, col=0, size_x=2, size_y=8
+-- --title Table estimates, row=2, col=0, size_x=2, size_y=8
 ## 3 - UC Data modeling
 
 The third step of a successful UC migration is defining your target data model on UC.

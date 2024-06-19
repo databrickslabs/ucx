@@ -1,4 +1,4 @@
--- widget title=Table estimates, row=3, col=0, size_x=2, size_y=8
+-- --title Table estimates, row=3, col=0, size_x=2, size_y=8
 ## 4 - Data migration to UC
 
 Once you have defined your data model in UC and that you've created appropriate Storage Credentials and External Locations,

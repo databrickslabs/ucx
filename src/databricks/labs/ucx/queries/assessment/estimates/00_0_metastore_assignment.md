@@ -1,4 +1,4 @@
--- widget title=Metastore assignment, row=0, col=0, size_x=2, size_y=8
+-- --title Metastore assignment, row=0, col=0, size_x=2, size_y=8
 
 ## 1 - Metastore assignment
 

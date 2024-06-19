@@ -1,5 +1,5 @@
 -- --title 'Tables to migrate'
--- widget title=Tables to migrate, row=2, col=2, size_x=3, size_y=8
+-- --title Tables to migrate, row=2, col=2, size_x=3, size_y=8
 select
   catalog,
   database,

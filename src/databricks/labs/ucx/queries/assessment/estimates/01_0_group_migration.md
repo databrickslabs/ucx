@@ -1,4 +1,4 @@
--- widget title=Group migration, row=1, col=0, size_x=2, size_y=8
+-- --title Group migration, row=1, col=0, size_x=2, size_y=8
 
 ## 2 - Group migration
 
