@@ -177,7 +177,9 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
 
 
 def test_graph_builder_parse_error(
-    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup, caplog
+    simple_dependency_resolver: DependencyResolver,
+    mock_path_lookup: PathLookup,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Check that internal parsing errors are caught and logged."""
     # Fixture.
