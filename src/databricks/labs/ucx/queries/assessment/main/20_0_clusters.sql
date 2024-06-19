@@ -1,4 +1,4 @@
--- --title 'Clusters'
+-- --title 'Incompatible clusters' --width 3 --height 6
 SELECT EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
     cluster_id,
     cluster_name,

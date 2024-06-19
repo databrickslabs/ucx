@@ -1,4 +1,4 @@
--- --title 'Workspace UC readiness'
+-- --title 'UC readiness'
 WITH raw AS (
   SELECT object_type, object_id, IF(failures == '[]', 1, 0) AS ready
   FROM inventory.objects
