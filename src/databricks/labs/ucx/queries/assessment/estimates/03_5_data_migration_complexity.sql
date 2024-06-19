@@ -8,4 +8,4 @@ CASE WHEN total_estimated_hours < 30 THEN "S"
  ELSE NULL
 END as data_migration_complexity FROM
 (SELECT sum(estimated_hours) AS total_estimated_hours
-FROM $inventory.table_estimates)
+FROM inventory.table_estimates)

@@ -14,6 +14,6 @@ SELECT
            WHEN STARTSWITH(location, "adl") THEN "UNSUPPORTED"
            ELSE "EXTERNAL"
        END AS storage
-FROM $inventory.tables)
+FROM inventory.tables)
 GROUP BY storage
 ORDER BY storage;

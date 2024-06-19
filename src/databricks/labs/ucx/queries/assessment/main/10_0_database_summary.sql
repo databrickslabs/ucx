@@ -19,7 +19,7 @@ WITH table_stats AS (
         ELSE 0
     END AS is_unsupported,
     IF(table_format = "DELTA", 1, 0) AS is_delta
-   FROM $inventory.tables
+   FROM inventory.tables
 ), database_stats AS (
   SELECT `database`,
     CASE
@@ -46,7 +46,7 @@ WITH table_stats AS (
     SUM(IF(principal_type == 'service-principal', 1, 0)) AS service_principal_grants,
     SUM(IF(principal_type == 'user', 1, 0)) AS user_grants,
     SUM(IF(principal_type == 'group', 1, 0)) AS group_grants
-  FROM $inventory.grant_detail
+  FROM inventory.grant_detail
   GROUP BY `database`
 )
 SELECT * FROM database_stats FULL JOIN grant_stats USING (`database`)

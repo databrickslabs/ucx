@@ -6,6 +6,6 @@ SELECT
     success,
     failures,
     creator
-FROM $inventory.jobs
+FROM inventory.jobs
 WHERE job_name not like '[UCX]%'
 ORDER BY job_id DESC

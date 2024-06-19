@@ -11,4 +11,4 @@ SELECT
   count(*) AS total,
   concat(round(success / total * 100, 2), '%') AS success_rate
 FROM
-    $inventory.reconciliation_results
+    inventory.reconciliation_results
