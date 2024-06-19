@@ -1,5 +1,5 @@
 -- --title 'UDF Summary' --filter name
-SELECT *
+SELECT
   catalog,
   database,
   name,
