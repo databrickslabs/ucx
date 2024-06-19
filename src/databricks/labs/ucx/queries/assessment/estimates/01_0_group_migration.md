@@ -1,4 +1,6 @@
--- --title 'Group migration'
+--- 
+title: 'Group migration'
+---
 
 ## 2 - Group migration
 
