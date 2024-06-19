@@ -10,6 +10,7 @@ from enum import Enum
 from pathlib import Path
 
 from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
+from astroid.exceptions import AstroidSyntaxError  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
@@ -395,7 +396,8 @@ class GraphBuilder:
         try:
             python_code = Tree.convert_magic_lines_to_magic_commands(python_code)
             tree = Tree.parse(python_code)
-        except Exception as e:  # pylint: disable=broad-except
+        except AstroidSyntaxError as e:
+            logger.debug(f"Could not parse Python code: {python_code}", exc_info=True)
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
             return problems
         syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)

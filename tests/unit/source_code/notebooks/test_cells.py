@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from unittest.mock import create_autospec
 
@@ -9,11 +10,19 @@ from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell, PythonCell, PipMagic, MagicCommand
+from databricks.labs.ucx.source_code.notebooks.cells import (
+    CellLanguage,
+    GraphBuilder,
+    PipCell,
+    PythonCell,
+    PipMagic,
+    MagicCommand,
+)
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
 )
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
 from databricks.labs.ucx.source_code.known import Whitelist
 
@@ -165,6 +174,34 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
 
     assert len(problems) == 0
     graph.register_library.assert_called_once_with("databricks")
+
+
+def test_graph_builder_parse_error(
+    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup, caplog
+) -> None:
+    """Check that internal parsing errors are caught and logged."""
+    # Fixture.
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    graph.new_graph_builder_context()
+    builder = GraphBuilder(graph.new_graph_builder_context())
+
+    # Run the test.
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG):
+        problems = builder.build_graph_from_python_source("this is not valid python")
+
+    # Check results.
+    assert [
+        problem
+        for problem in problems
+        if problem.code == "parse-error" and problem.message.startswith("Could not parse Python code")
+    ]
+    assert [
+        log
+        for log in caplog.records
+        if log.levelname == "DEBUG" and log.message.startswith("Could not parse Python code")
+    ]
 
 
 def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup):
