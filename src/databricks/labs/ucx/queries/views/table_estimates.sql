@@ -9,5 +9,5 @@ when object_type == "EXTERNAL" and table_format in ("SQLSERVER", "MYSQL", "SNOWF
 when object_type == "EXTERNAL" and table_format != "DELTA" then 1 -- Can vary depending of format
 when object_type == "VIEW" then 2 -- Can vary depending of view complexity and number of tables used in the view
 else NULL
-end as estimated_hours from inventory.tables
+end as estimated_hours from $inventory.tables
 where not startswith(name, "__apply_changes")
