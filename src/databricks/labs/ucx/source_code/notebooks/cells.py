@@ -519,8 +519,11 @@ class PipMagic:
             return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
         return graph.register_library(*argv[2:])  # Skipping %pip install
 
-    @staticmethod
-    def _split(code) -> list[str]:
+    # Cache re-used regex (and ensure issues are raised during class init instead of upon first use).
+    _splitter = re.compile(r"(?<!\\)\n")
+
+    @classmethod
+    def _split(cls, code: str) -> list[str]:
         """Split pip cell code into multiple arguments
 
         Note:
@@ -529,7 +532,7 @@ class PipMagic:
         Sources:
             https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
         """
-        match = re.search(r"(?<!\\)\n", code)
+        match = cls._splitter.search(code)
         if match:
             code = code[: match.start()]  # Remove code after non-escaped newline
         code = code.replace("\\\n", " ")
