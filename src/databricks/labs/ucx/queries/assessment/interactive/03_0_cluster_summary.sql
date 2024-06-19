@@ -1,4 +1,4 @@
--- viz type=table, name=Findings by Cluster, columns=distinct_findings,Commands,Users,First_command,Last_command,workspace_id,cluster_id,cluster_name,dbr_version,creator
+-- --title Findings by Cluster, columns=distinct_findings,Commands,Users,First_command,Last_command,workspace_id,cluster_id,cluster_name,dbr_version,creator
 -- widget title=Findings by Cluster, row=3, col=0, size_x=6, size_y=12
 --
 WITH

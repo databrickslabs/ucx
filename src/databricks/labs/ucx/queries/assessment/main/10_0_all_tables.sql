@@ -1,4 +1,4 @@
--- viz type=table, --title Table Types, search_by=name, columns=name,type,format,storage,is_delta,location
+-- --title Table Types, search_by=name, columns=name,type,format,storage,is_delta,location
 -- widget title=Table Types, row=13, col=0, size_x=8, size_y=8
 SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        object_type AS type,

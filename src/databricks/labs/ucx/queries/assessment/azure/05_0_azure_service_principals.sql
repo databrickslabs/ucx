@@ -1,4 +1,4 @@
--- viz type=table, name=Azure Service Principals, columns=application_id,secret_scope,secret_key,tenant_id,storage_account
+-- --title 'Azure Service Principals'
 -- widget title=Azure Service Principals, row=0, col=0, size_x=3, size_y=8
 select
   application_id,

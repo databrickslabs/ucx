@@ -1,4 +1,4 @@
--- viz type=table, --title Submit Runs, columns=hashed_id,finding,run_ids
+-- --title Submit Runs, columns=hashed_id,finding,run_ids
 -- widget title=Incompatible Submit Runs, row=36, col=0, size_x=3, size_y=8
 SELECT
     hashed_id,
