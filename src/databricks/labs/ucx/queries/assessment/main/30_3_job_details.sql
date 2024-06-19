@@ -1,4 +1,4 @@
--- --title Job Details, search_by=job_name, columns=job_id,job_name,success,failures,creator
+-- --title 'Job Details' --filter job_name
 SELECT
     job_id,
     job_name,

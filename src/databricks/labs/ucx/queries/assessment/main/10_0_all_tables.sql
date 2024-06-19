@@ -1,4 +1,4 @@
--- --title Table Types, search_by=name, columns=name,type,format,storage,is_delta,location
+-- --title 'Table Types' --filter name
 SELECT CONCAT(tables.`database`, '.', tables.name) AS name,
        object_type AS type,
        table_format AS format,
