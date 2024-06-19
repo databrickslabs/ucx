@@ -11,4 +11,4 @@ SELECT
     start_col,
     end_line,
     end_col
-FROM $inventory.workflow_problems
+FROM inventory.workflow_problems

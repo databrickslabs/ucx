@@ -9,8 +9,8 @@ SELECT
   level,
   substring(component, length('databricks.labs.') + 1) AS component,  -- left strip 'databricks.labs.'
   message
-FROM $inventory.logs
+FROM inventory.logs
 WHERE job_run_id = (
-    SELECT DISTINCT job_run_id FROM $inventory.logs WHERE timestamp = (SELECT MAX(timestamp) FROM $inventory.logs)
+    SELECT DISTINCT job_run_id FROM inventory.logs WHERE timestamp = (SELECT MAX(timestamp) FROM inventory.logs)
 )
 ORDER BY timestamp ASC

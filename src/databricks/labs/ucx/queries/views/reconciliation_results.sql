@@ -10,7 +10,7 @@ WITH flattened AS (
       'STRUCT<source_missing_count: BIGINT, target_missing_count: BIGINT, source_row_count: BIGINT, target_row_count: BIGINT>'
     ) AS data_comparison_result
   FROM
-    $inventory.recon_results
+    inventory.recon_results
 )
 SELECT
   src_schema,

@@ -22,10 +22,10 @@ SELECT
   tables.storage_properties,
   tables.is_partitioned
 FROM
-    $inventory.tables AS tables
+    inventory.tables AS tables
   LEFT JOIN
-    $inventory.migration_status AS migration_status
+    inventory.migration_status AS migration_status
   ON tables.`database` = migration_status.src_schema AND tables.name = migration_status.src_table
   LEFT JOIN
-    $inventory.reconciliation_results AS reconciliation_results
+    inventory.reconciliation_results AS reconciliation_results
   ON tables.`database` = reconciliation_results.src_schema AND tables.name = reconciliation_results.src_table

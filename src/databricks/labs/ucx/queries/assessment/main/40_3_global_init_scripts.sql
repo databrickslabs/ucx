@@ -5,5 +5,5 @@ SELECT
     script_name,
     created_by
 FROM
-  $inventory.global_init_scripts
+  inventory.global_init_scripts
 ORDER BY script_name DESC

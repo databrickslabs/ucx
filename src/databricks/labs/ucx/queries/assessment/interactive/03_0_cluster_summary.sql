@@ -20,19 +20,19 @@ iteractive_cluster_commands (
         c.creator,
         a.event_date
     FROM system.access.audit a
-        LEFT OUTER JOIN $inventory.clusters AS c ON a.request_params.clusterId = c.cluster_id
+        LEFT OUTER JOIN inventory.clusters AS c ON a.request_params.clusterId = c.cluster_id
         AND a.action_name = 'runCommand'
     WHERE a.event_date >= DATE_SUB(CURRENT_DATE(), 90)
 ),
 misc_patterns(
-    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM $inventory.misc_patterns
+    SELECT commandLanguage, dbr_version_major, dbr_version_minor, dbr_type, pattern, issue FROM inventory.misc_patterns
 ),
 pattern_matcher(
     SELECT
         explode(array_except(array(p.issue, lp.issue, rv.issue,dbr_type.issue), array(null))) issue,
         a.*
     FROM iteractive_cluster_commands a
-        LEFT OUTER JOIN $inventory.code_patterns p
+        LEFT OUTER JOIN inventory.code_patterns p
             ON a.commandLanguage in ('python','scala')
                 AND contains(a.commandText, p.pattern)
         LEFT OUTER JOIN misc_patterns lp
