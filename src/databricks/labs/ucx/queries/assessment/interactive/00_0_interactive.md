@@ -1,7 +1,3 @@
---- 
-title: 'Metastore assignment'
----
-
 ## Compute Access Mode Limitations
 
 Unity Catalog enabled Shared Compute enforces strict user isolation and many of the SparkContext and Distributed ML routines are thus not allowed. The best alternative will be to run these workloads on Assigned clusters. See [Databricks documentation for more information](https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations)

@@ -1,4 +1,3 @@
--- --title 'Table estimates'
 ## 3 - UC Data modeling
 
 The third step of a successful UC migration is defining your target data model on UC.

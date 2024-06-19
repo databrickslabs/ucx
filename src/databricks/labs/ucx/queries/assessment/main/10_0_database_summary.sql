@@ -1,4 +1,3 @@
--- --title 'Database Summary' --filter database
 WITH table_stats AS (
   SELECT
     `database`,
@@ -48,6 +47,7 @@ WITH table_stats AS (
   FROM inventory.grant_detail
   GROUP BY `database`
 )
+-- --title 'Database Summary' --filter database
 SELECT
   database,
   upgrade,

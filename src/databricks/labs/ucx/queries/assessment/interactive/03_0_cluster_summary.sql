@@ -1,4 +1,3 @@
--- --title 'Findings by Cluster'
 WITH
 iteractive_cluster_commands (
     SELECT
@@ -42,6 +41,7 @@ pattern_matcher(
         LEFT OUTER JOIN misc_patterns dbr_type
             ON a.dbr_type = dbr_type.dbr_type and a.dbr_type in ('cpu','gpu')
 )
+-- --title 'Findings by Cluster'
 SELECT
     collect_list(distinct issue) `Distinct Findings`,
     count(1) `Commands`,

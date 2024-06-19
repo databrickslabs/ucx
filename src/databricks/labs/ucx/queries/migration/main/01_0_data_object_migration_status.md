@@ -1,7 +1,3 @@
---- 
-title: 'Table migration status'
----
-
 ## Table migration status
 
 The two widgets on the right show high-level summary of the table migration. The first widget shows the migration
