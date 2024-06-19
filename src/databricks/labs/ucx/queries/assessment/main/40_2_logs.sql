@@ -1,4 +1,4 @@
--- viz type=table, --title Warning messages, columns=timestamp,job_id,workflow_name,task_name,job_run_id,level,component,message
+-- --title Warning messages, columns=timestamp,job_id,workflow_name,task_name,job_run_id,level,component,message
 -- widget title=Warning messages, row=44, col=0, size_x=8, size_y=12
 SELECT
   from_unixtime(timestamp) AS timestamp,
