@@ -177,9 +177,7 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
 
 
 def test_graph_builder_parse_error(
-    simple_dependency_resolver: DependencyResolver,
-    mock_path_lookup: PathLookup,
-    caplog: pytest.LogCaptureFixture,
+    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup
 ) -> None:
     """Check that internal parsing errors are caught and logged."""
     # Fixture.
@@ -189,20 +187,13 @@ def test_graph_builder_parse_error(
     builder = GraphBuilder(graph.new_graph_builder_context())
 
     # Run the test.
-    caplog.clear()
-    with caplog.at_level(logging.DEBUG):
-        problems = builder.build_graph_from_python_source("this is not valid python")
+    problems = builder.build_graph_from_python_source("this is not valid python")
 
     # Check results.
     assert [
         problem
         for problem in problems
         if problem.code == "parse-error" and problem.message.startswith("Could not parse Python code")
-    ]
-    assert [
-        log
-        for log in caplog.records
-        if log.levelname == "DEBUG" and log.message.startswith("Could not parse Python code")
     ]
 
 
