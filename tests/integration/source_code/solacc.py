@@ -45,18 +45,19 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
-def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[int, int]:
+def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int]:
     try:
-        missing_imports = 0
+        missing_imports: set[str] = set()
         for located_advice in ctx.local_code_linter.lint_path(file):
             if located_advice.advice.code == 'import-not-found':
-                missing_imports += 1
+                missing_import = located_advice.advice.message.split(':')[1].strip()
+                missing_imports.add(missing_import)
             message = located_advice.message_relative_to(dist.parent, default=file)
             sys.stdout.write(f"{message}\n")
         return missing_imports, 1
     except Exception as e:  # pylint: disable=broad-except
         # here we're most likely catching astroid & sqlglot errors
-        if unparsed is None:  # linting single file, log exception detqils
+        if unparsed is None:  # linting single file, log exception details
             logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "), exc_info=e)
         else:
             logger.error(f"Error during parsing of {file}: {e}".replace("\n", " "))
@@ -64,7 +65,7 @@ def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tu
             with unparsed.open(mode="a", encoding="utf-8") as f:
                 f.write(file.relative_to(dist).as_posix())
                 f.write("\n")
-        return 0, 0
+        return set(), 0
 
 
 def lint_all(file_to_lint: str | None):
@@ -73,7 +74,7 @@ def lint_all(file_to_lint: str | None):
         linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
     )
     parseable = 0
-    missing_imports = 0
+    missing_imports: dict[str, int] = {}
     all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
     unparsed: Path | None = None
     if file_to_lint is None:
@@ -84,17 +85,25 @@ def lint_all(file_to_lint: str | None):
     malformed = Path(__file__).parent / "solacc-malformed.txt"
     if file_to_lint is None and malformed.exists():
         text = malformed.read_text(encoding="utf-8")
-        skipped = set(text.split("\n"))
+        lines = text.split("\n")
+        skipped = set(line for line in lines if len(line) > 0 and not line.startswith("#"))
     for file in all_files:
         if skipped and file.relative_to(dist).as_posix() in skipped:
             continue
         _missing_imports, _parseable = lint_one(file, ctx, unparsed)
-        missing_imports += _missing_imports
+        for _import in _missing_imports:
+            count = missing_imports.get(_import, 0)
+            missing_imports[_import] = count + 1
         parseable += _parseable
-    parseable_pct = int(parseable / len(all_files) * 100)
+    parseable_pct = int(parseable / (len(all_files) - len(skipped))* 100)
+    missing_imports_count = sum(missing_imports.values())
     logger.info(
-        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)}), missing imports: {missing_imports}"
+        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)-len(skipped)}), missing imports: {missing_imports_count}"
     )
+    missing_imports = { k: v for k, v in sorted(missing_imports.items(), key=lambda item: item[1], reverse=True)}
+    for k, v in missing_imports.items():
+        logger.info(f"Missing import '{k}': {v} occurrences")
+    # fail the job if files are unparseable
     if parseable_pct < 100:
         sys.exit(1)
 
