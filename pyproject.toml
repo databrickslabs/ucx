@@ -51,8 +51,16 @@ dependencies = ["databricks-sdk>=0.27,<0.29",
                 "sqlglot>=23.9,<25.2",
                 "astroid>=3.2.2"]
 
+[project.optional-dependencies]
+pylsp = [
+    "python-lsp-server>=1.9.0"
+]
+
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
+
+[project.entry-points.pylsp]
+plugin = "databricks.labs.ucx.source_code.lsp_plugin"
 
 [project.urls]
 Issues = "https://github.com/databricks/ucx/issues"
@@ -74,6 +82,7 @@ dependencies = [
     "pytest-mock~=3.14.0",
     "pytest-timeout~=2.3.1",
     "pytest-xdist~=3.5.0",
+    "python-lsp-server>=1.9.0",
     "ruff~=0.3.4",
     "types-PyYAML~=6.0.12",
     "types-requests~=2.31.0",
