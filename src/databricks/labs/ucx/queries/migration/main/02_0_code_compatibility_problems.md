@@ -1,4 +1,6 @@
--- --title 'Workflow migration problems'
+--- 
+title: 'Workflow migration problems'
+---
 
 ## 2 - Code compatibility problems
 

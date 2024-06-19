@@ -1,4 +1,6 @@
--- --title 'Table migration status'
+--- 
+title: 'Table migration status'
+---
 
 ## Table migration status
 

@@ -1,4 +1,6 @@
--- --title 'Metastore assignment'
+--- 
+title: 'Metastore assignment'
+---
 
 ## Cluster Summary
 
