@@ -50,8 +50,7 @@ def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tu
         missing_imports: set[str] = set()
         for located_advice in ctx.local_code_linter.lint_path(file):
             if located_advice.advice.code == 'import-not-found':
-                missing_import = located_advice.advice.message.split(':')[1].strip()
-                missing_imports.add(missing_import)
+                missing_imports.add(located_advice.advice.message.split(':')[1].strip())
             message = located_advice.message_relative_to(dist.parent, default=file)
             sys.stdout.write(f"{message}\n")
         return missing_imports, 1
@@ -84,8 +83,7 @@ def lint_all(file_to_lint: str | None):
     skipped: set[str] | None = None
     malformed = Path(__file__).parent / "solacc-malformed.txt"
     if file_to_lint is None and malformed.exists():
-        text = malformed.read_text(encoding="utf-8")
-        lines = text.split("\n")
+        lines = malformed.read_text(encoding="utf-8").split("\n")
         skipped = set(line for line in lines if len(line) > 0 and not line.startswith("#"))
     for file in all_files:
         if skipped and file.relative_to(dist).as_posix() in skipped:
@@ -95,14 +93,14 @@ def lint_all(file_to_lint: str | None):
             count = missing_imports.get(_import, 0)
             missing_imports[_import] = count + 1
         parseable += _parseable
-    parseable_pct = int(parseable / (len(all_files) - len(skipped))* 100)
-    missing_imports_count = sum(missing_imports.values())
+    all_files_len = len(all_files) - (len(skipped) if skipped else 0)
+    parseable_pct = int(parseable / all_files_len * 100)
     logger.info(
-        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{len(all_files)-len(skipped)}), missing imports: {missing_imports_count}"
+        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {sum(missing_imports.values())}"
     )
-    missing_imports = { k: v for k, v in sorted(missing_imports.items(), key=lambda item: item[1], reverse=True)}
-    for k, v in missing_imports.items():
-        logger.info(f"Missing import '{k}': {v} occurrences")
+    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: item[1], reverse=True))
+    for key, value in missing_imports.items():
+        logger.info(f"Missing import '{key}': {value} occurrences")
     # fail the job if files are unparseable
     if parseable_pct < 100:
         sys.exit(1)
