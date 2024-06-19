@@ -1,4 +1,4 @@
--- --title Cluster Policies, columns=policy_name,cluster_dbr_version,policy_spark_version
+-- --title 'Cluster Policies'
 -- widget title=Cluster Policies, row=22, col=4, size_x=3, size_y=8
 SELECT
     distinct policy_name,

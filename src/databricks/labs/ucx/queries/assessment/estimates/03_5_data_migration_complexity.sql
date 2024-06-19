@@ -1,4 +1,4 @@
--- --title Data migration complexity, counter_label=Data migration complexity, value_column=data_migration_complexity
+-- --title 'Data migration complexity'
 -- widget row=3, col=5, size_x=1, size_y=8
 SELECT
 CASE WHEN total_estimated_hours < 30 THEN "S"

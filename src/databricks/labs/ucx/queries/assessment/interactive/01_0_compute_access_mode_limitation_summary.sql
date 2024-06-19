@@ -1,4 +1,4 @@
--- --title Compute Access Mode Limitation Summary, columns=issue,link,distinct_workspaces,distinct_notebooks,distinct_clusters,distinct_users
+-- --title 'Compute Access Mode Limitation Summary'
 -- widget title=Compute Access Mode Limitation Summary, row=1, col=0, size_x=6, size_y=12
 -- Scan notebook command history for potential paper cut issues
 -- https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations

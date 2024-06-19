@@ -1,4 +1,4 @@
--- --title Group migration complexity, counter_label=Group migration complexity, value_column=group_migration_complexity
+-- --title 'Group migration complexity'
 -- widget row=1, col=5, size_x=1, size_y=8
 select
 case when total_groups = 0 then NULL
