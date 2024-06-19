@@ -206,7 +206,14 @@ b = 'else'
     ],
 )
 def test_pip_command_split(code, split):
-    assert PipMagic._split(code) == split  # pylint: disable=protected-access
+
+    # Avoid direct protected access to the _split method.
+    class _PipMagicFriend(PipMagic):
+        @classmethod
+        def split(cls, code: str) -> list[str]:
+            return cls._split(code)
+
+    assert _PipMagicFriend.split(code) == split
 
 
 def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup):
