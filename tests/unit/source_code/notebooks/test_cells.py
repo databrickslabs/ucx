@@ -209,6 +209,24 @@ b = 'else'
     assert not problems
 
 
+@pytest.mark.xfail(reason="Line-magic as an expression is not supported ", strict=True)
+def test_python_cell_with_expression_magic(
+    simple_dependency_resolver: DependencyResolver, mock_path_lookup: PathLookup
+) -> None:
+    """Line magic (%) can be used in places where expressions are expected; check that this is handled."""
+    # Fixture
+    code = "current_directory = %pwd"
+    cell = PythonCell(code, original_offset=1)
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+
+    # Run the test
+    problems = cell.build_dependency_graph(graph)
+
+    # Verify there were no problems.
+    assert not problems
+
+
 @pytest.mark.parametrize(
     "code,split",
     [
