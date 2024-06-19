@@ -1,7 +1,3 @@
---- 
-title: 'Metastore assignment'
----
-
 ## Cluster Summary
 
 Detailed itemized findings by cluster helping users prioritize which clusters to upgrade.

@@ -1,7 +1,3 @@
---- 
-title: 'Workflow migration problems'
----
-
 ## 2 - Code compatibility problems
 
 The table on the right assist with verifying if workflows are Unity Catalog compatible. It can be filtered on the path,

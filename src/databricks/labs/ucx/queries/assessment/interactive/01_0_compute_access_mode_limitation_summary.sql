@@ -1,7 +1,5 @@
--- --title 'Compute Access Mode Limitation Summary'
 -- Scan notebook command history for potential paper cut issues
 -- https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations
---
 WITH
 iteractive_cluster_commands (
     SELECT
@@ -46,6 +44,7 @@ exp (
     select distinct explode(issues) issue, workspace_id, notebook_id, cluster_id, email
     FROM pattern_matcher
 )
+-- --title 'Compute Access Mode Limitation Summary'
 SELECT
     issue `Finding`,
     -- concat('<a href="https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md#',replace(issue,' ','-'),'">',issue,'</a>') as link,
