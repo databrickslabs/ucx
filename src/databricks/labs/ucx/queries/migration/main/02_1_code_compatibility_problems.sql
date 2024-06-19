@@ -1,5 +1,5 @@
 -- --title 'Workflow migration problems'
--- widget title=Workflow migration problems, row=2, col=2, size_x=4, size_y=8
+-- --title Workflow migration problems, row=2, col=2, size_x=4, size_y=8
 SELECT
     path,
     code,

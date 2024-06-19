@@ -1,4 +1,4 @@
--- widget title=Metastore assignment, row=2, col=0, size_x=8, size_y=5
+-- --title Metastore assignment, row=2, col=0, size_x=8, size_y=5
 
 ## Cluster Summary
 

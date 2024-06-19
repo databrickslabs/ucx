@@ -1,4 +1,4 @@
--- widget title=Workflow migration problems, row=2, col=0, size_x=2, size_y=8
+-- --title Workflow migration problems, row=2, col=0, size_x=2, size_y=8
 
 ## 2 - Code compatibility problems
 

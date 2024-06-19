@@ -1,5 +1,5 @@
 -- --title 'Findings by Cluster'
--- widget title=Findings by Cluster, row=3, col=0, size_x=6, size_y=12
+-- --title Findings by Cluster, row=3, col=0, size_x=6, size_y=12
 --
 WITH
 iteractive_cluster_commands (

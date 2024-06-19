@@ -1,5 +1,5 @@
 -- --title 'Warning messages'
--- widget title=Warning messages, row=44, col=0, size_x=8, size_y=12
+-- --title Warning messages, row=44, col=0, size_x=8, size_y=12
 SELECT
   from_unixtime(timestamp) AS timestamp,
   job_id,

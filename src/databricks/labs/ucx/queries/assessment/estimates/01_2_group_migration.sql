@@ -1,5 +1,5 @@
 -- --title 'Workspace local groups'
--- widget title=Workspace local groups to migrate, row=1, col=2, size_x=3, size_y=8
+-- --title Workspace local groups to migrate, row=1, col=2, size_x=3, size_y=8
 SELECT
     id_in_workspace,
     name_in_workspace,

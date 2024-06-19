@@ -1,8 +1,8 @@
--- widget title=Group migration, row=1, col=0, size_x=2, size_y=8
+-- --title Group migration, row=1, col=0, size_x=2, size_y=8
 
 ## 2 - Group migration
 
-The second step of succesfully adopting UC if migrating your workspace local groups to the account.  
+The second step of succesfully adopting UC if migrating your workspace local groups to the account.
 This step is a relatively low risk as it's an additive operation, it won't disturb your currently running pipelines.
 
 Follow those steps in order to successfully migrate your groups to the account:

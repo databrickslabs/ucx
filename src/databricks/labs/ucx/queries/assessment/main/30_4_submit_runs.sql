@@ -1,5 +1,5 @@
 -- --title 'Submit Runs'
--- widget title=Incompatible Submit Runs, row=36, col=0, size_x=3, size_y=8
+-- --title Incompatible Submit Runs, row=36, col=0, size_x=3, size_y=8
 SELECT
     hashed_id,
     EXPLODE(FROM_JSON(failures, 'array<string>')) AS finding,
