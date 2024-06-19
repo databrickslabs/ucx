@@ -481,6 +481,7 @@ class MagicCommand(NodeBase):
                 commands.append(command)
             return commands, problems
         except Exception as e:  # pylint: disable=broad-except
+            logger.debug(f"Internal error while checking magic commands in tree: {tree.root}", exc_info=True)
             problem = problem_factory('internal-error', f"While checking magic commands: {e}", tree.root)
             problems.append(problem)
             return [], problems
