@@ -1332,6 +1332,33 @@
   "graphql-relay": {
     "graphql_relay": []
   },
+  "greenlet": {
+    "greenlet": [],
+    "greenlet.platform": [],
+    "greenlet.tests": [],
+    "greenlet.tests.fail_clearing_run_switches": [],
+    "greenlet.tests.fail_cpp_exception": [],
+    "greenlet.tests.fail_initialstub_already_started": [],
+    "greenlet.tests.fail_slp_switch": [],
+    "greenlet.tests.fail_switch_three_greenlets": [],
+    "greenlet.tests.fail_switch_three_greenlets2": [],
+    "greenlet.tests.fail_switch_two_greenlets": [],
+    "greenlet.tests.leakcheck": [],
+    "greenlet.tests.test_contextvars": [],
+    "greenlet.tests.test_cpp": [],
+    "greenlet.tests.test_extension_interface": [],
+    "greenlet.tests.test_gc": [],
+    "greenlet.tests.test_generator": [],
+    "greenlet.tests.test_generator_nested": [],
+    "greenlet.tests.test_greenlet": [],
+    "greenlet.tests.test_greenlet_trash": [],
+    "greenlet.tests.test_leaks": [],
+    "greenlet.tests.test_stack_saved": [],
+    "greenlet.tests.test_throw": [],
+    "greenlet.tests.test_tracing": [],
+    "greenlet.tests.test_version": [],
+    "greenlet.tests.test_weakref": []
+  },
   "grpcio": {
     "grpc": []
   },
