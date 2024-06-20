@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 import logging
+import re
 from collections.abc import Iterable, Iterator, Generator
 from typing import Any, TypeVar
 
@@ -62,10 +63,17 @@ class Tree:
     def _convert_magic_lines_to_magic_commands(cls, python_code: str):
         lines = python_code.split("\n")
         magic_markers = {"%", "!"}
+        in_multi_line_comment = False
+        pattern = re.compile('"""')
         for i, line in enumerate(lines):
-            if len(line) == 0 or line[0] not in magic_markers:
+            if len(line) == 0:
                 continue
-            lines[i] = f"magic_command({line.encode()!r})"
+            if not in_multi_line_comment and line[0] in magic_markers:
+                lines[i] = f"magic_command({line.encode()!r})"
+                continue
+            matches = re.findall(pattern, line)
+            if len(matches) & 1:
+                in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
 
     def __init__(self, node: NodeNG):

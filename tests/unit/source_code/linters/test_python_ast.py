@@ -280,3 +280,14 @@ def test_parses_incorrectly_indented_code():
         Tree.parse(source)
     Tree.normalize_and_parse(source)
     assert True
+
+
+def test_ignores_magic_marker_in_multiline_comment():
+    source = """message_unformatted = u\"""
+%s is only supported in Python %s and above.\"""
+name="name"
+version="version"
+formatted=message_unformatted % (name, version)
+"""
+    Tree.normalize_and_parse(source)
+    assert True
