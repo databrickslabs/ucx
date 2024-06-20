@@ -175,10 +175,10 @@ class FileLinter:
     def _guess_encoding(self):
         path = self._path.as_posix()
         count = min(32, os.path.getsize(path))
-        raw = open(path, 'rb').read(count)
-        if raw.startswith(codecs.BOM_UTF8):
-            return 'utf-8-sig'
-        else:
+        with open(path, 'rb') as _file:
+            raw = _file.read(count)
+            if raw.startswith(codecs.BOM_UTF8):
+                return 'utf-8-sig'
             return locale.getpreferredencoding(False)
 
     def _file_language(self):
