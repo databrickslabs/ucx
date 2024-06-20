@@ -290,6 +290,240 @@
   "cycler": {
     "cycler": []
   },
+  "databricks-feature-engineering": {
+    "databricks": [],
+    "databricks._feature_store_pkg_metadata": [],
+    "databricks._feature_store_pkg_metadata._core_client_pkg_metadata": [],
+    "databricks.feature_engineering": [],
+    "databricks.feature_engineering.client": [],
+    "databricks.feature_engineering.entities": [],
+    "databricks.feature_engineering.entities.feature_function": [],
+    "databricks.feature_engineering.entities.feature_lookup": [],
+    "databricks.feature_engineering.entities.feature_serving_endpoint": [],
+    "databricks.feature_engineering.entities.feature_spec_info": [],
+    "databricks.feature_engineering.entities.feature_table": [],
+    "databricks.feature_engineering.online_store_spec": [],
+    "databricks.feature_engineering.training_set": [],
+    "databricks.feature_engineering.upgrade_client": [],
+    "databricks.feature_engineering.utils.upgrade_utils": [],
+    "databricks.feature_engineering.version": [],
+    "databricks.feature_store": [],
+    "databricks.feature_store.client": [],
+    "databricks.feature_store.decorators": [],
+    "databricks.feature_store.entities": [],
+    "databricks.feature_store.entities.feature": [],
+    "databricks.feature_store.entities.feature_function": [],
+    "databricks.feature_store.entities.feature_lookup": [],
+    "databricks.feature_store.entities.feature_serving_endpoint": [],
+    "databricks.feature_store.entities.feature_spec": [],
+    "databricks.feature_store.entities.feature_spec_info": [],
+    "databricks.feature_store.entities.feature_table": [],
+    "databricks.feature_store.mlflow_model": [],
+    "databricks.feature_store.online_store_spec": [],
+    "databricks.feature_store.publish_engine": [],
+    "databricks.feature_store.training_set": [],
+    "databricks.feature_store.version": [],
+    "databricks.ml_features": [],
+    "databricks.ml_features._catalog_client": [],
+    "databricks.ml_features._catalog_client._catalog_client": [],
+    "databricks.ml_features._catalog_client._catalog_client_helper": [],
+    "databricks.ml_features._compute_client": [],
+    "databricks.ml_features._compute_client._compute_client": [],
+    "databricks.ml_features._databricks_client": [],
+    "databricks.ml_features._databricks_client._databricks_client": [],
+    "databricks.ml_features._feature_serving_endpoint_client": [],
+    "databricks.ml_features._feature_serving_endpoint_client._feature_serving_endpoint_client": [],
+    "databricks.ml_features._information_schema_spark_client": [],
+    "databricks.ml_features._information_schema_spark_client._information_schema_spark_client": [],
+    "databricks.ml_features._online_store_publish_client": [],
+    "databricks.ml_features._online_store_publish_client._online_store_publish_client": [],
+    "databricks.ml_features._online_store_publish_client._online_store_publish_client_factory": [],
+    "databricks.ml_features._online_store_publish_client._online_store_publish_nosql_client": [],
+    "databricks.ml_features._online_store_publish_client._online_store_publish_rdbms_client": [],
+    "databricks.ml_features._publish_client": [],
+    "databricks.ml_features._publish_client._publish_client": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "databricks.ml_features._spark_client": [],
+    "databricks.ml_features._spark_client._spark_client": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(SparkClient.drop_pk_statement(full_table_name))' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(SparkClient.set_pk_tk_statement(full_table_name=full_table_name, pk_cols=pk_cols, tk_col=tk_col, pk_name=pk_name))' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(f\"ALTER TABLE {sanitize_multi_level_name(delta_table_name)} ALTER COLUMN {sanitize_identifier(column_name)} COMMENT '{escaped_comment}'\")' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(f\"COMMENT ON TABLE {sanitize_multi_level_name(delta_table_name)} IS '{escaped_comment}'\")' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(f'ALTER TABLE {sanitize_multi_level_name(delta_table_name)} ALTER COLUMN {sanitize_identifier(column_name)} COMMENT NULL')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(f'ALTER TABLE {sanitize_multi_level_name(full_table_name)} ALTER COLUMN {sanitize_identifier(c)} SET NOT NULL')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(f'DESCRIBE CATALOG {sanitize_identifier(catalog_name)}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(f'DESCRIBE SCHEMA {sanitize_identifier(catalog_name)}.{sanitize_identifier(database_name)}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._spark.sql(sql_string)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "SQL query is not supported yet: COMMENT ON TABLE  IS NULL"
+      },
+      {
+        "code": "table-migrate",
+        "message": "SQL query is not supported yet: DESCRIBE TABLE EXTENDED "
+      },
+      {
+        "code": "table-migrate",
+        "message": "SQL query is not supported yet: DROP TABLE IF EXISTS "
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "databricks.ml_features._spark_client._spark_client_helper": [],
+    "databricks.ml_features._training_scoring_client": [],
+    "databricks.ml_features._training_scoring_client._training_scoring_client": [],
+    "databricks.ml_features.api": [],
+    "databricks.ml_features.api.proto": [],
+    "databricks.ml_features.api.proto.feature_catalog_pb2": [],
+    "databricks.ml_features.constants": [],
+    "databricks.ml_features.entities": [],
+    "databricks.ml_features.entities._permission_level": [],
+    "databricks.ml_features.entities.consumer": [],
+    "databricks.ml_features.entities.data_type": [],
+    "databricks.ml_features.entities.feature": [],
+    "databricks.ml_features.entities.feature_function": [],
+    "databricks.ml_features.entities.feature_lookup": [],
+    "databricks.ml_features.entities.feature_serving_endpoint": [],
+    "databricks.ml_features.entities.feature_spec": [],
+    "databricks.ml_features.entities.feature_spec_info": [],
+    "databricks.ml_features.entities.feature_table": [],
+    "databricks.ml_features.entities.job": [],
+    "databricks.ml_features.entities.key_spec": [],
+    "databricks.ml_features.entities.notebook": [],
+    "databricks.ml_features.entities.online_store_detailed": [],
+    "databricks.ml_features.entities.online_store_metadata": [],
+    "databricks.ml_features.entities.tag": [],
+    "databricks.ml_features.local_models": [],
+    "databricks.ml_features.local_models.databricks_identity_model": [],
+    "databricks.ml_features.online_store_spec": [],
+    "databricks.ml_features.online_store_spec.amazon_dynamodb_online_store_spec": [],
+    "databricks.ml_features.online_store_spec.amazon_rds_mysql_online_store_spec": [],
+    "databricks.ml_features.online_store_spec.azure_cosmosdb_online_store_spec": [],
+    "databricks.ml_features.online_store_spec.azure_mysql_online_store_spec": [],
+    "databricks.ml_features.online_store_spec.azure_sql_server_online_store_spec": [],
+    "databricks.ml_features.online_store_spec.online_store_properties": [],
+    "databricks.ml_features.online_store_spec.online_store_spec": [],
+    "databricks.ml_features.publish_engine": [],
+    "databricks.ml_features.publish_engine.publish_cosmosdb_engine": [],
+    "databricks.ml_features.publish_engine.publish_dynamodb_engine": [],
+    "databricks.ml_features.publish_engine.publish_mysql_engine": [],
+    "databricks.ml_features.publish_engine.publish_sql_engine": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "databricks.ml_features.publish_engine.publish_sql_server_engine": [],
+    "databricks.ml_features.training_set": [],
+    "databricks.ml_features.utils.cosmosdb_type_utils": [],
+    "databricks.ml_features.utils.cosmosdb_utils": [],
+    "databricks.ml_features.utils.dynamodb_type_utils": [],
+    "databricks.ml_features.utils.e2e_test_utils": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'spark_session.sql(f'CREATE DATABASE {sanitize_identifier(db_name)}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'spark_session.sql(f'DROP DATABASE IF EXISTS {sanitize_identifier(db_name)} CASCADE')' because its value cannot be computed"
+      }
+    ],
+    "databricks.ml_features.utils.feature_lookup_utils": [],
+    "databricks.ml_features.utils.feature_serving_endpoint_utils": [],
+    "databricks.ml_features.utils.feature_utils": [],
+    "databricks.ml_features.utils.logging_utils": [],
+    "databricks.ml_features.utils.on_demand_utils": [],
+    "databricks.ml_features.utils.publish_utils": [],
+    "databricks.ml_features.utils.request_context": [],
+    "databricks.ml_features.utils.rest_utils": [],
+    "databricks.ml_features.utils.schema_utils": [],
+    "databricks.ml_features.utils.signature_utils": [],
+    "databricks.ml_features.utils.spark_listener": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "databricks.ml_features.utils.spark_test_utils": [],
+    "databricks.ml_features.utils.spark_utils": [],
+    "databricks.ml_features.utils.test_utils": [],
+    "databricks.ml_features.utils.training_scoring_utils": [],
+    "databricks.ml_features.utils.utils": [],
+    "databricks.ml_features.utils.validation_utils": [],
+    "databricks.ml_features.version": [],
+    "databricks.ml_features_common": [],
+    "databricks.ml_features_common.entities": [],
+    "databricks.ml_features_common.entities._feature_store_object": [],
+    "databricks.ml_features_common.entities._proto_enum_entity": [],
+    "databricks.ml_features_common.entities.cloud": [],
+    "databricks.ml_features_common.entities.column_info": [],
+    "databricks.ml_features_common.entities.feature_column_info": [],
+    "databricks.ml_features_common.entities.feature_spec": [],
+    "databricks.ml_features_common.entities.feature_spec_constants": [],
+    "databricks.ml_features_common.entities.feature_table_info": [],
+    "databricks.ml_features_common.entities.feature_tables_for_serving": [],
+    "databricks.ml_features_common.entities.function_info": [],
+    "databricks.ml_features_common.entities.on_demand_column_info": [],
+    "databricks.ml_features_common.entities.online_feature_table": [],
+    "databricks.ml_features_common.entities.online_store_for_serving": [],
+    "databricks.ml_features_common.entities.query_mode": [],
+    "databricks.ml_features_common.entities.source_data_column_info": [],
+    "databricks.ml_features_common.entities.store_type": [],
+    "databricks.ml_features_common.mlflow_model_constants": [],
+    "databricks.ml_features_common.protos": [],
+    "databricks.ml_features_common.protos.feature_spec_pb2": [],
+    "databricks.ml_features_common.protos.feature_store_serving_pb2": [],
+    "databricks.ml_features_common.utils": [],
+    "databricks.ml_features_common.utils.converter_utils": [],
+    "databricks.ml_features_common.utils.dynamodb_utils": [],
+    "databricks.ml_features_common.utils.feature_spec_test_utils": [],
+    "databricks.ml_features_common.utils.feature_spec_utils": [],
+    "databricks.ml_features_common.utils.test_utils_common": [],
+    "databricks.ml_features_common.utils.topological_sort": [],
+    "databricks.ml_features_common.utils.uc_utils": [],
+    "databricks.ml_features_common.utils.utils_common": []
+  },
   "databricks-labs-blueprint": {
     "databricks.labs.blueprint": []
   },
