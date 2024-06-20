@@ -464,6 +464,108 @@
   "huggingface-hub": {
     "huggingface_hub": []
   },
+  "hyperopt": {
+    "hyperopt": [],
+    "hyperopt.algobase": [],
+    "hyperopt.anneal": [],
+    "hyperopt.atpe": [],
+    "hyperopt.base": [],
+    "hyperopt.criteria": [],
+    "hyperopt.early_stop": [],
+    "hyperopt.exceptions": [],
+    "hyperopt.fmin": [],
+    "hyperopt.graph_viz": [],
+    "hyperopt.hp": [],
+    "hyperopt.ipy": [],
+    "hyperopt.main": [],
+    "hyperopt.mix": [],
+    "hyperopt.mongoexp": [],
+    "hyperopt.plotting": [],
+    "hyperopt.progress": [],
+    "hyperopt.pyll": [],
+    "hyperopt.pyll.base": [],
+    "hyperopt.pyll.stochastic": [],
+    "hyperopt.pyll.tests": [],
+    "hyperopt.pyll.tests.test_base": [],
+    "hyperopt.pyll.tests.test_stochastic": [],
+    "hyperopt.pyll_utils": [],
+    "hyperopt.rand": [],
+    "hyperopt.rdists": [],
+    "hyperopt.spark": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "hyperopt.std_out_err_redirect_tqdm": [],
+    "hyperopt.tests": [],
+    "hyperopt.tests.integration": [],
+    "hyperopt.tests.integration.test_mongoexp": [],
+    "hyperopt.tests.integration.test_spark": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot set Spark log level directly from code on UC Shared Clusters. Remove the call and set the cluster spark conf 'spark.log.level' instead"
+      }
+    ],
+    "hyperopt.tests.test_anneal": [],
+    "hyperopt.tests.test_atpe_basic": [],
+    "hyperopt.tests.test_base": [],
+    "hyperopt.tests.test_criteria": [],
+    "hyperopt.tests.test_domains": [],
+    "hyperopt.tests.test_fmin": [],
+    "hyperopt.tests.test_ipy": [],
+    "hyperopt.tests.test_mongoexp": [],
+    "hyperopt.tests.test_pchoice": [],
+    "hyperopt.tests.test_plotting": [],
+    "hyperopt.tests.test_progress": [],
+    "hyperopt.tests.test_pyll_utils": [],
+    "hyperopt.tests.test_rand": [],
+    "hyperopt.tests.test_randint": [],
+    "hyperopt.tests.test_rdists": [],
+    "hyperopt.tests.test_spark": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot set Spark log level directly from code on UC Shared Clusters. Remove the call and set the cluster spark conf 'spark.log.level' instead"
+      }
+    ],
+    "hyperopt.tests.test_tpe": [],
+    "hyperopt.tests.test_utils": [],
+    "hyperopt.tests.test_vectorize": [],
+    "hyperopt.tests.test_webpage": [],
+    "hyperopt.tests.unit": [],
+    "hyperopt.tests.unit.test_anneal": [],
+    "hyperopt.tests.unit.test_atpe_basic": [],
+    "hyperopt.tests.unit.test_criteria": [],
+    "hyperopt.tests.unit.test_domains": [],
+    "hyperopt.tests.unit.test_fmin": [],
+    "hyperopt.tests.unit.test_ipy": [],
+    "hyperopt.tests.unit.test_pchoice": [],
+    "hyperopt.tests.unit.test_plotting": [],
+    "hyperopt.tests.unit.test_progress": [],
+    "hyperopt.tests.unit.test_pyll_utils": [],
+    "hyperopt.tests.unit.test_rand": [],
+    "hyperopt.tests.unit.test_randint": [],
+    "hyperopt.tests.unit.test_rdists": [],
+    "hyperopt.tests.unit.test_tpe": [],
+    "hyperopt.tests.unit.test_utils": [],
+    "hyperopt.tests.unit.test_vectorize": [],
+    "hyperopt.tests.unit.test_webpage": [],
+    "hyperopt.tpe": [],
+    "hyperopt.utils": [],
+    "hyperopt.vectorize": []
+  },
   "idna": {
     "idna": []
   },
