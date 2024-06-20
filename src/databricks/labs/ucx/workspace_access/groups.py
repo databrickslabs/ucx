@@ -114,7 +114,7 @@ class MigrationState:
         return True
 
     @staticmethod
-    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str):
+    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str) -> int:
         batch_size = 1000
         logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)")
         permissions_migrated = 0
