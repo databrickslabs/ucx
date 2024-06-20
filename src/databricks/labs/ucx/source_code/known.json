@@ -437,6 +437,37 @@
   "gitpython": {
     "git": []
   },
+  "glow": {
+    "glow": [],
+    "glow._array": [],
+    "glow._coro": [],
+    "glow._debug": [],
+    "glow._ic": [],
+    "glow._import_hook": [],
+    "glow._more": [],
+    "glow._parallel": [],
+    "glow._patch_len": [],
+    "glow._patch_print": [],
+    "glow._patch_scipy": [],
+    "glow._profile": [],
+    "glow._reduction": [],
+    "glow._repr": [],
+    "glow._sizeof": [],
+    "glow._thread_quota": [],
+    "glow._uuid": [],
+    "glow.api": [],
+    "glow.api.config": [],
+    "glow.api.exporting": [],
+    "glow.cli": [],
+    "glow.io": [],
+    "glow.io._sound": [],
+    "glow.io._svg": [],
+    "glow.wrap": [],
+    "glow.wrap.cache": [],
+    "glow.wrap.concurrency": [],
+    "glow.wrap.reusable": [],
+    "glow.wrap.util": []
+  },
   "google-auth": {
     "google.auth": [],
     "google.oauth2": []
