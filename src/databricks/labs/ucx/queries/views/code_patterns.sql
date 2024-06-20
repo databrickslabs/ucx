@@ -9,14 +9,14 @@ SELECT col1 AS pattern, col2 AS issue FROM values
   ('._jvm',                                     'AF302.5 - Arbitrary Java'),
   ('._jvm.org.apache.log4j',                    'AF302.6 - Arbitrary Java'),
   ('spark.udf.registerJavaFunction',            'AF303.1 - Java UDF'),
-  
+
   ('spark.read.format("jdbc")',                 'AF304.1 - JDBC datasource'),
   ('boto3',                                     'AF305.1 - boto3'),
   ('s3fs',                                      'AF305.2 - s3fs'),
 
   ('dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()', 'AF306.1 - dbutils...getContext'),
   ('dbutils.notebook.entry_point.getDbutils().notebook().getContext()',          'AF306.2 - dbutils...getContext'),
-  
+
   ('dbutils.credentials.',                      'AF310.1 - credential passthrough'),
   ('dbutils.fs.',                               'AF311.1 - dbutils.fs'),
   ('dbutils.fs.mount',                          'AF311.2 - dbutils mount(s)'),
@@ -69,7 +69,7 @@ SELECT col1 AS pattern, col2 AS issue FROM values
   ('UserDefinedAggregateFunction',              'AF315.1 - UDAF scala issue'),
   ('applyInPandas',                             'AF315.2 - applyInPandas'),
   ('mapInPandas',                               'AF315.3 - mapInPandas'),
-  
+
 
   ('.trigger(continuous',                       'AF330.1 - Streaming'),
   ('kafka.sasl.client.callback.handler.class',  'AF330.2 - Streaming'),
