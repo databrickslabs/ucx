@@ -99,7 +99,9 @@ class MigrationState:
             logger.info("No valid groups selected, nothing to do.")
             return True
         logger.info(f"Migrating permissions to {len(self)} account groups.")
-        items = 0
+        total_permissions = 0
+        success_groups = 0
+        errors: list[Exception] = []
         for migrated_group in self.groups:
             name_in_workspace = migrated_group.name_in_workspace
             if renamed:
@@ -109,8 +111,18 @@ class MigrationState:
                 # the migration fails.
                 name_in_workspace = migrated_group.temporary_name
             name_in_account = migrated_group.name_in_account
-            items += self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
-            logger.info(f"Migrated {items} permissions.")
+            try:
+                this_group = self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
+                logger.info(f"Migrated {this_group} permissions: {name_in_workspace} -> {name_in_account}")
+                total_permissions += this_group
+                success_groups += 1
+            except IOError as e:
+                logger.exception(f"Migration of group permissions failed: {name_in_workspace} -> {name_in_account}")
+                errors.append(e)
+        logger.info(f"Migrated {total_permissions} permissions for {success_groups}/{len(self)} successfully.")
+        if errors:
+            logger.error(f"Migrating permissions failed for {len(errors)}/{len(self)} groups.")
+            raise ManyError(errors)
         return True
 
     @staticmethod
