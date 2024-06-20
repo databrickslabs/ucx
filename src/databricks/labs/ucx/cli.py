@@ -8,6 +8,7 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.labs.ucx.__about__ import __version__
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
@@ -147,9 +148,13 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, a: AccountClient, collection_workspace_id: int):
+def ensure_assessment_run(w: WorkspaceClient, collection_workspace_id: int | None = None):
     """ensure the assessment job was run on a workspace"""
     if collection_workspace_id:
+        a = AccountClient(
+            product='ucx',
+            product_version=__version__,
+        )
         account_installer = AccountInstaller(a)
         workspaces_context = account_installer.get_workspaces_context(collection_workspace_id)
     else:
