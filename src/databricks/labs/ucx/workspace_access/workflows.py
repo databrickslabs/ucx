@@ -92,8 +92,11 @@ class PermissionsMigrationAPI(Workflow):
         migration_state = ctx.group_manager.get_migration_state()
         if len(migration_state.groups) == 0:
             logger.info("Skipping group migration as no groups were found.")
-            return
-        migration_state.apply_to_renamed_groups(ctx.workspace_client)
+        elif migration_state.apply_to_renamed_groups(ctx.workspace_client):
+            logger.info("Group permission migration completed successfully.")
+        else:
+            msg = "Group migration failed; reason unknown."
+            raise RuntimeError(msg)
 
 
 class ValidateGroupPermissions(Workflow):
