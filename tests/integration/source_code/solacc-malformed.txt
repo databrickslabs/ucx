@@ -1,0 +1,21 @@
+# 3 failures are genuinely malformed code
+# the following fails because of incorrect predicate syntax: if start_over = "yes":
+user-behavior-analytics-for-cloud-services/Anomaly Detection Pipeline/0 - Ingest and Explore Raw User Data.py
+# the following fails to parse due to module dependency azure/devops/v5_1/client_factory.py
+edge-ml-for-manufacturing/03_Trigger_AzureDevOps_Job.py
+# the following fails to parse due to incomplete assignment 'fhir_file_location='
+hls-interop-workshop-jan23/fhir.py
+
+# 6 failures fail because of lack of automagic support
+# the following fails because of unsupported automagic line: pip install git+https://github.com/databricks-industry-solutions/dbignite.git@feature-FHIR-schema-dbignite-HLSSA-294
+dbignite-forked/notebooks/fhir-mapping-demo.py
+# the following fails because of unsupported automagic line: sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+hls-llm-doc-qa/util/install-llm-libraries.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/Setup/3. test_connections.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/Setup/gcp/configure_sa_auth_tokens.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/Setup/gcp/configure_tokens_for_worksaces.py
+# the following fails because of unsupported automagic line: pip install --upgrade google-auth  gcsfs
+security-analysis-tool/notebooks/diagnosis/sat_diagnosis_gcp.py
