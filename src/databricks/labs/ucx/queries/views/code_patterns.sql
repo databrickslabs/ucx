@@ -22,9 +22,9 @@ SELECT col1 AS pattern, col2 AS issue FROM values
   ('dbutils.fs.mount',                          'AF311.2 - dbutils mount(s)'),
   ('dbutils.fs.refreshMounts',                  'AF311.3 - dbutils mount(s)'),
   ('dbutils.fs.unmount',                        'AF311.4 - dbutils mount(s)'),
-  ('dbfs:/mnt', 			                          'AF311.5 - mount points'),
-  ('dbfs:/', 			                              'AF311.6 - dbfs usage'),
-  ('/dbfs/', 			                              'AF311.7 - dbfs usage'),
+  ('dbfs:/mnt',                                 'AF311.5 - mount points'),
+  ('dbfs:/',                                    'AF311.6 - dbfs usage'),
+  ('/dbfs/',                                    'AF311.7 - dbfs usage'),
 
 
   ('spark.sparkContext',                        'AF313.1 - SparkContext'),
@@ -54,7 +54,7 @@ SELECT col1 AS pattern, col2 AS issue FROM values
   ('.union',                                    'AF313.24 - SparkContext'),
   ('.wholeTextFiles',                           'AF313.25 - SparkContext'),
 
-  ('sparknlp',     			                        'AF314.1 - Distributed ML'),
+  ('sparknlp',                                  'AF314.1 - Distributed ML'),
   ('xgboost.spark',                             'AF314.2 - Distributed ML'),
   ('catboost_spark',                            'AF314.3 - Distributed ML'),
   ('ai.catboost:catboost-spark',                'AF314.4 - Distributed ML'),
