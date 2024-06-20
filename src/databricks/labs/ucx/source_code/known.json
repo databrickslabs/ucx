@@ -276,6 +276,10 @@
   "contourpy": {
     "contourpy": []
   },
+  "core": {
+    "core.dbclient": [],
+    "core.logging_utils": []
+  },
   "coverage": {
     "coverage": []
   },
