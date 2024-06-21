@@ -104,8 +104,9 @@ class DashboardFromFiles:
             for dashboard_folder in dashboard_folders:
                 logger.info(f"Creating dashboard in {dashboard_folder}...")
                 lakeview_dashboard = self._dashboards.create_dashboard(dashboard_folder)
-                dashboard = self._dashboards.deploy_dashboard(lakeview_dashboard)
                 dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
+                dashboard_id = self._state.dashboards.get(dashboard_ref)
+                dashboard = self._dashboards.deploy_dashboard(lakeview_dashboard, dashboard_id=dashboard_id)
                 self._state.dashboards[dashboard_ref] = dashboard.dashboard_id
 
     def validate(self):
