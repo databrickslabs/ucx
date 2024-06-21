@@ -106,7 +106,11 @@ class DashboardFromFiles:
                 lakeview_dashboard = self._dashboards.create_dashboard(dashboard_folder)
                 dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
                 dashboard_id = self._state.dashboards.get(dashboard_ref)
-                dashboard = self._dashboards.deploy_dashboard(lakeview_dashboard, dashboard_id=dashboard_id)
+                dashboard = self._dashboards.deploy_dashboard(
+                    lakeview_dashboard,
+                    dashboard_id=dashboard_id,
+                    parent_path=self._remote_folder,
+                )
                 self._state.dashboards[dashboard_ref] = dashboard.dashboard_id
 
     def validate(self):
