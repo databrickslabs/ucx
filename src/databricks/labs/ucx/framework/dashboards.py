@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from databricks.labs.blueprint.installer import InstallState
+from databricks.labs.lsql.dashboards import Dashboards
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError, NotFound
 from databricks.sdk.service import workspace
@@ -88,6 +89,7 @@ class DashboardFromFiles:
         self._warehouse_id = warehouse_id
         self._state = state
         self._pos = 0
+        self._dashboards = Dashboards(self._ws)
 
     def dashboard_link(self, dashboard_ref: str):
         dashboard_id = self._state.dashboards[dashboard_ref]
@@ -127,19 +129,15 @@ class DashboardFromFiles:
             dashboard_folders = [p for p in step_folder.iterdir() if p.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
-                self._validate_folder(dashboard_folder, step_folder)
+                self._validate_folder(dashboard_folder)
 
-    def _validate_folder(self, dashboard_folder, step_folder):
-        dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
-        for query in self._desired_queries(dashboard_folder, dashboard_ref):
-            if query.text:
-                continue
-            try:
-                self._get_viz_options(query)
-                self._get_widget_options(query)
-            except Exception as err:
-                msg = f"Error in {query.name}: {err}"
-                raise AssertionError(msg) from err
+    def _validate_folder(self, folder: Path):
+        try:
+            dashboard = self._dashboards.create_dashboard(folder)
+        except ValueError as e:
+            raise AssertionError(f"Creating dashboard in {folder}") from e
+        if len(dashboard.datasets) != len(list(folder.glob("*.sql"))):
+            raise AssertionError(f"Dashboard in {folder} contains invalid query.")
 
     def _install_widget(self, query: SimpleQuery, dashboard_ref: str):
         dashboard_id = self._state.dashboards[dashboard_ref]
