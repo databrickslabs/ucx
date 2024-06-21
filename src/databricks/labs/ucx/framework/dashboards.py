@@ -20,8 +20,6 @@ from databricks.sdk.service.sql import (
 
 logger = logging.getLogger(__name__)
 
-# pylint: disable=invalid-name
-
 
 @dataclass
 class SimpleQuery:
@@ -98,10 +96,10 @@ class DashboardFromFiles:
     def create_dashboards(self) -> dict[str, str]:
         queries_per_dashboard = {}
         # Iterate over dashboards for each step, represented as first-level folders
-        step_folders = [f for f in self._local_folder.glob("*") if f.is_dir()]
+        step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
         for step_folder in step_folders:
             logger.debug(f"Reading step folder {step_folder}...")
-            dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
+            dashboard_folders = [p for p in step_folder.iterdir() if p.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
                 logger.debug(f"Reading dashboard folder {dashboard_folder}...")
