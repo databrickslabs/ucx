@@ -98,7 +98,7 @@ class MigrationState:
         if len(self) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        logger.info(f"Migrating permissions to {len(self)} account groups.")
+        logger.info(f"Migrating permissions for {len(self)} account groups.")
         total_permissions = 0
         success_groups = 0
         errors: list[Exception] = []
@@ -112,14 +112,18 @@ class MigrationState:
                 name_in_workspace = migrated_group.temporary_name
             name_in_account = migrated_group.name_in_account
             try:
-                this_group = self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
-                logger.info(f"Migrated {this_group} permissions: {name_in_workspace} -> {name_in_account}")
-                total_permissions += this_group
+                group_permissions = self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
+                logger.info(
+                    f"Migrated {group_permissions} permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)"
+                )
+                total_permissions += group_permissions
                 success_groups += 1
             except IOError as e:
-                logger.exception(f"Migration of group permissions failed: {name_in_workspace} -> {name_in_account}")
+                logger.exception(
+                    f"Migration of group permissions failed: {name_in_workspace} (workspace) -> {name_in_account} (account)"
+                )
                 errors.append(e)
-        logger.info(f"Migrated {total_permissions} permissions for {success_groups}/{len(self)} successfully.")
+        logger.info(f"Migrated {total_permissions} permissions for {success_groups}/{len(self)} groups successfully.")
         if errors:
             logger.error(f"Migrating permissions failed for {len(errors)}/{len(self)} groups.")
             raise ManyError(errors)
@@ -137,9 +141,14 @@ class MigrationState:
                 name_in_account,
                 size=batch_size,
             )
-            permissions_migrated += result.permissions_migrated or 0
+            if not result.permissions_migrated:
+                logger.info(
+                    f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) finished"
+                )
+                return permissions_migrated
+            permissions_migrated += result.permissions_migrated
             logger.info(
-                f"Permission migration progress: {name_in_workspace} -> {name_in_account} {permissions_migrated}(+{result.permissions_migrated})"
+                f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) progress={permissions_migrated}(+{result.permissions_migrated})"
             )
             if not result.permissions_migrated:
                 logger.info("No more permissions to migrate.")
