@@ -1,3 +1,6 @@
+---
+height: 4
+---
 # Other
 Global Init Scripts
 - Object permissions
