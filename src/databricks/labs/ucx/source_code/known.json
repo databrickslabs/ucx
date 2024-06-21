@@ -694,6 +694,33 @@
   "numpy": {
     "numpy": []
   },
+  "omegaconf": {
+    "omegaconf": [],
+    "omegaconf._impl": [],
+    "omegaconf._utils": [],
+    "omegaconf.base": [],
+    "omegaconf.basecontainer": [],
+    "omegaconf.dictconfig": [],
+    "omegaconf.errors": [],
+    "omegaconf.grammar": [],
+    "omegaconf.grammar.gen.OmegaConfGrammarLexer": [],
+    "omegaconf.grammar.gen.OmegaConfGrammarParser": [],
+    "omegaconf.grammar.gen.OmegaConfGrammarParserListener": [],
+    "omegaconf.grammar.gen.OmegaConfGrammarParserVisitor": [],
+    "omegaconf.grammar.gen": [],
+    "omegaconf.grammar_parser": [],
+    "omegaconf.grammar_visitor": [],
+    "omegaconf.listconfig": [],
+    "omegaconf.nodes": [],
+    "omegaconf.omegaconf": [],
+    "omegaconf.resolvers": [],
+    "omegaconf.resolvers.oc": [],
+    "omegaconf.resolvers.oc.dict": [],
+    "omegaconf.version": [],
+    "pydevd_plugins": [],
+    "pydevd_plugins.extensions": [],
+    "pydevd_plugins.extensions.pydevd_plugin_omegaconf": []
+  },
   "opentelemetry-api": {
     "opentelemetry._logs": [],
     "opentelemetry._logs._internal": [],
