@@ -16,27 +16,27 @@ from databricks.labs.ucx.workspace_access.workflows import (
 from tests.unit import GROUPS, PERMISSIONS
 
 
-def test_runtime_delete_backup_groups(run_workflow):
+def test_runtime_delete_backup_groups(run_workflow) -> None:
     ctx = run_workflow(RemoveWorkspaceLocalGroups.delete_backup_groups)
     assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
 
 
-def test_runtime_apply_permissions_to_account_groups(run_workflow):
+def test_runtime_apply_permissions_to_account_groups(run_workflow) -> None:
     ctx = run_workflow(GroupMigration.apply_permissions_to_account_groups)
     assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
 
 
-def test_rename_workspace_local_group(run_workflow):
+def test_rename_workspace_local_group(run_workflow) -> None:
     ctx = run_workflow(GroupMigration.rename_workspace_local_groups)
     assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
 
 
-def test_reflect_account_groups_on_workspace(run_workflow):
+def test_reflect_account_groups_on_workspace(run_workflow) -> None:
     ctx = run_workflow(PermissionsMigrationAPI.reflect_account_groups_on_workspace)
     assert 'SELECT * FROM hive_metastore.ucx.groups' in ctx.sql_backend.queries
 
 
-def test_migrate_permissions_experimental(run_workflow):
+def test_migrate_permissions_experimental(run_workflow) -> None:
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
@@ -60,7 +60,7 @@ def test_migrate_permissions_experimental(run_workflow):
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 
 
-def test_migrate_permissions_experimental_paginated(run_workflow):
+def test_migrate_permissions_experimental_paginated(run_workflow) -> None:
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
@@ -86,7 +86,7 @@ def test_migrate_permissions_experimental_paginated(run_workflow):
     ws.permission_migration.migrate_permissions.assert_has_calls(calls, any_order=True)
 
 
-def test_migrate_permissions_experimental_error(run_workflow):
+def test_migrate_permissions_not_enabled_error(run_workflow) -> None:
     rows = {
         'SELECT \\* FROM hive_metastore.ucx.groups': GROUPS[
             ("", "workspace_group_1", "account_group_1", "temp_1", "", "", "", ""),
