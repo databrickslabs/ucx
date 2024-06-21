@@ -137,11 +137,13 @@ class MigrationState:
                 name_in_account,
                 size=batch_size,
             )
+            permissions_migrated += result.permissions_migrated or 0
+            logger.info(
+                f"Permission migration progress: {name_in_workspace} -> {name_in_account} {permissions_migrated}(+{result.permissions_migrated})"
+            )
             if not result.permissions_migrated:
                 logger.info("No more permissions to migrate.")
                 return permissions_migrated
-            permissions_migrated += result.permissions_migrated
-            logger.info(f"Migrated {result.permissions_migrated} permissions to {name_in_account} account group")
 
 
 class GroupMigrationStrategy:
