@@ -4954,6 +4954,183 @@
     "peft.utils.peft_types": [],
     "peft.utils.save_and_load": []
   },
+  "petastorm": {
+    "petastorm": [],
+    "petastorm.arrow_reader_worker": [],
+    "petastorm.benchmark": [],
+    "petastorm.benchmark.cli": [],
+    "petastorm.benchmark.dummy_reader": [],
+    "petastorm.benchmark.throughput": [],
+    "petastorm.cache": [],
+    "petastorm.codecs": [],
+    "petastorm.errors": [],
+    "petastorm.etl": [],
+    "petastorm.etl.dataset_metadata": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.etl.legacy": [],
+    "petastorm.etl.metadata_util": [],
+    "petastorm.etl.petastorm_generate_metadata": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.etl.rowgroup_indexers": [],
+    "petastorm.etl.rowgroup_indexing": [],
+    "petastorm.fs_utils": [],
+    "petastorm.generator": [],
+    "petastorm.hdfs": [],
+    "petastorm.hdfs.namenode": [],
+    "petastorm.hdfs.tests": [],
+    "petastorm.hdfs.tests.test_hdfs_namenode": [],
+    "petastorm.local_disk_cache": [],
+    "petastorm.namedtuple_gt_255_fields": [],
+    "petastorm.ngram": [],
+    "petastorm.predicates": [],
+    "petastorm.py_dict_reader_worker": [],
+    "petastorm.pyarrow_helpers": [],
+    "petastorm.pyarrow_helpers.batching_table_queue": [],
+    "petastorm.pytorch": [],
+    "petastorm.reader": [],
+    "petastorm.reader_impl": [],
+    "petastorm.reader_impl.arrow_table_serializer": [],
+    "petastorm.reader_impl.pickle_serializer": [],
+    "petastorm.reader_impl.pytorch_shuffling_buffer": [],
+    "petastorm.reader_impl.shuffling_buffer": [],
+    "petastorm.selectors": [],
+    "petastorm.spark": [],
+    "petastorm.spark.spark_dataset_converter": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.spark_utils": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "petastorm.test_util": [],
+    "petastorm.test_util.reader_mock": [],
+    "petastorm.test_util.shuffling_analysis": [],
+    "petastorm.tests": [],
+    "petastorm.tests.bootstrap_test_schema_data": [],
+    "petastorm.tests.conftest": [],
+    "petastorm.tests.generate_dataset_for_legacy_tests": [],
+    "petastorm.tests.tempdir": [],
+    "petastorm.tests.test_arrow_table_serializer": [],
+    "petastorm.tests.test_benchmark": [],
+    "petastorm.tests.test_cache": [],
+    "petastorm.tests.test_codec_compressed_image": [],
+    "petastorm.tests.test_codec_ndarray": [],
+    "petastorm.tests.test_codec_scalar": [],
+    "petastorm.tests.test_common": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.tests.test_copy_dataset": [],
+    "petastorm.tests.test_dataset_metadata": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "petastorm.tests.test_decode_row": [],
+    "petastorm.tests.test_disk_cache": [],
+    "petastorm.tests.test_end_to_end": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.tests.test_end_to_end_predicates_impl": [],
+    "petastorm.tests.test_fs_utils": [],
+    "petastorm.tests.test_generate_metadata": [],
+    "petastorm.tests.test_metadata_read": [],
+    "petastorm.tests.test_ngram": [],
+    "petastorm.tests.test_ngram_end_to_end": [],
+    "petastorm.tests.test_parquet_reader": [],
+    "petastorm.tests.test_pickle_serializer": [],
+    "petastorm.tests.test_predicates": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "petastorm.tests.test_pytorch_dataloader": [],
+    "petastorm.tests.test_pytorch_utils": [],
+    "petastorm.tests.test_reader": [],
+    "petastorm.tests.test_reader_mock": [],
+    "petastorm.tests.test_reading_legacy_datasets": [],
+    "petastorm.tests.test_run_in_subprocess": [],
+    "petastorm.tests.test_shuffling_buffer": [],
+    "petastorm.tests.test_spark_dataset_converter": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.tests.test_spark_session_cli": [],
+    "petastorm.tests.test_spark_utils": [],
+    "petastorm.tests.test_tf_autograph": [],
+    "petastorm.tests.test_tf_dataset": [],
+    "petastorm.tests.test_tf_utils": [],
+    "petastorm.tests.test_transform": [],
+    "petastorm.tests.test_unischema": [],
+    "petastorm.tests.test_weighted_sampling_reader": [],
+    "petastorm.tf_utils": [],
+    "petastorm.tools": [],
+    "petastorm.tools.copy_dataset": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "petastorm.tools.spark_session_cli": [],
+    "petastorm.transform": [],
+    "petastorm.unischema": [],
+    "petastorm.utils": [],
+    "petastorm.weighted_sampling_reader": [],
+    "petastorm.workers_pool": [],
+    "petastorm.workers_pool.dummy_pool": [],
+    "petastorm.workers_pool.exec_in_new_process": [],
+    "petastorm.workers_pool.exec_in_new_process_entrypoint": [],
+    "petastorm.workers_pool.process_pool": [],
+    "petastorm.workers_pool.tests": [],
+    "petastorm.workers_pool.tests.stub_workers": [],
+    "petastorm.workers_pool.tests.test_ventilator": [],
+    "petastorm.workers_pool.tests.test_workers_pool": [],
+    "petastorm.workers_pool.thread_pool": [],
+    "petastorm.workers_pool.ventilator": [],
+    "petastorm.workers_pool.worker_base": []
+  },
   "pexpect": {
     "pexpect": []
   },
