@@ -297,6 +297,68 @@
   "databricks-sdk": {
     "databricks.sdk": []
   },
+  "dbldatagen": {
+    "dbldatagen": [],
+    "dbldatagen._version": [],
+    "dbldatagen.column_generation_spec": [],
+    "dbldatagen.column_spec_options": [],
+    "dbldatagen.constraints": [],
+    "dbldatagen.constraints.chained_relation": [],
+    "dbldatagen.constraints.constraint": [],
+    "dbldatagen.constraints.literal_range_constraint": [],
+    "dbldatagen.constraints.literal_relation_constraint": [],
+    "dbldatagen.constraints.negative_values": [],
+    "dbldatagen.constraints.positive_values": [],
+    "dbldatagen.constraints.ranged_values_constraint": [],
+    "dbldatagen.constraints.sql_expr": [],
+    "dbldatagen.constraints.unique_combinations": [],
+    "dbldatagen.data_analyzer": [],
+    "dbldatagen.data_generator": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "dbldatagen.datagen_constants": [],
+    "dbldatagen.datarange": [],
+    "dbldatagen.datasets": [],
+    "dbldatagen.datasets.basic_geometries": [],
+    "dbldatagen.datasets.basic_process_historian": [],
+    "dbldatagen.datasets.basic_telematics": [],
+    "dbldatagen.datasets.basic_user": [],
+    "dbldatagen.datasets.benchmark_groupby": [],
+    "dbldatagen.datasets.dataset_provider": [],
+    "dbldatagen.datasets.multi_table_telephony_provider": [],
+    "dbldatagen.datasets_object": [],
+    "dbldatagen.daterange": [],
+    "dbldatagen.distributions": [],
+    "dbldatagen.distributions.beta": [],
+    "dbldatagen.distributions.data_distribution": [],
+    "dbldatagen.distributions.exponential_distribution": [],
+    "dbldatagen.distributions.gamma": [],
+    "dbldatagen.distributions.normal_distribution": [],
+    "dbldatagen.function_builder": [],
+    "dbldatagen.html_utils": [],
+    "dbldatagen.nrange": [],
+    "dbldatagen.schema_parser": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'sparkSession.sql(f'create temporary table {table_name}{table_body}using csv')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'sparkSession.sql(f'drop table {table_name}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'sparkSession.sql(f'select * from {table_name}')' because its value cannot be computed"
+      }
+    ],
+    "dbldatagen.spark_singleton": [],
+    "dbldatagen.text_generator_plugins": [],
+    "dbldatagen.text_generators": [],
+    "dbldatagen.utils": []
+  },
   "debugpy": {
     "debugpy": []
   },
