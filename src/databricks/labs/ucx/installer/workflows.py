@@ -492,7 +492,7 @@ class WorkflowsDeployment(InstallationMixin):
             if len(dashboard_link) == 0:
                 dashboard_link += "Go to the one of the following dashboards after running the job:\n"
             first, second = dash.replace("_", " ").title().split()
-            dashboard_url = f"{self._ws.config.host}/sql/dashboards/{self._install_state.dashboards[dash]}"
+            dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{self._install_state.dashboards[dash]}"
             dashboard_link += f"  - [{first} ({second}) dashboard]({dashboard_url})\n"
         return dashboard_link
 
