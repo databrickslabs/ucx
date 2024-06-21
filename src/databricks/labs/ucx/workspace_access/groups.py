@@ -132,7 +132,7 @@ class MigrationState:
     @staticmethod
     def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str) -> int:
         batch_size = 1000
-        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)")
+        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) starting")
         permissions_migrated = 0
         while True:
             result = ws.permission_migration.migrate_permissions(
@@ -150,9 +150,6 @@ class MigrationState:
             logger.info(
                 f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) progress={permissions_migrated}(+{result.permissions_migrated})"
             )
-            if not result.permissions_migrated:
-                logger.info("No more permissions to migrate.")
-                return permissions_migrated
 
 
 class GroupMigrationStrategy:
