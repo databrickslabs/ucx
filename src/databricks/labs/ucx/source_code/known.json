@@ -847,6 +847,23 @@
   "decorator": {
     "decorator": []
   },
+  "delta-spark": {
+    "delta": [],
+    "delta._typing": [],
+    "delta.exceptions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "delta.pip_utils": [],
+    "delta.tables": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ]
+  },
   "deprecated": {
     "deprecated": [],
     "deprecated.classic": [],
