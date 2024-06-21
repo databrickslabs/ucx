@@ -6,6 +6,7 @@ WITH
                 array('Explicitly DENYing privileges is not supported in UC.'),
                 array()
             ) as failures
+        -- TODO: Verify that split works
         from inventory.grants where database is null or database <> split("inventory",'[.]')[1]
     )
 SELECT
