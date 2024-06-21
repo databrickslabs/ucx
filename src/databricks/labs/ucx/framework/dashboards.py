@@ -104,6 +104,10 @@ class DashboardFromFiles:
             for dashboard_folder in dashboard_folders:
                 logger.info(f"Creating dashboard in {dashboard_folder}...")
                 lakeview_dashboard = self._dashboards.create_dashboard(dashboard_folder)
+                main_name = step_folder.stem.title()
+                sub_name = dashboard_folder.stem.title()
+                dashboard_name = f"{self._name_prefix} {main_name} ({sub_name})"
+                lakeview_dashboard.pages[0].display_name = dashboard_name
                 dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
                 dashboard_id = self._state.dashboards.get(dashboard_ref)
                 dashboard = self._dashboards.deploy_dashboard(
