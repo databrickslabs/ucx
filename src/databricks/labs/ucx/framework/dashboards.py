@@ -121,10 +121,10 @@ class DashboardFromFiles:
         return self._state.dashboards
 
     def validate(self):
-        step_folders = [f for f in self._local_folder.glob("*") if f.is_dir()]
+        step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
         for step_folder in step_folders:
             logger.info(f"Reading step folder {step_folder}...")
-            dashboard_folders = [f for f in step_folder.glob("*") if f.is_dir()]
+            dashboard_folders = [p for p in step_folder.iterdir() if p.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
                 self._validate_folder(dashboard_folder, step_folder)
