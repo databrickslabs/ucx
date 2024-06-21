@@ -6,7 +6,7 @@ WITH
                 array('Explicitly DENYing privileges is not supported in UC.'),
                 array()
             ) as failures
-        from $inventory.grants where database <> split("inventory",'[.]')[1]
+        from $inventory.grants where database <> split("$inventory",'[.]')[1]
     )
 SELECT
     CASE
