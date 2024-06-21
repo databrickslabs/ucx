@@ -8,6 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service.iam import PermissionMigrationResponse
 
+from databricks.labs.ucx.workspace_access.groups import GroupManager
 from databricks.labs.ucx.workspace_access.workflows import (
     RemoveWorkspaceLocalGroups,
     GroupMigration,
@@ -136,3 +137,21 @@ def test_migrate_permissions_continue_on_error(run_workflow, caplog) -> None:
     assert "Migration of group permissions failed: temp_2" in caplog.text
     assert "Migrated 50 permissions for 1/3 groups successfully." in caplog.messages
     assert "Migrating permissions failed for 2/3 groups." in caplog.messages
+
+
+def test_migrate_permissions_non_raised_error(run_workflow, migration_state, mocker) -> None:
+    """The internal API for permission migration can report failure via the return value; verify this fails the task."""
+
+    # Set up the mocking plumbing.
+    mock_gm = create_autospec(GroupManager)
+    mock_gm.get_migration_state.return_value = migration_state
+
+    # Set up the injected "failure" where we return false without raising a specific error.
+    migration_state.apply_to_renamed_groups = mocker.Mock(return_value=False)
+
+    # Run the test.
+    with pytest.raises(RuntimeError) as exc_info:
+        run_workflow(PermissionsMigrationAPI.apply_permissions, group_manager=mock_gm)
+
+    # Verify the migration failure was converted into a task exception.
+    assert str(exc_info.value) == "Permission migration for groups failed; reason unknown."

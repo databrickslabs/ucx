@@ -95,7 +95,7 @@ class PermissionsMigrationAPI(Workflow):
         elif migration_state.apply_to_renamed_groups(ctx.workspace_client):
             logger.info("Group permission migration completed successfully.")
         else:
-            msg = "Group migration failed; reason unknown."
+            msg = "Permission migration for groups failed; reason unknown."
             raise RuntimeError(msg)
 
 
