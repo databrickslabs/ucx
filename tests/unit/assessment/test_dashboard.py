@@ -19,7 +19,7 @@ def test_dashboard():
         remote_folder="/non/existing/folder/",
         name_prefix="Assessment",
         warehouse_id="000000",
-        query_text_callback=lambda x: x,
+        query_transformer=lambda x: x,
     )
     dash.create_dashboards()
     ws.lakeview.create.assert_called()
