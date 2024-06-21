@@ -93,8 +93,7 @@ class DashboardFromFiles:
         dashboard_id = self._state.dashboards[dashboard_ref]
         return f"{self._ws.config.host}/sql/dashboards/{dashboard_id}"
 
-    def create_dashboards(self) -> dict[str, str]:
-        queries_per_dashboard = {}
+    def create_dashboards(self) -> None:
         # Iterate over dashboards for each step, represented as first-level folders
         step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
         for step_folder in step_folders:
@@ -102,23 +101,8 @@ class DashboardFromFiles:
             dashboard_folders = [p for p in step_folder.iterdir() if p.is_dir()]
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
-                logger.debug(f"Reading dashboard folder {dashboard_folder}...")
-                main_name = step_folder.stem.title()
-                sub_name = dashboard_folder.stem.title()
-                dashboard_name = f"{self._name_prefix} {main_name} ({sub_name})"
-                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
-                logger.info(f"Creating dashboard {dashboard_name}...")
-                desired_queries = self._desired_queries(dashboard_folder, dashboard_ref)
-                parent_folder_id = self._installed_query_state()
-                data_source_id = self._dashboard_data_source()
-                self._install_dashboard(dashboard_name, parent_folder_id, dashboard_ref)
-                for query in desired_queries:
-                    self._install_query(query, dashboard_name, data_source_id, parent_folder_id)
-                    self._install_viz(query)
-                    self._install_widget(query, dashboard_ref)
-                queries_per_dashboard[dashboard_ref] = desired_queries
-        self._store_query_state(queries_per_dashboard)
-        return self._state.dashboards
+                logger.info(f"Creating dashboard in {dashboard_folder}...")
+                self._dashboards.create_dashboard(dashboard_folder)
 
     def validate(self):
         step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
