@@ -1086,6 +1086,181 @@
     "dbldatagen.text_generators": [],
     "dbldatagen.utils": []
   },
+  "dbx": {
+    "dbx": [],
+    "dbx.api": [],
+    "dbx.api._module_loader": [],
+    "dbx.api.adjuster": [],
+    "dbx.api.adjuster.adjuster": [],
+    "dbx.api.adjuster.mixins": [],
+    "dbx.api.adjuster.mixins.base": [],
+    "dbx.api.adjuster.mixins.existing_cluster": [],
+    "dbx.api.adjuster.mixins.file_reference": [],
+    "dbx.api.adjuster.mixins.instance_pool": [],
+    "dbx.api.adjuster.mixins.instance_profile": [],
+    "dbx.api.adjuster.mixins.pipeline": [],
+    "dbx.api.adjuster.mixins.service_principal": [],
+    "dbx.api.adjuster.mixins.sql_properties": [],
+    "dbx.api.adjuster.policy": [],
+    "dbx.api.auth": [],
+    "dbx.api.build": [],
+    "dbx.api.client_provider": [],
+    "dbx.api.cluster": [],
+    "dbx.api.config_reader": [],
+    "dbx.api.configure": [],
+    "dbx.api.context": [],
+    "dbx.api.dependency": [],
+    "dbx.api.dependency.core_package": [],
+    "dbx.api.dependency.requirements": [],
+    "dbx.api.deployment": [],
+    "dbx.api.destroyer": [],
+    "dbx.api.execute": [],
+    "dbx.api.jinja": [],
+    "dbx.api.launch": [],
+    "dbx.api.launch.contexts": [],
+    "dbx.api.launch.functions": [],
+    "dbx.api.launch.pipeline_models": [],
+    "dbx.api.launch.processors": [],
+    "dbx.api.launch.runners": [],
+    "dbx.api.launch.runners.asset_based": [],
+    "dbx.api.launch.runners.base": [],
+    "dbx.api.launch.runners.pipeline": [],
+    "dbx.api.launch.runners.standard": [],
+    "dbx.api.launch.tracer": [],
+    "dbx.api.output_provider": [],
+    "dbx.api.services": [],
+    "dbx.api.services._base": [],
+    "dbx.api.services.jobs": [],
+    "dbx.api.services.permissions": [],
+    "dbx.api.services.pipelines": [],
+    "dbx.api.storage": [],
+    "dbx.api.storage.io": [],
+    "dbx.api.storage.mlflow_based": [],
+    "dbx.callbacks": [],
+    "dbx.cli": [],
+    "dbx.commands": [],
+    "dbx.commands.configure": [],
+    "dbx.commands.deploy": [],
+    "dbx.commands.destroy": [],
+    "dbx.commands.execute": [],
+    "dbx.commands.init": [],
+    "dbx.commands.launch": [],
+    "dbx.commands.sync": [],
+    "dbx.commands.sync.functions": [],
+    "dbx.commands.sync.options": [],
+    "dbx.commands.sync.sync": [],
+    "dbx.commands.version": [],
+    "dbx.constants": [],
+    "dbx.custom": [],
+    "dbx.models": [],
+    "dbx.models.build": [],
+    "dbx.models.cli": [],
+    "dbx.models.cli.destroyer": [],
+    "dbx.models.cli.execute": [],
+    "dbx.models.cli.options": [],
+    "dbx.models.deployment": [],
+    "dbx.models.files": [],
+    "dbx.models.files.context": [],
+    "dbx.models.files.project": [],
+    "dbx.models.validators": [],
+    "dbx.models.workflow": [],
+    "dbx.models.workflow.common": [],
+    "dbx.models.workflow.common.access_control": [],
+    "dbx.models.workflow.common.deployment_config": [],
+    "dbx.models.workflow.common.flexible": [],
+    "dbx.models.workflow.common.job_email_notifications": [],
+    "dbx.models.workflow.common.libraries": [],
+    "dbx.models.workflow.common.new_cluster": [],
+    "dbx.models.workflow.common.parameters": [],
+    "dbx.models.workflow.common.pipeline": [],
+    "dbx.models.workflow.common.task": [],
+    "dbx.models.workflow.common.task_type": [],
+    "dbx.models.workflow.common.workflow": [],
+    "dbx.models.workflow.common.workflow_types": [],
+    "dbx.models.workflow.v2dot0": [],
+    "dbx.models.workflow.v2dot0.parameters": [],
+    "dbx.models.workflow.v2dot0.task": [],
+    "dbx.models.workflow.v2dot0.workflow": [],
+    "dbx.models.workflow.v2dot1": [],
+    "dbx.models.workflow.v2dot1._parameters": [],
+    "dbx.models.workflow.v2dot1.job_cluster": [],
+    "dbx.models.workflow.v2dot1.job_task_settings": [],
+    "dbx.models.workflow.v2dot1.parameters": [],
+    "dbx.models.workflow.v2dot1.task": [],
+    "dbx.models.workflow.v2dot1.workflow": [],
+    "dbx.options": [],
+    "dbx.sync": [],
+    "dbx.sync.clients": [],
+    "dbx.sync.config": [],
+    "dbx.sync.constants": [],
+    "dbx.sync.event_handler": [],
+    "dbx.sync.path_matcher": [],
+    "dbx.sync.snapshot": [],
+    "dbx.templates.projects.python_basic.render.hooks.post_gen_project": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.notebooks.sample_notebook": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.setup": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.entrypoint": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.integration.e2e_test": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'etl_job.spark.table(table_name)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.unit.conftest": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.unit.sample_test": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'spark.table(table_name)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.common": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
+      }
+    ],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.tasks": [],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.tasks.sample_etl_task": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'df.write.format('delta').mode('overwrite').saveAsTable(f'{db}.{table}')' because its table name argument cannot be computed"
+      }
+    ],
+    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.tasks.sample_ml_task": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.spark.table(f'{db}.{table}')' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "dbx.types": [],
+    "dbx.utils": [],
+    "dbx.utils.common": [],
+    "dbx.utils.file_uploader": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ],
+    "dbx.utils.json": [],
+    "dbx.utils.url": []
+  },
   "debugpy": {
     "debugpy": []
   },
