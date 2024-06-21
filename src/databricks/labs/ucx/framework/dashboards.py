@@ -102,7 +102,10 @@ class DashboardFromFiles:
             # Create separate dashboards per step, represented as second-level folders
             for dashboard_folder in dashboard_folders:
                 logger.info(f"Creating dashboard in {dashboard_folder}...")
-                self._dashboards.create_dashboard(dashboard_folder)
+                lakeview_dashboard = self._dashboards.create_dashboard(dashboard_folder)
+                dashboard = self._dashboards.deploy_dashboard(lakeview_dashboard)
+                dashboard_ref = f"{step_folder.stem}_{dashboard_folder.stem}".lower()
+                self._state.dashboards[dashboard_ref] = dashboard.id
 
     def validate(self):
         step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
