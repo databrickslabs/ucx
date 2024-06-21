@@ -6,7 +6,7 @@ import re
 import time
 import webbrowser
 from datetime import timedelta
-from functools import cached_property, partial
+from functools import cached_property
 from typing import Any
 
 import databricks.sdk.errors
@@ -23,7 +23,6 @@ from databricks.labs.blueprint.wheels import (
 )
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
-from databricks.labs.lsql.dashboards import replace_database_in_query
 from databricks.sdk import WorkspaceClient, AccountClient
 from databricks.sdk.core import with_user_agent_extra
 from databricks.sdk.errors import (
@@ -516,10 +515,6 @@ class WorkspaceInstallation(InstallationMixin):
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
         local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
-        replace_database = partial(
-            replace_database_in_query,
-            database=f"hive_metastore.{self._config.inventory_database}",
-        )
         dash = DashboardFromFiles(
             self._ws,
             state=self._install_state,
@@ -527,7 +522,7 @@ class WorkspaceInstallation(InstallationMixin):
             remote_folder=self._installation.install_folder(),
             name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
-            query_transformer=replace_database,
+            query_transformer=self._config.transform_inventory_database,
         )
         dash.create_dashboards()
 
