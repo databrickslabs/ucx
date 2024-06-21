@@ -1,3 +1,7 @@
+---
+height: 4
+---
+
 ## Cluster Summary
 
 Detailed itemized findings by cluster helping users prioritize which clusters to upgrade.
