@@ -1265,7 +1265,7 @@
         "code": "dbfs-usage",
         "message": "Deprecated file system path: dbfs:/"
       },
-     {
+      {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
       }
@@ -4902,6 +4902,9 @@
     "megatron.utils.hash": [],
     "megatron.utils.pipeline": [],
     "megatron.visuals": []
+  },
+  "mmf_sa": {
+    "mmf_sa": []
   },
   "ml-dtypes": {
     "ml_dtypes": [],
