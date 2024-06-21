@@ -524,7 +524,7 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws,
             state=self._install_state,
             local_folder=local_query_files,
-            remote_folder=f"{self._installation.install_folder()}/queries",
+            remote_folder=self._installation.install_folder(),
             name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
             query_transformer=replace_database,
