@@ -8,6 +8,6 @@ SELECT
     END
   ) AS success,
   count(*) AS total,
-  concat(round(success / total * 100, 2), '%') AS success_rate
+  concat(round(try_divide(success, total) * 100, 2), '%') AS success_rate
 FROM
     inventory.reconciliation_results
