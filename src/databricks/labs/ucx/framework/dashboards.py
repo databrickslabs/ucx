@@ -91,7 +91,8 @@ class DashboardFromFiles:
 
     def dashboard_link(self, dashboard_ref: str):
         dashboard_id = self._state.dashboards[dashboard_ref]
-        return f"{self._ws.config.host}/sql/dashboards/{dashboard_id}"
+        dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{dashboard_id}"
+        return dashboard_url
 
     def create_dashboards(self) -> None:
         # Iterate over dashboards for each step, represented as first-level folders
