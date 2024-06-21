@@ -114,6 +114,7 @@ class DashboardFromFiles:
                     lakeview_dashboard,
                     dashboard_id=dashboard_id,
                     parent_path=self._remote_folder,
+                    warehouse_id=self._warehouse_id,
                 )
                 self._state.dashboards[dashboard_ref] = dashboard.dashboard_id
 
