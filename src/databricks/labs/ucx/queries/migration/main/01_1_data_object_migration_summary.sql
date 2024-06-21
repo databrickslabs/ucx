@@ -7,7 +7,7 @@ SELECT
     END
   ) AS migrated,
   count(*) AS total,
-  concat(round(migrated / total * 100, 2), '%') AS migrated_rate
+  concat(round(try_divide(migrated, total) * 100, 2), '%') AS migrated_rate
 FROM
     inventory.tables AS tables
   LEFT JOIN
