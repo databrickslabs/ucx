@@ -218,6 +218,13 @@ def test_ensure_assessment_run(ws):
     ws.jobs.list_runs.assert_called_once()
 
 
+def test_ensure_assessment_run_collection(ws):
+    acc_client = create_autospec(AccountClient)
+    ensure_assessment_run(ws, 123, acc_client)
+
+    acc_client.workspaces.get.assert_called_once()
+
+
 def test_repair_run(ws):
     repair_run(ws, "assessment")
 

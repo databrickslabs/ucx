@@ -148,13 +148,13 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient, collection_workspace_id: int | None = None):
+def ensure_assessment_run(
+    w: WorkspaceClient, collection_workspace_id: int | None = None, a: AccountClient | None = None
+):
     """ensure the assessment job was run on a workspace"""
     if collection_workspace_id:
-        a = AccountClient(
-            product='ucx',
-            product_version=__version__,
-        )
+        if not a:
+            a = AccountClient(product='ucx', product_version=__version__)
         account_installer = AccountInstaller(a)
         workspaces_context = account_installer.get_workspaces_context(collection_workspace_id)
     else:
