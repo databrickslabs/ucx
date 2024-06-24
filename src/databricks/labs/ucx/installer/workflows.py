@@ -598,8 +598,6 @@ class WorkflowsDeployment(InstallationMixin):
         for task in self._tasks:
             if task.workflow != step_name:
                 continue
-            if self._skip_dashboards and task.dashboard:
-                continue
             job_clusters.add(task.job_cluster)
             job_tasks.append(self._job_task(task, remote_wheels))
         job_tasks.append(self._job_parse_logs_task(job_tasks, step_name, remote_wheels))
@@ -624,24 +622,9 @@ class WorkflowsDeployment(InstallationMixin):
             job_cluster_key=task.job_cluster,
             depends_on=[jobs.TaskDependency(task_key=d) for d in task.dependencies()],
         )
-        if task.dashboard:
-            # dashboards are created in parallel to wheel uploads, so we'll just retry
-            retry_on_attribute_error = retried(on=[KeyError], timeout=self._verify_timeout)
-            retried_job_dashboard_task = retry_on_attribute_error(self._job_dashboard_task)
-            return retried_job_dashboard_task(jobs_task, task)
         if task.notebook:
             return self._job_notebook_task(jobs_task, task)
         return self._job_wheel_task(jobs_task, task.workflow, remote_wheels)
-
-    def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
-        assert task.dashboard is not None
-        dashboard_id = self._install_state.dashboards[task.dashboard]
-        dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{dashboard_id}"
-        remote_notebook = self._installation.upload(
-            f"dashboards/dashboard_link_{task.dashboard}.py",
-            bytes(f"print('{dashboard_url}')", encoding="utf8"),
-        )
-        return replace(jobs_task, notebook_task=jobs.NotebookTask(notebook_path=remote_notebook))
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.notebook is not None
