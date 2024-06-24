@@ -176,41 +176,6 @@ class Assessment(Workflow):
         """Scans all groups for the local group migration scope"""
         ctx.group_manager.snapshot()
 
-    @job_task(
-        depends_on=[
-            crawl_grants,
-            crawl_groups,
-            crawl_permissions,
-            guess_external_locations,
-            assess_jobs,
-            assess_incompatible_submit_runs,
-            assess_clusters,
-            crawl_cluster_policies,
-            assess_azure_service_principals,
-            assess_pipelines,
-            assess_global_init_scripts,
-            crawl_tables,
-        ],
-        dashboard="assessment_main",
-    )
-    def assessment_report(self, ctx: RuntimeContext):
-        """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
-
-    @job_task(
-        depends_on=[
-            assess_jobs,
-            assess_incompatible_submit_runs,
-            assess_clusters,
-            assess_pipelines,
-            crawl_tables,
-        ],
-        dashboard="assessment_estimates",
-    )
-    def estimates_report(self, ctx: RuntimeContext):
-        """Refreshes the assessment dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
-
 
 class Failing(Workflow):
     def __init__(self):
