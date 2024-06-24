@@ -10,19 +10,19 @@ from pylsp.config.config import Config  # type: ignore
 from databricks.labs.ucx.source_code import lsp_plugin
 
 
-@pytest.fixture()
-def workspace(tmp_path):
+@pytest.fixture
+def workspace(tmp_path) -> Workspace:
     uri = tmp_path.absolute().as_uri()
     config = Config(uri, {}, 0, {})
     ws = Workspace(uri, Mock(), config=config)
     return ws
 
 
-def temp_document(doc_text, workspace):
-    with tempfile.NamedTemporaryFile(mode="w", dir=workspace.root_path, delete=False) as temp_file:
+def temp_document(doc_text, ws):
+    with tempfile.NamedTemporaryFile(mode="w", dir=ws.root_path, delete=False) as temp_file:
         name = temp_file.name
         temp_file.write(doc_text)
-    doc = Document(uris.from_fs_path(name), workspace)
+    doc = Document(uris.from_fs_path(name), ws)
     return name, doc
 
 

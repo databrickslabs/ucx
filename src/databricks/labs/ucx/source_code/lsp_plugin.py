@@ -7,7 +7,7 @@ from databricks.labs.ucx.source_code.lsp import Diagnostic
 
 
 @hookimpl
-def pylsp_lint(workspace: Workspace, document: Document) -> list[dict]:
+def pylsp_lint(workspace: Workspace, document: Document) -> list[dict]:  # pylint: disable=unused-argument
     # TODO: initialize migration index and session state from config / env variables
     languages = LinterContext(index=None, session_state=None)
     analyser = languages.linter(Language.PYTHON)
