@@ -97,6 +97,51 @@
       }
     ]
   },
+  "altair": {
+    "altair": [],
+    "altair._magics": [],
+    "altair.expr": [],
+    "altair.expr.consts": [],
+    "altair.expr.core": [],
+    "altair.expr.funcs": [],
+    "altair.jupyter": [],
+    "altair.jupyter.jupyter_chart": [],
+    "altair.utils": [],
+    "altair.utils._dfi_types": [],
+    "altair.utils._importers": [],
+    "altair.utils._show": [],
+    "altair.utils._transformed_data": [],
+    "altair.utils._vegafusion_data": [],
+    "altair.utils.compiler": [],
+    "altair.utils.core": [],
+    "altair.utils.data": [],
+    "altair.utils.deprecation": [],
+    "altair.utils.display": [],
+    "altair.utils.execeval": [],
+    "altair.utils.html": [],
+    "altair.utils.mimebundle": [],
+    "altair.utils.plugin_registry": [],
+    "altair.utils.save": [],
+    "altair.utils.schemapi": [],
+    "altair.utils.selection": [],
+    "altair.utils.server": [],
+    "altair.utils.theme": [],
+    "altair.vegalite": [],
+    "altair.vegalite.api": [],
+    "altair.vegalite.data": [],
+    "altair.vegalite.display": [],
+    "altair.vegalite.schema": [],
+    "altair.vegalite.v5": [],
+    "altair.vegalite.v5.api": [],
+    "altair.vegalite.v5.compiler": [],
+    "altair.vegalite.v5.data": [],
+    "altair.vegalite.v5.display": [],
+    "altair.vegalite.v5.schema": [],
+    "altair.vegalite.v5.schema.channels": [],
+    "altair.vegalite.v5.schema.core": [],
+    "altair.vegalite.v5.schema.mixins": [],
+    "altair.vegalite.v5.theme": []
+  },
   "aniso8601": {
     "aniso8601": []
   },
@@ -115,7 +160,6 @@
     "appnope._dummy": [],
     "appnope._nope": []
   },
-  "arc": {},
   "astor": {
     "astor": [],
     "astor.code_gen": [],
@@ -611,6 +655,75 @@
   },
   "cycler": {
     "cycler": []
+  },
+  "databricks-arc": {
+    "arc": [],
+    "arc.autolinker": [],
+    "arc.autolinker.autolinker": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark.sql(f\"show tables from {self.catalog}.{self.schema} like '*__splink__*'\")' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark.sql(f'drop table {self.catalog}.{self.schema}.{table.tableName}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark.sql(f'drop table {table.tableName}')' because its value cannot be computed"
+      }
+    ],
+    "arc.autolinker.cleaning_utils": [],
+    "arc.autolinker.splink_mlflow": [],
+    "arc.lib": [],
+    "arc.sql": [],
+    "arc.sql.enable_arc": [],
+    "arc.sql.functions": [],
+    "arc.sql.functions.functions": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "arc.sql.functions.library_handler": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot set Spark log level directly from code on UC Shared Clusters. Remove the call and set the cluster spark conf 'spark.log.level' instead"
+      }
+    ],
+    "arc.utils": [],
+    "arc.utils.utils": [],
+    "test": [],
+    "test.test_arc_sql": [],
+    "test.test_cleaning": [],
+    "test.utils": [],
+    "test.utils.arc_test": [],
+    "test.utils.spark_test_case": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
+      }
+    ]
   },
   "databricks-feature-engineering": {
     "databricks": [],
@@ -2252,6 +2365,83 @@
     "dockerpycreds.utils": [],
     "dockerpycreds.version": []
   },
+  "duckdb": {
+    "adbc_driver_duckdb": [],
+    "adbc_driver_duckdb.dbapi": [],
+    "duckdb": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'conn.table(table_name, **kwargs)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'conn.sql(query, **kwargs)' because its value cannot be computed"
+      }
+    ],
+    "duckdb.bytes_io_wrapper": [],
+    "duckdb.experimental": [],
+    "duckdb.experimental.spark": [],
+    "duckdb.experimental.spark._globals": [],
+    "duckdb.experimental.spark._typing": [],
+    "duckdb.experimental.spark.conf": [],
+    "duckdb.experimental.spark.context": [],
+    "duckdb.experimental.spark.errors": [],
+    "duckdb.experimental.spark.errors.error_classes": [],
+    "duckdb.experimental.spark.errors.exceptions": [],
+    "duckdb.experimental.spark.errors.exceptions.base": [],
+    "duckdb.experimental.spark.errors.utils": [],
+    "duckdb.experimental.spark.exception": [],
+    "duckdb.experimental.spark.sql": [],
+    "duckdb.experimental.spark.sql._typing": [],
+    "duckdb.experimental.spark.sql.catalog": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self._session.conn.sql(query)' because its value cannot be computed"
+      }
+    ],
+    "duckdb.experimental.spark.sql.column": [],
+    "duckdb.experimental.spark.sql.conf": [],
+    "duckdb.experimental.spark.sql.dataframe": [],
+    "duckdb.experimental.spark.sql.functions": [],
+    "duckdb.experimental.spark.sql.group": [],
+    "duckdb.experimental.spark.sql.readwriter": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.session.conn.sql(f'select * from {path}')' because its value cannot be computed"
+      }
+    ],
+    "duckdb.experimental.spark.sql.session": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.conn.table(tableName)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.conn.sql(f'select * from \"{unique_name}\"')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.conn.sql(query, params=parameters)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.conn.sql(sqlQuery)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "duckdb.experimental.spark.sql.streaming": [],
+    "duckdb.experimental.spark.sql.type_utils": [],
+    "duckdb.experimental.spark.sql.types": [],
+    "duckdb.experimental.spark.sql.udf": [],
+    "duckdb.filesystem": [],
+    "duckdb.functional": [],
+    "duckdb.typing": [],
+    "duckdb.udf": [],
+    "duckdb.value.constant": []
+  },
   "entrypoints": {
     "entrypoints": []
   },
@@ -2967,6 +3157,47 @@
     "johnsnowlabs.utils.venv_utils": [],
     "johnsnowlabs.visual": [],
     "johnsnowlabs.viz": []
+  },
+  "jsonschema": {
+    "jsonschema": [],
+    "jsonschema._format": [],
+    "jsonschema._keywords": [],
+    "jsonschema._legacy_keywords": [],
+    "jsonschema._types": [],
+    "jsonschema._typing": [],
+    "jsonschema._utils": [],
+    "jsonschema.benchmarks": [],
+    "jsonschema.benchmarks.const_vs_enum": [],
+    "jsonschema.benchmarks.contains": [],
+    "jsonschema.benchmarks.issue232": [],
+    "jsonschema.benchmarks.json_schema_test_suite": [],
+    "jsonschema.benchmarks.nested_schemas": [],
+    "jsonschema.benchmarks.subcomponents": [],
+    "jsonschema.benchmarks.unused_registry": [],
+    "jsonschema.benchmarks.useless_applicator_schemas": [],
+    "jsonschema.benchmarks.useless_keywords": [],
+    "jsonschema.benchmarks.validator_creation": [],
+    "jsonschema.cli": [],
+    "jsonschema.exceptions": [],
+    "jsonschema.protocols": [],
+    "jsonschema.tests": [],
+    "jsonschema.tests._suite": [],
+    "jsonschema.tests.fuzz_validate": [],
+    "jsonschema.tests.test_cli": [],
+    "jsonschema.tests.test_deprecations": [],
+    "jsonschema.tests.test_exceptions": [],
+    "jsonschema.tests.test_format": [],
+    "jsonschema.tests.test_jsonschema_test_suite": [],
+    "jsonschema.tests.test_types": [],
+    "jsonschema.tests.test_utils": [],
+    "jsonschema.tests.test_validators": [],
+    "jsonschema.validators": []
+  },
+  "jsonschema-specifications": {
+    "jsonschema_specifications": [],
+    "jsonschema_specifications._core": [],
+    "jsonschema_specifications.tests": [],
+    "jsonschema_specifications.tests.test_jsonschema_specifications": []
   },
   "jupyter_client": {
     "jupyter_client": []
@@ -6351,6 +6582,18 @@
   },
   "pexpect": {
     "pexpect": []
+  },
+  "phonetics": {
+    "phonetics": [],
+    "phonetics.metaphone": [],
+    "phonetics.nysiis": [],
+    "phonetics.soundex": [],
+    "phonetics.tests": [],
+    "phonetics.tests.test_metaphone": [],
+    "phonetics.utils": []
+  },
+  "pickleshare": {
+    "pickleshare": []
   },
   "pillow": {
     "PIL": []
@@ -20817,6 +21060,21 @@
     "querystring_parser.parser": [],
     "querystring_parser.tests": []
   },
+  "referencing": {
+    "referencing": [],
+    "referencing._attrs": [],
+    "referencing._core": [],
+    "referencing.exceptions": [],
+    "referencing.jsonschema": [],
+    "referencing.retrieval": [],
+    "referencing.tests": [],
+    "referencing.tests.test_core": [],
+    "referencing.tests.test_exceptions": [],
+    "referencing.tests.test_jsonschema": [],
+    "referencing.tests.test_referencing_suite": [],
+    "referencing.tests.test_retrieval": [],
+    "referencing.typing": []
+  },
   "regex": {
     "regex": [],
     "regex._regex_core": [],
@@ -20828,6 +21086,9 @@
   },
   "rich": {
     "rich": []
+  },
+  "rpds-py": {
+    "rpds": []
   },
   "rsa": {
     "rsa": []
@@ -22799,6 +23060,204 @@
     ],
     "spark_price_transparency.unified_viz": []
   },
+  "splink": {
+    "splink": [],
+    "splink.accuracy": [],
+    "splink.analyse_blocking": [],
+    "splink.athena.athena_comparison_level_library": [],
+    "splink.athena.athena_comparison_library": [],
+    "splink.athena.athena_comparison_template_library": [],
+    "splink.athena.athena_helpers.athena_base": [],
+    "splink.athena.athena_helpers.athena_blocking_rule_imports": [],
+    "splink.athena.athena_helpers.athena_comparison_imports": [],
+    "splink.athena.athena_helpers.athena_transforms": [],
+    "splink.athena.athena_helpers.athena_utils": [],
+    "splink.athena.athena_linker": [],
+    "splink.athena.blocking_rule_library": [],
+    "splink.athena.comparison_level_library": [],
+    "splink.athena.comparison_library": [],
+    "splink.athena.comparison_template_library": [],
+    "splink.athena.linker": [],
+    "splink.block_from_labels": [],
+    "splink.blocking": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'filter_condition.sql(self.sqlglot_dialect)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'j.sql(self.sqlglot_dialect)' because its value cannot be computed"
+      }
+    ],
+    "splink.blocking_rule_composition": [],
+    "splink.blocking_rules_library": [],
+    "splink.cache_dict_with_logging": [],
+    "splink.charts": [],
+    "splink.cluster_studio": [],
+    "splink.comparison": [],
+    "splink.comparison_helpers": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'duckdb.sql(sql)' because its value cannot be computed"
+      }
+    ],
+    "splink.comparison_helpers_utils": [],
+    "splink.comparison_level": [],
+    "splink.comparison_level_composition": [],
+    "splink.comparison_level_library": [],
+    "splink.comparison_level_sql": [],
+    "splink.comparison_library": [],
+    "splink.comparison_library_utils": [],
+    "splink.comparison_template_library": [],
+    "splink.comparison_vector_distribution": [],
+    "splink.comparison_vector_values": [],
+    "splink.connected_components": [],
+    "splink.constants": [],
+    "splink.convert_v2_to_v3": [],
+    "splink.databricks.enable_splink": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "splink.datasets": [],
+    "splink.default_from_jsonschema": [],
+    "splink.dialect_base": [],
+    "splink.duckdb.blocking_rule_library": [],
+    "splink.duckdb.comparison_level_library": [],
+    "splink.duckdb.comparison_library": [],
+    "splink.duckdb.comparison_template_library": [],
+    "splink.duckdb.duckdb_comparison_level_library": [],
+    "splink.duckdb.duckdb_comparison_library": [],
+    "splink.duckdb.duckdb_comparison_template_library": [],
+    "splink.duckdb.duckdb_helpers.duckdb_base": [],
+    "splink.duckdb.duckdb_helpers.duckdb_blocking_rule_imports": [],
+    "splink.duckdb.duckdb_helpers.duckdb_comparison_imports": [],
+    "splink.duckdb.duckdb_helpers.duckdb_helpers": [],
+    "splink.duckdb.duckdb_linker": [],
+    "splink.duckdb.linker": [],
+    "splink.em_training_session": [],
+    "splink.estimate_u": [],
+    "splink.exceptions": [],
+    "splink.expectation_maximisation": [],
+    "splink.format_sql": [],
+    "splink.input_column": [],
+    "splink.labelling_tool": [],
+    "splink.linker": [],
+    "splink.logging_messages": [],
+    "splink.lower_id_on_lhs": [],
+    "splink.m_from_labels": [],
+    "splink.m_training": [],
+    "splink.m_u_records_to_parameters": [],
+    "splink.match_key_analysis": [],
+    "splink.match_weights_histogram": [],
+    "splink.misc": [],
+    "splink.missingness": [],
+    "splink.parse_sql": [],
+    "splink.pipeline": [],
+    "splink.postgres.blocking_rule_library": [],
+    "splink.postgres.comparison_level_library": [],
+    "splink.postgres.comparison_library": [],
+    "splink.postgres.comparison_template_library": [],
+    "splink.postgres.linker": [],
+    "splink.postgres.postgres_comparison_level_library": [],
+    "splink.postgres.postgres_comparison_library": [],
+    "splink.postgres.postgres_comparison_template_library": [],
+    "splink.postgres.postgres_helpers.postgres_base": [],
+    "splink.postgres.postgres_helpers.postgres_blocking_rule_imports": [],
+    "splink.postgres.postgres_helpers.postgres_comparison_imports": [],
+    "splink.postgres.postgres_linker": [],
+    "splink.predict": [],
+    "splink.profile_data": [],
+    "splink.settings": [],
+    "splink.settings_validator": [],
+    "splink.spark.blocking_rule_library": [],
+    "splink.spark.comparison_level_library": [],
+    "splink.spark.comparison_library": [],
+    "splink.spark.comparison_template_library": [],
+    "splink.spark.jar_location": [],
+    "splink.spark.linker": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.linker.spark.table(self.physical_name)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.spark.table(write_path)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'spark_df.write.mode('overwrite').saveAsTable(write_path)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.linker.spark.sql(sql)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark.sql(f\"show tables from {self.splink_data_store} like '{table_name}'\")' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark.sql(f'drop table {x}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark.sql(final_sql)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "splink.spark.spark_comparison_level_library": [],
+    "splink.spark.spark_comparison_library": [],
+    "splink.spark.spark_comparison_template_library": [],
+    "splink.spark.spark_helpers.custom_spark_dialect": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.sql(expression, 'to')' because its value cannot be computed"
+      }
+    ],
+    "splink.spark.spark_helpers.spark_base": [],
+    "splink.spark.spark_helpers.spark_blocking_rule_imports": [],
+    "splink.spark.spark_helpers.spark_comparison_imports": [],
+    "splink.spark.spark_linker": [],
+    "splink.splink_comparison_viewer": [],
+    "splink.splink_dataframe": [],
+    "splink.sql_transform": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'transformed_tree.sql(dialect)' because its value cannot be computed"
+      }
+    ],
+    "splink.sqlite.blocking_rule_library": [],
+    "splink.sqlite.comparison_level_library": [],
+    "splink.sqlite.comparison_library": [],
+    "splink.sqlite.comparison_template_library": [],
+    "splink.sqlite.linker": [],
+    "splink.sqlite.sqlite_comparison_level_library": [],
+    "splink.sqlite.sqlite_comparison_library": [],
+    "splink.sqlite.sqlite_comparison_template_library": [],
+    "splink.sqlite.sqlite_helpers.sqlite_base": [],
+    "splink.sqlite.sqlite_helpers.sqlite_blocking_rule_imports": [],
+    "splink.sqlite.sqlite_helpers.sqlite_comparison_imports": [],
+    "splink.sqlite.sqlite_linker": [],
+    "splink.term_frequencies": [],
+    "splink.unique_id_concat": [],
+    "splink.unlinkables": [],
+    "splink.validate_jsonschema": [],
+    "splink.vertically_concatenate": [],
+    "splink.waterfall_chart": []
+  },
   "sqlalchemy": {
     "sqlalchemy": []
   },
@@ -22841,6 +23300,37 @@
   },
   "tomlkit": {
     "tomlkit": []
+  },
+  "toolz": {
+    "tlz": [],
+    "tlz._build_tlz": [],
+    "toolz": [],
+    "toolz._signatures": [],
+    "toolz._version": [],
+    "toolz.compatibility": [],
+    "toolz.curried": [],
+    "toolz.curried.exceptions": [],
+    "toolz.curried.operator": [],
+    "toolz.dicttoolz": [],
+    "toolz.functoolz": [],
+    "toolz.itertoolz": [],
+    "toolz.recipes": [],
+    "toolz.sandbox": [],
+    "toolz.sandbox.core": [],
+    "toolz.sandbox.parallel": [],
+    "toolz.tests.test_compatibility": [],
+    "toolz.tests.test_curried": [],
+    "toolz.tests.test_curried_doctests": [],
+    "toolz.tests.test_dicttoolz": [],
+    "toolz.tests.test_functoolz": [],
+    "toolz.tests.test_inspect_args": [],
+    "toolz.tests.test_itertoolz": [],
+    "toolz.tests.test_recipes": [],
+    "toolz.tests.test_serialization": [],
+    "toolz.tests.test_signatures": [],
+    "toolz.tests.test_tlz": [],
+    "toolz.tests.test_utils": [],
+    "toolz.utils": []
   },
   "torch": {
     "functorch": [],
