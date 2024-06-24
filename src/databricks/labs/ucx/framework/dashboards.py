@@ -6,6 +6,7 @@ import sqlglot
 from databricks.labs.blueprint.installer import InstallState
 from databricks.labs.lsql.dashboards import Dashboards
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import ResourceAlreadyExists
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,10 @@ class DashboardFromFiles:
         return dashboard_url
 
     def create_dashboards(self) -> None:
+        try:
+            self._ws.workspace.mkdirs(self._remote_folder)
+        except ResourceAlreadyExists:
+            pass
         # Iterate over dashboards for each step, represented as first-level folders
         step_folders = [p for p in self._local_folder.iterdir() if p.is_dir()]
         for step_folder in step_folders:
