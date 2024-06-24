@@ -637,11 +637,11 @@ class WorkflowsDeployment(InstallationMixin):
         assert task.dashboard is not None
         dashboard_id = self._install_state.dashboards[task.dashboard]
         dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{dashboard_id}"
-        return replace(
-            jobs_task,
-            job_cluster_key=None,
-            description=f"View dashboard: {dashboard_url}",
+        remote_notebook = self._installation.upload(
+            f"dashboard-link-{task.name}",
+            bytes(f"%md\nView dashboard: {dashboard_url}", encoding="utf8"),
         )
+        return replace(jobs_task, notebook_task=jobs.NotebookTask(notebook_path=remote_notebook))
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.notebook is not None
