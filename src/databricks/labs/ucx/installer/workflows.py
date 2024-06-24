@@ -639,7 +639,7 @@ class WorkflowsDeployment(InstallationMixin):
         dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{dashboard_id}"
         remote_notebook = self._installation.upload(
             f"dashboards/dashboard-link-{task.name}.py",
-            bytes(f"%md\nView dashboard: {dashboard_url}", encoding="utf8"),
+            bytes(f"print('{dashboard_url}')", encoding="utf8"),
         )
         return replace(jobs_task, notebook_task=jobs.NotebookTask(notebook_path=remote_notebook))
 
