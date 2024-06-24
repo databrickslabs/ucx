@@ -19,14 +19,45 @@ Assumptions for a single table migration estimates:
 Please note that depending on the table type and their location, the migration effort will differ.
 [Full guidance](https://www.databricks.com/blog/migrating-tables-hive-metastore-unity-catalog-metastore)
 
-| object_type | table_format                         | location       | estimated effort | suggestion                                                                               |
-|-------------|--------------------------------------|----------------|------------------|------------------------------------------------------------------------------------------|
-| MANAGED     | DELTA                                | -              | 0.5              | CTAS or recreate as external table in S3/ADLS, then SYNC                                 |
-| MANAGED     | not DELTA                            | -              | 2                | Can vary depending of table_format                                                       |
-| EXTERNAL    | DELTA                                | dbfs:/         | 0.5              | CTAS or recreate as external table in S3/ADLS, then SYNC                                 |
-| EXTERNAL    | DELTA                                | adl:/          | 0.5              | CTAS or recreate as external table in S3/ADLS, then SYNC                                 |
-| EXTERNAL    | DELTA                                | wasbs:/        | 0.5              | CTAS or recreate as external table in S3/ADLS, then SYNC                                 |
-| EXTERNAL    | DELTA                                | adls:/ or S3:/ | 0.1              | In place SYNC                                                                            |
-| EXTERNAL    | not DELTA                            | -              | 2                | Can vary depending of table_format                                                       |
-| EXTERNAL    | -SQLSERVER<br/>-MYSQL<br/>-SNOWFLAKE | -              | 2                | Recreate via Lakehouse Federation                                                        |
-| VIEW        | -                                    | -              | 2                | Recreate in target catalog on UC, can vary depending on the number of tables in the view |
+- Object type: Managed \
+  Table format: DELTA \
+  Estimated effort: 0.5 \
+  Suggestion: CTAS or recreate as external table in S3/ADLS, then SYNC
+- Object type: Managed \
+  Table format: not DELTA \
+  Estimated effort: 2 \
+  Suggestion: Can vary depending of table_format
+- Object type: External \
+  Table format: DELTA \
+  Location: dbfs:/ \
+  Estimated effort: 0.5 \
+  Suggestion: CTAS or recreate as external table in S3/ADLS, then SYNC
+- Object type: External \
+  Table format: DELTA \
+  Location: adl:/ \
+  Estimated effort: 0.5 \
+  Suggestion: CTAS or recreate as external table in S3/ADLS, then SYNC
+- Object type: External \
+  Table format: DELTA \
+  Location: asbs:/ \
+  Estimated effort: 0.5 \
+  Suggestion: CTAS or recreate as external table in S3/ADLS, then SYNC
+- Object type: External \
+  Table format: DELTA \
+  Location: adls:/ or S3:/ \
+  Estimated effort: 0.1 \
+  Suggestion: In place SYNC
+- Object type: External \
+  Table format: not DELTA \
+  Estimated effort: 2 \
+  Suggestion: Can vary depending of table_format
+- Object type: External \
+  Estimated effort: 2 \
+  Suggestion: Recreate via Lakehouse Federation \
+  Table format:
+  - SQLSERVER
+  - MYSQL
+  - SNOWFLAKE
+- Object type: View \
+  Estimated effort: 2 \
+  Suggestion: Recreate in target catalog on UC, can vary depending on the number of tables in the view
