@@ -249,7 +249,12 @@ def _permissions_mapping():
             [PermissionLevel.CAN_USE, PermissionLevel.CAN_MANAGE],
             _simple,
         ),
-        # TODO: Add Lakeview dashboards?
+        (
+            "lakeview_dashboard",
+            "dashboards",
+            [PermissionLevel.CAN_EDIT, PermissionLevel.CAN_RUN, PermissionLevel.CAN_MANAGE, PermissionLevel.CAN_READ],
+            _simple,
+        ),
         (
             "dashboard",
             "sql/dashboards",
