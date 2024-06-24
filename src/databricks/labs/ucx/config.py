@@ -73,7 +73,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
         if (
             isinstance(node, sqlglot.exp.Table)
             and node.args.get("db") is not None
-            and node.args.get("db").this == "inventory"
+            and getattr(node.args.get("db"), "this", "") == "inventory"
         ):
             node.args["db"].set("this", f"hive_metastore.{self.inventory_database}")
         return node
