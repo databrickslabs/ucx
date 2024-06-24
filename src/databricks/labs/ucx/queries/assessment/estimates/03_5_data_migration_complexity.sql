@@ -1,4 +1,4 @@
--- --title 'Data migration complexity'
+-- --title 'Data migration complexity' --heigh 10 --width 1
 SELECT
 CASE WHEN total_estimated_hours < 30 THEN "S"
  WHEN total_estimated_hours BETWEEN 30 AND 100 THEN "M"

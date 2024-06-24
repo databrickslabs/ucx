@@ -1,4 +1,4 @@
--- --title 'Incompatible submit runs detected'
+-- --title 'Incompatible submit runs detected' --height 10 --width 4
 SELECT
     object_type,
     object_id,

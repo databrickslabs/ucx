@@ -1,4 +1,4 @@
--- --title 'Group migration complexity'
+-- --title 'Group migration complexity' --height 10 --width 1
 select
 case when total_groups = 0 then NULL
 when total_groups between 1 and 50 then "S"

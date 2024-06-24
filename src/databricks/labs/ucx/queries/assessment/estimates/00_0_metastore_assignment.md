@@ -1,3 +1,8 @@
+---
+height: 10
+width: 2
+---
+
 ## 1 - Metastore assignment
 
 The first step of adopting is UC is attaching your current workspace to a UC metastore.

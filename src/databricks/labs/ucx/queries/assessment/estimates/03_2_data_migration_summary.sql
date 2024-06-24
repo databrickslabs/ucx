@@ -1,4 +1,4 @@
--- --title 'Table estimates'
+-- --title 'Table estimates' --height 10 --width 3
 SELECT
   table_name,
   object_type,

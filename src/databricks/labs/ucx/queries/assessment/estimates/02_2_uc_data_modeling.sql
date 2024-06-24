@@ -1,4 +1,4 @@
--- --title 'Tables to migrate'
+-- --title 'Tables to migrate' --height 10 --width 3
 select
   catalog,
   database,

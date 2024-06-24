@@ -1,3 +1,8 @@
+---
+height: 10
+width: 2
+---
+
 ## 4 - Data migration to UC
 
 Once you have defined your data model in UC and that you've created appropriate Storage Credentials and External Locations,
