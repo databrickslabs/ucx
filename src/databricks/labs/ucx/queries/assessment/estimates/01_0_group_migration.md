@@ -1,3 +1,8 @@
+---
+height: 10
+width: 2
+---
+
 ## 2 - Group migration
 
 The second step of succesfully adopting UC if migrating your workspace local groups to the account.

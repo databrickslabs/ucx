@@ -1,4 +1,4 @@
--- --title 'Data modeling complexity'
+-- --title 'Data modeling complexity' --height 10 --width 1
 select
 case when distinct_tables = 0 then NULL
 when distinct_tables between 1 and 100 then "S"

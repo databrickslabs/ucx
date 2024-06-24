@@ -1,4 +1,4 @@
--- --title 'Workspace local groups'
+-- --title 'Workspace local groups' --height 10 --width 3
 SELECT
     id_in_workspace,
     name_in_workspace,
