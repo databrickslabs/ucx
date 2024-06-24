@@ -115,6 +115,7 @@
     "appnope._dummy": [],
     "appnope._nope": []
   },
+  "arc": {},
   "astor": {
     "astor": [],
     "astor.code_gen": [],
