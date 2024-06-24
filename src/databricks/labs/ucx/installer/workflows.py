@@ -636,13 +636,11 @@ class WorkflowsDeployment(InstallationMixin):
     def _job_dashboard_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
         assert task.dashboard is not None
         dashboard_id = self._install_state.dashboards[task.dashboard]
+        dashboard_url = f"{self._ws.config.host}/sql/dashboardsv3/{dashboard_id}"
         return replace(
             jobs_task,
             job_cluster_key=None,
-            sql_task=jobs.SqlTask(
-                warehouse_id=self._warehouse_id,
-                dashboard=jobs.SqlTaskDashboard(dashboard_id=dashboard_id),
-            ),
+            description=f"View dashboard: {dashboard_url}",
         )
 
     def _job_notebook_task(self, jobs_task: jobs.Task, task: Task) -> jobs.Task:
