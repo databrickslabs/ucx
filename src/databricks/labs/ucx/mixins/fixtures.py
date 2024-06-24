@@ -1345,7 +1345,11 @@ def make_storage_dir(ws, env_or_skip):
 
 @pytest.fixture
 def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_query):
-    # TODO: Update to use Lakeview dashboard
+    """Create a legacy dashboard.
+
+    This fixture is used to test migrating legacy dashboards to Lakeview.
+    """
+
     def create() -> Dashboard:
         query = make_query()
         viz = ws.query_visualizations.create(
