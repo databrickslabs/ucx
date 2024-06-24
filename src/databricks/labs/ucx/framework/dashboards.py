@@ -120,6 +120,8 @@ class DashboardFromFiles:
                     parent_path=self._remote_folder,
                     warehouse_id=self._warehouse_id,
                 )
+                assert dashboard.dashboard_id is not None
+                self._ws.lakeview.publish(dashboard.dashboard_id)
                 self._state.dashboards[dashboard_ref] = dashboard.dashboard_id
 
     def validate(self):
