@@ -12,19 +12,14 @@ from databricks.labs.ucx.source_code.queries import FromTable
 
 
 class LinterContext:
-    def __init__(self, index: MigrationIndex | None, session_state: CurrentSessionState | None = None):
+    def __init__(self, index: MigrationIndex | None = None, session_state: CurrentSessionState | None = None):
         self._index = index
         session_state = CurrentSessionState() if not session_state else session_state
 
-        python_linters: list[Linter] = [
-            DBFSUsageLinter(session_state),
-            DBRv8d0Linter(dbr_version=None),
-            SparkConnectLinter(is_serverless=False),
-            DbutilsLinter(session_state),
-        ]
+        python_linters: list[Linter] = []
         python_fixers: list[Fixer] = []
 
-        sql_linters: list[Linter] = [FromDbfsFolder()]
+        sql_linters: list[Linter] = []
         sql_fixers: list[Fixer] = []
 
         if index is not None:
@@ -34,6 +29,14 @@ class LinterContext:
 
             sql_linters.append(from_table)
             sql_fixers.append(from_table)
+
+        python_linters += [
+            DBFSUsageLinter(session_state),
+            DBRv8d0Linter(dbr_version=None),
+            SparkConnectLinter(is_serverless=False),
+            DbutilsLinter(session_state),
+        ]
+        sql_linters.append(FromDbfsFolder())
 
         self._linters = {
             Language.PYTHON: SequentialLinter(python_linters),
