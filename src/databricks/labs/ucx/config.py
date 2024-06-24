@@ -72,7 +72,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_object_permissions: list[str] | None = None
 
     def transform_inventory_database(self, node: sqlglot.Expression) -> sqlglot.Expression:
-        """Replace the database in a query."""
+        """Replace the inventory database in a query."""
         if (
             isinstance(node, sqlglot.exp.Table)
             and node.args.get("db") is not None
