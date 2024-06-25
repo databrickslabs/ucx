@@ -137,6 +137,20 @@ fstring = f"Hello {value}!"
     assert strings == ["Hello abc!"]
 
 
+def test_infers_fstring_dict_value():
+    source = """
+value = { "abc": 123 }
+fstring = f"Hello {value['abc']}!"
+"""
+    tree = Tree.parse(source)
+    nodes = tree.locate(Assign, [])
+    tree = Tree(nodes[1].value)  # value of fstring = ...
+    values = list(tree.infer_values())
+    assert all(value.is_inferred() for value in values)
+    strings = list(value.as_string() for value in values)
+    assert strings == ["Hello 123!"]
+
+
 def test_infers_string_format_value():
     source = """
 value = "abc"
