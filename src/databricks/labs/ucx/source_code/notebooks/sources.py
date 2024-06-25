@@ -179,6 +179,10 @@ class FileLinter:
             raw = _file.read(count)
             if raw.startswith(codecs.BOM_UTF8):
                 return 'utf-8-sig'
+            if raw.startswith(codecs.BOM_UTF16_LE):
+                return 'utf-16-le'
+            if raw.startswith(codecs.BOM_UTF16_BE):
+                return 'utf-16-be'
             return locale.getpreferredencoding(False)
 
     def _file_language(self):
