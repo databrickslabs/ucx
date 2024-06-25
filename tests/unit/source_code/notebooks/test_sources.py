@@ -21,6 +21,23 @@ def test_file_linter_lints_not_yet_supported_language(path, migration_index):
     assert [advice.code for advice in advices] == ["unsupported-language"]
 
 
+class FriendFileLinter(FileLinter):
+
+    def source_code(self):
+        return self._source_code
+
+
+def test_checks_encoding_of_pseudo_file(migration_index):
+    linter = FriendFileLinter(LinterContext(migration_index), Path("whatever"), "a=b")
+    assert linter.source_code() == "a=b"
+
+
+def test_checks_encoding_of_file_with_bom(migration_index, mock_path_lookup):
+    path = mock_path_lookup.resolve(Path("file_with_bom.py"))
+    linter = FriendFileLinter(LinterContext(migration_index), path)
+    assert linter.source_code() is not None
+
+
 @pytest.mark.parametrize(
     "path",
     [
