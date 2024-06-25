@@ -1224,6 +1224,358 @@
     "datasetsforecast.m5": [],
     "datasetsforecast.utils": []
   },
+  "dbacademy": {
+    "dbacademy": [],
+    "dbacademy.clients": [],
+    "dbacademy.clients.airtable": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'client.table(table_config.table_id)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "dbacademy.clients.airtable.at_utils": [],
+    "dbacademy.clients.airtable.tables_api": [],
+    "dbacademy.clients.classrooms": [],
+    "dbacademy.clients.classrooms.classroom": [],
+    "dbacademy.clients.classrooms.cloudlabs": [],
+    "dbacademy.clients.classrooms.monitor": [],
+    "dbacademy.clients.cloudlabs": [],
+    "dbacademy.clients.cloudlabs.instructors": [],
+    "dbacademy.clients.cloudlabs.labs": [],
+    "dbacademy.clients.cloudlabs.templates": [],
+    "dbacademy.clients.dbrest": [],
+    "dbacademy.clients.dbrest.accounts_client": [],
+    "dbacademy.clients.dbrest.accounts_client.metastores_api": [],
+    "dbacademy.clients.dbrest.accounts_client.scim": [],
+    "dbacademy.clients.dbrest.accounts_client.scim.users": [],
+    "dbacademy.clients.dbrest.accounts_client.workspaces_api": [],
+    "dbacademy.clients.dbrest.cluster_policies_api": [],
+    "dbacademy.clients.dbrest.clusters_api": [],
+    "dbacademy.clients.dbrest.clusters_api.cluster_config": [],
+    "dbacademy.clients.dbrest.instance_pools_api": [],
+    "dbacademy.clients.dbrest.jobs_api": [],
+    "dbacademy.clients.dbrest.jobs_api.job_config": [],
+    "dbacademy.clients.dbrest.jobs_api.task_config": [],
+    "dbacademy.clients.dbrest.ml_api": [],
+    "dbacademy.clients.dbrest.ml_api.feature_store_api": [],
+    "dbacademy.clients.dbrest.ml_api.mlflow_endpoints_api": [],
+    "dbacademy.clients.dbrest.ml_api.mlflow_model_versions_api": [],
+    "dbacademy.clients.dbrest.ml_api.mlflow_models_api": [],
+    "dbacademy.clients.dbrest.permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.authorization_tokens_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.cluster_policies_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.clusters_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.directories_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.jobs_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.permission_crud_api": [],
+    "dbacademy.clients.dbrest.permissions_api.pools_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.sql": [],
+    "dbacademy.clients.dbrest.permissions_api.sql.sql_crud_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.sql.warehouses_permissions_api": [],
+    "dbacademy.clients.dbrest.permissions_api.warehouses_permissions_api": [],
+    "dbacademy.clients.dbrest.pipelines_api": [],
+    "dbacademy.clients.dbrest.repos_api": [],
+    "dbacademy.clients.dbrest.runs_api": [],
+    "dbacademy.clients.dbrest.scim_api": [],
+    "dbacademy.clients.dbrest.scim_api.groups_api": [],
+    "dbacademy.clients.dbrest.scim_api.service_principals_api": [],
+    "dbacademy.clients.dbrest.scim_api.users_api": [],
+    "dbacademy.clients.dbrest.secrets_api": [],
+    "dbacademy.clients.dbrest.serving_endpoints_api": [],
+    "dbacademy.clients.dbrest.sql_api": [],
+    "dbacademy.clients.dbrest.sql_api.config_api": [],
+    "dbacademy.clients.dbrest.sql_api.queries_api": [],
+    "dbacademy.clients.dbrest.sql_api.statements_api": [],
+    "dbacademy.clients.dbrest.sql_api.warehouses_api": [],
+    "dbacademy.clients.dbrest.token_management_api": [],
+    "dbacademy.clients.dbrest.tokens_api": [],
+    "dbacademy.clients.dbrest.uc_api": [],
+    "dbacademy.clients.dbrest.workspace_api": [],
+    "dbacademy.clients.dbrest.workspace_config_api": [],
+    "dbacademy.clients.docebo": [],
+    "dbacademy.clients.docebo.courses_api": [],
+    "dbacademy.clients.docebo.events_api": [],
+    "dbacademy.clients.docebo.manage_api": [],
+    "dbacademy.clients.docebo.sessions_api": [],
+    "dbacademy.clients.dougrest": [],
+    "dbacademy.clients.dougrest.accounts": [],
+    "dbacademy.clients.dougrest.accounts.budgets": [],
+    "dbacademy.clients.dougrest.accounts.credentials": [],
+    "dbacademy.clients.dougrest.accounts.crud": [],
+    "dbacademy.clients.dougrest.accounts.keys": [],
+    "dbacademy.clients.dougrest.accounts.logs": [],
+    "dbacademy.clients.dougrest.accounts.metastores": [],
+    "dbacademy.clients.dougrest.accounts.network": [],
+    "dbacademy.clients.dougrest.accounts.private_access": [],
+    "dbacademy.clients.dougrest.accounts.storage": [],
+    "dbacademy.clients.dougrest.accounts.usage": [],
+    "dbacademy.clients.dougrest.accounts.users": [],
+    "dbacademy.clients.dougrest.accounts.vpc": [],
+    "dbacademy.clients.dougrest.accounts.workspaces": [],
+    "dbacademy.clients.dougrest.client": [],
+    "dbacademy.clients.dougrest.clusters": [],
+    "dbacademy.clients.dougrest.groups": [],
+    "dbacademy.clients.dougrest.jobs": [],
+    "dbacademy.clients.dougrest.mlflow": [],
+    "dbacademy.clients.dougrest.mlflow.models": [],
+    "dbacademy.clients.dougrest.mlflow.versions": [],
+    "dbacademy.clients.dougrest.pools": [],
+    "dbacademy.clients.dougrest.repos": [],
+    "dbacademy.clients.dougrest.runs": [],
+    "dbacademy.clients.dougrest.scim": [],
+    "dbacademy.clients.dougrest.scim.groups": [],
+    "dbacademy.clients.dougrest.scim.users": [],
+    "dbacademy.clients.dougrest.secrets": [],
+    "dbacademy.clients.dougrest.sql": [],
+    "dbacademy.clients.dougrest.sql.warehouses": [],
+    "dbacademy.clients.dougrest.workspace": [],
+    "dbacademy.clients.github": [],
+    "dbacademy.clients.google": [],
+    "dbacademy.clients.google.drive_api": [],
+    "dbacademy.clients.google.google_client_exception": [],
+    "dbacademy.clients.rest": [],
+    "dbacademy.clients.rest.common": [],
+    "dbacademy.clients.rest.crud": [],
+    "dbacademy.clients.rest.factory": [],
+    "dbacademy.clients.slack": [],
+    "dbacademy.clients.vocareum": [],
+    "dbacademy.clients.vocareum.assignments_api": [],
+    "dbacademy.clients.vocareum.courses_api": [],
+    "dbacademy.clients.vocareum.users_api": [],
+    "dbacademy.common": [],
+    "dbacademy.common.cloud": [],
+    "dbacademy.common.validator": [],
+    "dbacademy.dbbuild": [],
+    "dbacademy.dbbuild.build_config": [],
+    "dbacademy.dbbuild.build_config_data": [],
+    "dbacademy.dbbuild.build_utils": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ],
+    "dbacademy.dbbuild.change_log": [],
+    "dbacademy.dbbuild.dbb_constants": [],
+    "dbacademy.dbbuild.publish": [],
+    "dbacademy.dbbuild.publish.advertiser": [],
+    "dbacademy.dbbuild.publish.artifact_validator": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/mnt/resources.training.databricks.com/distributions/"
+      }
+    ],
+    "dbacademy.dbbuild.publish.docs_publisher": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: /dbfs/mnt/resources.training.databricks.com/distributions/"
+      }
+    ],
+    "dbacademy.dbbuild.publish.notebook_def": [],
+    "dbacademy.dbbuild.publish.notebook_def_data": [],
+    "dbacademy.dbbuild.publish.notebook_logger": [],
+    "dbacademy.dbbuild.publish.pub_utils": [],
+    "dbacademy.dbbuild.publish.publisher": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: /dbfs/mnt/resources.training.databricks.com/distributions/"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/FileStore/tmp/"
+      }
+    ],
+    "dbacademy.dbbuild.publish.publishing_info": [],
+    "dbacademy.dbbuild.publish.resource_diff": [],
+    "dbacademy.dbbuild.publish.state_variables": [],
+    "dbacademy.dbbuild.publish.translator": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/FileStore/tmp/"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/mnt/resources.training.databricks.com/distributions/"
+      }
+    ],
+    "dbacademy.dbbuild.test": [],
+    "dbacademy.dbbuild.test.results_evaluator": [],
+    "dbacademy.dbbuild.test.test_instance": [],
+    "dbacademy.dbbuild.test.test_suite": [],
+    "dbacademy.dbgems": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'spark.sql(query)' because its value cannot be computed"
+      }
+    ],
+    "dbacademy.dbgems.mock_dbutils_class": [],
+    "dbacademy.dbgems.mock_spark_context_class": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "dbacademy.dbhelper": [],
+    "dbacademy.dbhelper.course_config": [],
+    "dbacademy.dbhelper.dataset_manager": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ],
+    "dbacademy.dbhelper.dbacademy_helper": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/mnt/dbacademy-datasets"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/mnt/dbacademy-datasets-staging"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/mnt/dbacademy-users"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f\"CREATE DATABASE IF NOT EXISTS {self.schema_name} LOCATION '{self.paths.user_db}'\")' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'CREATE CATALOG IF NOT EXISTS {self.catalog_name}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'SHOW SCHEMAS IN {self.catalog_name}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'SHOW TABLES IN {schema}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'SHOW TABLES IN {self.catalog_name}.{schema}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'USE CATALOG {self.catalog_name}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'USE {self.schema_name}')' because its value cannot be computed"
+      }
+    ],
+    "dbacademy.dbhelper.dbh_constants": [],
+    "dbacademy.dbhelper.lesson_config": [],
+    "dbacademy.dbhelper.paths": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ],
+    "dbacademy.dbhelper.supporting": [],
+    "dbacademy.dbhelper.supporting.clusters_helper": [],
+    "dbacademy.dbhelper.supporting.databases_helper": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'DROP CATALOG IF EXISTS {cat_name} CASCADE;')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'DROP CATALOG {catalog_name} CASCADE;')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'DROP DATABASE IF EXISTS {db_name} CASCADE;')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'DROP DATABASE {schema_name} CASCADE;')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f\"CREATE DATABASE IF NOT EXISTS {db_name} LOCATION '{db_path}';\")' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'CREATE CATALOG IF NOT EXISTS {cat_name};')' because its value cannot be computed"
+      }
+    ],
+    "dbacademy.dbhelper.supporting.dev_helper": [],
+    "dbacademy.dbhelper.supporting.universal_worskpace_setup_runner": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      },
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/mnt/dbacademy/uws.json"
+      }
+    ],
+    "dbacademy.dbhelper.supporting.warehouses_helper": [],
+    "dbacademy.dbhelper.supporting.workspace_helper": [],
+    "dbacademy.dbhelper.validations": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "dbacademy.dbhelper.validations.validation_class": [],
+    "dbacademy.dbhelper.validations.validation_result_class": [],
+    "dbacademy.dbhelper.validations.validation_results_aggregator_class": [],
+    "dbacademy.dbhelper.workspace_cleaner": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'DROP CATALOG IF EXISTS {catalog_name} CASCADE')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'DROP CATALOG IF EXISTS {self.__da.catalog_name} CASCADE')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.spark.sql(f'SHOW DATABASES IN {catalog_name}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'DESCRIBE TABLE EXTENDED {schema_name}')' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'dbgems.sql(f'DROP DATABASE IF EXISTS {schema_name} CASCADE')' because its value cannot be computed"
+      }
+    ],
+    "dbacademy.jobs": [],
+    "dbacademy.jobs.pools": [],
+    "dbacademy.jobs.pools.account_config_class": [],
+    "dbacademy.jobs.pools.uc_storage_config_class": [],
+    "dbacademy.jobs.pools.workspace_config_classe": [],
+    "dbacademy.jobs.pools.workspace_setup_class": [
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ]
+  },
   "dbignite": {
     "dbignite": [],
     "dbignite.fhir_mapping_model": [],
