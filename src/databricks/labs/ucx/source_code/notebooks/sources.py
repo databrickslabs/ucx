@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import codecs
 import locale
+import os
 from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path
@@ -179,7 +181,6 @@ class FileLinter:
             if raw.startswith(codecs.BOM_UTF8):
                 return 'utf-8-sig'
             return locale.getpreferredencoding(False)
-
 
     def _file_language(self):
         return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
