@@ -24436,6 +24436,9 @@
     "sparknlp.upload_to_hub": [],
     "sparknlp.util": []
   },
+  "spark-ocr": {
+    "sparkocr": []
+  },
   "spark-price-transparency": {
     "spark_price_transparency": [],
     "spark_price_transparency.allowed_amounts": [],
