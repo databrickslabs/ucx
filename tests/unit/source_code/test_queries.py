@@ -88,7 +88,7 @@ def test_parses_create_schema(migration_index):
 
 
 def test_raises_advice_when_parsing_unsupported_sql(migration_index):
-    query = "DESCRIBE DETAIL xyz"
+    query = "XDESCRIBE DETAILS xyz" # not a valid query
     session_state = CurrentSessionState(schema="old")
     ftf = FromTable(migration_index, session_state=session_state)
     advices = list(ftf.lint(query))
