@@ -4,7 +4,6 @@ import codecs
 import locale
 import os
 from collections.abc import Iterable
-from functools import cached_property
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
@@ -167,13 +166,13 @@ class FileLinter:
         self._path: Path = path
         self._content = content
 
-    @cached_property
+    @property
     def _source_code(self) -> str:
-        return self._path.read_text(self._guess_encoding()) if self._content is None else self._content
+        if self._content is None:
+            self._content = self._path.read_text(self._guess_encoding())
+        return self._content
 
     def _guess_encoding(self):
-        if self._content is not None:
-            return "utf-8"
         path = self._path.as_posix()
         count = min(32, os.path.getsize(path))
         with open(path, 'rb') as _file:
