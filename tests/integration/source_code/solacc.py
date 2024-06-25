@@ -90,13 +90,7 @@ def lint_all(file_to_lint: str | None):
             continue
         _missing_imports, _parseable = lint_one(file, ctx, unparsed)
         for _import in _missing_imports:
-            prefix = _import.split(".")[0]
-            details = missing_imports.get(prefix, None)
-            if details is None:
-                details = {}
-                missing_imports[prefix] = details
-            count = details.get(_import, 0)
-            details[_import] = count + 1
+            register_missing_import(missing_imports, _import)
         parseable += _parseable
     all_files_len = len(all_files) - (len(skipped) if skipped else 0)
     parseable_pct = int(parseable / all_files_len * 100)
@@ -104,14 +98,28 @@ def lint_all(file_to_lint: str | None):
     logger.info(
         f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {missing_imports_count}"
     )
-    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: sum(item[1].values()), reverse=True))
-    for key, details in missing_imports.items():
-        logger.info(f"Missing import '{key}'")
-        for item, count in details.items():
-            logger.info(f"  {item}: {count} occurrences")
+    log_missing_imports(missing_imports)
     # fail the job if files are unparseable
     if parseable_pct < 100:
         sys.exit(1)
+
+
+def register_missing_import(missing_imports: dict[str, dict[str, int]], missing_import: str):
+    prefix = missing_import.split(".")[0]
+    details = missing_imports.get(prefix, None)
+    if details is None:
+        details = {}
+        missing_imports[prefix] = details
+    count = details.get(missing_import, 0)
+    details[missing_import] = count + 1
+
+
+def log_missing_imports(missing_imports: dict[str, dict[str, int]]):
+    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: sum(item[1].values()), reverse=True))
+    for prefix, details in missing_imports.items():
+        logger.info(f"Missing import '{prefix}'")
+        for item, count in details.items():
+            logger.info(f"  {item}: {count} occurrences")
 
 
 def main(args: list[str]):
