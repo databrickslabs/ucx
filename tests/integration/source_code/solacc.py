@@ -73,7 +73,8 @@ def lint_all(file_to_lint: str | None):
         linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
     )
     parseable = 0
-    missing_imports: dict[str, int] = {}
+    missing_imports_details: dict[str, int] = {}
+    missing_imports_merged: dict[str, int] = {}
     all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
     unparsed: Path | None = None
     if file_to_lint is None:
@@ -90,16 +91,20 @@ def lint_all(file_to_lint: str | None):
             continue
         _missing_imports, _parseable = lint_one(file, ctx, unparsed)
         for _import in _missing_imports:
-            count = missing_imports.get(_import, 0)
-            missing_imports[_import] = count + 1
+            count = missing_imports_details.get(_import, 0)
+            missing_imports_details[_import] = count + 1
+            prefix = _import.split(".")[0]
+            count = missing_imports_merged.get(prefix, 0)
+            missing_imports_merged[prefix] = count + 1
+
         parseable += _parseable
     all_files_len = len(all_files) - (len(skipped) if skipped else 0)
     parseable_pct = int(parseable / all_files_len * 100)
     logger.info(
-        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {sum(missing_imports.values())}"
+        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {sum(missing_imports_details.values())}"
     )
-    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: item[1], reverse=True))
-    for key, value in missing_imports.items():
+    missing_imports_merged = dict(sorted(missing_imports_merged.items(), key=lambda item: item[1], reverse=True))
+    for key, value in missing_imports_merged.items():
         logger.info(f"Missing import '{key}': {value} occurrences")
     # fail the job if files are unparseable
     if parseable_pct < 100:
