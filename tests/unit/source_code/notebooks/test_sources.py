@@ -1,3 +1,4 @@
+import codecs
 import locale
 import tempfile
 from pathlib import Path
@@ -33,35 +34,22 @@ def test_checks_encoding_of_pseudo_file(migration_index):
     assert linter.source_code() == "a=b"
 
 
-def test_checks_encoding_of_file_with_utf8_bom(migration_index, mock_path_lookup):
-    path = mock_path_lookup.resolve(Path("file_with_bom.py"))
-    linter = FriendFileLinter(LinterContext(migration_index), path)
-    assert linter.source_code() is not None
-
-
-def test_checks_encoding_of_file_with_utf16_le_bom(migration_index):
-    with (tempfile.NamedTemporaryFile() as tf):
-        data = bytearray()
-        data.append(0xFF)
-        data.append(0xFE)
-        for b in "a = 12".encode('utf-16-le'):
-            data.append(b)
-        tf.write(data)
-        tf.flush()
-        linter = FriendFileLinter(LinterContext(migration_index), Path(tf.name))
-        assert linter.source_code() == "a = 12"
-
-
-def test_checks_encoding_of_file_with_utf16_be_bom(migration_index):
-    with (tempfile.NamedTemporaryFile() as tf):
-        data = bytearray()
-        data.append(0xFE)
-        data.append(0xFF)
-        for b in "a = 12".encode('utf-16-be'):
-            data.append(b)
-        tf.write(data)
-        tf.flush()
-        linter = FriendFileLinter(LinterContext(migration_index), Path(tf.name))
+@pytest.mark.parametrize(
+    "bom, encoding",
+    [
+        (codecs.BOM_UTF8, "utf-8"),
+        (codecs.BOM_UTF16_LE, "utf-16-le"),
+        (codecs.BOM_UTF16_BE, "utf-16-be"),
+        (codecs.BOM_UTF32_LE, "utf-32-le"),
+        (codecs.BOM_UTF32_BE, "utf-32-be"),
+    ],
+)
+def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding):
+    with tempfile.NamedTemporaryFile() as temp:
+        data = bom + "a = 12".encode(encoding)
+        temp.write(data)
+        temp.flush()
+        linter = FriendFileLinter(LinterContext(migration_index), Path(temp.name))
         assert linter.source_code() == "a = 12"
 
 
