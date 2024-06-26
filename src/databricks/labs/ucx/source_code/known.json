@@ -3740,6 +3740,9 @@
     "duckdb.udf": [],
     "duckdb.value.constant": []
   },
+  "emmv": {
+    "emmv": []
+  },
   "entrypoints": {
     "entrypoints": []
   },
