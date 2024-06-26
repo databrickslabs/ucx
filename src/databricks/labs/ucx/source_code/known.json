@@ -960,6 +960,12 @@
     "bidict._typing": [],
     "bidict.metadata": []
   },
+  "bioinfokit": {
+    "bioinfokit": [],
+    "bioinfokit.analys": [],
+    "bioinfokit.help": [],
+    "bioinfokit.visuz": []
+  },
   "black": {
     "_black_version": [],
     "black": [],
