@@ -5791,6 +5791,21 @@
     "pydevd_plugins.extensions": [],
     "pydevd_plugins.extensions.pydevd_plugin_omegaconf": []
   },
+  "opencv-python": {
+    "cv2": [],
+    "cv2.config-3": [],
+    "cv2.config": [],
+    "cv2.data": [],
+    "cv2.gapi": [],
+    "cv2.load_config_py2": [],
+    "cv2.load_config_py3": [],
+    "cv2.mat_wrapper": [],
+    "cv2.misc": [],
+    "cv2.misc.version": [],
+    "cv2.typing": [],
+    "cv2.utils": [],
+    "cv2.version": []
+  },
   "opentelemetry-api": {
     "opentelemetry._logs": [],
     "opentelemetry._logs._internal": [],
