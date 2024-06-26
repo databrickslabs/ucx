@@ -97,7 +97,7 @@ class MockPathLookup(PathLookup):
 
 
 @pytest.fixture
-def mock_path_lookup():
+def mock_path_lookup() -> PathLookup:
     return MockPathLookup()
 
 
