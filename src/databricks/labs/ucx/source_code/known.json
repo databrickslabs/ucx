@@ -2799,6 +2799,29 @@
   "gunicorn": {
     "gunicorn": []
   },
+  "h3": {
+    ".........setup": [],
+    "h3": [],
+    "h3._cy": [],
+    "h3._version": [],
+    "h3.api": [],
+    "h3.api._api_template": [],
+    "h3.api.basic_int": [],
+    "h3.api.basic_int._binding": [],
+    "h3.api.basic_int._public_api": [],
+    "h3.api.basic_str": [],
+    "h3.api.basic_str._binding": [],
+    "h3.api.basic_str._public_api": [],
+    "h3.api.memview_int": [],
+    "h3.api.memview_int._binding": [],
+    "h3.api.memview_int._public_api": [],
+    "h3.api.numpy_int": [],
+    "h3.api.numpy_int._binding": [],
+    "h3.api.numpy_int._public_api": [],
+    "h3.unstable": [],
+    "h3.unstable.v4": [],
+    "h3.unstable.vect": []
+  },
   "h5py": {
     "h5py": []
   },
