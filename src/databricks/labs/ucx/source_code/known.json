@@ -22564,6 +22564,20 @@
     "isympy": [],
     "sympy": []
   },
+  "tenacity": {
+    "tenacity": [],
+    "tenacity._utils": [],
+    "tenacity.after": [],
+    "tenacity.asyncio": [],
+    "tenacity.asyncio.retry": [],
+    "tenacity.before": [],
+    "tenacity.before_sleep": [],
+    "tenacity.nap": [],
+    "tenacity.retry": [],
+    "tenacity.stop": [],
+    "tenacity.tornadoweb": [],
+    "tenacity.wait": []
+  },
   "tensorboard": {
     "tensorboard": []
   },
