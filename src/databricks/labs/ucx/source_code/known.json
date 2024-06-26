@@ -1000,6 +1000,22 @@
       }
     ]
   },
+  "btyd": {
+    "btyd": [],
+    "btyd.datasets": [],
+    "btyd.fitters": [],
+    "btyd.fitters.beta_geo_beta_binom_fitter": [],
+    "btyd.fitters.beta_geo_covar_fitter": [],
+    "btyd.fitters.beta_geo_fitter": [],
+    "btyd.fitters.gamma_gamma_fitter": [],
+    "btyd.fitters.modified_beta_geo_fitter": [],
+    "btyd.fitters.pareto_nbd_fitter": [],
+    "btyd.generate_data": [],
+    "btyd.models": [],
+    "btyd.models.beta_geo_model": [],
+    "btyd.plotting": [],
+    "btyd.utils": []
+  },
   "cachetools": {
     "cachetools": []
   },
@@ -23706,4 +23722,3 @@
     "zipp.glob": []
   }
 }
-
