@@ -400,6 +400,7 @@ class TablesCrawler(CrawlerBase):
         for database in self._all_databases():
             logger.debug(f"[{catalog}.{database}] listing tables")
             try:
+                # Also returns views.
                 table_rows = self._fetch(
                     f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
                 )
