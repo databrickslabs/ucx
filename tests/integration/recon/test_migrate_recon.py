@@ -1,10 +1,11 @@
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.mapping import Rule
 from databricks.labs.ucx.hive_metastore.tables import What
+
+from ..retries import retried
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

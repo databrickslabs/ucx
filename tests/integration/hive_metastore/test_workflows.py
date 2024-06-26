@@ -2,7 +2,8 @@ from datetime import timedelta
 
 import pytest
 from databricks.sdk.errors import InvalidParameterValue, NotFound
-from databricks.sdk.retries import retried
+
+from ..retries import retried
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))

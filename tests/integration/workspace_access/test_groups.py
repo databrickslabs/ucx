@@ -4,11 +4,11 @@ from datetime import timedelta
 
 import pytest
 from databricks.sdk.errors import NotFound, ResourceConflict
-from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group, ResourceMeta
 
 from databricks.labs.ucx.workspace_access.groups import GroupManager
 
+from ..retries import retried
 
 logger = logging.getLogger(__name__)
 

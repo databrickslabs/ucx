@@ -23,7 +23,6 @@ from databricks.sdk.errors import (
     ResourceConflict,
 )
 
-from databricks.sdk.retries import retried
 from databricks.sdk.service import compute
 from databricks.sdk.service.iam import PermissionLevel
 
@@ -31,6 +30,8 @@ import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
+
+from .retries import retried
 
 logger = logging.getLogger(__name__)
 

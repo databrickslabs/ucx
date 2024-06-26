@@ -8,7 +8,6 @@ from unittest.mock import create_autospec
 
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Library, PythonPyPiLibrary
 from databricks.sdk.service.pipelines import NotebookLibrary
 from databricks.sdk.service.workspace import ImportFormat
@@ -21,6 +20,8 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
+
+from ..retries import retried
 
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))

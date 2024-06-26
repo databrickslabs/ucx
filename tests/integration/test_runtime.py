@@ -7,10 +7,11 @@ from databricks.sdk.errors import (
     InvalidParameterValue,
     NotFound,
 )
-from databricks.sdk.retries import retried
 from databricks.sdk.service import sql
 from databricks.sdk.service.iam import PermissionLevel
 from databricks.sdk.service.workspace import AclPermission
+
+from .retries import retried
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,12 @@ import logging
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.catalog import Privilege, PrivilegeAssignment, SecurableType
 
 from databricks.labs.ucx.hive_metastore.table_move import TableMove
+
+from ..retries import retried
+
 
 logger = logging.getLogger(__name__)
 

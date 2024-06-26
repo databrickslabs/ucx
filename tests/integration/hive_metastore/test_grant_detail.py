@@ -4,13 +4,13 @@ import datetime as dt
 
 import pytest
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from databricks.labs.ucx.install import deploy_schema
 
 from ..conftest import TestRuntimeContext
+from ..retries import retried
 
 logger = logging.getLogger(__name__)
 
