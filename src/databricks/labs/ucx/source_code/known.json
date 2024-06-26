@@ -1911,6 +1911,9 @@
     "dockerpycreds.utils": [],
     "dockerpycreds.version": []
   },
+  "emmv": {
+    "emmv": []
+  },
   "entrypoints": {
     "entrypoints": []
   },
