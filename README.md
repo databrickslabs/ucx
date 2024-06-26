@@ -1301,6 +1301,9 @@ By default, it will revert all the clusters present in the backup folder
 
 [[back to top](#databricks-labs-ucx)]
 
+# Common Challenges and the Solutions
+Users might encounter some challenges while installing and executing UCX. Please find the listing of some common challenges and the solutions [here](docs/common_challenges_and_solutions.md).
+
 # Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=databrickslabs/ucx&type=Date)](https://star-history.com/#databrickslabs/ucx)
