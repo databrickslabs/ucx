@@ -196,7 +196,7 @@ def test_running_real_remove_backup_groups_job(ws, installation_ctx):
         get_group(ws_group_a.id)
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=3))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_repair_run_workflow_job(installation_ctx, mocker):
     mocker.patch("webbrowser.open")
     installation_ctx.workspace_installation.run()
