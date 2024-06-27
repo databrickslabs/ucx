@@ -174,7 +174,7 @@ def test_hiveserde_table_in_place_migration_job(
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_ctas_migration_job(
     ws,
