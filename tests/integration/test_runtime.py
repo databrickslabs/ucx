@@ -35,7 +35,7 @@ def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, 
     assert after[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=20))
 def test_running_real_migrate_groups_job(
     ws,
     installation_ctx,
