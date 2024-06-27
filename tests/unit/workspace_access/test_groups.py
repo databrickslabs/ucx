@@ -450,9 +450,8 @@ def test_rename_groups_should_fail_if_error_is_thrown():
     }
     wsclient.groups.patch.side_effect = RuntimeError("Something bad")
     group_manager = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
-    with pytest.raises(ManyError) as e:
+    with pytest.raises(RuntimeError, match="Something bad"):
         group_manager.rename_groups()
-    assert e.value.args[0] == "Detected 1 failures: RuntimeError: Something bad"
 
 
 def test_reflect_account_groups_on_workspace_should_be_called_for_eligible_groups():
