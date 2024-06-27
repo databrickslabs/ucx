@@ -10,6 +10,7 @@ from functools import cached_property
 from typing import Any
 
 import databricks.sdk.errors
+import sqlglot
 from databricks.labs.blueprint.entrypoint import get_logger, is_in_debug
 from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.installer import InstallState
@@ -509,9 +510,24 @@ class WorkspaceInstallation(InstallationMixin):
                 raise BadRequest(msg) from err
             raise err
 
+    @staticmethod
+    def _transform_inventory_database(node: sqlglot.Expression, *, inventory_database: str) -> sqlglot.Expression:
+        """Replace the inventory database in a query."""
+        if (
+            isinstance(node, sqlglot.exp.Table)
+            and node.args.get("db") is not None
+            and getattr(node.args.get("db"), "this", "") == "inventory"
+        ):
+            node.args["db"].set("this", f"hive_metastore.{inventory_database}")
+        return node
+
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
         local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
+        query_transformer = functools.partial(
+            self._transform_inventory_database,
+            inventory_database=self._config.inventory_database,
+        )
         dash = DashboardFromFiles(
             self._ws,
             state=self._install_state,
@@ -519,7 +535,7 @@ class WorkspaceInstallation(InstallationMixin):
             remote_folder=f"{self._installation.install_folder()}/dashboards",
             name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
-            query_transformer=self._config.transform_inventory_database,
+            query_transformer=query_transformer,
         )
         dash.create_dashboards()
 

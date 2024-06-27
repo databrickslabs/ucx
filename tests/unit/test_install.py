@@ -1,9 +1,11 @@
+import functools
 import io
 import json
 import logging
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, create_autospec, patch
 
+import sqlglot
 import pytest
 import yaml
 from databricks.labs.blueprint.installation import Installation, MockInstallation
@@ -1926,3 +1928,41 @@ def test_upload_dependencies(ws, mock_installation):
     workspace_installation.run()
     wheels.upload_wheel_dependencies.assert_called_once()
     wheels.upload_to_wsfs.assert_called_once()
+
+
+def test_workspace_installation_transforms_inventory_database_in_query(ws, mock_installation, any_prompt):
+    install_state = InstallState.from_installation(mock_installation)
+    wheels = create_autospec(WheelsV2)
+    workflows_installation = WorkflowsDeployment(
+        WorkspaceConfig(inventory_database="...", policy_id='123'),
+        mock_installation,
+        install_state,
+        ws,
+        wheels,
+        PRODUCT_INFO,
+        timedelta(seconds=1),
+        [],
+    )
+
+    workspace_installation = WorkspaceInstallation(
+        WorkspaceConfig(inventory_database='ucx'),
+        mock_installation,
+        install_state,
+        MockBackend(),
+        ws,
+        workflows_installation,
+        any_prompt,
+        PRODUCT_INFO,
+    )
+
+    query_transformed_expected = "SELECT a, b FROM hive_metastore.test.table"
+    query = sqlglot.parse_one("SELECT a, b FROM inventory.table")
+
+    query_transformer = functools.partial(
+        workspace_installation._transform_inventory_database,  # pylint: disable=protected-access
+        inventory_database="test",
+    )
+    query_transformed = query.transform(query_transformer).sql(dialect=sqlglot.dialects.Databricks)
+
+    assert query_transformed == query_transformed_expected
+    wheels.assert_not_called()
