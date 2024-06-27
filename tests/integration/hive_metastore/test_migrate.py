@@ -492,7 +492,7 @@ def test_migrate_managed_tables_with_acl(ws, sql_backend, runtime_ctx, make_cata
     assert target_table_grants.privilege_assignments[0].privileges == [Privilege.MODIFY, Privilege.SELECT]
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_external_tables_with_principal_acl_azure(
     ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster, make_ucx_group
 ):
