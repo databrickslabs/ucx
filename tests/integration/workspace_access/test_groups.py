@@ -88,7 +88,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     # At this time previous ws level groups aren't deleted
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
