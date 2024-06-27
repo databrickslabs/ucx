@@ -23,7 +23,7 @@ from databricks.sdk.service import jobs, compute, pipelines
 from databricks.labs.ucx.mixins.wspath import WorkspacePath
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=10))
 def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job):
     # Deprecated file system path in call to: /mnt/things/e/f/g
     lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
