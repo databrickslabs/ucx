@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from abc import abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Collection
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import ClassVar
@@ -374,6 +374,16 @@ class RegexMatchStrategy(GroupMigrationStrategy):
             )
 
 
+class GroupRenameIncompleteError(RuntimeError):
+    __slots__ = ("group_id", "old_name", "new_name")
+
+    def __init__(self, group_id: str, old_name: str, new_name: str) -> None:
+        super().__init__(f"Rename incomplete for group {group_id}: {old_name} -> {new_name}")
+        self.group_id = group_id
+        self.old_name = old_name
+        self.new_name = new_name
+
+
 class GroupManager(CrawlerBase[MigratedGroup]):
     _SYSTEM_GROUPS: ClassVar[list[str]] = ["users", "admins", "account users"]
 
@@ -425,18 +435,62 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 continue
             logger.info(f"Renaming: {migrated_group.name_in_workspace} -> {migrated_group.temporary_name}")
             tasks.append(
-                functools.partial(self._rename_group, migrated_group.id_in_workspace, migrated_group.temporary_name)
+                functools.partial(
+                    self._rename_group_and_wait,
+                    migrated_group.id_in_workspace,
+                    migrated_group.name_in_workspace,
+                    migrated_group.temporary_name,
+                )
             )
-        _, errors = Threads.gather("rename groups in the workspace", tasks)
-        if len(errors) > 0:
-            raise ManyError(errors)
+        renamed_groups = Threads.strict("rename groups in the workspace", tasks)
+        # Renaming is eventually consistent, and the tasks above have each polled to verify their rename completed.
+        # Here we also check that enumeration yields the updated names; this is necessary because otherwise downstream
+        # tasks (like reflect_account_groups_on_workspace()) may skip a renamed group because it doesn't appear to be
+        # present.
+        self._wait_for_renamed_groups(renamed_groups)
+
+    def _rename_group_and_wait(self, group_id: str, old_group_name, new_group_name: str) -> tuple[str, str]:
+        logger.debug(f"Renaming group {group_id}: {old_group_name} -> {new_group_name}")
+        self._rename_group(group_id, new_group_name)
+        logger.debug(f"Waiting for group {group_id} rename to take effect: {old_group_name} -> {new_group_name}")
+        self._wait_for_rename(group_id, old_group_name, new_group_name)
+        return group_id, new_group_name
 
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=10, burst_period_seconds=60)
-    def _rename_group(self, group_id: str, new_group_name: str):
+    def _rename_group(self, group_id: str, new_group_name: str) -> None:
         ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
         self._ws.groups.patch(group_id, operations=ops)
-        return True
+
+    @retried(on=[GroupRenameIncompleteError], timeout=timedelta(minutes=2))
+    def _wait_for_rename(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
+        group = self._ws.groups.get(group_id)
+        if group.display_name == old_group_name:
+            # Rename still pending.
+            raise GroupRenameIncompleteError(group_id, old_group_name, new_group_name)
+        if group.display_name != new_group_name:
+            # Group has an entirely unexpected name; something else is interfering.
+            msg = f"While waiting for group {group_id} rename ({old_group_name} -> {new_group_name} an unexpected name was observed: {group.display_name}"
+            raise RuntimeError(msg)
+        # Normal exit; group has been renamed.
+
+    @retried(on=[ManyError], timeout=timedelta(minutes=2))
+    def _wait_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]]) -> None:
+        attributes = "id,displayName"
+        found_groups = {
+            group.id: group.display_name
+            for group in self._list_workspace_groups("WorkspaceGroup", attributes)
+            if group.display_name
+        }
+        pending_renames: list[RuntimeError] = []
+        for group_id, expected_name in expected_groups:
+            found_name = found_groups.get(group_id, None)
+            if found_name is None:
+                pending_renames.append(RuntimeError(f"Missing group with id: {group_id} (renamed to {expected_name}"))
+            elif found_name != expected_name:
+                pending_renames.append(GroupRenameIncompleteError(group_id, found_name, expected_name))
+        if pending_renames:
+            raise ManyError(pending_renames)
 
     def reflect_account_groups_on_workspace(self):
         tasks = []

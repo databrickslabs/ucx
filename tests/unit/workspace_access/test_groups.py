@@ -1,13 +1,15 @@
+import dataclasses
 import json
 import logging
-from unittest.mock import create_autospec
+from collections.abc import Generator, Sequence
+from unittest.mock import create_autospec, patch, Mock
 
 import pytest
 from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.labs.lsql.backends import MockBackend
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import DatabricksError, NotFound, ResourceDoesNotExist
+from databricks.sdk.errors import DatabricksError, InternalError, NotFound, ResourceDoesNotExist
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import ComplexValue, Group, ResourceMeta
 
@@ -17,6 +19,22 @@ from databricks.labs.ucx.workspace_access.groups import (
     MigratedGroup,
     MigrationState,
 )
+
+
+@pytest.fixture
+def fake_sleep() -> Generator[Mock, None, None]:
+    """Allow a test to request this fixture if internal calls to sleep should return immediately.
+
+    This is useful during unit testing when we're normally checking for interactions and don't want normal delays to
+    occur.
+    """
+    with patch("time.sleep") as mock:
+        # To prevent runaway loops, raise an exception if invoked more than 100 times.
+        def _check_count(*_, **__):
+            assert mock.call_count < 100, "time.sleep() has been invoked too often; runaway loop?"
+
+        mock.side_effect = _check_count
+        yield mock
 
 
 def test_snapshot_with_group_created_in_account_console_should_be_considered():
@@ -255,16 +273,26 @@ def test_rename_groups_should_patch_eligible_groups():
     backend = MockBackend()
     wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [
-        group1,
-    ]
+    updated_group1 = dataclasses.replace(group1, display_name="test-group-de")
+    wsclient.groups.list.side_effect = (
+        # Preparing for the rename.
+        *[[group1]] * 3,
+        # Checking the rename completed
+        [updated_group1],
+    )
+    wsclient.groups.get.side_effect = (
+        # Preparing for the rename.
+        *[group1] * 2,
+        # Checking the rename completed.
+        updated_group1,
+    )
     wsclient.groups.get.return_value = group1
     account_admins_group_1 = Group(id="11", display_name="de")
     wsclient.api_client.do.return_value = {
         "Resources": [g.as_dict() for g in (account_admins_group_1,)],
     }
     GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").rename_groups()
-    wsclient.groups.patch.assert_called_with(
+    wsclient.groups.patch.assert_called_once_with(
         "1",
         operations=[iam.Patch(iam.PatchOp.REPLACE, "displayName", "test-group-de")],
     )
@@ -291,6 +319,121 @@ def test_rename_groups_should_filter_already_renamed_groups():
     wsclient.groups.get.return_value = group1
     GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").rename_groups()
     wsclient.groups.patch.assert_not_called()
+
+
+def test_rename_groups_should_wait_for_renames_to_complete(fake_sleep: Mock) -> None:
+    """Test that renaming groups waits until completion instead of returning immediately.
+
+    Group renaming is eventually consistent; however many downstream tasks assume that it completes synchronously.
+    Here we test that renaming the groups polls until the rename is detected.
+    """
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    original_group = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    updated_group = dataclasses.replace(original_group, display_name="test-group-de")
+    # Used to enumerate groups.
+    list_side_effect_values = (
+        # Preparing for the rename.
+        *[[original_group]] * 3,
+        # Checking the rename completed; simulate:
+        # 1. Rename incomplete: original group still visible.
+        # 2. Still incomplete: group missing entirely.
+        # 3. Rename has finished: updated group is now visible.
+        [original_group],
+        [],
+        [updated_group],
+    )
+    wsclient.groups.list.side_effect = list_side_effect_values
+    # Used to load the migration state.
+    matching_account_admin_group = dataclasses.replace(
+        original_group, id="11", meta=ResourceMeta(resource_type="Group")
+    )
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (matching_account_admin_group,)],
+    }
+    # Used to get the group data prior to the rename, and then poll for the change.
+    get_return_values = (
+        # Enumerating the workspace groups and loading the migration state.
+        *[original_group] * 2,
+        # First call after rename: simulate the rename not yet being visible.
+        original_group,
+        # Second call, simulate things now being complete.
+        updated_group,
+    )
+    wsclient.groups.get.side_effect = get_return_values
+
+    # Perform the test itself.
+    GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").rename_groups()
+
+    # Verify the internal interactions.
+    assert wsclient.groups.get.call_count == len(get_return_values)
+    assert wsclient.groups.list.call_count == len(list_side_effect_values)
+    fake_sleep.assert_called()
+
+
+def test_rename_groups_should_retry_on_internal_error(fake_sleep: Mock) -> None:
+    """Test that when a rename fails due to an internal error that an automatic retry takes place."""
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    original_group = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    updated_group = dataclasses.replace(original_group, display_name="test-group-de")
+    wsclient.groups.list.side_effect = (
+        # Preparing for the rename.
+        *[[original_group]] * 3,
+        # Checking the rename completed.
+        [updated_group],
+    )
+    matching_account_admin_group = dataclasses.replace(
+        original_group, id="11", meta=ResourceMeta(resource_type="Group")
+    )
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (matching_account_admin_group,)],
+    }
+    wsclient.groups.get.side_effect = (
+        # Preparing for the rename.
+        *[original_group] * 2,
+        # Checking the rename completed.
+        updated_group,
+    )
+    # The response to the PATCH call is ignored; set things up to fail on the first call and succeed on the second.
+    patch_responses: Sequence[type[BaseException] | dict] = (InternalError, {})
+    wsclient.groups.patch.side_effect = patch_responses
+
+    # Perform the test itself.
+    GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-").rename_groups()
+
+    # Verify the internal interactions.
+    assert wsclient.groups.patch.call_count == len(patch_responses)
+    fake_sleep.assert_called()
+
+
+def test_rename_groups_should_fail_if_unknown_name_observed() -> None:
+    """Test that interference during group renaming is detected.
+
+    During a rename from A -> B verify that we fail immediately if C is observed instead of waiting for a timeout to
+    occur. (Most likely a concurrent process is busy, and B will never happen.)
+    """
+    backend = MockBackend()
+    wsclient = create_autospec(WorkspaceClient)
+    original_group = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
+    wsclient.groups.list.return_value = [original_group]
+    matching_account_admin_group = dataclasses.replace(
+        original_group, id="11", meta=ResourceMeta(resource_type="Group")
+    )
+    wsclient.api_client.do.return_value = {
+        "Resources": [g.as_dict() for g in (matching_account_admin_group,)],
+    }
+    wsclient.groups.get.side_effect = (
+        # Preparing for the rename.
+        *[original_group] * 2,
+        # Here we inject the fault that the group has a completely different name.
+        dataclasses.replace(original_group, display_name="completely-unexpected-name"),
+    )
+
+    # Perform the test itself.
+    group_manager = GroupManager(backend, wsclient, inventory_database="inv", renamed_group_prefix="test-group-")
+    with pytest.raises(RuntimeError, match="unexpected name was observed: completely-unexpected-name"):
+        group_manager.rename_groups()
 
 
 def test_rename_groups_should_fail_if_error_is_thrown():
