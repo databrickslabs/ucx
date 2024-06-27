@@ -30,7 +30,7 @@ def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=lint_problem)
     make_job(notebook_path=notebook)
 
-    ctx = installation_ctx
+    ctx = installation_ctx.replace(skip_dashboards=False)
     ctx.workspace_installation.run()
     ctx.deployed_workflows.run_workflow("experimental-workflow-linter")
     ctx.deployed_workflows.validate_step("experimental-workflow-linter")
