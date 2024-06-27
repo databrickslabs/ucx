@@ -183,7 +183,7 @@ dbutils.notebook.run(name)
         ),
     ],
 )
-def test_infers_dbutils_notebook_run_dynamic_value(code, expected):
+def test_infers_dbutils_notebook_run_dynamic_value(code, expected) -> None:
     tree = Tree.parse(code)
     calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
     all_paths: list[str] = []
