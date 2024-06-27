@@ -15,7 +15,7 @@ from databricks.sdk.service.workspace import AclPermission
 logger = logging.getLogger(__name__)
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=20))
 def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions):
     ctx = installation_ctx.replace(skip_dashboards=False)
     ws_group_a, _ = ctx.make_ucx_group()
