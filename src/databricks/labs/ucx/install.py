@@ -9,7 +9,6 @@ from datetime import timedelta
 from functools import cached_property
 from typing import Any
 
-import databricks.sdk.errors
 import sqlglot
 from databricks.labs.blueprint.entrypoint import get_logger, is_in_debug
 from databricks.labs.blueprint.installation import Installation, SerdeError
@@ -30,6 +29,7 @@ from databricks.sdk.errors import (
     BadRequest,
     InvalidParameterValue,
     NotFound,
+    NotImplemented,
     PermissionDenied,
     ResourceDoesNotExist,
 )
@@ -266,7 +266,7 @@ class WorkspaceInstaller(WorkspaceContext):
             # Logic for forced global over user install
             # Migration logic will go here
             # verify complains without full path, asks to raise NotImplementedError builtin
-            raise databricks.sdk.errors.NotImplemented("Migration needed. Not implemented yet.")
+            raise NotImplemented("Migration needed. Not implemented yet.")
         if self.installation.is_global() and self._force_install == "user":
             # Logic for forced user install over global install
             self.replace(
