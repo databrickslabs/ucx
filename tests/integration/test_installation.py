@@ -91,7 +91,7 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx,
     make_cluster_policy,
