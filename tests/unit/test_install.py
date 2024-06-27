@@ -1933,7 +1933,9 @@ def test_upload_dependencies(ws, mock_installation):
 @pytest.mark.parametrize(
     "query, query_transformed_expected",
     [
+        ("SELECT a FROM table", "SELECT a FROM table"),
         ("SELECT a, b FROM inventory.table", "SELECT a, b FROM hive_metastore.test.table"),
+        ("SELECT '$DATABRICKS_HOST' FROM table", "SELECT '$DATABRICKS_HOST' FROM table"),
         ("/* $DATABRICKS_HOST */ SELECT 1", "/* https://adb-0123456789.2.azuredatabricks.net */ SELECT 1"),
     ],
 )
