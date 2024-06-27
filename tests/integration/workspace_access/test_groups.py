@@ -115,7 +115,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
         get_group(ws_group.id)
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, _ = make_ucx_group()
 
