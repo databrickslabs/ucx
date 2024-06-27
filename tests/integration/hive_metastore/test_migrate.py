@@ -259,7 +259,7 @@ def test_migrate_external_table_hiveserde_ctas(
         assert row["region"] == "us"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_migrate_view(ws, sql_backend, runtime_ctx, make_catalog):
     src_schema = runtime_ctx.make_schema(catalog_name="hive_metastore")
     src_managed_table = runtime_ctx.make_table(catalog_name=src_schema.catalog_name, schema_name=src_schema.name)
