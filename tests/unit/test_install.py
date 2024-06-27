@@ -1930,7 +1930,16 @@ def test_upload_dependencies(ws, mock_installation):
     wheels.upload_to_wsfs.assert_called_once()
 
 
-def test_workspace_installation_transforms_inventory_database_in_query(ws, mock_installation, any_prompt):
+@pytest.mark.parametrize(
+    "query, query_transformed_expected",
+    [
+        ("SELECT a, b FROM inventory.table", "SELECT a, b FROM hive_metastore.test.table"),
+        ("/* $DATABRICKS_HOST */ SELECT 1", "/* https://adb-0123456789.2.azuredatabricks.net */ SELECT 1"),
+    ],
+)
+def test_workspace_installation_transforms_inventory_database_in_query(
+    ws, mock_installation, any_prompt, query, query_transformed_expected
+):
     install_state = InstallState.from_installation(mock_installation)
     wheels = create_autospec(WheelsV2)
     workflows_installation = WorkflowsDeployment(
@@ -1955,14 +1964,12 @@ def test_workspace_installation_transforms_inventory_database_in_query(ws, mock_
         PRODUCT_INFO,
     )
 
-    query_transformed_expected = "SELECT a, b FROM hive_metastore.test.table"
-    query = sqlglot.parse_one("SELECT a, b FROM inventory.table")
-
     query_transformer = functools.partial(
-        workspace_installation._transform_inventory_database,  # pylint: disable=protected-access
+        workspace_installation._transform_dashboard_query,  # pylint: disable=protected-access
         inventory_database="test",
+        databricks_host="https://adb-0123456789.2.azuredatabricks.net",
     )
-    query_transformed = query.transform(query_transformer).sql(dialect=sqlglot.dialects.Databricks)
+    query_transformed = sqlglot.parse_one(query).transform(query_transformer).sql(dialect=sqlglot.dialects.Databricks)
 
     assert query_transformed == query_transformed_expected
     wheels.assert_not_called()

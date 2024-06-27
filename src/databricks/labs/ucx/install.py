@@ -511,7 +511,12 @@ class WorkspaceInstallation(InstallationMixin):
             raise err
 
     @staticmethod
-    def _transform_inventory_database(node: sqlglot.Expression, *, inventory_database: str) -> sqlglot.Expression:
+    def _transform_dashboard_query(
+        node: sqlglot.Expression,
+        *,
+        inventory_database: str,
+        databricks_host: str = "",
+    ) -> sqlglot.Expression:
         """Replace the inventory database in a query."""
         if (
             isinstance(node, sqlglot.exp.Table)
@@ -519,14 +524,17 @@ class WorkspaceInstallation(InstallationMixin):
             and getattr(node.args.get("db"), "this", "") == "inventory"
         ):
             node.args["db"].set("this", f"hive_metastore.{inventory_database}")
+        if node.comments is not None and len(databricks_host) > 0:
+            node.comments = [comment.replace("$DATABRICKS_HOST", databricks_host) for comment in node.comments]
         return node
 
     def _create_dashboards(self):
         logger.info("Creating dashboards...")
         local_query_files = find_project_root(__file__) / "src/databricks/labs/ucx/queries"
         query_transformer = functools.partial(
-            self._transform_inventory_database,
+            self._transform_dashboard_query,
             inventory_database=self._config.inventory_database,
+            databricks_host=self._ws.config.host,
         )
         dash = DashboardFromFiles(
             self._ws,
