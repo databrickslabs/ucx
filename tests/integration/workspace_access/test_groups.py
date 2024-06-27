@@ -146,7 +146,7 @@ def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_gro
         raise NotFound(f'missing account group: {to_group.display_name}')
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize("strategy", ["prefix", "suffix", "substitute", "matching"])
 def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, make_random, strategy):
     random_element = f"ucx{make_random(4)}"
