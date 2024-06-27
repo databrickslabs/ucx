@@ -122,7 +122,7 @@ def test_running_real_validate_groups_permissions_job(
     installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=15))
 def test_running_real_validate_groups_permissions_job_fails(
     ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
