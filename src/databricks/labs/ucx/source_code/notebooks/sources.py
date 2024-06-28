@@ -188,7 +188,7 @@ class FileLinter:
             yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
             return
         except PermissionError:
-            failure_message = f"Missing permission to read {self._path}"
+            failure_message = f"Missing read permission for {self._path}"
             yield Failure("file-permission", failure_message, 0, 0, 1, 1)
             return
 
