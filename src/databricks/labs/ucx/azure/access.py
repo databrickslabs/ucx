@@ -39,6 +39,13 @@ class StoragePermissionMapping:
     directory_id: str | None = None
 
 
+@dataclass
+class AccessConnectorWithStorageUrl:
+    access_connector: AccessConnector
+    storage_url: str
+    storage_account: str
+
+
 class AzureResourcePermissions:
     FILENAME = 'azure_storage_account_info.csv'
 
@@ -291,7 +298,7 @@ class AzureResourcePermissions:
 
     def _create_access_connector_for_storage_account(
         self, storage_account: StorageAccount, role_name: str = "STORAGE_BLOB_DATA_READER"
-    ) -> tuple[AccessConnector, str]:
+    ) -> AccessConnectorWithStorageUrl:
         access_connector = self._azurerm.create_or_update_access_connector(
             storage_account.id.subscription_id,
             storage_account.id.resource_group,
@@ -308,15 +315,20 @@ class AzureResourcePermissions:
         else:
             url = f"abfss://{container.container}@{container.storage_account}.dfs.core.windows.net/"
 
-        return access_connector, url
+        return AccessConnectorWithStorageUrl(access_connector, url, storage_account.name)
 
-    def create_access_connectors_for_storage_accounts(self) -> list[tuple[AccessConnector, str]]:
+    def create_access_connectors_for_storage_accounts(
+        self, storage_acc_set: set[str] | None = None
+    ) -> list[AccessConnectorWithStorageUrl]:
         """Create access connectors for storage accounts
 
         Returns:
             list[AccessConnector, str] : The access connectors with a storage url to which it has access.
         """
-        used_storage_accounts = self._get_storage_accounts()
+        if storage_acc_set is None:
+            used_storage_accounts = self._get_storage_accounts()
+        else:
+            used_storage_accounts = list(storage_acc_set)
         if len(used_storage_accounts) == 0:
             logger.warning(
                 "There are no external table present with azure storage account. "

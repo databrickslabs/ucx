@@ -816,7 +816,7 @@ def test_create_access_connectors_for_storage_accounts_one_access_connector(yiel
     azure_resources.containers.assert_called_once_with(storage_account.id)
 
     assert len(access_connectors) == 1
-    assert access_connectors[0][0].name == "ac-test"
+    assert access_connectors[0].access_connector.name == "ac-test"
 
 
 def test_create_access_connectors_for_storage_accounts_log_permission_applied(caplog):

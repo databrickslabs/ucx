@@ -183,7 +183,9 @@ class ServicePrincipalMigration(SecretsMixin):
         self._sp_crawler = service_principal_crawler
         self._storage_credential_manager = storage_credential_manager
 
-    def _fetch_client_secret(self, sp_list: list[StoragePermissionMapping]) -> list[ServicePrincipalMigrationInfo]:
+    def _fetch_client_secret(
+        self, sp_list: list[StoragePermissionMapping], storage_acc_set: set[str] | None = None
+    ) -> tuple[list[ServicePrincipalMigrationInfo], set[str]]:
         # check AzureServicePrincipalInfo from AzureServicePrincipalCrawler, if AzureServicePrincipalInfo
         # has secret_scope and secret_key not empty, fetch the client_secret and put it to the client_secret field
         #
@@ -192,6 +194,7 @@ class ServicePrincipalMigration(SecretsMixin):
 
         # fetch client_secrets of crawled service principal, if any
         sp_info_with_client_secret: dict[str, str] = {}
+        storage_acc_no_secret = set()
         sp_infos = self._sp_crawler.snapshot()
 
         for sp_info in sp_infos:
@@ -204,9 +207,22 @@ class ServicePrincipalMigration(SecretsMixin):
 
             if secret_value:
                 sp_info_with_client_secret[sp_info.application_id] = secret_value
+            elif sp_info.storage_account is not None:
+                if storage_acc_set and sp_info.storage_account in storage_acc_set:
+                    logger.info(
+                        f"Cannot fetch the service principal client_secret for {sp_info.application_id}. "
+                        f"However, this storage account {sp_info.storage_account} is already configured using "
+                        f"access connector."
+                    )
+                else:
+                    logger.info(
+                        f"Cannot fetch the service principal client_secret for {sp_info.application_id}. "
+                        f"An access connector will be used for this storage account {sp_info.storage_account}."
+                    )
+                    storage_acc_no_secret.add(sp_info.storage_account)
             else:
                 logger.info(
-                    f"Cannot fetch the service principal client_secret for {sp_info.application_id}. "
+                    f"Storage account information missing for service principal {sp_info.application_id}. "
                     f"This service principal will be skipped for migration"
                 )
 
@@ -217,7 +233,7 @@ class ServicePrincipalMigration(SecretsMixin):
                 sp_list_with_secret.append(
                     ServicePrincipalMigrationInfo(spn, sp_info_with_client_secret[spn.client_id])
                 )
-        return sp_list_with_secret
+        return sp_list_with_secret, storage_acc_no_secret
 
     def _print_action_plan(self, sp_list: list[StoragePermissionMapping]):
         # print action plan to console for customer to review.
@@ -229,7 +245,9 @@ class ServicePrincipalMigration(SecretsMixin):
                 f"on location {spn.prefix}"
             )
 
-    def _generate_migration_list(self, include_names: set[str] | None = None) -> list[ServicePrincipalMigrationInfo]:
+    def _generate_migration_list(
+        self, include_names: set[str] | None = None, storage_acc_set: set[str] | None = None
+    ) -> tuple[list[ServicePrincipalMigrationInfo], set[str]]:
         """
         Create the list of SP that need to be migrated, output an action plan as a csv file for users to confirm
         """
@@ -242,14 +260,14 @@ class ServicePrincipalMigration(SecretsMixin):
         # check if the sp is already used in UC storage credential
         filtered_sp_list = [sp for sp in sp_list if sp.client_id not in sc_set]
         # fetch sp client_secret if any
-        sp_list_with_secret = self._fetch_client_secret(filtered_sp_list)
+        sp_list_with_secret, storage_acc_no_secret = self._fetch_client_secret(filtered_sp_list, storage_acc_set)
 
         # output the action plan for customer to confirm
         # but first make a copy of the list and strip out the client_secret
         sp_candidates = [sp.permission_mapping for sp in sp_list_with_secret]
         self._print_action_plan(sp_candidates)
 
-        return sp_list_with_secret
+        return sp_list_with_secret, storage_acc_no_secret
 
     def save(self, migration_results: list[StorageCredentialValidationResult]) -> str:
         return self._installation.save(migration_results, filename=self._output_file)
@@ -273,36 +291,46 @@ class ServicePrincipalMigration(SecretsMixin):
             execution_result.append(validation_results)
         return execution_result
 
-    def _create_storage_credentials_for_storage_accounts(self) -> list[StorageCredentialValidationResult]:
-        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts()
+    def _create_storage_credentials_for_storage_accounts(
+        self, storage_acc_set: set[str] | None = None
+    ) -> tuple[list[StorageCredentialValidationResult], set[str]]:
+        access_connectors = self._resource_permissions.create_access_connectors_for_storage_accounts(storage_acc_set)
 
         execution_results = []
-        for access_connector, url in access_connectors:
+        storage_acc_set = set()
+        for access_connector_with_url in access_connectors:
             storage_credential_info = self._ws.storage_credentials.create(
-                access_connector.name,
-                azure_managed_identity=AzureManagedIdentityRequest(str(access_connector.id)),
+                access_connector_with_url.access_connector.name,
+                azure_managed_identity=AzureManagedIdentityRequest(str(access_connector_with_url.access_connector.id)),
                 comment="Created by UCX",
                 read_only=False,  # Access connectors get "STORAGE_BLOB_DATA_CONTRIBUTOR" permissions
             )
             try:
-                validation_results = self._storage_credential_manager.validate(storage_credential_info, url)
+                validation_results = self._storage_credential_manager.validate(
+                    storage_credential_info, access_connector_with_url.storage_url
+                )
+                storage_acc_set.add(access_connector_with_url.storage_account)
             except BadRequest:
-                logger.warning(f"Could not validate storage credential {storage_credential_info.name} for url {url}")
+                logger.warning(
+                    f"Could not validate storage credential {storage_credential_info.name} for "
+                    f"url {access_connector_with_url.storage_url}"
+                )
             else:
                 execution_results.append(validation_results)
 
-        return execution_results
+        return execution_results, storage_acc_set
 
     def run(self, prompts: Prompts, include_names: set[str] | None = None) -> list[StorageCredentialValidationResult]:
         plan_confirmed = prompts.confirm(
             "[RECOMMENDED] Please confirm to create an access connector with a managed identity for each storage "
             "account."
         )
-        ac_results = []
+        ac_results: list[StorageCredentialValidationResult] = []
+        storage_acc_w_ac: set[str] = set()
         if plan_confirmed:
-            ac_results = self._create_storage_credentials_for_storage_accounts()
+            ac_results, storage_acc_w_ac = self._create_storage_credentials_for_storage_accounts()
 
-        sp_migration_infos = self._generate_migration_list(include_names)
+        sp_migration_infos, storage_acc_no_secret = self._generate_migration_list(include_names, storage_acc_w_ac)
         if any(spn.permission_mapping.default_network_action != "Allow" for spn in sp_migration_infos):
             logger.warning(
                 "At least one Azure Service Principal accesses a storage account with non-Allow default network "
@@ -316,7 +344,22 @@ class ServicePrincipalMigration(SecretsMixin):
         if plan_confirmed:
             sp_results = self._migrate_service_principals(sp_migration_infos)
 
-        execution_results = ac_results + sp_results
+        ac_results_no_secret: list[StorageCredentialValidationResult] = []
+        if storage_acc_no_secret:
+            logger.info(
+                f"The client secrets for some service principals could not be fetched. "
+                f"Access connectors can be created for these Storage Accounts: {','.join(storage_acc_no_secret)}"
+            )
+            plan_confirmed = prompts.confirm(
+                "Please confirm whether to create an access connector with a managed identity for each of the above "
+                "storage accounts."
+            )
+            if plan_confirmed:
+                ac_results_no_secret, storage_acc_w_ac = self._create_storage_credentials_for_storage_accounts(
+                    storage_acc_no_secret
+                )
+
+        execution_results = ac_results + sp_results + ac_results_no_secret
         if execution_results:
             results_file = self.save(execution_results)
             logger.info(
