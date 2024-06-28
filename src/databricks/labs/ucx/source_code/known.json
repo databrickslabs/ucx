@@ -2929,6 +2929,26 @@
   "iniconfig": {
     "iniconfig": []
   },
+  "inquirer": {
+    "inquirer": [],
+    "inquirer.errors": [],
+    "inquirer.events": [],
+    "inquirer.prompt": [],
+    "inquirer.questions": [],
+    "inquirer.render": [],
+    "inquirer.render.console": [],
+    "inquirer.render.console._checkbox": [],
+    "inquirer.render.console._confirm": [],
+    "inquirer.render.console._editor": [],
+    "inquirer.render.console._list": [],
+    "inquirer.render.console._other": [],
+    "inquirer.render.console._password": [],
+    "inquirer.render.console._path": [],
+    "inquirer.render.console._text": [],
+    "inquirer.render.console.base": [],
+    "inquirer.shortcuts": [],
+    "inquirer.themes": []
+  },
   "ipykernel": {
     "ipykernel": []
   },
@@ -23706,4 +23726,3 @@
     "zipp.glob": []
   }
 }
-
