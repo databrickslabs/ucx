@@ -8,7 +8,8 @@ from databricks.sdk.core import (
     ApiClient,
     AzureCliTokenSource,
     Config,
-    credentials_provider,
+    CredentialsStrategy,
+    credentials_strategy,
 )
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
@@ -222,24 +223,26 @@ class AzureAPIClient:
         self.api_client = ApiClient(
             Config(
                 host=host_endpoint,
-                credentials_provider=self._provider_for(service_endpoint),
+                credentials_strategy=self._provider_for(service_endpoint),
             )
         )
         self._token_source = AzureCliTokenSource(host_endpoint)
 
     @staticmethod
-    def _provider_for(endpoint: str):
-        @credentials_provider("azure-cli", ["host"])
-        def _credentials(_: Config):
+    def _provider_for(endpoint: str) -> CredentialsStrategy:
+        @credentials_strategy("azure-cli", ["host"])
+        def _credentials(_: Config) -> CredentialsStrategy:
             token_source = AzureCliTokenSource(endpoint)
 
             def inner() -> dict[str, str]:
                 token = token_source.token()
                 return {"Authorization": f"{token.token_type} {token.access_token}"}
 
-            return inner
+            # The type hints are off but according to the sdk:
+            # https://github.com/databricks/databricks-sdk-py/blob/f7d920e1f912b204669b826ed76e026607c59797/databricks/sdk/credentials_provider.py#L116
+            return inner  # type: ignore
 
-        return _credentials
+        return _credentials  # type: ignore
 
     def get(self, path: str, api_version: str | None = None, query: dict[str, str] | None = None):
         headers = {"Accept": "application/json"}
