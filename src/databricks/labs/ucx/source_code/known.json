@@ -1210,6 +1210,12 @@
     "chispa.structfield_comparer": [],
     "chispa.terminal_str_formatter": []
   },
+  "chronos": {
+    "chronos": [],
+    "chronos.main": [],
+    "test": [],
+    "test.test_trigger": []
+  },
   "clang": {
     "clang": [],
     "clang.cindex": [
