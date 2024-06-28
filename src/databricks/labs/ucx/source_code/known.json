@@ -3256,6 +3256,13 @@
   "jupyter_core": {
     "jupyter": []
   },
+  "kaleido": {
+    "kaleido": [],
+    "kaleido._version": [],
+    "kaleido.scopes": [],
+    "kaleido.scopes.base": [],
+    "kaleido.scopes.plotly": []
+  },
   "keras": {
     "keras": []
   },
