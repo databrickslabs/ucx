@@ -1115,6 +1115,21 @@
   "charset-normalizer": {
     "charset_normalizer": []
   },
+  "chispa": {
+    "chispa": [],
+    "chispa.bcolors": [],
+    "chispa.column_comparer": [],
+    "chispa.dataframe_comparer": [],
+    "chispa.default_formats": [],
+    "chispa.number_helpers": [],
+    "chispa.prettytable": [],
+    "chispa.row_comparer": [],
+    "chispa.rows_comparer": [],
+    "chispa.schema_comparer": [],
+    "chispa.six": [],
+    "chispa.structfield_comparer": [],
+    "chispa.terminal_str_formatter": []
+  },
   "clang": {
     "clang": [],
     "clang.cindex": [
@@ -23706,4 +23721,3 @@
     "zipp.glob": []
   }
 }
-
