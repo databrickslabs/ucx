@@ -151,7 +151,7 @@ For large organization with many workspaces, grouping workspaces into collection
 User should be an account admin to be able to join a collection.
 
 After this, UCX will be installed locally and a number of assets will be deployed in the selected workspace.
-These assets are available under the installation folder, i.e. `/Users/<your user>/.ucx/`.
+These assets are available under the installation folder, i.e. `/Applications/ucx` is the default installation folder. Please check [here](#advanced-force-install-over-existing-ucx) for more details.
 
 You can also install a specific version by specifying it like `@v0.13.2` - `databricks labs install ucx@v0.13.2`.
 
