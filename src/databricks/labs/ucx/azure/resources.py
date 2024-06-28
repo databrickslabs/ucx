@@ -227,7 +227,8 @@ class AzureAPIClient:
         )
         self._token_source = AzureCliTokenSource(host_endpoint)
 
-    def _provider_for(self, endpoint: str):
+    @staticmethod
+    def _provider_for(endpoint: str):
         @credentials_provider("azure-cli", ["host"])
         def _credentials(_: Config):
             token_source = AzureCliTokenSource(endpoint)
