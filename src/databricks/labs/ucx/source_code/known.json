@@ -4643,6 +4643,15 @@
   "fastcluster": {
     "fastcluster": []
   },
+  "fasttext": {
+    "fasttext.FastText": [],
+    "fasttext": [],
+    "fasttext.tests": [],
+    "fasttext.tests.test_configurations": [],
+    "fasttext.tests.test_script": [],
+    "fasttext.util": [],
+    "fasttext.util.util": []
+  },
   "filelock": {
     "filelock": [],
     "filelock._api": [],
