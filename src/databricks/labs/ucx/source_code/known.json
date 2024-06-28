@@ -1115,6 +1115,12 @@
   "charset-normalizer": {
     "charset_normalizer": []
   },
+  "chronos": {
+    "chronos": [],
+    "chronos.main": [],
+    "test": [],
+    "test.test_trigger": []
+  },
   "clang": {
     "clang": [],
     "clang.cindex": [
