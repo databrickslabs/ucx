@@ -10,6 +10,7 @@ chromadb
 mediamix
 dbruntime
 horovod
+sat
 
 3) code that cannot be located
 utils
