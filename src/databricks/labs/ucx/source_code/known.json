@@ -2666,6 +2666,16 @@
   "gast": {
     "gast": []
   },
+  "geoip2": {
+    "geoip2": [],
+    "geoip2.database": [],
+    "geoip2.errors": [],
+    "geoip2.mixins": [],
+    "geoip2.models": [],
+    "geoip2.records": [],
+    "geoip2.types": [],
+    "geoip2.webservice": []
+  },
   "gitdb": {
     "gitdb": []
   },
