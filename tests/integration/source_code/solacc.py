@@ -45,15 +45,18 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
-def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int]:
+def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int, int]:
     try:
         missing_imports: set[str] = set()
+        not_computed = 0
         for located_advice in ctx.local_code_linter.lint_path(file):
             if located_advice.advice.code == 'import-not-found':
                 missing_imports.add(located_advice.advice.message.split(':')[1].strip())
+            if "computed" in located_advice.advice.message:
+                not_computed += 1
             message = located_advice.message_relative_to(dist.parent, default=file)
             sys.stdout.write(f"{message}\n")
-        return missing_imports, 1
+        return missing_imports, 1, not_computed
     except Exception as e:  # pylint: disable=broad-except
         # here we're most likely catching astroid & sqlglot errors
         if unparsed is None:  # linting single file, log exception details
@@ -64,7 +67,7 @@ def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tu
             with unparsed.open(mode="a", encoding="utf-8") as f:
                 f.write(file.relative_to(dist).as_posix())
                 f.write("\n")
-        return set(), 0
+        return set(), 0, 0
 
 
 def lint_all(file_to_lint: str | None):
@@ -73,6 +76,7 @@ def lint_all(file_to_lint: str | None):
         linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
     )
     parseable = 0
+    not_computed = 0
     missing_imports: dict[str, dict[str, int]] = {}
     all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
     unparsed: Path | None = None
@@ -88,15 +92,16 @@ def lint_all(file_to_lint: str | None):
     for file in all_files:
         if skipped and file.relative_to(dist).as_posix() in skipped:
             continue
-        _missing_imports, _parseable = lint_one(file, ctx, unparsed)
+        _missing_imports, _parseable, _not_computed = lint_one(file, ctx, unparsed)
         for _import in _missing_imports:
             register_missing_import(missing_imports, _import)
         parseable += _parseable
+        not_computed += _not_computed
     all_files_len = len(all_files) - (len(skipped) if skipped else 0)
     parseable_pct = int(parseable / all_files_len * 100)
     missing_imports_count = sum(sum(details.values()) for details in missing_imports.values())
     logger.info(
-        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {missing_imports_count}"
+        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {missing_imports_count}, not computed: {not_computed}"
     )
     log_missing_imports(missing_imports)
     # fail the job if files are unparseable
