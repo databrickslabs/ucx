@@ -7280,6 +7280,30 @@
   "mpmath": {
     "mpmath": []
   },
+  "msal": {
+    "msal": [],
+    "msal.application": [],
+    "msal.auth_scheme": [],
+    "msal.authority": [],
+    "msal.broker": [],
+    "msal.cloudshell": [],
+    "msal.exceptions": [],
+    "msal.individual_cache": [],
+    "msal.managed_identity": [],
+    "msal.mex": [],
+    "msal.oauth2cli": [],
+    "msal.oauth2cli.assertion": [],
+    "msal.oauth2cli.authcode": [],
+    "msal.oauth2cli.http": [],
+    "msal.oauth2cli.oauth2": [],
+    "msal.oauth2cli.oidc": [],
+    "msal.region": [],
+    "msal.telemetry": [],
+    "msal.throttled_http_client": [],
+    "msal.token_cache": [],
+    "msal.wstrust_request": [],
+    "msal.wstrust_response": []
+  },
   "multidict": {
     "multidict": []
   },
