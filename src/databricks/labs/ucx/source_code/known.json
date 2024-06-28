@@ -22564,6 +22564,10 @@
     "isympy": [],
     "sympy": []
   },
+  "tabulate": {
+    "tabulate": [],
+    "tabulate.version": []
+  },
   "tensorboard": {
     "tensorboard": []
   },
