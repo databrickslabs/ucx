@@ -1,9 +1,10 @@
 Known libraries that are not in known.json
 
-1) libraries with remaining Python 2 syntax that astroid cannot parse
+1) libraries with Python syntax that astroid cannot parse
 tempo
 mosaic
 sparkdl
+chromadb
 
 2) code that cannot be installed locally
 mediamix
