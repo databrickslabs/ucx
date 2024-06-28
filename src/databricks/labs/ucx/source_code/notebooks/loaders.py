@@ -52,7 +52,7 @@ class NotebookLoader(DependencyLoader, abc.ABC):
             return None
         try:
             content = absolute_path.read_text("utf-8")
-        except NotFound:
+        except (NotFound, PermissionError):
             logger.warning(f"Could not read notebook from workspace: {absolute_path}")
             return None
         language = self._detect_language(absolute_path, content)
