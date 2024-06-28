@@ -22560,6 +22560,35 @@
   "stack-data": {
     "stack_data": []
   },
+  "statsforecast": {
+    "action_files": [],
+    "action_files.conftest": [],
+    "action_files.imports_with_code": [],
+    "action_files.test_dask": [],
+    "action_files.test_fit_predict": [],
+    "action_files.test_ray": [],
+    "action_files.test_spark": [],
+    "action_files.utils": [],
+    "statsforecast": [],
+    "statsforecast._modidx": [],
+    "statsforecast.adapters": [],
+    "statsforecast.adapters.prophet": [],
+    "statsforecast.arima": [],
+    "statsforecast.ces": [],
+    "statsforecast.core": [],
+    "statsforecast.distributed": [],
+    "statsforecast.distributed.fugue": [],
+    "statsforecast.distributed.multiprocess": [],
+    "statsforecast.ets": [],
+    "statsforecast.feature_engineering": [],
+    "statsforecast.garch": [],
+    "statsforecast.mfles": [],
+    "statsforecast.models": [],
+    "statsforecast.mstl": [],
+    "statsforecast.tbats": [],
+    "statsforecast.theta": [],
+    "statsforecast.utils": []
+  },
   "sympy": {
     "isympy": [],
     "sympy": []
