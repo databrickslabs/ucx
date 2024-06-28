@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 logger = logging.getLogger("verify-accelerators")
@@ -45,17 +46,34 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
+def collect_missing_imports(advices: list[LocatedAdvice]):
+    missing_imports: set[str] = set()
+    for located_advice in advices:
+        if located_advice.advice.code == 'import-not-found':
+            missing_imports.add(located_advice.advice.message.split(':')[1].strip())
+    return missing_imports
+
+
+def collect_not_computed(advices: list[LocatedAdvice]):
+    not_computed = 0
+    for located_advice in advices:
+        if "computed" in located_advice.advice.message:
+            not_computed += 1
+    return not_computed
+
+
+def print_advices(advices: list[LocatedAdvice], file: Path):
+    for located_advice in advices:
+        message = located_advice.message_relative_to(dist.parent, default=file)
+        sys.stdout.write(f"{message}\n")
+
+
 def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int, int]:
     try:
-        missing_imports: set[str] = set()
-        not_computed = 0
-        for located_advice in ctx.local_code_linter.lint_path(file):
-            if located_advice.advice.code == 'import-not-found':
-                missing_imports.add(located_advice.advice.message.split(':')[1].strip())
-            if "computed" in located_advice.advice.message:
-                not_computed += 1
-            message = located_advice.message_relative_to(dist.parent, default=file)
-            sys.stdout.write(f"{message}\n")
+        advices = list(ctx.local_code_linter.lint_path(file))
+        missing_imports = collect_missing_imports(advices)
+        not_computed = collect_not_computed(advices)
+        print_advices(advices, file)
         return missing_imports, 1, not_computed
     except Exception as e:  # pylint: disable=broad-except
         # here we're most likely catching astroid & sqlglot errors
