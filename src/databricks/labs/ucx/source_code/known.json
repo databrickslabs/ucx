@@ -4962,6 +4962,234 @@
     "fsspec.transaction": [],
     "fsspec.utils": []
   },
+  "fugue": {
+    "fugue": [],
+    "fugue._utils": [],
+    "fugue._utils.display": [],
+    "fugue._utils.exception": [],
+    "fugue._utils.interfaceless": [],
+    "fugue._utils.io": [],
+    "fugue._utils.misc": [],
+    "fugue._utils.registry": [],
+    "fugue.api": [],
+    "fugue.bag": [],
+    "fugue.bag.array_bag": [],
+    "fugue.bag.bag": [],
+    "fugue.collections": [],
+    "fugue.collections.partition": [],
+    "fugue.collections.sql": [],
+    "fugue.collections.yielded": [],
+    "fugue.column": [],
+    "fugue.column.expressions": [],
+    "fugue.column.functions": [],
+    "fugue.column.sql": [],
+    "fugue.constants": [],
+    "fugue.dataframe": [],
+    "fugue.dataframe.api": [],
+    "fugue.dataframe.array_dataframe": [],
+    "fugue.dataframe.arrow_dataframe": [],
+    "fugue.dataframe.dataframe": [],
+    "fugue.dataframe.dataframe_iterable_dataframe": [],
+    "fugue.dataframe.dataframes": [],
+    "fugue.dataframe.function_wrapper": [],
+    "fugue.dataframe.iterable_dataframe": [],
+    "fugue.dataframe.pandas_dataframe": [],
+    "fugue.dataframe.utils": [],
+    "fugue.dataset": [],
+    "fugue.dataset.api": [],
+    "fugue.dataset.dataset": [],
+    "fugue.dev": [],
+    "fugue.exceptions": [],
+    "fugue.execution": [],
+    "fugue.execution.api": [],
+    "fugue.execution.execution_engine": [],
+    "fugue.execution.factory": [],
+    "fugue.execution.native_execution_engine": [],
+    "fugue.extensions": [],
+    "fugue.extensions._builtins": [],
+    "fugue.extensions._builtins.creators": [],
+    "fugue.extensions._builtins.outputters": [],
+    "fugue.extensions._builtins.processors": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "fugue.extensions._utils": [],
+    "fugue.extensions.context": [],
+    "fugue.extensions.creator": [],
+    "fugue.extensions.creator.convert": [],
+    "fugue.extensions.creator.creator": [],
+    "fugue.extensions.outputter": [],
+    "fugue.extensions.outputter.convert": [],
+    "fugue.extensions.outputter.outputter": [],
+    "fugue.extensions.processor": [],
+    "fugue.extensions.processor.convert": [],
+    "fugue.extensions.processor.processor": [],
+    "fugue.extensions.transformer": [],
+    "fugue.extensions.transformer.constants": [],
+    "fugue.extensions.transformer.convert": [],
+    "fugue.extensions.transformer.transformer": [],
+    "fugue.plugins": [],
+    "fugue.registry": [],
+    "fugue.rpc": [],
+    "fugue.rpc.base": [],
+    "fugue.rpc.flask": [],
+    "fugue.sql": [],
+    "fugue.sql._utils": [],
+    "fugue.sql._visitors": [],
+    "fugue.sql.api": [],
+    "fugue.sql.workflow": [],
+    "fugue.test": [],
+    "fugue.test.pandas_tester": [],
+    "fugue.test.plugins": [],
+    "fugue.workflow": [],
+    "fugue.workflow._checkpoint": [],
+    "fugue.workflow._tasks": [],
+    "fugue.workflow._workflow_context": [],
+    "fugue.workflow.api": [],
+    "fugue.workflow.input": [],
+    "fugue.workflow.module": [],
+    "fugue.workflow.workflow": [],
+    "fugue_contrib": [],
+    "fugue_contrib.contrib": [],
+    "fugue_contrib.seaborn": [],
+    "fugue_contrib.viz": [],
+    "fugue_contrib.viz._ext": [],
+    "fugue_dask": [],
+    "fugue_dask._constants": [],
+    "fugue_dask._io": [],
+    "fugue_dask._utils": [],
+    "fugue_dask.dataframe": [],
+    "fugue_dask.execution_engine": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'ctx.sql(sql, dataframes=_dfs, config_options={'sql.identifier.case_sensitive': True})' because its value cannot be computed"
+      }
+    ],
+    "fugue_dask.registry": [],
+    "fugue_dask.tester": [],
+    "fugue_duckdb": [],
+    "fugue_duckdb._io": [],
+    "fugue_duckdb._utils": [],
+    "fugue_duckdb.dask": [],
+    "fugue_duckdb.dataframe": [],
+    "fugue_duckdb.execution_engine": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.execution_engine.connection.table(table)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "fugue_duckdb.registry": [],
+    "fugue_duckdb.tester": [],
+    "fugue_ibis": [],
+    "fugue_ibis._compat": [],
+    "fugue_ibis._utils": [],
+    "fugue_ibis.dataframe": [],
+    "fugue_ibis.execution_engine": [
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate 'self.backend.table(table)' because its table name argument cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.backend.sql(sql)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "fugue_notebook": [],
+    "fugue_notebook.env": [],
+    "fugue_notebook.nbextension": [],
+    "fugue_polars": [],
+    "fugue_polars._utils": [],
+    "fugue_polars.polars_dataframe": [],
+    "fugue_polars.registry": [],
+    "fugue_ray": [],
+    "fugue_ray._constants": [],
+    "fugue_ray._utils": [],
+    "fugue_ray._utils.cluster": [],
+    "fugue_ray._utils.dataframe": [],
+    "fugue_ray._utils.io": [],
+    "fugue_ray.dataframe": [],
+    "fugue_ray.execution_engine": [],
+    "fugue_ray.registry": [],
+    "fugue_ray.tester": [],
+    "fugue_spark": [],
+    "fugue_spark._constants": [],
+    "fugue_spark._utils": [],
+    "fugue_spark._utils.convert": [],
+    "fugue_spark._utils.io": [],
+    "fugue_spark._utils.misc": [],
+    "fugue_spark._utils.partition": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Use mapInArrow() or Pandas UDFs instead"
+      }
+    ],
+    "fugue_spark.dataframe": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "fugue_spark.execution_engine": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext and getConf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.execution_engine.spark_session.sql(_sql)' because its value cannot be computed"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'self.spark_session.sql(f'SELECT * FROM {temp_name} TABLESAMPLE({n} ROWS)')' because its value cannot be computed"
+      }
+    ],
+    "fugue_spark.registry": [
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      },
+      {
+        "code": "table-migrate",
+        "message": "Can't migrate table_name argument in 'spark.sql(sql[1])' because its value cannot be computed"
+      }
+    ],
+    "fugue_spark.tester": [],
+    "fugue_sql": [],
+    "fugue_sql.exceptions": [],
+    "fugue_test": [],
+    "fugue_test.bag_suite": [],
+    "fugue_test.builtin_suite": [],
+    "fugue_test.dataframe_suite": [],
+    "fugue_test.execution_suite": [],
+    "fugue_test.fixtures": [],
+    "fugue_version": []
+  },
   "gast": {
     "gast": []
   },
