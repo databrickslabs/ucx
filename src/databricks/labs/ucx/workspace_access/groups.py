@@ -296,8 +296,8 @@ class RegexSubStrategy(GroupMigrationStrategy):
             include_group_names=include_group_names,
             renamed_groups_prefix=renamed_groups_prefix,
         )
-        self.workspace_group_replace = workspace_group_replace
         self.workspace_group_regex = workspace_group_regex
+        self.workspace_group_replace = workspace_group_replace
 
     def generate_migrated_groups(self):
         workspace_groups = self.get_filtered_groups()
