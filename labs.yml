@@ -242,5 +242,5 @@ commands:
     flags:
       - name: workspace-id
         description: workspace_id which should join a collection.
-      - name: target_workspace-id
+      - name: target-workspace-id
         description: (Optional) id of a workspace in the target collection. If not specified, ucx will prompt to select from a list
