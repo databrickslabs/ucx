@@ -186,7 +186,7 @@ class _Retrier:
                 if msg is not None:
                     raise TimeoutError(msg) from last_err
 
-                self._clock.sleep(sleep + random())
+                self._clock.sleep(sleep_duration)
 
         return wrapper
 
