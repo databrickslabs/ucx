@@ -60,7 +60,7 @@ commands:
   - name: ensure-assessment-run
     description: ensure the assessment job was run on a workspace
     flags:
-      - name: collection_workspace_id
+      - name: collection-workspace-id
         description: id of the collection workspace, the cmd will run for all workspaces in this collection.
 
   - name: validate-external-locations
