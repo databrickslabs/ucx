@@ -302,7 +302,6 @@ class RegexSubStrategy(GroupMigrationStrategy):
     def generate_migrated_groups(self):
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             name_in_account = self._safe_sub(
                 group.display_name, self.workspace_group_regex, self.workspace_group_replace
             )
@@ -312,6 +311,7 @@ class RegexSubStrategy(GroupMigrationStrategy):
                     f"Couldn't find a matching account group for {group.display_name} group with regex substitution"
                 )
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
