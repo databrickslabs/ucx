@@ -145,7 +145,6 @@ def test_snapshot_should_consider_groups_defined_in_conf():
     wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [group1, group2]
     acc_group_1 = Group(id="11", display_name="de", external_id="1234")
     acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
     wsclient.api_client.do.return_value = {
