@@ -721,6 +721,8 @@ class ConfigureGroups:
     group_match_by_external_id = None
     include_group_names = None
 
+    _valid_substitute_pattern = re.compile(r"[\s#,+ \\<>;]")
+
     def __init__(self, prompts: Prompts):
         self._prompts = prompts
         self._ask_for_group = functools.partial(self._prompts.question, validate=self._is_valid_group_str)
@@ -799,9 +801,8 @@ class ConfigureGroups:
     def _is_valid_group_str(self, group_str: str) -> bool:
         return len(group_str) > 0 and self._is_valid_substitute_str(group_str)
 
-    @staticmethod
-    def _is_valid_substitute_str(substitute: str) -> bool:
-        return not re.search(r"[\s#,+ \\<>;]", substitute)
+    def _is_valid_substitute_str(self, substitute: str) -> bool:
+        return not self._valid_substitute_pattern.search(substitute)
 
     @staticmethod
     def _validate_regex(regex_input: str) -> bool:
