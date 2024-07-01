@@ -223,13 +223,13 @@ class AzureAPIClient:
         self.api_client = ApiClient(
             Config(
                 host=host_endpoint,
-                credentials_strategy=self._provider_for(service_endpoint),
+                credentials_strategy=self._strategy_for(service_endpoint),
             )
         )
         self._token_source = AzureCliTokenSource(host_endpoint)
 
     @staticmethod
-    def _provider_for(endpoint: str) -> CredentialsStrategy:
+    def _strategy_for(endpoint: str) -> CredentialsStrategy:
         @credentials_strategy("azure-cli", ["host"])
         def _credentials(_: Config) -> CredentialsStrategy:
             token_source = AzureCliTokenSource(endpoint)
