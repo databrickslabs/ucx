@@ -14,6 +14,7 @@ More workflows, like notebook code migration are coming in future releases.
 
 UCX also provides a number of command line utilities accessible via `databricks labs ucx`.
 
+
 For questions, troubleshooting or bug fixes, please see our [troubleshooting guide](docs/troubleshooting.md) or submit [an issue](https://github.com/databrickslabs/ucx/issues).
 See [contributing instructions](CONTRIBUTING.md) to help improve this project.
 
