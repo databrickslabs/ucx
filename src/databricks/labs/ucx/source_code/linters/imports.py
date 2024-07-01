@@ -16,7 +16,7 @@ from astroid import (  # type: ignore
     NodeNG,
 )
 
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory, CurrentSessionState
+from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState, PythonLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor, InferredValue
 
 logger = logging.getLogger(__name__)
@@ -110,13 +110,12 @@ class NotebookRunCall(NodeBase):
         return has_unresolved, paths
 
 
-class DbutilsLinter(Linter):
+class DbutilsLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
 
-    def lint(self, code: str) -> Iterable[Advice]:
-        tree = Tree.normalize_and_parse(code)
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:
             yield from self._raise_advice_if_unresolved(node.node, self._session_state)

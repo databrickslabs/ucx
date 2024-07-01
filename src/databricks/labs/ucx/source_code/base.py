@@ -6,10 +6,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from astroid import NodeNG  # type: ignore
+from astroid import AstroidSyntaxError, NodeNG  # type: ignore
 
 from databricks.sdk.service import compute
 
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 # Code mapping between LSP, PyLint, and our own diagnostics:
 # | LSP                       | PyLint     | Our            |
@@ -130,6 +131,16 @@ class Linter:
     def lint(self, code: str) -> Iterable[Advice]: ...
 
 
+class PythonLinter(Linter):
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        tree = Tree.normalize_and_parse(code)
+        yield from self.lint_tree(tree)
+
+    @abstractmethod
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]: ...
+
+
 class Fixer:
     @abstractmethod
     def name(self) -> str: ...
@@ -170,3 +181,22 @@ class SequentialLinter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         for linter in self._linters:
             yield from linter.lint(code)
+
+
+class PythonSequentialLinter(Linter):
+
+    def __init__(self, linters: list[PythonLinter]):
+        self._linters = linters
+        self._tree: Tree | None = None
+
+    def lint(self, code: str) -> Iterable[Advice]:
+        try:
+            tree = Tree.normalize_and_parse(code)
+            if self._tree is None:
+                self._tree = tree
+            else:
+                tree = self._tree.append_statements(tree)
+            for linter in self._linters:
+                yield from linter.lint_tree(tree)
+        except AstroidSyntaxError as e:
+            yield Failure('syntax-error', str(e), 0, 0, 0, 0)

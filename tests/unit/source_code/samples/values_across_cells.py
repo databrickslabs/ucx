@@ -3,5 +3,4 @@ a = 12
 
 # COMMAND ----------
 
-b = f"{a}"
-spark.table(b)
+spark.table(f"{a}")
