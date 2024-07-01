@@ -10,7 +10,7 @@ from pathlib import Path
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Failure
+from databricks.labs.ucx.source_code.base import Advice, Failure, Linter
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext
@@ -88,6 +88,8 @@ class NotebookLinter:
     def __init__(self, langs: LinterContext, notebook: Notebook):
         self._languages: LinterContext = langs
         self._notebook: Notebook = notebook
+        # reuse Python linter, which accumulates statements for improved inference
+        self._python_linter = langs.linter(Language.PYTHON)
 
     @classmethod
     def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
@@ -100,12 +102,17 @@ class NotebookLinter:
         for cell in self._notebook.cells:
             if not self._languages.is_supported(cell.language.language):
                 continue
-            linter = self._languages.linter(cell.language.language)
+            linter = self._linter(cell.language.language)
             for advice in linter.lint(cell.original_code):
                 yield advice.replace(
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )
+
+    def _linter(self, language: Language) -> Linter:
+        if language is Language.PYTHON:
+            return self._python_linter
+        return self._languages.linter(language)
 
     @staticmethod
     def name() -> str:

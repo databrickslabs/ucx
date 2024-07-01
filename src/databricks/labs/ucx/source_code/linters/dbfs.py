@@ -5,7 +5,7 @@ from astroid import Call, Const, InferenceError, NodeNG  # type: ignore
 from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table
 
-from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, Failure, PythonLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class DetectDbfsVisitor(TreeVisitor):
         yield from self._advices
 
 
-class DBFSUsageLinter(Linter):
+class DBFSUsageLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
@@ -76,11 +76,10 @@ class DBFSUsageLinter(Linter):
         """
         return 'dbfs-usage'
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         """
         Lints the code looking for file system paths that are deprecated
         """
-        tree = Tree.normalize_and_parse(code)
         visitor = DetectDbfsVisitor(self._session_state)
         visitor.visit(tree.node)
         yield from visitor.get_advices()
