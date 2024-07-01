@@ -98,8 +98,10 @@ class MigrationState:
         if len(self) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        logger.info(f"Migrating permissions to {len(self)} account groups.")
-        items = 0
+        logger.info(f"Migrating permissions for {len(self)} account groups.")
+        total_permissions = 0
+        success_groups = 0
+        errors: list[Exception] = []
         for migrated_group in self.groups:
             name_in_workspace = migrated_group.name_in_workspace
             if renamed:
@@ -109,14 +111,28 @@ class MigrationState:
                 # the migration fails.
                 name_in_workspace = migrated_group.temporary_name
             name_in_account = migrated_group.name_in_account
-            items += self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
-            logger.info(f"Migrated {items} permissions.")
+            try:
+                group_permissions = self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
+                logger.info(
+                    f"Migrated {group_permissions} permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)"
+                )
+                total_permissions += group_permissions
+                success_groups += 1
+            except IOError as e:
+                logger.exception(
+                    f"Migration of group permissions failed: {name_in_workspace} (workspace) -> {name_in_account} (account)"
+                )
+                errors.append(e)
+        logger.info(f"Migrated {total_permissions} permissions for {success_groups}/{len(self)} groups successfully.")
+        if errors:
+            logger.error(f"Migrating permissions failed for {len(errors)}/{len(self)} groups.")
+            raise ManyError(errors)
         return True
 
     @staticmethod
-    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str):
+    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str) -> int:
         batch_size = 1000
-        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)")
+        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) starting")
         permissions_migrated = 0
         while True:
             result = ws.permission_migration.migrate_permissions(
@@ -126,10 +142,14 @@ class MigrationState:
                 size=batch_size,
             )
             if not result.permissions_migrated:
-                logger.info("No more permissions to migrate.")
+                logger.info(
+                    f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) finished"
+                )
                 return permissions_migrated
             permissions_migrated += result.permissions_migrated
-            logger.info(f"Migrated {result.permissions_migrated} permissions to {name_in_account} account group")
+            logger.info(
+                f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) progress={permissions_migrated}(+{result.permissions_migrated})"
+            )
 
 
 class GroupMigrationStrategy:

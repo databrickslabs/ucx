@@ -1302,7 +1302,6 @@ def test_triggering_assessment_wf_w_job(ws, mocker, mock_installation):
 def test_runs_upgrades_on_too_old_version(ws, any_prompt):
     existing_installation = MockInstallation(
         {
-            'state.json': {'resources': {'dashboards': {'assessment_main': 'abc'}}},
             'config.yml': {
                 'inventory_database': 'x',
                 'warehouse_id': 'abc',
