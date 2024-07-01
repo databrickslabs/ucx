@@ -12,8 +12,9 @@ from databricks.labs.ucx.source_code.base import (
     CurrentSessionState,
     PythonLinter,
 )
+from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 from databricks.labs.ucx.source_code.queries import FromTable
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, InferredValue
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
@@ -77,7 +78,7 @@ class QueryMatcher(Matcher):
         table_arg = self._get_table_arg(node)
         if table_arg:
             try:
-                for inferred in Tree(table_arg).infer_values(self.session_state):
+                for inferred in InferredValue.infer_from_node(table_arg, self.session_state):
                     yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(
@@ -113,7 +114,7 @@ class TableNameMatcher(Matcher):
     ) -> Iterator[Advice]:
         table_arg = self._get_table_arg(node)
         table_name = table_arg.as_string().strip("'").strip('"')
-        for inferred in Tree(table_arg).infer_values(session_state):
+        for inferred in InferredValue.infer_from_node(table_arg, session_state):
             if not inferred.is_inferred():
                 yield Advisory.from_node(
                     code='table-migrate',
