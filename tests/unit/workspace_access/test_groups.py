@@ -771,6 +771,31 @@ def test_snapshot_with_group_matched_by_external_id_not_found(caplog):
     assert "Couldn't find a matching account group for de_(1234) group with external_id" in caplog.text
 
 
+def test_snapshot_migrated_groups_when_substitute_with_empty_string():
+    backend = MockBackend()
+
+    workspace_group = Group(display_name="group_old", id="1")
+    ws = create_autospec(WorkspaceClient)
+    ws.groups.list.return_value = [workspace_group]
+    ws.groups.get.return_value = workspace_group
+
+    account_group = Group(display_name="group")
+    ws.api_client.do.return_value = {"Resources": [account_group.as_dict()]}
+
+    group_manager = GroupManager(
+        backend,
+        ws,
+        inventory_database="inv",
+        workspace_group_regex="_old",
+        workspace_group_replace="",
+    )
+    migrated_groups = group_manager.snapshot()
+
+    assert len(migrated_groups) == 1
+    assert migrated_groups[0].name_in_workspace == "group_old"
+    assert migrated_groups[0].name_in_account == "group"
+
+
 def test_configure_include_groups():
     configure_groups = ConfigureGroups(
         MockPrompts(
