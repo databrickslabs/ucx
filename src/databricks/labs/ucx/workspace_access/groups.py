@@ -281,11 +281,12 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
 class RegexSubStrategy(GroupMigrationStrategy):
     def __init__(
         self,
-        workspace_groups_in_workspace,
-        account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
+        workspace_groups_in_workspace: dict[str, Group],
+        account_groups_in_account: dict[str, Group],
+        *,
+        # TODO: Check if hints below could be non optional
+        renamed_groups_prefix: str | None,
+        include_group_names: list[str] | None = None,
         workspace_group_regex: str | None = None,
         workspace_group_replace: str | None = None,
     ):
