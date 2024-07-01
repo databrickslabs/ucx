@@ -133,7 +133,7 @@ class _Retrier:
                 )
             elif (timeout * 0.80) <= attempt_duration:
                 logger.warning(
-                    f"Retryable call ({func.__name__}) attempt took {attempt_duration}, within 20% of the specified timeout ({timeout}); please adjust timeout accordingly."
+                    f"Retryable call ({func.__name__}) attempt took {attempt_duration}, remaining time ({timeout-attempt_duration}) within 20% margin of the specified timeout ({timeout}); please adjust timeout accordingly."
                 )
 
     def _check_retries_exhausted(self, attempt: int, deadline: float | None, pending_sleep: float) -> str | None:
