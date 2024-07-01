@@ -1,7 +1,13 @@
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter, CurrentSessionState
+from databricks.labs.ucx.source_code.base import (
+    Fixer,
+    Linter,
+    SequentialLinter,
+    CurrentSessionState,
+    PythonSequentialLinter,
+)
 from databricks.labs.ucx.source_code.linters.dbfs import FromDbfsFolder, DBFSUsageLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 
@@ -18,7 +24,7 @@ class LinterContext:
         from_table = FromTable(index, session_state=session_state)
         dbfs_from_folder = FromDbfsFolder()
         self._linters = {
-            Language.PYTHON: SequentialLinter(
+            Language.PYTHON: PythonSequentialLinter(
                 [
                     SparkSql(from_table, index, session_state),
                     DBFSUsageLinter(session_state),

@@ -7,8 +7,23 @@ from collections.abc import Iterable, Iterator, Generator
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
-from astroid import (Assign, Attribute, Call, Const, decorators, Dict, FormattedValue, Import, ImportFrom, JoinedStr,
-                     Module, Name, NodeNG, parse, Uninferable)  # type: ignore
+from astroid import (  # type: ignore
+    Assign,
+    Attribute,
+    Call,
+    Const,
+    decorators,
+    Dict,
+    FormattedValue,
+    Import,
+    ImportFrom,
+    JoinedStr,
+    Module,
+    Name,
+    NodeNG,
+    parse,
+    Uninferable,
+)
 from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
 from astroid.typing import InferenceErrorInfo  # type: ignore
 from astroid.exceptions import InferenceError  # type: ignore

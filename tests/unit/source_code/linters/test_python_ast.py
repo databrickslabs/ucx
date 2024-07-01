@@ -300,7 +300,7 @@ def test_appends_statements():
     tree_2 = Tree.normalize_and_parse(source_2)
     tree_3 = tree_1.append_statements(tree_2)
     nodes = tree_3.locate(Assign, [])
-    tree = Tree(nodes[0].value) # tree_3 only contains tree_2 statements
+    tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
     values = list(tree.infer_values(CurrentSessionState()))
     strings = list(value.as_string() for value in values)
     assert strings == ["Hello John!"]
