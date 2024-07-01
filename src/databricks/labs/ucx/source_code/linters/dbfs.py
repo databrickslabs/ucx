@@ -6,7 +6,8 @@ from sqlglot import Expression, parse as parse_sql, ParseError as SqlParseError
 from sqlglot.expressions import Table
 
 from databricks.labs.ucx.source_code.base import Advice, Linter, Deprecation, CurrentSessionState, Failure, PythonLinter
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor, InferredValue
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, TreeVisitor
+from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class DetectDbfsVisitor(TreeVisitor):
 
     def _visit_arg(self, arg: NodeNG):
         try:
-            for inferred in Tree(arg).infer_values(self._session_state):
+            for inferred in InferredValue.infer_from_node(arg, self._session_state):
                 if not inferred.is_inferred():
                     logger.debug(f"Could not infer value of {arg.as_string()}")
                     continue
