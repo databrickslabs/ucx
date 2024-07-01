@@ -716,6 +716,7 @@ class ConfigureGroups:
     def __init__(self, prompts: Prompts):
         self._prompts = prompts
         self._ask_for_group = functools.partial(self._prompts.question, validate=self._is_valid_group_str)
+        self._ask_for_substitute = functools.partial(self._prompts.question, validate=self._is_valid_substitute_str)
         self._ask_for_regex = functools.partial(self._prompts.question, validate=self._validate_regex)
 
     def run(self):
@@ -755,7 +756,7 @@ class ConfigureGroups:
         match_value = self._ask_for_regex("Enter a regular expression for substitution")
         if not match_value:
             return False
-        sub_value = self._ask_for_group("Enter the substitution value")
+        sub_value = self._ask_for_substitute("Enter the substitution value")
         if sub_value is None:
             return False
         self.workspace_group_regex = match_value
@@ -787,9 +788,12 @@ class ConfigureGroups:
         self.group_match_by_external_id = True
         return True
 
+    def _is_valid_group_str(self, group_str: str) -> bool:
+        return len(group_str) > 0 and self._is_valid_substitute_str(group_str)
+
     @staticmethod
-    def _is_valid_group_str(group_str: str | None) -> bool:
-        return group_str is not None and not re.search(r"[\s#,+ \\<>;]", group_str)
+    def _is_valid_substitute_str(substitute: str) -> bool:
+        return not re.search(r"[\s#,+ \\<>;]", substitute)
 
     @staticmethod
     def _validate_regex(regex_input: str) -> bool:
