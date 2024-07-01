@@ -222,13 +222,13 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             account_group = self.account_groups_in_account.get(group.display_name)
             if not account_group:
                 logger.info(
                     f"Couldn't find a matching account group for {group.display_name} group using name matching"
                 )
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
@@ -261,11 +261,11 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
         workspace_groups = self.get_filtered_groups()
         account_groups_by_id = {group.external_id: group for group in self.account_groups_in_account.values()}
         for group in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             account_group = account_groups_by_id.get(group.external_id)
             if not account_group:
                 logger.info(f"Couldn't find a matching account group for {group.display_name} group with external_id")
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
@@ -353,13 +353,13 @@ class RegexMatchStrategy(GroupMigrationStrategy):
             for group_name, group in self.account_groups_in_account.items()
         }
         for group_match, ws_group in workspace_groups_by_match.items():
-            temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             account_group = account_groups_by_match.get(group_match)
             if not account_group:
                 logger.info(
                     f"Couldn't find a matching account group for {ws_group.display_name} group with regex matching"
                 )
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=ws_group.id,
                 name_in_workspace=ws_group.display_name,
