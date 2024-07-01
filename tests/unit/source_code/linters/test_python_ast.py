@@ -305,3 +305,16 @@ formatted=message_unformatted % (name, version)
 """
     Tree.normalize_and_parse(source)
     assert True
+
+
+def test_appends_statements():
+    source_1 = "a = 'John'"
+    tree_1 = Tree.normalize_and_parse(source_1)
+    source_2 = 'b = f"Hello {a}!"'
+    tree_2 = Tree.normalize_and_parse(source_2)
+    tree_3 = tree_1.append_statements(tree_2)
+    nodes = tree_3.locate(Assign, [])
+    tree = Tree(nodes[0].value) # tree_3 only contains tree_2 statements
+    values = list(tree.infer_values(CurrentSessionState()))
+    strings = list(value.as_string() for value in values)
+    assert strings == ["Hello John!"]
