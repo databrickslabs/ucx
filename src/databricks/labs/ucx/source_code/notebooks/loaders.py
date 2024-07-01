@@ -54,8 +54,12 @@ class NotebookLoader(DependencyLoader, abc.ABC):
             content = absolute_path.read_text("utf-8")
         except NotFound:
             logger.warning(f"Path not found trying to read notebook from workspace: {absolute_path}")
-        except PermissionError as e:
-            logger.warning(f"Permissions error ({e}) while reading notebook from workspace: {absolute_path}")
+            return None
+        except PermissionError:
+            logger.warning(
+                f"Permission error while reading notebook from workspace: {absolute_path}",
+                exc_info=True,
+            )
             return None
         language = self._detect_language(absolute_path, content)
         if not language:

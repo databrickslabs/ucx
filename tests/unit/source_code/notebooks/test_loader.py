@@ -35,5 +35,5 @@ def test_notebook_loader_loads_dependency_with_permission_error(caplog):
     with caplog.at_level(logging.WARNING, logger="databricks.labs.ucx.source_code.notebooks.loaders"):
         found = NotebookLoader().load_dependency(path_lookup, dependency)
 
-    assert f"Could not read notebook from workspace: {path}" in caplog.text
+    assert f"Permission error while reading notebook from workspace: {path}" in caplog.text
     assert found is None
