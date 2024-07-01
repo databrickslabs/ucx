@@ -449,7 +449,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
         # present.
         self._wait_for_renamed_groups(renamed_groups)
 
-    def _rename_group_and_wait(self, group_id: str, old_group_name, new_group_name: str) -> tuple[str, str]:
+    def _rename_group_and_wait_for_rename(self, group_id: str, old_group_name, new_group_name: str) -> tuple[str, str]:
         logger.debug(f"Renaming group {group_id}: {old_group_name} -> {new_group_name}")
         self._rename_group(group_id, new_group_name)
         logger.debug(f"Waiting for group {group_id} rename to take effect: {old_group_name} -> {new_group_name}")
