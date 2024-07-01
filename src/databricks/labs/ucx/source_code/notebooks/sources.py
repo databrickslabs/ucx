@@ -183,6 +183,10 @@ class FileLinter:
         encoding = locale.getpreferredencoding(False)
         try:
             is_notebook = self._is_notebook()
+        except FileNotFoundError:
+            failure_message = f"File not found: {self._path}"
+            yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
+            return
         except UnicodeDecodeError:
             failure_message = f"File without {encoding} encoding is not supported {self._path}"
             yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
