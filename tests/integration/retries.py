@@ -89,6 +89,9 @@ class _Retrier:
             raise SyntaxError('either on=[Exception] or callback=lambda x: .. is required')
         if timeout is None and max_attempts is None:
             raise SyntaxError('either timeout=... or max_attempts=... is required')
+        if min_attempts < 1:
+            msg = "min_attempts=x must be at least 1"
+            raise SyntaxError(msg)
         if max_attempts is not None and max_attempts < min_attempts:
             msg = f'max_attempts=x must be equal or higher to min_attempts ({min_attempts})'
             raise SyntaxError(msg)
