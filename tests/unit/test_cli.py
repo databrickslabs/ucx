@@ -2,7 +2,6 @@ import io
 import json
 import time
 from pathlib import Path
-from unittest import mock
 from unittest.mock import create_autospec, patch
 
 import pytest
@@ -219,10 +218,9 @@ def test_ensure_assessment_run(ws):
     ws.jobs.list_runs.assert_called_once()
 
 
-def test_ensure_assessment_run_collection(ws, mocker):
+def test_ensure_assessment_run_collection(ws):
     acc_client = create_autospec(AccountClient)
-    with patch('databricks.sdk.AccountClient.__new__', mock.Mock(return_value=acc_client) ):
-        ensure_assessment_run(ws, 123)
+    ensure_assessment_run(ws, 123, acc_client)
 
     acc_client.workspaces.get.assert_called_once()
 
