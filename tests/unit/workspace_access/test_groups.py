@@ -856,21 +856,22 @@ def test_configure_external_id():
     assert configure_groups.group_match_by_external_id
 
 
-def test_configure_substitute():
+@pytest.mark.parametrize("substitution_value", ["business", ""])
+def test_configure_substitute(substitution_value):
     configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
                 r"Choose how to map the workspace groups.*": "4",  # substitute
                 r".*for substitution": "biz",
-                r".*substitution value": "business",
+                r".*substitution value": substitution_value,
                 ".*": "",
             }
         )
     )
     configure_groups.run()
     assert configure_groups.workspace_group_regex == "biz"
-    assert configure_groups.workspace_group_replace == "business"
+    assert configure_groups.workspace_group_replace == substitution_value
 
 
 def test_configure_match():

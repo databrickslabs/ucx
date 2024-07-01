@@ -756,7 +756,7 @@ class ConfigureGroups:
         if not match_value:
             return False
         sub_value = self._ask_for_group("Enter the substitution value")
-        if not sub_value:
+        if sub_value is None:
             return False
         self.workspace_group_regex = match_value
         self.workspace_group_replace = sub_value
@@ -788,8 +788,8 @@ class ConfigureGroups:
         return True
 
     @staticmethod
-    def _is_valid_group_str(group_str: str):
-        return group_str and not re.search(r"[\s#,+ \\<>;]", group_str)
+    def _is_valid_group_str(group_str: str | None) -> bool:
+        return group_str is not None and not re.search(r"[\s#,+ \\<>;]", group_str)
 
     @staticmethod
     def _validate_regex(regex_input: str) -> bool:
