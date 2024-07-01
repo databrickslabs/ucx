@@ -299,7 +299,7 @@ class RegexSubStrategy(GroupMigrationStrategy):
         self.workspace_group_regex = workspace_group_regex
         self.workspace_group_replace = workspace_group_replace
 
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
             name_in_account = self._safe_sub(
