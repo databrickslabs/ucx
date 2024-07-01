@@ -1,8 +1,8 @@
 import pytest
 from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr  # type: ignore
 
-from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 
 
 def test_extracts_root():
@@ -301,6 +301,6 @@ def test_appends_statements():
     tree_3 = tree_1.append_statements(tree_2)
     nodes = tree_3.locate(Assign, [])
     tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
-    values = list(tree.infer_values(CurrentSessionState()))
+    values = list(InferredValue.infer_from_node(tree.node))
     strings = list(value.as_string() for value in values)
     assert strings == ["Hello John!"]
