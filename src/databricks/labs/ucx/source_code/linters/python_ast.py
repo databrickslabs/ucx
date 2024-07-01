@@ -4,14 +4,14 @@ from abc import ABC
 import logging
 import re
 from collections.abc import Iterable, Iterator, Generator
-from typing import Any, TypeVar
+from dataclasses import dataclass
+from typing import Any, TypeVar, cast
 
-from astroid import Assign, Attribute, Call, Const, decorators, Dict, FormattedValue, Import, ImportFrom, JoinedStr, Module, Name, NodeNG, parse, Uninferable  # type: ignore
+from astroid import (Assign, Attribute, Call, Const, decorators, Dict, FormattedValue, Import, ImportFrom, JoinedStr,
+                     Module, Name, NodeNG, parse, Uninferable)  # type: ignore
 from astroid.context import InferenceContext, InferenceResult, CallContext  # type: ignore
 from astroid.typing import InferenceErrorInfo  # type: ignore
 from astroid.exceptions import InferenceError  # type: ignore
-
-from databricks.labs.ucx.source_code.base import CurrentSessionState
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,12 @@ missing_handlers: set[str] = set()
 
 
 T = TypeVar("T", bound=NodeNG)
+
+
+# need a forward declaration for typing
+@dataclass
+class CurrentSessionState:
+    named_parameters: dict[str, str] | None
 
 
 class Tree:
@@ -247,6 +253,19 @@ class Tree:
         for firsts in _LocalTree(nodes[0]).do_infer_values():
             for remains in cls._infer_values_from_joined_values(nodes[1:]):
                 yield list(firsts) + list(remains)
+
+    def append_statements(self, tree: Tree) -> Tree:
+        if not isinstance(tree.node, Module):
+            raise NotImplementedError(f"Can't append statements from {type(tree.node).__name__}")
+        tree_module: Module = cast(Module, tree.node)
+        if not isinstance(self.node, Module):
+            raise NotImplementedError(f"Can't append statements to {type(self.node).__name__}")
+        self_module: Module = cast(Module, self.node)
+        for stmt in tree_module.body:
+            stmt.parent = self_module
+            self_module.body.append(stmt)
+        # the following may seem strange but it's actually ok to use the original module as tree root
+        return tree
 
 
 class _LocalTree(Tree):
