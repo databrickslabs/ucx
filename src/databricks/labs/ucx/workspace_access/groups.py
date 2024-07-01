@@ -673,7 +673,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     def _get_strategy(
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]
     ) -> GroupMigrationStrategy:
-        if self._workspace_group_regex and self._workspace_group_replace:
+        if self._workspace_group_regex is not None and self._workspace_group_replace is not None:
             return RegexSubStrategy(
                 workspace_groups_in_workspace,
                 account_groups_in_account,
@@ -682,7 +682,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 workspace_group_regex=self._workspace_group_regex,
                 workspace_group_replace=self._workspace_group_replace,
             )
-        if self._workspace_group_regex and self._account_group_regex:
+        if self._workspace_group_regex is not None and self._account_group_regex is not None:
             return RegexMatchStrategy(
                 workspace_groups_in_workspace,
                 account_groups_in_account,
