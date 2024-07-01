@@ -436,7 +436,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
             logger.info(f"Renaming: {migrated_group.name_in_workspace} -> {migrated_group.temporary_name}")
             tasks.append(
                 functools.partial(
-                    self._rename_group_and_wait,
+                    self._rename_group_and_wait_for_rename,
                     migrated_group.id_in_workspace,
                     migrated_group.name_in_workspace,
                     migrated_group.temporary_name,
