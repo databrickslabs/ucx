@@ -766,11 +766,11 @@ class ConfigureGroups:
         match_value = self._ask_for_regex("Enter a regular expression for substitution")
         if not match_value:
             return False
-        sub_value = self._ask_for_substitute("Enter the substitution value")
-        if sub_value is None:
+        substitute = self._ask_for_substitute("Enter the substitution value")
+        if substitute is None:
             return False
         self.workspace_group_regex = match_value
-        self.workspace_group_replace = sub_value
+        self.workspace_group_replace = substitute
         return True
 
     def _configure_matching(self):
