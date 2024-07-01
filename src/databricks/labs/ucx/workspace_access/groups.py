@@ -167,7 +167,7 @@ class GroupMigrationStrategy:
         self.include_group_names = include_group_names
 
     @abstractmethod
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         raise NotImplementedError
 
     def get_filtered_groups(self):
@@ -219,7 +219,7 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
             renamed_groups_prefix=renamed_groups_prefix,
         )
 
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
             temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
@@ -257,7 +257,7 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
             renamed_groups_prefix=renamed_groups_prefix,
         )
 
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         account_groups_by_id = {group.external_id: group for group in self.account_groups_in_account.values()}
         for group in workspace_groups.values():
@@ -343,7 +343,7 @@ class RegexMatchStrategy(GroupMigrationStrategy):
         self.account_group_regex = account_group_regex
         self.workspace_group_regex = workspace_group_regex
 
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups_by_match = {
             self._safe_match(group_name, self.workspace_group_regex): group
             for group_name, group in self.get_filtered_groups().items()
