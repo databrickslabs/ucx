@@ -16,6 +16,7 @@ from databricks.labs.ucx.workspace_access.groups import (
     GroupManager,
     MigratedGroup,
     MigrationState,
+    RegexSubStrategy,
 )
 
 
@@ -1108,3 +1109,23 @@ def test_migration_state_with_filtered_group():
             roles='',
         )
     ]
+
+
+def test_regex_sub_strategy_replaces_with_empty_replace():
+    workspace_groups = {"group_old": Group("group_old")}
+    account_groups = {"group": Group("group")}
+    strategy = RegexSubStrategy(
+        workspace_groups,
+        account_groups,
+        renamed_groups_prefix="ucx-renamed-",
+        include_group_names=["group_old"],
+        workspace_group_regex="_old",
+        workspace_group_replace="",
+    )
+
+    migrated_group = next(strategy.generate_migrated_groups(), None)
+
+    assert migrated_group is not None
+    assert migrated_group.name_in_workspace == "group_old"
+    assert migrated_group.name_in_account == "group"
+    assert migrated_group.temporary_name == "ucx-renamed-group_old"
