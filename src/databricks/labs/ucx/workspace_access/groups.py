@@ -182,9 +182,9 @@ class GroupMigrationStrategy:
         }
 
     @staticmethod
-    def _safe_match(group_name: str, match_re: str) -> str:
+    def _safe_match(group_name: str, pattern: re.Pattern) -> str:
         try:
-            match = re.search(match_re, group_name)
+            match = pattern.search(group_name)
             if not match:
                 return group_name
             match_groups = match.groups()
@@ -195,11 +195,11 @@ class GroupMigrationStrategy:
             return group_name
 
     @staticmethod
-    def _safe_sub(group_name: str, match_re: str, replace: str) -> str:
+    def _safe_sub(group_name: str, pattern: re.Pattern, replace: str) -> str:
         try:
-            return re.sub(match_re, replace, group_name)
+            return pattern.sub(replace, group_name)
         except re.error:
-            logger.warning(f"Failed to apply Regex Expression {match_re} on Group Name {group_name}")
+            logger.warning(f"Failed to apply Regex Expression {pattern} on Group Name {group_name}")
             return group_name
 
 
@@ -295,14 +295,18 @@ class RegexSubStrategy(GroupMigrationStrategy):
             include_group_names=include_group_names,
             renamed_groups_prefix=renamed_groups_prefix,
         )
-        self.workspace_group_regex = workspace_group_regex
+        self.workspace_group_regex = workspace_group_regex  # Keep to support legacy public API
         self.workspace_group_replace = workspace_group_replace
+
+        self._workspace_group_pattern = re.compile(self.workspace_group_regex)
 
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
             name_in_account = self._safe_sub(
-                group.display_name, self.workspace_group_regex, self.workspace_group_replace
+                group.display_name,
+                self._workspace_group_pattern,
+                self.workspace_group_replace,
             )
             account_group = self.account_groups_in_account.get(name_in_account)
             if not account_group:
@@ -340,16 +344,20 @@ class RegexMatchStrategy(GroupMigrationStrategy):
             include_group_names=include_group_names,
             renamed_groups_prefix=renamed_groups_prefix,
         )
-        self.account_group_regex = account_group_regex
+        # Keep to support legacy public API
         self.workspace_group_regex = workspace_group_regex
+        self.account_group_regex = account_group_regex
+
+        self._workspace_group_pattern = re.compile(self.workspace_group_regex)
+        self._account_group_pattern = re.compile(self.account_group_regex)
 
     def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups_by_match = {
-            self._safe_match(group_name, self.workspace_group_regex): group
+            self._safe_match(group_name, self._workspace_group_pattern): group
             for group_name, group in self.get_filtered_groups().items()
         }
         account_groups_by_match = {
-            self._safe_match(group_name, self.account_group_regex): group
+            self._safe_match(group_name, self._account_group_pattern): group
             for group_name, group in self.account_groups_in_account.items()
         }
         for group_match, ws_group in workspace_groups_by_match.items():
