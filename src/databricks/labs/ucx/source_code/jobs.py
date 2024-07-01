@@ -1,4 +1,5 @@
 import functools
+import itertools
 import logging
 import tempfile
 from collections.abc import Iterable
@@ -296,9 +297,15 @@ class WorkflowLinter:
         for job in all_jobs:
             tasks.append(functools.partial(self.lint_job, job.job_id))
         logger.info(f"Running {tasks} linting tasks in parallel...")
-        problems, errors = Threads.gather('linting workflows', tasks)
-        logger.info(f"Saving {len(problems)} linting problems...")
-        sql_backend.save_table(f'{inventory_database}.workflow_problems', problems, JobProblem, mode='overwrite')
+        job_problems, errors = Threads.gather('linting workflows', tasks)
+        logger.info(f"Saving {len(job_problems)} linting problems...")
+        job_problems_flattened = list(itertools.chain(*job_problems))
+        sql_backend.save_table(
+            f'{inventory_database}.workflow_problems',
+            job_problems_flattened,
+            JobProblem,
+            mode='overwrite',
+        )
         if len(errors) > 0:
             raise ManyError(errors)
 
