@@ -208,9 +208,9 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
         self,
         workspace_groups_in_workspace,
         account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -246,9 +246,9 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
         self,
         workspace_groups_in_workspace,
         account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -284,11 +284,10 @@ class RegexSubStrategy(GroupMigrationStrategy):
         workspace_groups_in_workspace: dict[str, Group],
         account_groups_in_account: dict[str, Group],
         *,
-        # TODO: Check if hints below could be non optional
-        renamed_groups_prefix: str | None,
-        include_group_names: list[str] | None = None,
-        workspace_group_regex: str | None = None,
-        workspace_group_replace: str | None = None,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
+        workspace_group_regex: str,
+        workspace_group_replace: str,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -329,11 +328,11 @@ class RegexMatchStrategy(GroupMigrationStrategy):
         self,
         workspace_groups_in_workspace,
         account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
-        workspace_group_regex: str | None = None,
-        account_group_regex: str | None = None,
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
+        workspace_group_regex: str,
+        account_group_regex: str,
     ):
         super().__init__(
             workspace_groups_in_workspace,
