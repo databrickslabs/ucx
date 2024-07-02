@@ -8,6 +8,7 @@ from databricks.labs.blueprint.installation import Installation, SerdeError
 from databricks.labs.blueprint.tui import Prompts
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.labs.ucx.__about__ import __version__
 
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.contexts.account_cli import AccountContext
@@ -147,12 +148,22 @@ def validate_external_locations(w: WorkspaceClient, prompts: Prompts):
 
 
 @ucx.command
-def ensure_assessment_run(w: WorkspaceClient):
+def ensure_assessment_run(
+    w: WorkspaceClient, collection_workspace_id: int | None = None, a: AccountClient | None = None
+):
     """ensure the assessment job was run on a workspace"""
-    ctx = WorkspaceContext(w)
-    deployed_workflows = ctx.deployed_workflows
-    if not deployed_workflows.validate_step("assessment"):
-        deployed_workflows.run_workflow("assessment")
+    if collection_workspace_id:
+        if not a:
+            a = AccountClient(product='ucx', product_version=__version__)
+        account_installer = AccountInstaller(a)
+        workspaces_context = account_installer.get_workspaces_context(collection_workspace_id)
+    else:
+        workspaces_context = [WorkspaceContext(w)]
+    for ctx in workspaces_context:
+        logger.info(f"Running cmd for workspace {ctx.workspace_client.get_workspace_id()}")
+        deployed_workflows = ctx.deployed_workflows
+        if not deployed_workflows.validate_step("assessment"):
+            deployed_workflows.run_workflow("assessment")
 
 
 @ucx.command
@@ -473,10 +484,10 @@ def revert_dbsql_dashboards(w: WorkspaceClient, dashboard_id: str | None = None)
 
 
 @ucx.command(is_account=True)
-def join_collection(a: AccountClient, workspace_id: int, join_workspace_id: int):
+def join_collection(a: AccountClient, workspace_id: int, target_workspace_id: int):
     """joins the workspace to an existing collection"""
     account_installer = AccountInstaller(a)
-    account_installer.join_collection(workspace_id, join_workspace_id)
+    account_installer.join_collection(workspace_id, target_workspace_id)
 
 
 @ucx.command
