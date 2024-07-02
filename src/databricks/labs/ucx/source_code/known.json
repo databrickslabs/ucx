@@ -1991,20 +1991,10 @@
     "spacy.cli.debug_diff": [],
     "spacy.cli.debug_model": [],
     "spacy.cli.download": [],
-    "spacy.cli.evaluate": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'msg.table([(k, f'{v:.2f}' if isinstance(v, (float, int)) else v) for (k, v) in scores.items()], header=('', 'ROC AUC'), aligns=('l', 'r'), title='Textcat ROC AUC (per label)')' because its table name argument cannot be computed"
-      }
-    ],
+    "spacy.cli.evaluate": [],
     "spacy.cli.find_function": [],
     "spacy.cli.find_threshold": [],
-    "spacy.cli.info": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'msg.table(table_data, title=title)' because its table name argument cannot be computed"
-      }
-    ],
+    "spacy.cli.info": [],
     "spacy.cli.init_config": [],
     "spacy.cli.init_pipeline": [],
     "spacy.cli.package": [],
@@ -2442,12 +2432,7 @@
     "spacy.ml.models.tok2vec": [],
     "spacy.ml.staticvectors": [],
     "spacy.ml.tb_framework": [],
-    "spacy.pipe_analysis": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'msg.table(body, header=header, divider=True, multiline=True)' because its table name argument cannot be computed"
-      }
-    ],
+    "spacy.pipe_analysis": [],
     "spacy.pipeline": [],
     "spacy.pipeline._edit_tree_internals": [],
     "spacy.pipeline._edit_tree_internals.schemas": [],
