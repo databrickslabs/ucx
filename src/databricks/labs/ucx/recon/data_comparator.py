@@ -15,18 +15,18 @@ from .base import (
 class StandardDataComparator(DataComparator):
     _DATA_COMPARISON_QUERY_TEMPLATE = """
     WITH compare_results AS (
-        SELECT 
-            CASE 
+        SELECT
+            CASE
                 WHEN source.hash_value IS NULL AND target.hash_value IS NULL THEN TRUE
                 WHEN source.hash_value IS NULL OR target.hash_value IS NULL THEN FALSE
                 WHEN source.hash_value = target.hash_value THEN TRUE
                 ELSE FALSE
             END AS is_match,
-            CASE 
+            CASE
                 WHEN target.hash_value IS NULL THEN 1
                 ELSE 0
             END AS target_missing_count,
-            CASE 
+            CASE
                 WHEN source.hash_value IS NULL THEN 1
                 ELSE 0
             END AS source_missing_count
@@ -40,7 +40,7 @@ class StandardDataComparator(DataComparator):
         ) AS target
         ON source.hash_value = target.hash_value
     )
-    SELECT 
+    SELECT
         COUNT(*) AS total_mismatches,
         COALESCE(SUM(target_missing_count), 0) AS target_missing_count,
         COALESCE(SUM(source_missing_count), 0) AS source_missing_count

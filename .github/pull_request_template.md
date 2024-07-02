@@ -7,7 +7,7 @@
 
 Resolves #..
 
-### Functionality 
+### Functionality
 
 - [ ] added relevant user documentation
 - [ ] added new CLI command

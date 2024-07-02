@@ -19,7 +19,7 @@ Choose how to map the workspace groups:
 [3] Match by External ID
 [4] Regex Substitution
 [5] Regex Matching
-Enter a number between 0 and 5: 
+Enter a number between 0 and 5:
 ```
 
 The user then input the Prefix/Suffix/Regular Expression.

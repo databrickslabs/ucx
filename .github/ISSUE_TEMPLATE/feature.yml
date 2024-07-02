@@ -33,4 +33,3 @@ body:
       description: Add any other context, references or screenshots about the feature request here.
     validations:
       required: false
-  

@@ -517,4 +517,4 @@ saveAsTable(forecast_evals, "forecast_evals_sparkr", "delta", "append", mergeSch
 # MAGIC | library                                | description             | license    | source                                              |
 # MAGIC |----------------------------------------|-------------------------|------------|-----------------------------------------------------|
 # MAGIC | prophet                                  |Implements a procedure for forecasting time series data based on an additive model |  MIT   | https://cran.r-project.org/web/packages/prophet/index.html                 |
-# MAGIC | Metrics | An implementation of evaluation metrics in R that are commonly used in supervised machine learning | 	BSD 3 | https://cran.r-project.org/web/packages/Metrics/index.html | 
+# MAGIC | Metrics | An implementation of evaluation metrics in R that are commonly used in supervised machine learning | BSD 3 | https://cran.r-project.org/web/packages/Metrics/index.html |

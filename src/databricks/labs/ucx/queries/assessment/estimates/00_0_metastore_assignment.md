@@ -8,8 +8,8 @@ This section assumes that your workspace has been attached to a UC metastore, it
 
 If you haven't created a metastore yet, follow the docs below to attach your workspace to the metastore:
 
-[[AWS]](https://docs.databricks.com/en/data-governance/unity-catalog/enable-workspaces.html)  
-[[Azure]](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/enable-workspaces)  
+[[AWS]](https://docs.databricks.com/en/data-governance/unity-catalog/enable-workspaces.html)
+[[Azure]](https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/enable-workspaces)
 [[GCP]](https://docs.gcp.databricks.com/data-governance/unity-catalog/enable-workspaces.html)
 
 If any incompatible submit runs has been detected, follow the steps highlighted below:

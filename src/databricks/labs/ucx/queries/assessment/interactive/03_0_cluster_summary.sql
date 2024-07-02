@@ -1,9 +1,9 @@
 -- viz type=table, name=Findings by Cluster, columns=distinct_findings,Commands,Users,First_command,Last_command,workspace_id,cluster_id,cluster_name,dbr_version,creator
 -- widget title=Findings by Cluster, row=3, col=0, size_x=6, size_y=12
--- 
-WITH 
+--
+WITH
 iteractive_cluster_commands (
-    SELECT  
+    SELECT
         a.event_id,
         a.request_params.notebookId AS notebook_id,
         a.request_params.clusterId AS cluster_id,
@@ -32,16 +32,16 @@ pattern_matcher(
         explode(array_except(array(p.issue, lp.issue, rv.issue,dbr_type.issue), array(null))) issue,
         a.*
     FROM iteractive_cluster_commands a
-        LEFT OUTER JOIN $inventory.code_patterns p 
+        LEFT OUTER JOIN $inventory.code_patterns p
             ON a.commandLanguage in ('python','scala')
                 AND contains(a.commandText, p.pattern)
-        LEFT OUTER JOIN misc_patterns lp                                                       
+        LEFT OUTER JOIN misc_patterns lp
             ON a.commandLanguage = lp.commandLanguage
-        LEFT OUTER JOIN misc_patterns rv -- runtime version                                                       
+        LEFT OUTER JOIN misc_patterns rv -- runtime version
             ON (a.commandLanguage = rv.commandLanguage OR rv.commandLanguage is null)
                 AND a.dbr_version_major < rv.dbr_version_major
                 AND rv.dbr_version_major is not null
-        LEFT OUTER JOIN misc_patterns dbr_type                                                         
+        LEFT OUTER JOIN misc_patterns dbr_type
             ON a.dbr_type = dbr_type.dbr_type and a.dbr_type in ('cpu','gpu')
 )
 SELECT

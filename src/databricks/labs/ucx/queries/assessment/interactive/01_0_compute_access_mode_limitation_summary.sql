@@ -2,10 +2,10 @@
 -- widget title=Compute Access Mode Limitation Summary, row=1, col=0, size_x=6, size_y=12
 -- Scan notebook command history for potential paper cut issues
 -- https://docs.databricks.com/en/compute/access-mode-limitations.html#compute-access-mode-limitations
--- 
-WITH 
+--
+WITH
 iteractive_cluster_commands (
-    SELECT  
+    SELECT
         a.event_id,
         a.request_params.notebookId AS notebook_id,
         a.request_params.clusterId AS cluster_id,
@@ -18,7 +18,7 @@ iteractive_cluster_commands (
         a.request_params.commandText,
         md5(a.request_params.commandText) commandHash
     FROM system.access.audit a
-        LEFT OUTER JOIN $inventory.clusters AS c 
+        LEFT OUTER JOIN $inventory.clusters AS c
             ON a.request_params.clusterId = c.cluster_id
         AND a.action_name = 'runCommand'
     WHERE a.event_date >= DATE_SUB(CURRENT_DATE(), 90)
@@ -31,23 +31,23 @@ pattern_matcher(
         array_except(array(p.issue, lp.issue, rv.issue,dbr_type.issue), array(null)) issues,
         a.*
     FROM iteractive_cluster_commands a
-        LEFT OUTER JOIN $inventory.code_patterns p 
+        LEFT OUTER JOIN $inventory.code_patterns p
             ON a.commandLanguage in ('python','scala')
                 AND contains(a.commandText, p.pattern)
-        LEFT OUTER JOIN misc_patterns lp                                                       
+        LEFT OUTER JOIN misc_patterns lp
             ON a.commandLanguage = lp.commandLanguage
-        LEFT OUTER JOIN misc_patterns rv -- runtime version                                                       
+        LEFT OUTER JOIN misc_patterns rv -- runtime version
             ON (a.commandLanguage = rv.commandLanguage OR rv.commandLanguage is null)
                 AND a.dbr_version_major < rv.dbr_version_major
                 AND rv.dbr_version_major is not null
-        LEFT OUTER JOIN misc_patterns dbr_type                                                         
+        LEFT OUTER JOIN misc_patterns dbr_type
             ON a.dbr_type = dbr_type.dbr_type and a.dbr_type in ('cpu','gpu')
 ),
 exp (
     select distinct explode(issues) issue, workspace_id, notebook_id, cluster_id, email
     FROM pattern_matcher
 )
-SELECT 
+SELECT
     issue `Finding`,
     -- concat('<a href="https://github.com/databrickslabs/ucx/blob/main/docs/assessment.md#',replace(issue,' ','-'),'">',issue,'</a>') as link,
     count(distinct workspace_id) `# workspaces`,
