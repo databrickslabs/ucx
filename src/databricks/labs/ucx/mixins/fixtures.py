@@ -1278,6 +1278,7 @@ def make_feature_table(ws, make_random):
 
 @pytest.fixture
 def make_dbfs_data_copy(ws, make_cluster, env_or_skip):
+    _ = make_cluster  # Need cluster to copy data
     if ws.config.is_aws:
         cmd_exec = CommandExecutor(ws.clusters, ws.command_execution, lambda: env_or_skip("TEST_WILDCARD_CLUSTER_ID"))
 
