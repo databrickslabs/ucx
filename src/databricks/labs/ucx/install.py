@@ -694,6 +694,7 @@ class AccountInstaller(AccountContext):
             return None
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
+        ids_to_workspace = self._get_workspace_info(current_workspace_id)
         if target_workspace_id is None:
             # If joining a collection as part of the installation then collection_workspace_id would be empty
             try:
@@ -722,7 +723,6 @@ class AccountInstaller(AccountContext):
             return None
         # below code is executed if either joining an existing collection (through the cli)
         # or selecting one while installing
-        ids_to_workspace = self._get_workspace_info(current_workspace_id)
         collection_workspace: Workspace = AccountInstaller._get_workspace(
             target_workspace_id,
             ids_to_workspace,
