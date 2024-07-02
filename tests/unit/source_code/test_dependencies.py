@@ -98,6 +98,12 @@ def test_dependency_resolver_visits_file_dependencies(simple_dependency_resolver
     assert maybe.graph.all_relative_names() == {"root5.py", "leaf4.py"}
 
 
+def test_dependency_resolver_visits_sub_module_dependencies(simple_dependency_resolver):
+    maybe = simple_dependency_resolver.build_local_file_dependency_graph(Path("imports/main.py"), CurrentSessionState())
+    assert not maybe.failed
+    assert maybe.graph.all_relative_names() == {"main.py", "util/configuration.py"}
+
+
 def test_dependency_resolver_skips_builtin_dependencies(simple_dependency_resolver):
     maybe = simple_dependency_resolver.build_local_file_dependency_graph(
         Path("python_builtins.py"), CurrentSessionState()
