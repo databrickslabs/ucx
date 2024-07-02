@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -564,6 +565,25 @@ def test_computes_values_across_cells(extended_test_index, mock_path_lookup):
             start_col=0,
             end_line=5,
             end_col=19,
+        )
+    ]
+    assert advices == expected
+
+
+def test_computes_values_across_imports(extended_test_index, mock_path_lookup):
+    path = mock_path_lookup.resolve(Path("values_across_imports.py"))
+    sys.path.append(path.parent.as_posix())
+    source = path.read_text()
+    linter = NotebookLinter.from_source(extended_test_index, source, Language.PYTHON)
+    advices = list(linter.lint())
+    expected = [
+        Advice(
+            code='table-migrate',
+            message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
+            start_line=2,
+            start_col=0,
+            end_line=2,
+            end_col=30,
         )
     ]
     assert advices == expected

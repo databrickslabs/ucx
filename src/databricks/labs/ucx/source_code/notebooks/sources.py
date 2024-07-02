@@ -92,7 +92,7 @@ class NotebookLinter:
         self._python_linter = langs.linter(Language.PYTHON)
 
     @classmethod
-    def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
+    def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> NotebookLinter:
         ctx = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
