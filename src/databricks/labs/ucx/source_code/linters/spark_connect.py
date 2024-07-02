@@ -6,7 +6,7 @@ from astroid import Attribute, Call, Name, NodeNG  # type: ignore
 from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
-    Linter,
+    PythonLinter,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -172,7 +172,7 @@ class LoggingMatcher(SharedClusterMatcher):
             )
 
 
-class SparkConnectLinter(Linter):
+class SparkConnectLinter(PythonLinter):
     def __init__(self, is_serverless: bool = False):
         self._matchers = [
             JvmAccessMatcher(is_serverless=is_serverless),
@@ -181,7 +181,6 @@ class SparkConnectLinter(Linter):
             LoggingMatcher(is_serverless=is_serverless),
         ]
 
-    def lint(self, code: str) -> Iterator[Advice]:
-        tree = Tree.normalize_and_parse(code)
+    def lint_tree(self, tree: Tree) -> Iterator[Advice]:
         for matcher in self._matchers:
             yield from matcher.lint_tree(tree.node)
