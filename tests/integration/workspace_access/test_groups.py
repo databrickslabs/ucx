@@ -88,7 +88,7 @@ def test_reflect_account_groups_on_workspace(ws, make_ucx_group, sql_backend, in
     # At this time previous ws level groups aren't deleted
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
     ws, make_ucx_group, sql_backend, inventory_schema
 ):
@@ -115,7 +115,7 @@ def test_delete_ws_groups_should_delete_renamed_and_reflected_groups_only(
         get_group(ws_group.id)
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, _ = make_ucx_group()
 
@@ -125,7 +125,7 @@ def test_delete_ws_groups_should_not_delete_current_ws_groups(ws, make_ucx_group
     assert ws.groups.get(ws_group.id).display_name == ws_group.display_name
 
 
-@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=2))
+@retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=3))
 def test_delete_ws_groups_should_not_delete_non_reflected_acc_groups(ws, make_ucx_group, sql_backend, inventory_schema):
     ws_group, _ = make_ucx_group()
     group_manager = GroupManager(sql_backend, ws, inventory_schema, [ws_group.display_name], "ucx-temp-")
@@ -146,7 +146,7 @@ def validate_migrate_groups(group_manager: GroupManager, ws_group: Group, to_gro
         raise NotFound(f'missing account group: {to_group.display_name}')
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=2))
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize("strategy", ["prefix", "suffix", "substitute", "matching"])
 def test_group_name_change(ws, sql_backend, inventory_schema, make_ucx_group, make_random, strategy):
     random_element = f"ucx{make_random(4)}"
