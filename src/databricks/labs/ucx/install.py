@@ -42,7 +42,6 @@ from databricks.sdk.service.sql import (
 )
 
 from databricks.labs.ucx.__about__ import __version__
-from databricks.labs.ucx.account.workspaces import WorkspaceInfo
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.assessment.clusters import ClusterInfo, PolicyInfo
 from databricks.labs.ucx.assessment.init_scripts import GlobalInitScriptInfo
@@ -677,13 +676,17 @@ class AccountInstaller(AccountContext):
             raise KeyError(msg) from None
 
     def get_workspace_info(self, current_workspace_id: int):
-        #account_client = self._get_safe_account_client()
-        #workspace = account_client.workspaces.get(current_workspace_id)
-        #current_workspace_client = account_client.get_workspace_client(workspace)
-        current_workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
-        installation = Installation.current(current_workspace_client, self.product_info.product_name())
-        workspace_info = WorkspaceInfo(installation, current_workspace_client)
-        return workspace_info.load_workspace_info()
+        account_client = self._get_safe_account_client()
+        workspaces = account_client.workspaces.list()
+        ids_to_workspace = {}
+        for workspace in workspaces:
+            ids_to_workspace[workspace.workspace_id] = workspace
+        # current_workspace_client = account_client.get_workspace_client(workspace)
+        # current_workspace_client = WorkspaceClient(product="ucx", product_version=__version__)
+        # installation = Installation.current(current_workspace_client, self.product_info.product_name())
+        # workspace_info = WorkspaceInfo(installation, current_workspace_client)
+        # return workspace_info.load_workspace_info()
+        return ids_to_workspace
 
     def get_workspaces_context(self, collection_workspace_id: int) -> list[WorkspaceContext]:
         workspace_contexts = []
