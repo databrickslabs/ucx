@@ -3,13 +3,13 @@ from datetime import timedelta
 import pytest
 from databricks.sdk import AccountClient, WorkspaceClient
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 
 from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.scim import ScimSupport
 
+from ..retries import retried
 from . import apply_tasks
 
 

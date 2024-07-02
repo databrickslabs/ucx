@@ -5,7 +5,6 @@ from datetime import timedelta
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors.platform import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service import workspace
 from databricks.sdk.service.workspace import AclPermission
 
@@ -13,6 +12,7 @@ from databricks.labs.ucx.workspace_access.base import Permissions
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 from databricks.labs.ucx.workspace_access.secrets import SecretScopesSupport
 
+from ..retries import retried
 from . import apply_tasks
 
 logger = logging.getLogger(__name__)

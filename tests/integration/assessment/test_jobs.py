@@ -3,12 +3,12 @@ import time
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.jobs import NotebookTask, RunTask
 from databricks.sdk.service.workspace import ImportFormat
 
 from databricks.labs.ucx.assessment.jobs import JobsCrawler, SubmitRunsCrawler
 
+from ..retries import retried
 from .test_assessment import _SPARK_CONF
 
 
