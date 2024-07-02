@@ -408,58 +408,6 @@
     "dbx.sync.path_matcher": [],
     "dbx.sync.snapshot": [],
     "dbx.templates.projects.python_basic.render.hooks.post_gen_project": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.notebooks.sample_notebook": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.setup": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.entrypoint": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.integration.e2e_test": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'etl_job.spark.table(table_name)' because its table name argument cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
-      }
-    ],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.unit.conftest": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.tests.unit.sample_test": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'spark.table(table_name)' because its table name argument cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
-      }
-    ],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.common": [
-      {
-        "code": "jvm-access-in-shared-clusters",
-        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
-      },
-      {
-        "code": "spark-logging-in-shared-clusters",
-        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
-      }
-    ],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.tasks": [],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.tasks.sample_etl_task": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'df.write.format('delta').mode('overwrite').saveAsTable(f'{db}.{table}')' because its table name argument cannot be computed"
-      }
-    ],
-    "dbx.templates.projects.python_basic.render.{{cookiecutter.project_name}}.{{cookiecutter.project_slug}}.tasks.sample_ml_task": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'self.spark.table(f'{db}.{table}')' because its table name argument cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
-      }
-    ],
     "dbx.types": [],
     "dbx.utils": [],
     "dbx.utils.common": [],
