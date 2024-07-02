@@ -246,8 +246,12 @@ class GrantsCrawler(CrawlerBase[Grant]):
                 tasks.append(partial(self.grants, catalog=catalog, database=database))
         for table in self._tc.snapshot():
             fn = partial(self.grants, catalog=catalog, database=table.database)
-            # views are recognized as tables
-            tasks.append(partial(fn, table=table.name))
+            # Views are treated as a type of table and enumerated by the table crawler.
+            if table.view_text is None:
+                task = partial(fn, table=table.name)
+            else:
+                task = partial(fn, view=table.name)
+            tasks.append(task)
         for udf in self._udf.snapshot():
             fn = partial(self.grants, catalog=catalog, database=udf.database)
             tasks.append(partial(fn, udf=udf.name))
@@ -268,6 +272,17 @@ class GrantsCrawler(CrawlerBase[Grant]):
         for grant in self.grants(catalog=schema.catalog_name, database=schema.name):
             principal_permissions[grant.principal].add(grant.action_type)
         return principal_permissions
+
+    # The reported ObjectType for grants doesn't necessary match the type of grants we asked for. This maps
+    # those that aren't themselves.
+    _grants_reported_as = {
+        # SHOW type: RESULT type
+        "SCHEMA": "DATABASE",
+        "CATALOG": "CATALOG$",
+        "VIEW": "TABLE",
+        "ANY FILE": "ANY_FILE",
+        "ANONYMOUS FUNCTION": "ANONYMOUS_FUNCTION",
+    }
 
     def grants(
         self,
@@ -318,18 +333,13 @@ class GrantsCrawler(CrawlerBase[Grant]):
             any_file=any_file,
             anonymous_function=anonymous_function,
         )
-        try:  # pylint: disable=too-many-try-statements
-            grants = []
-            object_type_normalization = {
-                "SCHEMA": "DATABASE",
-                "CATALOG$": "CATALOG",
-                "ANY_FILE": "ANY FILE",
-                "ANONYMOUS_FUNCTION": "ANONYMOUS FUNCTION",
-            }
+        expected_grant_object_type = self._grants_reported_as.get(on_type, on_type)
+        grants = []
+        try:
             for row in self._fetch(f"SHOW GRANTS ON {on_type} {escape_sql_identifier(key)}"):
                 (principal, action_type, object_type, _) = row
-                object_type = object_type_normalization.get(object_type, object_type)
-                if on_type != object_type:
+                # This seems to be here to help unit tests that don't sufficiently narrow the target of mocked queries. -ajs
+                if object_type != expected_grant_object_type:
                     continue
                 # we have to return concrete list, as with yield we're executing
                 # everything on the main thread.

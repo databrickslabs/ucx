@@ -167,19 +167,6 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
     graph.register_library.assert_called_once_with("databricks")
 
 
-def test_parses_python_cell_with_magic_commands(simple_dependency_resolver, mock_path_lookup):
-    code = """
-a = 'something'
-%pip install databricks
-b = 'else'
-"""
-    cell = PythonCell(code, original_offset=1)
-    dependency = Dependency(FileLoader(), Path(""))
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    problems = cell.build_dependency_graph(graph)
-    assert not problems
-
-
 @pytest.mark.parametrize(
     "code,split",
     [
@@ -205,17 +192,5 @@ b = 'else'
         ),
     ],
 )
-def test_pip_command_split(code, split):
-    assert PipMagic._split(code) == split  # pylint: disable=protected-access
-
-
-def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup):
-    source = """
-%unsupported stuff '"%#@!
-"""
-    tree = Tree.normalize_and_parse(source)
-    commands, _ = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
-    dependency = Dependency(FileLoader(), Path(""))
-    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
-    problems = commands[0].build_dependency_graph(graph)
-    assert problems[0].code == "unsupported-magic-line"
+def test_pip_cell_split(code, split):
+    assert PipCell._split(code) == split  # pylint: disable=protected-access

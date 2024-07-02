@@ -175,7 +175,7 @@ def test_crawler_no_data():
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
-    grants = crawler.snapshot()
+    grants = list(crawler.snapshot())
     assert len(grants) == 0
 
 
@@ -212,7 +212,7 @@ def test_crawler_crawl():
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
-    grants = crawler.snapshot()
+    grants = list(crawler.snapshot())
     assert len(grants) == 3
 
 
@@ -240,7 +240,7 @@ def test_crawler_udf_crawl():
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
-    grants = crawler.snapshot()
+    grants = list(crawler.snapshot())
 
     assert len(grants) == 2
     assert Grant(
@@ -272,7 +272,7 @@ def test_crawler_snapshot_when_no_data():
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
-    snapshot = crawler.snapshot()
+    snapshot = list(crawler.snapshot())
     assert len(snapshot) == 0
 
 
@@ -281,7 +281,7 @@ def test_crawler_snapshot_with_data():
     table = TablesCrawler(sql_backend, "schema")
     udf = UdfsCrawler(sql_backend, "schema")
     crawler = GrantsCrawler(table, udf)
-    snapshot = crawler.snapshot()
+    snapshot = list(crawler.snapshot())
     assert len(snapshot) == 3
 
 
@@ -308,7 +308,7 @@ def test_grants_returning_error_when_showing_grants():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler.snapshot()
+    results = list(crawler.snapshot())
     assert results == [
         Grant(
             principal="principal1",
@@ -342,7 +342,7 @@ def test_grants_returning_error_when_describing():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler.snapshot()
+    results = list(crawler.snapshot())
     assert results == [
         Grant(
             principal="principal1",
@@ -381,7 +381,7 @@ def test_udf_grants_returning_error_when_showing_grants():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler.snapshot()
+    results = list(crawler.snapshot())
     assert results == [
         Grant(
             principal="principal1",
@@ -417,7 +417,7 @@ def test_udf_grants_returning_error_when_describing():
     udf = UdfsCrawler(backend, "default")
     crawler = GrantsCrawler(table_crawler, udf)
 
-    results = crawler.snapshot()
+    results = list(crawler.snapshot())
     assert results == [
         Grant(
             principal="principal1",
@@ -460,6 +460,6 @@ def test_crawler_should_filter_databases():
     table = TablesCrawler(sql_backend, "schema", include_databases=["database_one"])
     udf = UdfsCrawler(sql_backend, "schema", include_databases=["database_one"])
     crawler = GrantsCrawler(table, udf, include_databases=["database_one"])
-    grants = crawler.snapshot()
+    grants = list(crawler.snapshot())
     assert len(grants) == 3
     assert 'SHOW TABLES FROM hive_metastore.database_one' in sql_backend.queries

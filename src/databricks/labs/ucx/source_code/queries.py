@@ -68,7 +68,7 @@ class FromTable(Linter, Fixer):
                 # the schema  as the table name.
                 self._session_state.schema = table.name
                 continue
-            if isinstance(statement, Create) and statement.kind == "SCHEMA":
+            if isinstance(statement, Create) and getattr(statement, "kind", None) == "SCHEMA":
                 # Sqlglot captures the schema name in the Create statement as a Table, with
                 # the schema  as the db name.
                 self._session_state.schema = table.db
