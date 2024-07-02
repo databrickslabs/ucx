@@ -14,7 +14,7 @@ from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, GraphBuilder
 from databricks.labs.ucx.source_code.graph import (
     BaseImportResolver,
     BaseFileResolver,
@@ -40,7 +40,9 @@ class LocalFile(SourceContainer):
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
         if self._language is CellLanguage.PYTHON:
-            return parent.build_graph_from_python_source(self._original_code)
+            context = parent.new_graph_builder_context()
+            builder = GraphBuilder(context)
+            return builder.build_graph_from_python_source(self._original_code)
         # supported language that does not generate dependencies
         if self._language is CellLanguage.SQL:
             return []

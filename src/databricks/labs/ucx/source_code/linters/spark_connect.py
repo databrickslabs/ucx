@@ -182,6 +182,7 @@ class SparkConnectLinter(Linter):
         ]
 
     def lint(self, code: str) -> Iterator[Advice]:
+        code = Tree.convert_magic_lines_to_magic_commands(code)
         tree = Tree.parse(code)
         for matcher in self._matchers:
             yield from matcher.lint_tree(tree.node)
