@@ -18,6 +18,7 @@ from databricks.labs.ucx.workspace_access.groups import (
     GroupManager,
     MigratedGroup,
     MigrationState,
+    RegexSubStrategy,
 )
 
 
@@ -162,7 +163,6 @@ def test_snapshot_should_consider_groups_defined_in_conf():
     wsclient = create_autospec(WorkspaceClient)
     group1 = Group(id="1", display_name="de", meta=ResourceMeta(resource_type="WorkspaceGroup"))
     group2 = Group(id="2", display_name="ds", meta=ResourceMeta(resource_type="WorkspaceGroup"))
-    wsclient.groups.list.return_value = [group1, group2]
     acc_group_1 = Group(id="11", display_name="de", external_id="1234")
     acc_group_2 = Group(id="12", display_name="ds", external_id="1235")
     wsclient.api_client.do.return_value = {
@@ -913,6 +913,31 @@ def test_snapshot_with_group_matched_by_external_id_not_found(caplog):
     assert "Couldn't find a matching account group for de_(1234) group with external_id" in caplog.text
 
 
+def test_snapshot_migrated_groups_when_substitute_with_empty_string():
+    backend = MockBackend()
+
+    workspace_group = Group(display_name="group_old", id="1")
+    ws = create_autospec(WorkspaceClient)
+    ws.groups.list.return_value = [workspace_group]
+    ws.groups.get.return_value = workspace_group
+
+    account_group = Group(display_name="group")
+    ws.api_client.do.return_value = {"Resources": [account_group.as_dict()]}
+
+    group_manager = GroupManager(
+        backend,
+        ws,
+        inventory_database="inv",
+        workspace_group_regex="_old",
+        workspace_group_replace="",
+    )
+    migrated_groups = group_manager.snapshot()
+
+    assert len(migrated_groups) == 1
+    assert migrated_groups[0].name_in_workspace == "group_old"
+    assert migrated_groups[0].name_in_account == "group"
+
+
 def test_configure_include_groups():
     configure_groups = ConfigureGroups(
         MockPrompts(
@@ -973,21 +998,22 @@ def test_configure_external_id():
     assert configure_groups.group_match_by_external_id
 
 
-def test_configure_substitute():
+@pytest.mark.parametrize("substitution_value", ["business", ""])
+def test_configure_substitute(substitution_value):
     configure_groups = ConfigureGroups(
         MockPrompts(
             {
                 "Backup prefix": "",
                 r"Choose how to map the workspace groups.*": "4",  # substitute
                 r".*for substitution": "biz",
-                r".*substitution value": "business",
+                r".*substitution value": substitution_value,
                 ".*": "",
             }
         )
     )
     configure_groups.run()
     assert configure_groups.workspace_group_regex == "biz"
-    assert configure_groups.workspace_group_replace == "business"
+    assert configure_groups.workspace_group_replace == substitution_value
 
 
 def test_configure_match():
@@ -1250,3 +1276,23 @@ def test_migration_state_with_filtered_group():
             roles='',
         )
     ]
+
+
+def test_regex_sub_strategy_replaces_with_empty_replace():
+    workspace_groups = {"group_old": Group("group_old")}
+    account_groups = {"group": Group("group")}
+    strategy = RegexSubStrategy(
+        workspace_groups,
+        account_groups,
+        renamed_groups_prefix="ucx-renamed-",
+        include_group_names=["group_old"],
+        workspace_group_regex="_old",
+        workspace_group_replace="",
+    )
+
+    migrated_group = next(strategy.generate_migrated_groups(), None)
+
+    assert migrated_group is not None
+    assert migrated_group.name_in_workspace == "group_old"
+    assert migrated_group.name_in_account == "group"
+    assert migrated_group.temporary_name == "ucx-renamed-group_old"
