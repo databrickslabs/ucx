@@ -2084,10 +2084,6 @@
       },
       {
         "code": "table-migrate",
-        "message": "Can't migrate 'self._spark.table(self._meta_ingest_tbl)' because its table name argument cannot be computed"
-      },
-      {
-        "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
       }
     ],
@@ -2110,21 +2106,8 @@
         "message": "Deprecated file system path: dbfs:/tmp/pt/_checkpoint"
       }
     ],
-    "spark_price_transparency.pt_stage": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f'CREATE DATABASE IF NOT EXISTS {self.stage_db_name}')' because its value cannot be computed"
-      }
-    ],
+    "spark_price_transparency.pt_stage": [],
     "spark_price_transparency.pt_table": [
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DELETE FROM  WHERE 1=1"
-      },
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DROP TABLE IF EXISTS "
-      },
       {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
@@ -2134,30 +2117,10 @@
     "spark_price_transparency.table": [
       {
         "code": "table-migrate",
-        "message": "Can't migrate 'self.spark.table(self.wh_tbl_name)' because its table name argument cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self.spark.sql(f'DELETE FROM {self.wh_tbl_name} WHERE 1=1')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self.spark.sql(f'DROP TABLE IF EXISTS {self.wh_tbl_name}')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
       }
     ],
     "spark_price_transparency.table_analytic": [
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DELETE FROM  WHERE 1=1"
-      },
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DROP TABLE IF EXISTS "
-      },
       {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
@@ -2184,14 +2147,6 @@
     "spark_price_transparency.table_of_contents.toc_header": [],
     "spark_price_transparency.table_of_contents.toc_reporting": [],
     "spark_price_transparency.table_stream_tgt": [
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DELETE FROM  WHERE 1=1"
-      },
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DROP TABLE IF EXISTS "
-      },
       {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
