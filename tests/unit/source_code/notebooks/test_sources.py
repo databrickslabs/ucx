@@ -1,3 +1,4 @@
+import codecs
 import locale
 from pathlib import Path
 
@@ -19,6 +20,34 @@ def test_file_linter_lints_not_yet_supported_language(path, migration_index):
     linter = FileLinter(LinterContext(migration_index), Path(path), "")
     advices = list(linter.lint())
     assert [advice.code for advice in advices] == ["unsupported-language"]
+
+
+class FriendFileLinter(FileLinter):
+
+    def source_code(self):
+        return self._source_code
+
+
+def test_checks_encoding_of_pseudo_file(migration_index):
+    linter = FriendFileLinter(LinterContext(migration_index), Path("whatever"), "a=b")
+    assert linter.source_code() == "a=b"
+
+
+@pytest.mark.parametrize(
+    "bom, encoding",
+    [
+        (codecs.BOM_UTF8, "utf-8"),
+        (codecs.BOM_UTF16_LE, "utf-16-le"),
+        (codecs.BOM_UTF16_BE, "utf-16-be"),
+        (codecs.BOM_UTF32_LE, "utf-32-le"),
+        (codecs.BOM_UTF32_BE, "utf-32-be"),
+    ],
+)
+def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_path):
+    path = tmp_path / "file.py"
+    path.write_bytes(bom + "a = 12".encode(encoding))
+    linter = FriendFileLinter(LinterContext(migration_index), path)
+    assert linter.source_code() == "a = 12"
 
 
 @pytest.mark.parametrize(
