@@ -124,6 +124,9 @@ class WorkflowTaskContainer(SourceContainer):
             if problems:
                 yield from problems
         if library.egg:
+            if self.runtime_version > (14, 0):
+                yield DependencyProblem('not-yet-implemented', 'Installing eggs is no longer supported '
+                                                               'on Databricks 14.0 or higher')
             logger.info(f"Registering library from {library.egg}")
             with self._ws.workspace.download(library.egg, format=ExportFormat.AUTO) as remote_file:
                 with tempfile.TemporaryDirectory() as directory:
