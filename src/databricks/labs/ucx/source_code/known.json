@@ -347,42 +347,6 @@
       },
       {
         "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(SparkClient.drop_pk_statement(full_table_name))' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(SparkClient.set_pk_tk_statement(full_table_name=full_table_name, pk_cols=pk_cols, tk_col=tk_col, pk_name=pk_name))' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f\"ALTER TABLE {sanitize_multi_level_name(delta_table_name)} ALTER COLUMN {sanitize_identifier(column_name)} COMMENT '{escaped_comment}'\")' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f\"COMMENT ON TABLE {sanitize_multi_level_name(delta_table_name)} IS '{escaped_comment}'\")' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f'ALTER TABLE {sanitize_multi_level_name(delta_table_name)} ALTER COLUMN {sanitize_identifier(column_name)} COMMENT NULL')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f'ALTER TABLE {sanitize_multi_level_name(full_table_name)} ALTER COLUMN {sanitize_identifier(c)} SET NOT NULL')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f'DESCRIBE CATALOG {sanitize_identifier(catalog_name)}')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(f'DESCRIBE SCHEMA {sanitize_identifier(catalog_name)}.{sanitize_identifier(database_name)}')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self._spark.sql(sql_string)' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
         "message": "SQL query is not supported yet: COMMENT ON TABLE  IS NULL"
       },
       {
@@ -451,16 +415,7 @@
     "databricks.ml_features.utils.cosmosdb_type_utils": [],
     "databricks.ml_features.utils.cosmosdb_utils": [],
     "databricks.ml_features.utils.dynamodb_type_utils": [],
-    "databricks.ml_features.utils.e2e_test_utils": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'spark_session.sql(f'CREATE DATABASE {sanitize_identifier(db_name)}')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'spark_session.sql(f'DROP DATABASE IF EXISTS {sanitize_identifier(db_name)} CASCADE')' because its value cannot be computed"
-      }
-    ],
+    "databricks.ml_features.utils.e2e_test_utils": [],
     "databricks.ml_features.utils.feature_lookup_utils": [],
     "databricks.ml_features.utils.feature_serving_endpoint_utils": [],
     "databricks.ml_features.utils.feature_utils": [],
