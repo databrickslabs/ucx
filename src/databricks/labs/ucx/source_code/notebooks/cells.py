@@ -393,8 +393,7 @@ class GraphBuilder:
         """
         problems: list[DependencyProblem] = []
         try:
-            python_code = Tree.convert_magic_lines_to_magic_commands(python_code)
-            tree = Tree.parse(python_code)
+            tree = Tree.normalize_and_parse(python_code)
         except Exception as e:  # pylint: disable=broad-except
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
             return problems
