@@ -24,6 +24,7 @@ from databricks.labs.blueprint.wheels import (
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk.core import with_user_agent_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
@@ -74,6 +75,7 @@ WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 logger = logging.getLogger(__name__)
+with_user_agent_extra("cmd", "install")
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
