@@ -115,7 +115,7 @@ def test_dbfs_queries_failure(query: str):
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
-            code='dbfs-query',
+            code='dbfs-query-unsupported-sql',
             message=f'SQL query is not supported yet: {query}',
             start_line=0,
             start_col=0,
