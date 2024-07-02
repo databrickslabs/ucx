@@ -19479,6 +19479,9 @@
     "sparknlp.upload_to_hub": [],
     "sparknlp.util": []
   },
+  "spark-ocr": {
+    "sparkocr": []
+  },
   "sqlalchemy": {
     "sqlalchemy": []
   },
@@ -19851,3 +19854,4 @@
     "zipp.glob": []
   }
 }
+
