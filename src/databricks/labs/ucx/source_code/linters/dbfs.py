@@ -80,6 +80,7 @@ class DBFSUsageLinter(Linter):
         """
         Lints the code looking for file system paths that are deprecated
         """
+        code = Tree.convert_magic_lines_to_magic_commands(code)
         tree = Tree.parse(code)
         visitor = DetectDbfsVisitor(self._session_state)
         visitor.visit(tree.node)
