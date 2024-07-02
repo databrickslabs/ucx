@@ -31,6 +31,7 @@ from databricks.sdk.errors import (
     NotFound,
     PermissionDenied,
     ResourceDoesNotExist,
+    Unauthenticated,
 )
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
@@ -768,7 +769,6 @@ class AccountInstaller(AccountContext):
             )
             installed_workspaces.append(workspace)
             if not ctx.account_workspaces.can_administer(workspace):
-
                 logger.error(
                     f"User doesnt have admin access on the workspace {workspace_id} in the collection, "
                     f"cant join collection."
@@ -824,8 +824,16 @@ if __name__ == "__main__":
         account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
-
         workspace_installer.run()
-        account_installer.join_collection(
-            workspace_installer.workspace_client.get_workspace_id(),
-        )
+
+        try:
+            account_installer.join_collection(
+                workspace_installer.workspace_client.get_workspace_id(),
+            )
+        except Unauthenticated:
+            logger.warning(
+                "User is not authenticated, "
+                "you need account admin and workspace admin on "
+                "respective workspaces to enable collection joining. Please run join-collection command "
+                "with account admin credentials"
+            )

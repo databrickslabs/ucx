@@ -35,11 +35,29 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [Group migration workflow](#group-migration-workflow)
   * [Debug notebook](#debug-notebook)
   * [Debug logs](#debug-logs)
-  * [Table Migration Workflow](#table-migration-workflow)
-    * [Dependency CLI commands](#dependency-cli-commands)
-    * [Table Migration Workflow Tasks](#table-migration-workflow-tasks)
+  * [Table Migration](#table-migration)
+    * [Prerequisites](#prerequisites)
+    * [Upgrade Process](#upgrade-process)
+      * [Step 1: Mapping Metastore Tables (UCX Only)](#step-1-mapping-metastore-tables-ucx-only)
+        * [Step 1.1: Create the mapping file](#step-11-create-the-mapping-file)
+        * [Step 1.2: Update the mapping file](#step-12-update-the-mapping-file)
+      * [Step 2: Create the necessary cloud principals for the upgrade](#step-2-create-the-necessary-cloud-principals-for-the-upgrade)
+        * [Step 2.1: Map the cloud principals to the cloud "prefixes"](#step-21-map-the-cloud-principals-to-the-cloud-prefixes)
+        * [Step 2.2: Create/Modify Cloud Principals and Credentials](#step-22-createmodify-cloud-principals-and-credentials)
+        * [Step 2.3: Create External Locations](#step-23-create-external-locations)
+        * [Step 2.4: Create "Uber Principal"](#step-24-create-uber-principal)
+        * [Step 2.5: Create Catalogs and Schemas](#step-25-create-catalogs-and-schemas)
+      * [Step 3: Upgrade the Metastore](#step-3-upgrade-the-metastore)
+      * [Step 4: Odds and Ends](#step-4-odds-and-ends)
+        * [Step 4.1: Skipping Table/Schema](#step-41-skipping-tableschema)
+        * [Step 4.2: Moving objects](#step-42-moving-objects)
+        * [Step 4.2: Aliasing objects](#step-42-aliasing-objects)
+        * [Step 4.3: Reverting objects](#step-43-reverting-objects)
     * [Post Migration Data Reconciliation Task](#post-migration-data-reconciliation-task)
     * [Other considerations](#other-considerations)
+    * [[EXPERIMENTAL] Scan tables in mounts Workflow](#experimental-scan-tables-in-mounts-workflow)
+      * [<b>Always run this workflow AFTER the assessment has finished</b>](#balways-run-this-workflow-after-the-assessment-has-finishedb)
+    * [[EXPERIMENTAL] Migrate tables in mounts Workflow](#experimental-migrate-tables-in-mounts-workflow)
   * [Jobs Static Code Analysis Workflow](#jobs-static-code-analysis-workflow)
 * [Utility commands](#utility-commands)
   * [`logs` command](#logs-command)
@@ -56,6 +74,7 @@ See [contributing instructions](CONTRIBUTING.md) to help improve this project.
   * [`principal-prefix-access` command](#principal-prefix-access-command)
     * [Access for AWS S3 Buckets](#access-for-aws-s3-buckets)
     * [Access for Azure Storage Accounts](#access-for-azure-storage-accounts)
+  * [`create-missing-pricipals` command (AWS Only)](#create-missing-pricipals-command-aws-only)
   * [`create-uber-principal` command](#create-uber-principal-command)
   * [`migrate-credentials` command](#migrate-credentials-command)
   * [`validate-external-locations` command](#validate-external-locations-command)
@@ -405,6 +424,7 @@ The upgrade process is done in multiple steps. For each step we will discuss the
 
 #### Step 1: Mapping Metastore Tables (UCX Only)
 In this step we will map the metastore tables to UC tables.
+
 ##### Step 1.1: Create the mapping file
 This step can be performed using the `create-table-mapping` command documented in the [UCX Command](#create-table-mapping-command).
 
@@ -486,8 +506,7 @@ The `create-catalogs-schemas` [UCX command](#create-catalogs-schemas-command) ca
 
 The command will create the UC catalogs and schemas based on the mapping file created in the previous step.
 
-
-### Step 3: Upgrade the Metastore
+#### Step 3: Upgrade the Metastore
 Upgrading the metastore is done in steps.
 Each step can be executed separately as a standalone command.
 Each step represents a different type of metastore object.
@@ -512,24 +531,24 @@ The upgrade process can be triggered using the `migrate-tables` [UCX command](#m
 
 Or by running the "Migrate Tables" workflow deployed to the workspace.
 
-### Step 4: Odds and Ends
+#### Step 4: Odds and Ends
 The following steps can be used to repair/amend the metastore after the upgrade process.
 
-#### Step 4.1: Skipping Table/Schema
+##### Step 4.1: Skipping Table/Schema
 ```bash
 databricks labs ucx skip --schema X [--table Y]
 ```
 This command will mark the table or schema as skipped. The table will not be upgraded in the next run of the upgrade process.
 
-
-#### Step 4.2: Moving objects
+##### Step 4.2: Moving objects
 ```bash
 databricks labs ucx move --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
 ```
 This command will move the object from the source location to the target location.
 The `upgraded_from` property will be updated to reflect the new location on the source object.
 This command should be used in case the object was created in the wrong location.
-#### Step 4.2: Aliasing objects
+
+##### Step 4.2: Aliasing objects
 ```bash
 databricks labs ucx alias --from-catalog A --from-schema B --from-table C --to-catalog D --to-schema E
 ```
@@ -538,7 +557,8 @@ It will create a mirror view to view that is marked as alias.
 The use of this command is in case we need multiple identical tables or views in multiple locations.
 HMS allows creating multiple tables pointing to the same location.
 UC does not support creating multiple tables pointing to the same location, thus we need to create an alias for the table.
-#### Step 4.3: Reverting objects
+
+##### Step 4.3: Reverting objects
 ```bash
 databricks labs ucx revert-migrated-tables --schema X --table Y [--delete-managed]
 ```

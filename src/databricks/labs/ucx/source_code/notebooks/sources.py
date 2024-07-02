@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import codecs
 import locale
+import os
 from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path
@@ -167,8 +169,16 @@ class FileLinter:
 
     @cached_property
     def _source_code(self) -> str:
-        encoding = locale.getpreferredencoding(False)
-        return self._path.read_text(encoding) if self._content is None else self._content
+        return self._path.read_text(self._guess_encoding()) if self._content is None else self._content
+
+    def _guess_encoding(self):
+        path = self._path.as_posix()
+        count = min(32, os.path.getsize(path))
+        with open(path, 'rb') as _file:
+            raw = _file.read(count)
+            if raw.startswith(codecs.BOM_UTF8):
+                return 'utf-8-sig'
+            return locale.getpreferredencoding(False)
 
     def _file_language(self):
         return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
