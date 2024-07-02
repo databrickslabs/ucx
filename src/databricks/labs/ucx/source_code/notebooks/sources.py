@@ -3,6 +3,7 @@ from __future__ import annotations
 import codecs
 import locale
 from collections.abc import Iterable
+from functools import cached_property
 from pathlib import Path
 
 from databricks.sdk.service.workspace import Language
@@ -165,7 +166,7 @@ class FileLinter:
         self._path: Path = path
         self._content = content
 
-    @property
+    @cached_property
     def _source_code(self) -> str:
         if self._content is None:
             self._content = self._path.read_text(self._guess_encoding())
