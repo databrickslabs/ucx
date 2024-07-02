@@ -581,6 +581,9 @@
   "executing": {
     "executing": []
   },
+  "fastcluster": {
+    "fastcluster": []
+  },
   "filelock": {
     "filelock": [],
     "filelock._api": [],
