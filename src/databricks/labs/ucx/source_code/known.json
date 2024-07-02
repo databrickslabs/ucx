@@ -800,6 +800,45 @@
   "graphene": {
     "graphene": []
   },
+  "graphframes": {
+    "graphframes": [],
+    "graphframes.examples": [],
+    "graphframes.examples.belief_propagation": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "graphframes.examples.graphs": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sqlContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "graphframes.graphframe": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "graphframes.lib": [],
+    "graphframes.lib.aggregate_messages": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sqlContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "graphframes.tests": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ]
+  },
   "graphql-core": {
     "graphql": []
   },
