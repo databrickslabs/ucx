@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import codecs
 import locale
-import os
 from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path

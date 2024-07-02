@@ -1,6 +1,5 @@
 import codecs
 import locale
-import tempfile
 from pathlib import Path
 
 import pytest
