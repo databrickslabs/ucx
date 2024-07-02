@@ -14,8 +14,3 @@ class MigrationRecon(Workflow):
         # need to delete the existing content of recon results table, so that snapshot will re-populate it
         ctx.migration_recon.reset()
         ctx.migration_recon.snapshot()
-
-    @job_task(depends_on=[recon_migration_result], dashboard="migration_main")
-    def reconciliation_report(self, ctx: RuntimeContext):
-        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""

@@ -73,11 +73,6 @@ class TableMigration(Workflow):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
 
-    @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
-    def migration_report(self, ctx: RuntimeContext):
-        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
-
 
 class MigrateHiveSerdeTablesInPlace(Workflow):
     def __init__(self):
@@ -117,11 +112,6 @@ class MigrateHiveSerdeTablesInPlace(Workflow):
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
-
-    @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
-    def migration_report(self, ctx: RuntimeContext):
-        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
 
 
 class MigrateExternalTablesCTAS(Workflow):
@@ -173,11 +163,6 @@ class MigrateExternalTablesCTAS(Workflow):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
 
-    @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
-    def migration_report(self, ctx: RuntimeContext):
-        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
-
 
 class ScanTablesInMounts(Workflow):
     def __init__(self):
@@ -195,11 +180,6 @@ class ScanTablesInMounts(Workflow):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
 
-    @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
-    def migration_report(self, ctx: RuntimeContext):
-        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""
-
 
 class MigrateTablesInMounts(Workflow):
     def __init__(self):
@@ -214,8 +194,3 @@ class MigrateTablesInMounts(Workflow):
     def refresh_migration_status(self, ctx: RuntimeContext):
         """Refresh the migration status to present it in the dashboard."""
         ctx.tables_migrator.index_full_refresh()
-
-    @job_task(dashboard="migration_main", depends_on=[refresh_migration_status])
-    def migration_report(self, ctx: RuntimeContext):
-        """Refreshes the migration dashboard after all previous tasks have been completed. Note that you can access the
-        dashboard _before_ all tasks have been completed, but then only already completed information is shown."""

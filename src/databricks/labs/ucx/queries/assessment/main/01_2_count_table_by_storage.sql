@@ -1,5 +1,4 @@
--- viz type=table, name=Table counts by storage, columns=Storage,count
--- widget title=Table counts by storage, row=2, col=2, size_x=2, size_y=5
+-- --title 'Table counts by storage' --width 2 --height 4
 SELECT storage, COUNT(*) count
 FROM (
 SELECT
@@ -14,6 +13,6 @@ SELECT
            WHEN STARTSWITH(location, "adl") THEN "UNSUPPORTED"
            ELSE "EXTERNAL"
        END AS storage
-FROM $inventory.tables)
+FROM inventory.tables)
 GROUP BY storage
 ORDER BY storage;

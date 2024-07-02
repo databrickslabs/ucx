@@ -245,7 +245,6 @@ def test_install_cluster_override_jobs(ws, mock_installation):
     tasks = created_job_tasks(ws, '[MOCK] assessment')
     assert tasks['assess_jobs'].existing_cluster_id == 'one'
     assert tasks['crawl_grants'].existing_cluster_id == 'two'
-    assert tasks['estimates_report'].sql_task.dashboard.dashboard_id == 'def'
     wheels.upload_to_wsfs.assert_called_once()
     wheels.upload_to_dbfs.assert_not_called()
 

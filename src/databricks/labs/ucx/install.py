@@ -516,10 +516,10 @@ class WorkspaceInstallation(InstallationMixin):
             self._ws,
             state=self._install_state,
             local_folder=local_query_files,
-            remote_folder=f"{self._installation.install_folder()}/queries",
+            remote_folder=f"{self._installation.install_folder()}/dashboards",
             name_prefix=self._name("UCX "),
             warehouse_id=self._warehouse_id,
-            query_text_callback=self._config.replace_inventory_variable,
+            query_transformer=self._config.transform_inventory_database,
         )
         dash.create_dashboards()
 
