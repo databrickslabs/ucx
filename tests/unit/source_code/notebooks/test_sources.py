@@ -44,13 +44,11 @@ def test_checks_encoding_of_pseudo_file(migration_index):
         (codecs.BOM_UTF32_BE, "utf-32-be"),
     ],
 )
-def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding):
-    with tempfile.NamedTemporaryFile() as temp:
-        data = bom + "a = 12".encode(encoding)
-        temp.write(data)
-        temp.flush()
-        linter = FriendFileLinter(LinterContext(migration_index), Path(temp.name))
-        assert linter.source_code() == "a = 12"
+def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_path):
+    path = tmp_path / "file.py"
+    path.write_bytes(bom + "a = 12".encode(encoding))
+    linter = FriendFileLinter(LinterContext(migration_index), path)
+    assert linter.source_code() == "a = 12"
 
 
 @pytest.mark.parametrize(

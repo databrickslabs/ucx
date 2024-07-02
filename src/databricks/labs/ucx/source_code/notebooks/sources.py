@@ -174,8 +174,7 @@ class FileLinter:
 
     def _guess_encoding(self):
         # some files encode a unicode BOM (byte-order-mark), so let's use that if available
-        path = self._path.as_posix()
-        with open(path, 'rb') as _file:
+        with self._path.open( 'rb') as _file:
             raw = _file.read(4)
             if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
                 return 'utf-32'
