@@ -8,6 +8,7 @@ from databricks.sdk.core import (
     ApiClient,
     AzureCliTokenSource,
     Config,
+    CredentialsProvider,
     CredentialsStrategy,
     credentials_strategy,
 )
@@ -231,18 +232,16 @@ class AzureAPIClient:
     @staticmethod
     def _strategy_for(endpoint: str) -> CredentialsStrategy:
         @credentials_strategy("azure-cli", ["host"])
-        def _credentials(_: Config) -> CredentialsStrategy:
+        def _credentials(_: Config) -> CredentialsProvider:
             token_source = AzureCliTokenSource(endpoint)
 
             def inner() -> dict[str, str]:
                 token = token_source.token()
                 return {"Authorization": f"{token.token_type} {token.access_token}"}
 
-            # The type hints are off but according to the sdk:
-            # https://github.com/databricks/databricks-sdk-py/blob/f7d920e1f912b204669b826ed76e026607c59797/databricks/sdk/credentials_provider.py#L116
-            return inner  # type: ignore
+            return inner
 
-        return _credentials  # type: ignore
+        return _credentials
 
     def get(self, path: str, api_version: str | None = None, query: dict[str, str] | None = None):
         headers = {"Accept": "application/json"}
