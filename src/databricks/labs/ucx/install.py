@@ -690,43 +690,41 @@ class AccountInstaller(AccountContext):
         if self.is_account_install:
             # skip joining collection when installer is running for all account workspaces
             return None
-        collection_workspace: Workspace
+        prompt_message = "Do you want to join the current installation to an existing collection?"
+        if target_workspace_id is None and not self.prompts.confirm(prompt_message):
+            return None
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
         ids_to_workspace = self._get_workspace_info(current_workspace_id)
         if target_workspace_id is None:
-            if self.prompts.confirm("Do you want to join the current installation to an existing collection?"):
-                # If joining a collection as part of the installation then collection_workspace_id would be empty
-                try:
-                    # if user is account admin list and show available workspaces to select from
-                    accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
-                    target_workspace = self._get_collection_workspace(
-                        accessible_workspaces,
-                        account_client,
+            # If joining a collection as part of the installation then collection_workspace_id would be empty
+            try:
+                # if user is account admin list and show available workspaces to select from
+                accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
+                target_workspace = self._get_collection_workspace(
+                    accessible_workspaces,
+                    account_client,
+                )
+                assert target_workspace is not None
+                target_workspace_id = target_workspace.workspace_id
+            except PermissionDenied:
+                # if the user is not account admin, allow user to enter the workspace_id to join as collection.
+                # if no workspace_id is entered, then exit
+                logger.warning("User doesnt have account admin permission, cant list workspaces")
+                target_workspace_id = int(
+                    self.prompts.question(
+                        "Please enter, the workspace id to join as a collection (enter 0 to skip it)",
+                        valid_number=True,
+                        default="0",
                     )
-                    assert target_workspace is not None
-                    target_workspace_id = target_workspace.workspace_id
-
-                except PermissionDenied:
-                    # if the user is not account admin, allow user to enter the workspace_id to join as collection.
-                    # if no workspace_id is entered, then exit
-                    logger.warning("User doesnt have account admin permission, cant list workspaces")
-                    target_workspace_id = int(
-                        self.prompts.question(
-                            "Please enter, the workspace id to join as a collection (enter 0 to skip it)",
-                            valid_number=True,
-                            default="0",
-                        )
-                    )
-            else:
-                return None
+                )
         if target_workspace_id == 0 or target_workspace_id is None:
             # if user didn't enter workspace id
             logger.info("Skipping joining collection...")
             return None
         # below code is executed if either joining an existing collection (through the cli)
         # or selecting one while installing
-        collection_workspace = AccountInstaller._get_workspace(
+        collection_workspace: Workspace = AccountInstaller._get_workspace(
             target_workspace_id,
             ids_to_workspace,
         )

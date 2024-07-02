@@ -57,9 +57,7 @@ def test_join_collection_no_sync_called():
         product_info=ProductInfo.for_testing(WorkspaceConfig),
     )
     with pytest.raises(ValueError):
-        account_installer.join_collection(
-            123,
-        )
+        account_installer.join_collection(123)
 
 
 def test_join_collection_join_collection_no_installation_id():
