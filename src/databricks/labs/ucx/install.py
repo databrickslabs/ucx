@@ -24,6 +24,7 @@ from databricks.labs.blueprint.wheels import (
 from databricks.labs.lsql.backends import SqlBackend, StatementExecutionBackend
 from databricks.labs.lsql.deployment import SchemaDeployer
 from databricks.sdk import WorkspaceClient, AccountClient
+from databricks.sdk.core import with_user_agent_extra
 from databricks.sdk.errors import (
     AlreadyExists,
     BadRequest,
@@ -31,6 +32,7 @@ from databricks.sdk.errors import (
     NotFound,
     PermissionDenied,
     ResourceDoesNotExist,
+    Unauthenticated,
 )
 from databricks.sdk.service.provisioning import Workspace
 from databricks.sdk.service.sql import (
@@ -74,6 +76,7 @@ WAREHOUSE_PREFIX = "Unity Catalog Migration"
 NUM_USER_ATTEMPTS = 10  # number of attempts user gets at answering a question
 
 logger = logging.getLogger(__name__)
+with_user_agent_extra("cmd", "install")
 
 
 def deploy_schema(sql_backend: SqlBackend, inventory_schema: str):
@@ -711,43 +714,41 @@ class AccountInstaller(AccountContext):
         if self.is_account_install:
             # skip joining collection when installer is running for all account workspaces
             return None
-        collection_workspace: Workspace
+        prompt_message = "Do you want to join the current installation to an existing collection?"
+        if target_workspace_id is None and not self.prompts.confirm(prompt_message):
+            return None
         account_client = self._get_safe_account_client()
         ctx = AccountContext(account_client)
         ids_to_workspace = self.get_workspace_info(current_workspace_id)
         if target_workspace_id is None:
-            if self.prompts.confirm("Do you want to join the current installation to an existing collection?"):
-                # If joining a collection as part of the installation then collection_workspace_id would be empty
-                try:
-                    # if user is account admin list and show available workspaces to select from
-                    accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
-                    target_workspace = self._get_collection_workspace(
-                        accessible_workspaces,
-                        account_client,
+            # If joining a collection as part of the installation then collection_workspace_id would be empty
+            try:
+                # if user is account admin list and show available workspaces to select from
+                accessible_workspaces = ctx.account_workspaces.get_accessible_workspaces()
+                target_workspace = self._get_collection_workspace(
+                    accessible_workspaces,
+                    account_client,
+                )
+                assert target_workspace is not None
+                target_workspace_id = target_workspace.workspace_id
+            except PermissionDenied:
+                # if the user is not account admin, allow user to enter the workspace_id to join as collection.
+                # if no workspace_id is entered, then exit
+                logger.warning("User doesnt have account admin permission, cant list workspaces")
+                target_workspace_id = int(
+                    self.prompts.question(
+                        "Please enter, the workspace id to join as a collection (enter 0 to skip it)",
+                        valid_number=True,
+                        default="0",
                     )
-                    assert target_workspace is not None
-                    target_workspace_id = target_workspace.workspace_id
-
-                except PermissionDenied:
-                    # if the user is not account admin, allow user to enter the workspace_id to join as collection.
-                    # if no workspace_id is entered, then exit
-                    logger.warning("User doesnt have account admin permission, cant list workspaces")
-                    target_workspace_id = int(
-                        self.prompts.question(
-                            "Please enter, the workspace id to join as a collection (enter 0 to skip it)",
-                            valid_number=True,
-                            default="0",
-                        )
-                    )
-            else:
-                return None
+                )
         if target_workspace_id == 0 or target_workspace_id is None:
             # if user didn't enter workspace id
             logger.info("Skipping joining collection...")
             return None
         # below code is executed if either joining an existing collection (through the cli)
         # or selecting one while installing
-        collection_workspace = AccountInstaller._get_workspace(
+        collection_workspace: Workspace = AccountInstaller._get_workspace(
             target_workspace_id,
             ids_to_workspace,
         )
@@ -792,7 +793,6 @@ class AccountInstaller(AccountContext):
             )
             installed_workspaces.append(workspace)
             if not ctx.account_workspaces.can_administer(workspace):
-
                 logger.error(
                     f"User doesnt have admin access on the workspace {workspace_id} in the collection, "
                     f"cant join collection."
@@ -848,8 +848,16 @@ if __name__ == "__main__":
         account_installer.install_on_account()
     else:
         workspace_installer = WorkspaceInstaller(WorkspaceClient(product="ucx", product_version=__version__))
-
         workspace_installer.run()
-        account_installer.join_collection(
-            workspace_installer.workspace_client.get_workspace_id(),
-        )
+
+        try:
+            account_installer.join_collection(
+                workspace_installer.workspace_client.get_workspace_id(),
+            )
+        except Unauthenticated:
+            logger.warning(
+                "User is not authenticated, "
+                "you need account admin and workspace admin on "
+                "respective workspaces to enable collection joining. Please run join-collection command "
+                "with account admin credentials"
+            )

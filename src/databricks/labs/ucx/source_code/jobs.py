@@ -1,4 +1,5 @@
 import functools
+import itertools
 import logging
 import tempfile
 from collections.abc import Iterable
@@ -6,7 +7,7 @@ from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 
-from databricks.labs.blueprint.parallel import Threads
+from databricks.labs.blueprint.parallel import ManyError, Threads
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -295,12 +296,18 @@ class WorkflowLinter:
         logger.info(f"Preparing {len(all_jobs)} linting jobs...")
         for job in all_jobs:
             tasks.append(functools.partial(self.lint_job, job.job_id))
-        problems: list[JobProblem] = []
         logger.info(f"Running {tasks} linting tasks in parallel...")
-        for batch in Threads.strict('linting workflows', tasks):
-            problems.extend(batch)
-        logger.info(f"Saving {len(problems)} linting problems...")
-        sql_backend.save_table(f'{inventory_database}.workflow_problems', problems, JobProblem, mode='overwrite')
+        job_problems, errors = Threads.gather('linting workflows', tasks)
+        logger.info(f"Saving {len(job_problems)} linting problems...")
+        job_problems_flattened = list(itertools.chain(*job_problems))
+        sql_backend.save_table(
+            f'{inventory_database}.workflow_problems',
+            job_problems_flattened,
+            JobProblem,
+            mode='overwrite',
+        )
+        if len(errors) > 0:
+            raise ManyError(errors)
 
     def lint_job(self, job_id: int) -> list[JobProblem]:
         try:
