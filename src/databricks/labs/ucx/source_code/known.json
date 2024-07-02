@@ -4720,6 +4720,9 @@
     "sniffio._tests.test_sniffio": [],
     "sniffio._version": []
   },
+  "solacc": {
+    "solacc.companion": []
+  },
   "soupsieve": {
     "soupsieve": [],
     "soupsieve.__meta__": [],
