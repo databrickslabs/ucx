@@ -347,18 +347,6 @@
       },
       {
         "code": "table-migrate",
-        "message": "SQL query is not supported yet: COMMENT ON TABLE  IS NULL"
-      },
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DESCRIBE TABLE EXTENDED "
-      },
-      {
-        "code": "table-migrate",
-        "message": "SQL query is not supported yet: DROP TABLE IF EXISTS "
-      },
-      {
-        "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
       }
     ],
