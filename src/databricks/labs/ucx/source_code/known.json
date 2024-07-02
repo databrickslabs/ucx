@@ -1068,6 +1068,240 @@
   "joblib": {
     "joblib": []
   },
+  "johnsnowlabs": {
+    "johnsnowlabs": [],
+    "johnsnowlabs.abstract_base": [],
+    "johnsnowlabs.abstract_base.base_enum": [],
+    "johnsnowlabs.abstract_base.lib_resolver": [],
+    "johnsnowlabs.abstract_base.pydantic_model": [],
+    "johnsnowlabs.abstract_base.software_product": [],
+    "johnsnowlabs.auto_install": [],
+    "johnsnowlabs.auto_install.databricks": [],
+    "johnsnowlabs.auto_install.databricks.dbfs": [],
+    "johnsnowlabs.auto_install.databricks.endpoints": [],
+    "johnsnowlabs.auto_install.databricks.install_utils": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ],
+    "johnsnowlabs.auto_install.databricks.marketplace": [],
+    "johnsnowlabs.auto_install.databricks.marketplace_offering": [],
+    "johnsnowlabs.auto_install.databricks.work_utils": [],
+    "johnsnowlabs.auto_install.docker": [],
+    "johnsnowlabs.auto_install.docker.docker_template": [],
+    "johnsnowlabs.auto_install.docker.work_utils": [],
+    "johnsnowlabs.auto_install.emr": [],
+    "johnsnowlabs.auto_install.emr.enums": [],
+    "johnsnowlabs.auto_install.emr.install_utils": [],
+    "johnsnowlabs.auto_install.emr.utils": [],
+    "johnsnowlabs.auto_install.emr.work_utils": [],
+    "johnsnowlabs.auto_install.glue": [],
+    "johnsnowlabs.auto_install.glue.install_utils": [],
+    "johnsnowlabs.auto_install.glue.utils": [],
+    "johnsnowlabs.auto_install.health_checks": [],
+    "johnsnowlabs.auto_install.health_checks.benchmark_test": [],
+    "johnsnowlabs.auto_install.health_checks.endpoint_test": [],
+    "johnsnowlabs.auto_install.health_checks.generate_test": [],
+    "johnsnowlabs.auto_install.health_checks.hc_test": [],
+    "johnsnowlabs.auto_install.health_checks.load_predict_test": [],
+    "johnsnowlabs.auto_install.health_checks.nlp_test": [],
+    "johnsnowlabs.auto_install.health_checks.ocr_test": [],
+    "johnsnowlabs.auto_install.health_checks.report": [],
+    "johnsnowlabs.auto_install.install_flow": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/johnsnowlabs"
+      }
+    ],
+    "johnsnowlabs.auto_install.install_software": [],
+    "johnsnowlabs.auto_install.jsl_home": [],
+    "johnsnowlabs.auto_install.lib_resolvers": [],
+    "johnsnowlabs.auto_install.lib_resolvers.hc_installer": [],
+    "johnsnowlabs.auto_install.lib_resolvers.nlp_installer": [],
+    "johnsnowlabs.auto_install.lib_resolvers.ocr_installer": [],
+    "johnsnowlabs.auto_install.offline_install": [],
+    "johnsnowlabs.auto_install.snowflake": [],
+    "johnsnowlabs.auto_install.snowflake.work_utils": [],
+    "johnsnowlabs.auto_install.softwares": [],
+    "johnsnowlabs.finance": [],
+    "johnsnowlabs.frameworks": [],
+    "johnsnowlabs.frameworks.embedding_retrieval": [],
+    "johnsnowlabs.frameworks.embedding_retrieval.haystack_node": [],
+    "johnsnowlabs.frameworks.embedding_retrieval.langchain_node": [],
+    "johnsnowlabs.frameworks.embedding_retrieval.utils": [],
+    "johnsnowlabs.johnsnowlabs": [],
+    "johnsnowlabs.johnsnowlabs.abstract_base": [],
+    "johnsnowlabs.johnsnowlabs.abstract_base.base_enum": [],
+    "johnsnowlabs.johnsnowlabs.abstract_base.lib_resolver": [],
+    "johnsnowlabs.johnsnowlabs.abstract_base.pydantic_model": [],
+    "johnsnowlabs.johnsnowlabs.abstract_base.software_product": [],
+    "johnsnowlabs.johnsnowlabs.auto_install": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks.dbfs": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks.endpoints": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks.install_utils": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/"
+      }
+    ],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks.marketplace": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks.marketplace_offering": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.databricks.work_utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.docker": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.docker.docker_template": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.docker.work_utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.emr": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.emr.enums": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.emr.install_utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.emr.utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.emr.work_utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.glue": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.glue.install_utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.glue.utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.benchmark_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.endpoint_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.generate_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.hc_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.load_predict_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.nlp_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.ocr_test": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.health_checks.report": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.install_flow": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/johnsnowlabs"
+      }
+    ],
+    "johnsnowlabs.johnsnowlabs.auto_install.install_software": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.jsl_home": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.lib_resolvers": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.lib_resolvers.hc_installer": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.lib_resolvers.nlp_installer": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.lib_resolvers.ocr_installer": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.offline_install": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.snowflake": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.snowflake.work_utils": [],
+    "johnsnowlabs.johnsnowlabs.auto_install.softwares": [],
+    "johnsnowlabs.johnsnowlabs.finance": [],
+    "johnsnowlabs.johnsnowlabs.frameworks": [],
+    "johnsnowlabs.johnsnowlabs.frameworks.embedding_retrieval": [],
+    "johnsnowlabs.johnsnowlabs.frameworks.embedding_retrieval.haystack_node": [],
+    "johnsnowlabs.johnsnowlabs.frameworks.embedding_retrieval.langchain_node": [],
+    "johnsnowlabs.johnsnowlabs.frameworks.embedding_retrieval.utils": [],
+    "johnsnowlabs.johnsnowlabs.lab": [],
+    "johnsnowlabs.johnsnowlabs.legal": [],
+    "johnsnowlabs.johnsnowlabs.llm": [],
+    "johnsnowlabs.johnsnowlabs.medical": [],
+    "johnsnowlabs.johnsnowlabs.nlp": [],
+    "johnsnowlabs.johnsnowlabs.py_models": [],
+    "johnsnowlabs.johnsnowlabs.py_models.install_info": [],
+    "johnsnowlabs.johnsnowlabs.py_models.jsl_secrets": [],
+    "johnsnowlabs.johnsnowlabs.py_models.lib_version": [],
+    "johnsnowlabs.johnsnowlabs.py_models.license_info": [],
+    "johnsnowlabs.johnsnowlabs.py_models.primitive": [],
+    "johnsnowlabs.johnsnowlabs.py_models.url_dependency": [],
+    "johnsnowlabs.johnsnowlabs.serve": [],
+    "johnsnowlabs.johnsnowlabs.settings": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/johnsnowlabs"
+      }
+    ],
+    "johnsnowlabs.johnsnowlabs.utils": [],
+    "johnsnowlabs.johnsnowlabs.utils.boto_utils": [],
+    "johnsnowlabs.johnsnowlabs.utils.enums": [],
+    "johnsnowlabs.johnsnowlabs.utils.env_utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
+      }
+    ],
+    "johnsnowlabs.johnsnowlabs.utils.file_utils": [],
+    "johnsnowlabs.johnsnowlabs.utils.functional": [],
+    "johnsnowlabs.johnsnowlabs.utils.modelhub_markdown": [],
+    "johnsnowlabs.johnsnowlabs.utils.my_jsl_api": [],
+    "johnsnowlabs.johnsnowlabs.utils.notebooks": [],
+    "johnsnowlabs.johnsnowlabs.utils.pip_utils": [],
+    "johnsnowlabs.johnsnowlabs.utils.print_messages": [],
+    "johnsnowlabs.johnsnowlabs.utils.py_process": [],
+    "johnsnowlabs.johnsnowlabs.utils.s3_utils": [],
+    "johnsnowlabs.johnsnowlabs.utils.sparksession_utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "johnsnowlabs.johnsnowlabs.utils.testing": [],
+    "johnsnowlabs.johnsnowlabs.utils.testing.jsl_pre_processor": [],
+    "johnsnowlabs.johnsnowlabs.utils.testing.nb_code_match": [],
+    "johnsnowlabs.johnsnowlabs.utils.testing.nb_nodes": [],
+    "johnsnowlabs.johnsnowlabs.utils.testing.test_settings": [],
+    "johnsnowlabs.johnsnowlabs.utils.venv_utils": [],
+    "johnsnowlabs.johnsnowlabs.visual": [],
+    "johnsnowlabs.johnsnowlabs.viz": [],
+    "johnsnowlabs.lab": [],
+    "johnsnowlabs.legal": [],
+    "johnsnowlabs.llm": [],
+    "johnsnowlabs.medical": [],
+    "johnsnowlabs.nlp": [],
+    "johnsnowlabs.py_models": [],
+    "johnsnowlabs.py_models.install_info": [],
+    "johnsnowlabs.py_models.jsl_secrets": [],
+    "johnsnowlabs.py_models.lib_version": [],
+    "johnsnowlabs.py_models.license_info": [],
+    "johnsnowlabs.py_models.primitive": [],
+    "johnsnowlabs.py_models.url_dependency": [],
+    "johnsnowlabs.serve": [],
+    "johnsnowlabs.settings": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/johnsnowlabs"
+      }
+    ],
+    "johnsnowlabs.utils": [],
+    "johnsnowlabs.utils.boto_utils": [],
+    "johnsnowlabs.utils.enums": [],
+    "johnsnowlabs.utils.env_utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      },
+      {
+        "code": "spark-logging-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM logger on UC Shared Clusters. Use logging.getLogger() instead"
+      }
+    ],
+    "johnsnowlabs.utils.file_utils": [],
+    "johnsnowlabs.utils.functional": [],
+    "johnsnowlabs.utils.modelhub_markdown": [],
+    "johnsnowlabs.utils.my_jsl_api": [],
+    "johnsnowlabs.utils.notebooks": [],
+    "johnsnowlabs.utils.pip_utils": [],
+    "johnsnowlabs.utils.print_messages": [],
+    "johnsnowlabs.utils.py_process": [],
+    "johnsnowlabs.utils.s3_utils": [],
+    "johnsnowlabs.utils.sparksession_utils": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "johnsnowlabs.utils.testing": [],
+    "johnsnowlabs.utils.testing.jsl_pre_processor": [],
+    "johnsnowlabs.utils.testing.nb_code_match": [],
+    "johnsnowlabs.utils.testing.nb_nodes": [],
+    "johnsnowlabs.utils.testing.test_settings": [],
+    "johnsnowlabs.utils.venv_utils": [],
+    "johnsnowlabs.visual": [],
+    "johnsnowlabs.viz": []
+  },
   "jupyter_client": {
     "jupyter_client": []
   },
