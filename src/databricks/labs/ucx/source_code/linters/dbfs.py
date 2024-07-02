@@ -104,7 +104,7 @@ class FromDbfsFolder(Linter):
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
             yield Failure(
-                code='dbfs-query',
+                code='dbfs-query-unsupported-sql',
                 message=f"SQL query is not supported yet: {code}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,
