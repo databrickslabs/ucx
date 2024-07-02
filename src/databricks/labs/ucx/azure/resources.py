@@ -8,7 +8,9 @@ from databricks.sdk.core import (
     ApiClient,
     AzureCliTokenSource,
     Config,
-    credentials_provider,
+    CredentialsProvider,
+    CredentialsStrategy,
+    credentials_strategy,
 )
 from databricks.sdk.errors import NotFound, PermissionDenied, ResourceConflict
 
@@ -222,14 +224,15 @@ class AzureAPIClient:
         self.api_client = ApiClient(
             Config(
                 host=host_endpoint,
-                credentials_provider=self._provider_for(service_endpoint),
+                credentials_strategy=self._strategy_for(service_endpoint),
             )
         )
         self._token_source = AzureCliTokenSource(host_endpoint)
 
-    def _provider_for(self, endpoint: str):
-        @credentials_provider("azure-cli", ["host"])
-        def _credentials(_: Config):
+    @staticmethod
+    def _strategy_for(endpoint: str) -> CredentialsStrategy:
+        @credentials_strategy("azure-cli", ["host"])
+        def _credentials(_: Config) -> CredentialsProvider:
             token_source = AzureCliTokenSource(endpoint)
 
             def inner() -> dict[str, str]:
