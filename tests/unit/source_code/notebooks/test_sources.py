@@ -1,6 +1,7 @@
 import codecs
 import locale
 from pathlib import Path
+from unittest.mock import create_autospec
 
 import pytest
 
@@ -85,3 +86,29 @@ def test_file_linter_lints_non_ascii_encoded_file(migration_index):
     assert len(advices) == 1
     assert advices[0].code == "unsupported-file-encoding"
     assert advices[0].message == f"File without {preferred_encoding} encoding is not supported {non_ascii_encoded_file}"
+
+
+def test_file_linter_lints_file_with_missing_file(migration_index):
+    path = create_autospec(Path)
+    path.suffix = ".py"
+    path.read_text.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
+    linter = FileLinter(LinterContext(migration_index), path)
+
+    advices = list(linter.lint())
+
+    assert len(advices) == 1
+    assert advices[0].code == "file-not-found"
+    assert advices[0].message == f"File not found: {path}"
+
+
+def test_file_linter_lints_file_with_missing_read_permission(migration_index):
+    path = create_autospec(Path)
+    path.suffix = ".py"
+    path.read_text.side_effect = PermissionError("Permission denied")
+    linter = FileLinter(LinterContext(migration_index), path)
+
+    advices = list(linter.lint())
+
+    assert len(advices) == 1
+    assert advices[0].code == "file-permission"
+    assert advices[0].message == f"Missing read permission for {path}"

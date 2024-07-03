@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+from databricks.sdk.config import with_user_agent_extra
+
 from databricks.labs.ucx.__about__ import __version__
 from databricks.labs.ucx.assessment.workflows import Assessment, Failing
 from databricks.labs.ucx.contexts.workflow_task import RuntimeContext
@@ -78,6 +80,8 @@ class Workflows:
         workflow = self._workflows[workflow_name]
         if task_name == "parse_logs":
             return ctx.task_run_warning_recorder.snapshot()
+        # both CLI commands and workflow names appear in telemetry under `cmd`
+        with_user_agent_extra("cmd", workflow_name)
         # `{{parent_run_id}}` is the run of entire workflow, whereas `{{run_id}}` is the run of a task
         workflow_run_id = named_parameters.get("parent_run_id", "unknown_run_id")
         job_id = named_parameters.get("job_id", "unknown_job_id")

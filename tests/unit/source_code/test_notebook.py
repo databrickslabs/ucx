@@ -280,4 +280,4 @@ dbutils.notebook.run(f"Hey {name2}")
     linter = DbutilsLinter(CurrentSessionState())
     advices = list(linter.lint(source))
     assert len(advices) == 1
-    assert advices[0].code == "dbutils-notebook-run-dynamic"
+    assert advices[0].code == "notebook-run-cannot-compute-value"
