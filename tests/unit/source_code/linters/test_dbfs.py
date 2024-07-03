@@ -1,6 +1,6 @@
 import pytest
 
-from databricks.labs.ucx.source_code.base import Deprecation, Advisory, CurrentSessionState, Failure
+from databricks.labs.ucx.source_code.base import Deprecation, Advice, CurrentSessionState, Failure
 from databricks.labs.ucx.source_code.linters.dbfs import DBFSUsageLinter, FromDbfsFolder
 
 
@@ -20,7 +20,7 @@ class TestDetectDBFS:
         linter = DBFSUsageLinter(CurrentSessionState())
         advices = list(linter.lint(code))
         for advice in advices:
-            assert isinstance(advice, Advisory)
+            assert isinstance(advice, Advice)
         assert len(advices) == expected
 
     @pytest.mark.parametrize(
@@ -115,7 +115,7 @@ def test_dbfs_queries_failure(query: str):
     actual = list(ftf.lint(query))
     assert actual == [
         Failure(
-            code='dbfs-query',
+            code='dbfs-query-unsupported-sql',
             message=f'SQL query is not supported yet: {query}',
             start_line=0,
             start_col=0,
