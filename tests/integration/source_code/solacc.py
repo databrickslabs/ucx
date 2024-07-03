@@ -10,6 +10,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.labs.ucx.contexts.workspace_cli import LocalCheckoutContext
 from databricks.labs.ucx.framework.utils import run_command
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import LocatedAdvice
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 
 logger = logging.getLogger("verify-accelerators")
@@ -45,15 +46,35 @@ def clone_all():
         run_command(f'git clone {url} {dst}')
 
 
-def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int]:
+def collect_missing_imports(advices: list[LocatedAdvice]):
+    missing_imports: set[str] = set()
+    for located_advice in advices:
+        if located_advice.advice.code == 'import-not-found':
+            missing_imports.add(located_advice.advice.message.split(':')[1].strip())
+    return missing_imports
+
+
+def collect_not_computed(advices: list[LocatedAdvice]):
+    not_computed = 0
+    for located_advice in advices:
+        if "computed" in located_advice.advice.message:
+            not_computed += 1
+    return not_computed
+
+
+def print_advices(advices: list[LocatedAdvice], file: Path):
+    for located_advice in advices:
+        message = located_advice.message_relative_to(dist.parent, default=file)
+        sys.stdout.write(f"{message}\n")
+
+
+def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tuple[set[str], int, int]:
     try:
-        missing_imports: set[str] = set()
-        for located_advice in ctx.local_code_linter.lint_path(file):
-            if located_advice.advice.code == 'import-not-found':
-                missing_imports.add(located_advice.advice.message.split(':')[1].strip())
-            message = located_advice.message_relative_to(dist.parent, default=file)
-            sys.stdout.write(f"{message}\n")
-        return missing_imports, 1
+        advices = list(ctx.local_code_linter.lint_path(file))
+        missing_imports = collect_missing_imports(advices)
+        not_computed = collect_not_computed(advices)
+        print_advices(advices, file)
+        return missing_imports, 1, not_computed
     except Exception as e:  # pylint: disable=broad-except
         # here we're most likely catching astroid & sqlglot errors
         if unparsed is None:  # linting single file, log exception details
@@ -64,7 +85,7 @@ def lint_one(file: Path, ctx: LocalCheckoutContext, unparsed: Path | None) -> tu
             with unparsed.open(mode="a", encoding="utf-8") as f:
                 f.write(file.relative_to(dist).as_posix())
                 f.write("\n")
-        return set(), 0
+        return set(), 0, 0
 
 
 def lint_all(file_to_lint: str | None):
@@ -73,7 +94,8 @@ def lint_all(file_to_lint: str | None):
         linter_context_factory=lambda session_state: LinterContext(MigrationIndex([]), session_state)
     )
     parseable = 0
-    missing_imports: dict[str, int] = {}
+    not_computed = 0
+    missing_imports: dict[str, dict[str, int]] = {}
     all_files = list(dist.glob('**/*.py')) if file_to_lint is None else [Path(dist, file_to_lint)]
     unparsed: Path | None = None
     if file_to_lint is None:
@@ -88,22 +110,39 @@ def lint_all(file_to_lint: str | None):
     for file in all_files:
         if skipped and file.relative_to(dist).as_posix() in skipped:
             continue
-        _missing_imports, _parseable = lint_one(file, ctx, unparsed)
+        _missing_imports, _parseable, _not_computed = lint_one(file, ctx, unparsed)
         for _import in _missing_imports:
-            count = missing_imports.get(_import, 0)
-            missing_imports[_import] = count + 1
+            register_missing_import(missing_imports, _import)
         parseable += _parseable
+        not_computed += _not_computed
     all_files_len = len(all_files) - (len(skipped) if skipped else 0)
     parseable_pct = int(parseable / all_files_len * 100)
+    missing_imports_count = sum(sum(details.values()) for details in missing_imports.values())
     logger.info(
-        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {sum(missing_imports.values())}"
+        f"Skipped: {len(skipped or [])}, parseable: {parseable_pct}% ({parseable}/{all_files_len}), missing imports: {missing_imports_count}, not computed: {not_computed}"
     )
-    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: item[1], reverse=True))
-    for key, value in missing_imports.items():
-        logger.info(f"Missing import '{key}': {value} occurrences")
+    log_missing_imports(missing_imports)
     # fail the job if files are unparseable
     if parseable_pct < 100:
         sys.exit(1)
+
+
+def register_missing_import(missing_imports: dict[str, dict[str, int]], missing_import: str):
+    prefix = missing_import.split(".")[0]
+    details = missing_imports.get(prefix, None)
+    if details is None:
+        details = {}
+        missing_imports[prefix] = details
+    count = details.get(missing_import, 0)
+    details[missing_import] = count + 1
+
+
+def log_missing_imports(missing_imports: dict[str, dict[str, int]]):
+    missing_imports = dict(sorted(missing_imports.items(), key=lambda item: sum(item[1].values()), reverse=True))
+    for prefix, details in missing_imports.items():
+        logger.info(f"Missing import '{prefix}'")
+        for item, count in details.items():
+            logger.info(f"  {item}: {count} occurrences")
 
 
 def main(args: list[str]):

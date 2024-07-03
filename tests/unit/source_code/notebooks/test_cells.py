@@ -1,13 +1,15 @@
 from pathlib import Path
 from unittest.mock import create_autospec
-import yaml
 
 import pytest
+import yaml
+
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
-from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
+from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver, DependencyProblem
 from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFileResolver
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell
+from databricks.labs.ucx.source_code.linters.python_ast import Tree
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, PipCell, PipMagic, MagicCommand
 from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookResolver,
     NotebookLoader,
@@ -67,7 +69,7 @@ def test_pip_cell_build_dependency_graph_pip_registers_missing_library():
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Missing arguments after '%pip install'"
+    assert problems[0].message == "Missing arguments after 'pip install'"
     graph.register_library.assert_not_called()
 
 
@@ -88,14 +90,14 @@ def test_pip_cell_build_dependency_graph_reports_incorrect_syntax():
 def test_pip_cell_build_dependency_graph_reports_unsupported_command():
     graph = create_autospec(DependencyGraph)
 
-    code = "%pip freeze"
+    code = "!pip freeze"
     cell = PipCell(code, original_offset=1)
 
     problems = cell.build_dependency_graph(graph)
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Unsupported %pip command: freeze"
+    assert problems[0].message == "Unsupported 'pip' command: freeze"
     graph.register_library.assert_not_called()
 
 
@@ -109,7 +111,7 @@ def test_pip_cell_build_dependency_graph_reports_missing_command():
 
     assert len(problems) == 1
     assert problems[0].code == "library-install-failed"
-    assert problems[0].message == "Missing command after '%pip'"
+    assert problems[0].message == "Missing command after 'pip'"
     graph.register_library.assert_not_called()
 
 
@@ -190,5 +192,17 @@ def test_pip_cell_build_dependency_graph_handles_multiline_code():
         ),
     ],
 )
-def test_pip_cell_split(code, split):
-    assert PipCell._split(code) == split  # pylint: disable=protected-access
+def test_pip_magic_split(code, split):
+    assert PipMagic._split(code) == split  # pylint: disable=protected-access
+
+
+def test_unsupported_magic_raises_problem(simple_dependency_resolver, mock_path_lookup):
+    source = """
+%unsupported stuff '"%#@!
+"""
+    tree = Tree.normalize_and_parse(source)
+    commands, _ = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+    dependency = Dependency(FileLoader(), Path(""))
+    graph = DependencyGraph(dependency, None, simple_dependency_resolver, mock_path_lookup, CurrentSessionState())
+    problems = commands[0].build_dependency_graph(graph)
+    assert problems[0].code == "unsupported-magic-line"
