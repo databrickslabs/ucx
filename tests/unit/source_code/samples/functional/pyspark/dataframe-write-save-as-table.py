@@ -17,9 +17,9 @@ for i in range(10):
     df.write.saveAsTable(format="xyz", name="old.things")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:4:+1:46] Can't migrate 'df.write.format('delta').saveAsTable(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:46] Can't migrate 'df.write.format('delta').saveAsTable(name)' because its table name argument cannot be computed
     df.write.format("delta").saveAsTable(name)
-    # ucx[table-migrate:+1:4:+1:56] Can't migrate 'df.write.format('delta').saveAsTable(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:56] Can't migrate 'df.write.format('delta').saveAsTable(f'boop{stuff}')' because its table name argument cannot be computed
     df.write.format("delta").saveAsTable(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.

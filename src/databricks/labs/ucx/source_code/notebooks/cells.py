@@ -442,7 +442,7 @@ class GraphBuilder:
         has_unresolved, paths = base_node.get_notebook_paths(self._context.session_state)
         if has_unresolved:
             yield DependencyProblem(
-                'dependency-cannot-compute',
+                'dependency-cannot-compute-value',
                 f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
             )
         for path in paths:
@@ -451,7 +451,7 @@ class GraphBuilder:
     def _mutate_path_lookup(self, change: SysPathChange):
         if isinstance(change, UnresolvedPath):
             yield DependencyProblem(
-                'sys-path-cannot-compute',
+                'sys-path-cannot-compute-value',
                 f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
             )
             return
