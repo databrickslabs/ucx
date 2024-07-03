@@ -382,6 +382,6 @@ class WorkflowLinter:
             yield file.path, advice
 
     def _lint_notebook(self, notebook: Notebook, ctx: LinterContext):
-        linter = NotebookLinter(ctx, notebook)
+        linter = NotebookLinter(ctx, self._path_lookup, notebook)
         for advice in linter.lint():
             yield notebook.path, advice

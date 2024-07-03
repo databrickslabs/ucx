@@ -5,15 +5,18 @@ import locale
 from collections.abc import Iterable
 from functools import cached_property
 from pathlib import Path
+from typing import cast
 
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Advice, Failure, Linter
+from databricks.labs.ucx.source_code.base import Advice, Failure, Linter, PythonSequentialLinter
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR, NOTEBOOK_HEADER
+from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR, NOTEBOOK_HEADER, \
+    RunCell, PythonCell
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
 class Notebook(SourceContainer):
@@ -84,22 +87,25 @@ class NotebookLinter:
     to the code cells according to the language of the cell.
     """
 
-    def __init__(self, langs: LinterContext, notebook: Notebook):
-        self._languages: LinterContext = langs
+    def __init__(self, context: LinterContext, path_lookup: PathLookup, notebook: Notebook):
+        self._context: LinterContext = context
+        self._path_lookup = path_lookup
         self._notebook: Notebook = notebook
         # reuse Python linter, which accumulates statements for improved inference
-        self._python_linter = langs.linter(Language.PYTHON)
+        self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
 
     @classmethod
-    def from_source(cls, index: MigrationIndex, source: str, default_language: Language) -> 'NotebookLinter':
+    def from_source(cls, index: MigrationIndex, source: str, default_language: Language, path_lookup: PathLookup) -> NotebookLinter:
         ctx = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
-        return cls(ctx, notebook)
+        return cls(ctx, path_lookup, notebook)
 
     def lint(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
-            if not self._languages.is_supported(cell.language.language):
+            if isinstance(cell, RunCell):
+                self._process_run_cell(cell)
+            if not self._context.is_supported(cell.language.language):
                 continue
             linter = self._linter(cell.language.language)
             for advice in linter.lint(cell.original_code):
@@ -108,10 +114,32 @@ class NotebookLinter:
                     end_line=advice.end_line + cell.original_offset,
                 )
 
+    def _process_run_cell(self, cell: RunCell):
+        path, _ = cell.read_notebook_path()
+        if path is None:
+            return  # malformed run cell already reported
+        resolved = self._path_lookup.resolve(path)
+        if resolved is None:
+            return  # already reported during dependency building
+        # TODO deal with workspace notebooks
+        language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
+        # we only support Python for now
+        if language is not Language.PYTHON:
+            return
+        source = resolved.read_text(_guess_encoding(resolved))
+        notebook = Notebook.parse(path, source, language)
+        for cell in notebook.cells:
+            if isinstance(cell, RunCell):
+                self._process_run_cell(cell)
+                continue
+            if not isinstance(cell, PythonCell):
+                continue
+            self._python_linter.process_child_cell(cell.original_code)
+
     def _linter(self, language: Language) -> Linter:
         if language is Language.PYTHON:
             return self._python_linter
-        return self._languages.linter(language)
+        return self._context.linter(language)
 
     @staticmethod
     def name() -> str:
@@ -122,6 +150,20 @@ SUPPORTED_EXTENSION_LANGUAGES = {
     '.py': Language.PYTHON,
     '.sql': Language.SQL,
 }
+
+
+def _guess_encoding(path:Path):
+    # some files encode a unicode BOM (byte-order-mark), so let's use that if available
+    with path.open('rb') as _file:
+        raw = _file.read(4)
+        if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
+            return 'utf-32'
+        if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
+            return 'utf-16'
+        if raw.startswith(codecs.BOM_UTF8):
+            return 'utf-8-sig'
+        # no BOM, let's use default encoding
+        return locale.getpreferredencoding(False)
 
 
 class FileLinter:
@@ -176,21 +218,8 @@ class FileLinter:
     @cached_property
     def _source_code(self) -> str:
         if self._content is None:
-            self._content = self._path.read_text(self._guess_encoding())
+            self._content = self._path.read_text(_guess_encoding(self._path))
         return self._content
-
-    def _guess_encoding(self):
-        # some files encode a unicode BOM (byte-order-mark), so let's use that if available
-        with self._path.open('rb') as _file:
-            raw = _file.read(4)
-            if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
-                return 'utf-32'
-            if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
-                return 'utf-16'
-            if raw.startswith(codecs.BOM_UTF8):
-                return 'utf-8-sig'
-            # no BOM, let's use default encoding
-            return locale.getpreferredencoding(False)
 
     def _file_language(self):
         return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())

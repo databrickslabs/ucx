@@ -200,3 +200,14 @@ class PythonSequentialLinter(Linter):
                 yield from linter.lint_tree(tree)
         except AstroidSyntaxError as e:
             yield Failure('syntax-error', str(e), 0, 0, 0, 0)
+
+    def process_child_cell(self, code: str):
+        try:
+            tree = Tree.normalize_and_parse(code)
+            if self._tree is None:
+                self._tree = tree
+            else:
+                self._tree.append_statements(tree)
+        except AstroidSyntaxError as e:
+            # error already reported when linting enclosing notebook
+            logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
