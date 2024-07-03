@@ -13,9 +13,9 @@ for i in range(10):
     spark.catalog.refreshTable("old.things", "extra-argument")
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:4:+1:36] Can't migrate 'spark.catalog.refreshTable(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:36] Can't migrate 'spark.catalog.refreshTable(name)' because its table name argument cannot be computed
     spark.catalog.refreshTable(name)
-    # ucx[table-migrate:+1:4:+1:46] Can't migrate 'spark.catalog.refreshTable(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:4:+1:46] Can't migrate 'spark.catalog.refreshTable(f'boop{stuff}')' because its table name argument cannot be computed
     spark.catalog.refreshTable(f"boop{stuff}")
 
     ## Some trivial references to the method or table in unrelated contexts that should not trigger warnigns.
