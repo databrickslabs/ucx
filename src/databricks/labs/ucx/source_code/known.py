@@ -151,7 +151,7 @@ class Whitelist:
                 module_ref = module_ref[: -len(suffix)]
         logger.info(f"Processing module: {module_ref}")
         ctx = LinterContext(empty_index)
-        linter = FileLinter(ctx, module_path)
+        linter = FileLinter(ctx, PathLookup.from_sys_path(), module_path)
         known_problems = set()
         for problem in linter.lint():
             known_problems.add(KnownProblem(problem.code, problem.message))
