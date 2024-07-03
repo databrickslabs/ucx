@@ -82,7 +82,7 @@ class QueryMatcher(Matcher):
                     yield from self._lint_table_arg(from_table, node, inferred)
             except InferenceError:
                 yield Advisory.from_node(
-                    code='table-migrate',
+                    code='table-migrate-cannot-compute-value',
                     message=f"Can't migrate table_name argument in '{node.as_string()}' because its value cannot be computed",
                     node=node,
                 )
@@ -94,7 +94,7 @@ class QueryMatcher(Matcher):
                 yield advice.replace_from_node(call_node)
         else:
             yield Advisory.from_node(
-                code='table-migrate',
+                code='table-migrate-cannot-compute-value',
                 message=f"Can't migrate table_name argument in '{call_node.as_string()}' because its value cannot be computed",
                 node=call_node,
             )
@@ -117,7 +117,7 @@ class TableNameMatcher(Matcher):
         for inferred in InferredValue.infer_from_node(table_arg, session_state):
             if not inferred.is_inferred():
                 yield Advisory.from_node(
-                    code='table-migrate',
+                    code='table-migrate-cannot-compute-value',
                     message=f"Can't migrate '{node.as_string()}' because its table name argument cannot be computed",
                     node=node,
                 )

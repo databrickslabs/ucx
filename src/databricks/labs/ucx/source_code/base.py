@@ -114,11 +114,11 @@ class Advisory(Advice):
     """A warning that does not prevent the code from running."""
 
 
-class Failure(Advisory):
+class Failure(Advice):
     """An error that prevents the code from running."""
 
 
-class Deprecation(Advisory):
+class Deprecation(Advice):
     """An advisory that suggests to replace the code with a newer version."""
 
 

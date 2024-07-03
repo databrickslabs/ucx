@@ -129,7 +129,7 @@ class DbutilsLinter(PythonLinter):
         if has_unresolved:
             yield from [
                 Advisory.from_node(
-                    'dbutils-notebook-run-dynamic',
+                    'notebook-run-cannot-compute-value',
                     "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
                     node=node,
                 )

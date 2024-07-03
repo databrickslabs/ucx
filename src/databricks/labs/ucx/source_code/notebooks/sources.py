@@ -205,9 +205,17 @@ class FileLinter:
         encoding = locale.getpreferredencoding(False)
         try:
             is_notebook = self._is_notebook()
+        except FileNotFoundError:
+            failure_message = f"File not found: {self._path}"
+            yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
+            return
         except UnicodeDecodeError:
             failure_message = f"File without {encoding} encoding is not supported {self._path}"
             yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
+            return
+        except PermissionError:
+            failure_message = f"Missing read permission for {self._path}"
+            yield Failure("file-permission", failure_message, 0, 0, 1, 1)
             return
 
         if is_notebook:
@@ -230,9 +238,8 @@ class FileLinter:
                 linter = self._ctx.linter(language)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
-                yield Failure(
-                    "unsupported-content", f"Error while parsing content of {self._path.as_posix()}: {err}", 0, 0, 1, 1
-                )
+                failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
+                yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
 
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
