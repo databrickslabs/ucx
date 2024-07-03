@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from abc import abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Collection
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import ClassVar
@@ -98,8 +98,10 @@ class MigrationState:
         if len(self) == 0:
             logger.info("No valid groups selected, nothing to do.")
             return True
-        logger.info(f"Migrating permissions to {len(self)} account groups.")
-        items = 0
+        logger.info(f"Migrating permissions for {len(self)} account groups.")
+        total_permissions = 0
+        success_groups = 0
+        errors: list[Exception] = []
         for migrated_group in self.groups:
             name_in_workspace = migrated_group.name_in_workspace
             if renamed:
@@ -109,14 +111,28 @@ class MigrationState:
                 # the migration fails.
                 name_in_workspace = migrated_group.temporary_name
             name_in_account = migrated_group.name_in_account
-            items += self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
-            logger.info(f"Migrated {items} permissions.")
+            try:
+                group_permissions = self._migrate_group_permissions_paginated(ws, name_in_workspace, name_in_account)
+                logger.info(
+                    f"Migrated {group_permissions} permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)"
+                )
+                total_permissions += group_permissions
+                success_groups += 1
+            except IOError as e:
+                logger.exception(
+                    f"Migration of group permissions failed: {name_in_workspace} (workspace) -> {name_in_account} (account)"
+                )
+                errors.append(e)
+        logger.info(f"Migrated {total_permissions} permissions for {success_groups}/{len(self)} groups successfully.")
+        if errors:
+            logger.error(f"Migrating permissions failed for {len(errors)}/{len(self)} groups.")
+            raise ManyError(errors)
         return True
 
     @staticmethod
-    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str):
+    def _migrate_group_permissions_paginated(ws: WorkspaceClient, name_in_workspace: str, name_in_account: str) -> int:
         batch_size = 1000
-        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account)")
+        logger.info(f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) starting")
         permissions_migrated = 0
         while True:
             result = ws.permission_migration.migrate_permissions(
@@ -126,10 +142,14 @@ class MigrationState:
                 size=batch_size,
             )
             if not result.permissions_migrated:
-                logger.info("No more permissions to migrate.")
+                logger.info(
+                    f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) finished"
+                )
                 return permissions_migrated
             permissions_migrated += result.permissions_migrated
-            logger.info(f"Migrated {result.permissions_migrated} permissions to {name_in_account} account group")
+            logger.info(
+                f"Migrating permissions: {name_in_workspace} (workspace) -> {name_in_account} (account) progress={permissions_migrated}(+{result.permissions_migrated})"
+            )
 
 
 class GroupMigrationStrategy:
@@ -147,7 +167,7 @@ class GroupMigrationStrategy:
         self.include_group_names = include_group_names
 
     @abstractmethod
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         raise NotImplementedError
 
     def get_filtered_groups(self):
@@ -162,9 +182,9 @@ class GroupMigrationStrategy:
         }
 
     @staticmethod
-    def _safe_match(group_name: str, match_re: str) -> str:
+    def _safe_match(group_name: str, pattern: re.Pattern) -> str:
         try:
-            match = re.search(match_re, group_name)
+            match = pattern.search(group_name)
             if not match:
                 return group_name
             match_groups = match.groups()
@@ -175,11 +195,11 @@ class GroupMigrationStrategy:
             return group_name
 
     @staticmethod
-    def _safe_sub(group_name: str, match_re: str, replace: str) -> str:
+    def _safe_sub(group_name: str, pattern: re.Pattern, replace: str) -> str:
         try:
-            return re.sub(match_re, replace, group_name)
+            return pattern.sub(replace, group_name)
         except re.error:
-            logger.warning(f"Failed to apply Regex Expression {match_re} on Group Name {group_name}")
+            logger.warning(f"Failed to apply Regex Expression {pattern} on Group Name {group_name}")
             return group_name
 
 
@@ -188,9 +208,9 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
         self,
         workspace_groups_in_workspace,
         account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -199,16 +219,16 @@ class MatchingNamesStrategy(GroupMigrationStrategy):
             renamed_groups_prefix=renamed_groups_prefix,
         )
 
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             account_group = self.account_groups_in_account.get(group.display_name)
             if not account_group:
                 logger.info(
                     f"Couldn't find a matching account group for {group.display_name} group using name matching"
                 )
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
@@ -226,9 +246,9 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
         self,
         workspace_groups_in_workspace,
         account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -237,15 +257,15 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
             renamed_groups_prefix=renamed_groups_prefix,
         )
 
-    def generate_migrated_groups(self):
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         account_groups_by_id = {group.external_id: group for group in self.account_groups_in_account.values()}
         for group in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             account_group = account_groups_by_id.get(group.external_id)
             if not account_group:
                 logger.info(f"Couldn't find a matching account group for {group.display_name} group with external_id")
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
@@ -261,13 +281,13 @@ class MatchByExternalIdStrategy(GroupMigrationStrategy):
 class RegexSubStrategy(GroupMigrationStrategy):
     def __init__(
         self,
-        workspace_groups_in_workspace,
-        account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
-        workspace_group_regex: str | None = None,
-        workspace_group_replace: str | None = None,
+        workspace_groups_in_workspace: dict[str, Group],
+        account_groups_in_account: dict[str, Group],
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
+        workspace_group_regex: str,
+        workspace_group_replace: str,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -275,15 +295,18 @@ class RegexSubStrategy(GroupMigrationStrategy):
             include_group_names=include_group_names,
             renamed_groups_prefix=renamed_groups_prefix,
         )
+        self.workspace_group_regex = workspace_group_regex  # Keep to support legacy public API
         self.workspace_group_replace = workspace_group_replace
-        self.workspace_group_regex = workspace_group_regex
 
-    def generate_migrated_groups(self):
+        self._workspace_group_pattern = re.compile(self.workspace_group_regex)
+
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups = self.get_filtered_groups()
         for group in workspace_groups.values():
-            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             name_in_account = self._safe_sub(
-                group.display_name, self.workspace_group_regex, self.workspace_group_replace
+                group.display_name,
+                self._workspace_group_pattern,
+                self.workspace_group_replace,
             )
             account_group = self.account_groups_in_account.get(name_in_account)
             if not account_group:
@@ -291,6 +314,7 @@ class RegexSubStrategy(GroupMigrationStrategy):
                     f"Couldn't find a matching account group for {group.display_name} group with regex substitution"
                 )
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=group.id,
                 name_in_workspace=group.display_name,
@@ -308,11 +332,11 @@ class RegexMatchStrategy(GroupMigrationStrategy):
         self,
         workspace_groups_in_workspace,
         account_groups_in_account,
-        /,
-        renamed_groups_prefix,
-        include_group_names=None,
-        workspace_group_regex: str | None = None,
-        account_group_regex: str | None = None,
+        *,
+        renamed_groups_prefix: str,
+        include_group_names: list[str] | None,
+        workspace_group_regex: str,
+        account_group_regex: str,
     ):
         super().__init__(
             workspace_groups_in_workspace,
@@ -320,26 +344,30 @@ class RegexMatchStrategy(GroupMigrationStrategy):
             include_group_names=include_group_names,
             renamed_groups_prefix=renamed_groups_prefix,
         )
-        self.account_group_regex = account_group_regex
+        # Keep to support legacy public API
         self.workspace_group_regex = workspace_group_regex
+        self.account_group_regex = account_group_regex
 
-    def generate_migrated_groups(self):
+        self._workspace_group_pattern = re.compile(self.workspace_group_regex)
+        self._account_group_pattern = re.compile(self.account_group_regex)
+
+    def generate_migrated_groups(self) -> Iterable[MigratedGroup]:
         workspace_groups_by_match = {
-            self._safe_match(group_name, self.workspace_group_regex): group
+            self._safe_match(group_name, self._workspace_group_pattern): group
             for group_name, group in self.get_filtered_groups().items()
         }
         account_groups_by_match = {
-            self._safe_match(group_name, self.account_group_regex): group
+            self._safe_match(group_name, self._account_group_pattern): group
             for group_name, group in self.account_groups_in_account.items()
         }
         for group_match, ws_group in workspace_groups_by_match.items():
-            temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             account_group = account_groups_by_match.get(group_match)
             if not account_group:
                 logger.info(
                     f"Couldn't find a matching account group for {ws_group.display_name} group with regex matching"
                 )
                 continue
+            temporary_name = f"{self.renamed_groups_prefix}{ws_group.display_name}"
             yield MigratedGroup(
                 id_in_workspace=ws_group.id,
                 name_in_workspace=ws_group.display_name,
@@ -352,6 +380,16 @@ class RegexMatchStrategy(GroupMigrationStrategy):
                     json.dumps([gg.as_dict() for gg in ws_group.entitlements]) if ws_group.entitlements else None
                 ),
             )
+
+
+class GroupRenameIncompleteError(RuntimeError):
+    __slots__ = ("group_id", "old_name", "new_name")
+
+    def __init__(self, group_id: str, old_name: str, new_name: str) -> None:
+        super().__init__(f"Rename incomplete for group {group_id}: {old_name} -> {new_name}")
+        self.group_id = group_id
+        self.old_name = old_name
+        self.new_name = new_name
 
 
 class GroupManager(CrawlerBase[MigratedGroup]):
@@ -405,18 +443,62 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 continue
             logger.info(f"Renaming: {migrated_group.name_in_workspace} -> {migrated_group.temporary_name}")
             tasks.append(
-                functools.partial(self._rename_group, migrated_group.id_in_workspace, migrated_group.temporary_name)
+                functools.partial(
+                    self._rename_group_and_wait_for_rename,
+                    migrated_group.id_in_workspace,
+                    migrated_group.name_in_workspace,
+                    migrated_group.temporary_name,
+                )
             )
-        _, errors = Threads.gather("rename groups in the workspace", tasks)
-        if len(errors) > 0:
-            raise ManyError(errors)
+        renamed_groups = Threads.strict("rename groups in the workspace", tasks)
+        # Renaming is eventually consistent, and the tasks above have each polled to verify their rename completed.
+        # Here we also check that enumeration yields the updated names; this is necessary because otherwise downstream
+        # tasks (like reflect_account_groups_on_workspace()) may skip a renamed group because it doesn't appear to be
+        # present.
+        self._wait_for_renamed_groups(renamed_groups)
+
+    def _rename_group_and_wait_for_rename(self, group_id: str, old_group_name, new_group_name: str) -> tuple[str, str]:
+        logger.debug(f"Renaming group {group_id}: {old_group_name} -> {new_group_name}")
+        self._rename_group(group_id, new_group_name)
+        logger.debug(f"Waiting for group {group_id} rename to take effect: {old_group_name} -> {new_group_name}")
+        self._wait_for_rename(group_id, old_group_name, new_group_name)
+        return group_id, new_group_name
 
     @retried(on=[InternalError, ResourceConflict, DeadlineExceeded])
     @rate_limited(max_requests=10, burst_period_seconds=60)
-    def _rename_group(self, group_id: str, new_group_name: str):
+    def _rename_group(self, group_id: str, new_group_name: str) -> None:
         ops = [iam.Patch(iam.PatchOp.REPLACE, "displayName", new_group_name)]
         self._ws.groups.patch(group_id, operations=ops)
-        return True
+
+    @retried(on=[GroupRenameIncompleteError], timeout=timedelta(minutes=2))
+    def _wait_for_rename(self, group_id: str, old_group_name: str, new_group_name: str) -> None:
+        group = self._ws.groups.get(group_id)
+        if group.display_name == old_group_name:
+            # Rename still pending.
+            raise GroupRenameIncompleteError(group_id, old_group_name, new_group_name)
+        if group.display_name != new_group_name:
+            # Group has an entirely unexpected name; something else is interfering.
+            msg = f"While waiting for group {group_id} rename ({old_group_name} -> {new_group_name} an unexpected name was observed: {group.display_name}"
+            raise RuntimeError(msg)
+        # Normal exit; group has been renamed.
+
+    @retried(on=[ManyError], timeout=timedelta(minutes=2))
+    def _wait_for_renamed_groups(self, expected_groups: Collection[tuple[str, str]]) -> None:
+        attributes = "id,displayName"
+        found_groups = {
+            group.id: group.display_name
+            for group in self._list_workspace_groups("WorkspaceGroup", attributes)
+            if group.display_name
+        }
+        pending_renames: list[RuntimeError] = []
+        for group_id, expected_name in expected_groups:
+            found_name = found_groups.get(group_id, None)
+            if found_name is None:
+                pending_renames.append(RuntimeError(f"Missing group with id: {group_id} (renamed to {expected_name}"))
+            elif found_name != expected_name:
+                pending_renames.append(GroupRenameIncompleteError(group_id, found_name, expected_name))
+        if pending_renames:
+            raise ManyError(pending_renames)
 
     def reflect_account_groups_on_workspace(self):
         tasks = []
@@ -652,7 +734,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
     def _get_strategy(
         self, workspace_groups_in_workspace: dict[str, Group], account_groups_in_account: dict[str, Group]
     ) -> GroupMigrationStrategy:
-        if self._workspace_group_regex and self._workspace_group_replace:
+        if self._workspace_group_regex is not None and self._workspace_group_replace is not None:
             return RegexSubStrategy(
                 workspace_groups_in_workspace,
                 account_groups_in_account,
@@ -661,7 +743,7 @@ class GroupManager(CrawlerBase[MigratedGroup]):
                 workspace_group_regex=self._workspace_group_regex,
                 workspace_group_replace=self._workspace_group_replace,
             )
-        if self._workspace_group_regex and self._account_group_regex:
+        if self._workspace_group_regex is not None and self._account_group_regex is not None:
             return RegexMatchStrategy(
                 workspace_groups_in_workspace,
                 account_groups_in_account,
@@ -693,9 +775,12 @@ class ConfigureGroups:
     group_match_by_external_id = None
     include_group_names = None
 
+    _valid_substitute_pattern = re.compile(r"[\s#,+ \\<>;]")
+
     def __init__(self, prompts: Prompts):
         self._prompts = prompts
         self._ask_for_group = functools.partial(self._prompts.question, validate=self._is_valid_group_str)
+        self._ask_for_substitute = functools.partial(self._prompts.question, validate=self._is_valid_substitute_str)
         self._ask_for_regex = functools.partial(self._prompts.question, validate=self._validate_regex)
 
     def run(self):
@@ -735,11 +820,11 @@ class ConfigureGroups:
         match_value = self._ask_for_regex("Enter a regular expression for substitution")
         if not match_value:
             return False
-        sub_value = self._ask_for_group("Enter the substitution value")
-        if not sub_value:
+        substitute = self._ask_for_substitute("Enter the substitution value")
+        if substitute is None:
             return False
         self.workspace_group_regex = match_value
-        self.workspace_group_replace = sub_value
+        self.workspace_group_replace = substitute
         return True
 
     def _configure_matching(self):
@@ -767,9 +852,11 @@ class ConfigureGroups:
         self.group_match_by_external_id = True
         return True
 
-    @staticmethod
-    def _is_valid_group_str(group_str: str):
-        return group_str and not re.search(r"[\s#,+ \\<>;]", group_str)
+    def _is_valid_group_str(self, group_str: str) -> bool:
+        return len(group_str) > 0 and self._is_valid_substitute_str(group_str)
+
+    def _is_valid_substitute_str(self, substitute: str) -> bool:
+        return not self._valid_substitute_pattern.search(substitute)
 
     @staticmethod
     def _validate_regex(regex_input: str) -> bool:

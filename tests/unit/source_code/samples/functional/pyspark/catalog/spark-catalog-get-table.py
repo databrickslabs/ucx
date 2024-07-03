@@ -16,10 +16,10 @@ for i in range(10):
     do_stuff_with(table)
 
     ## Some calls that use a variable whose value is unknown: they could potentially reference a migrated table.
-    # ucx[table-migrate:+1:12:+1:40] Can't migrate 'spark.catalog.getTable(name)' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:12:+1:40] Can't migrate 'spark.catalog.getTable(name)' because its table name argument cannot be computed
     table = spark.catalog.getTable(name)
     do_stuff_with(table)
-    # ucx[table-migrate:+1:12:+1:50] Can't migrate 'spark.catalog.getTable(f'boop{stuff}')' because its table name argument cannot be computed
+    # ucx[table-migrate-cannot-compute-value:+1:12:+1:50] Can't migrate 'spark.catalog.getTable(f'boop{stuff}')' because its table name argument cannot be computed
     table = spark.catalog.getTable(f"boop{stuff}")
     do_stuff_with(table)
 

@@ -114,7 +114,6 @@ class DBRv8d0Linter(Linter):
     def lint(self, code: str) -> Iterable[Advice]:
         if self._skip_dbr:
             return
-        code = Tree.convert_magic_lines_to_magic_commands(code)
-        tree = Tree.parse(code)
+        tree = Tree.normalize_and_parse(code)
         for node in tree.walk():
             yield from self._linter.lint(node)

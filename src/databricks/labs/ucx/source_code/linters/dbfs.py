@@ -80,8 +80,7 @@ class DBFSUsageLinter(Linter):
         """
         Lints the code looking for file system paths that are deprecated
         """
-        code = Tree.convert_magic_lines_to_magic_commands(code)
-        tree = Tree.parse(code)
+        tree = Tree.normalize_and_parse(code)
         visitor = DetectDbfsVisitor(self._session_state)
         visitor.visit(tree.node)
         yield from visitor.get_advices()
@@ -105,7 +104,7 @@ class FromDbfsFolder(Linter):
         except SqlParseError as e:
             logger.debug(f"Failed to parse SQL: {code}", exc_info=e)
             yield Failure(
-                code='dbfs-query',
+                code='dbfs-query-unsupported-sql',
                 message=f"SQL query is not supported yet: {code}",
                 # SQLGlot does not propagate tokens yet. See https://github.com/tobymao/sqlglot/issues/3159
                 start_line=0,

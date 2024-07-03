@@ -394,8 +394,7 @@ class GraphBuilder:
         """
         problems: list[DependencyProblem] = []
         try:
-            python_code = Tree.convert_magic_lines_to_magic_commands(python_code)
-            tree = Tree.parse(python_code)
+            tree = Tree.normalize_and_parse(python_code)
         except AstroidSyntaxError as e:
             logger.debug(f"Could not parse Python code: {python_code}", exc_info=True)
             problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
@@ -445,7 +444,7 @@ class GraphBuilder:
         has_unresolved, paths = base_node.get_notebook_paths(self._context.session_state)
         if has_unresolved:
             yield DependencyProblem(
-                'dependency-cannot-compute',
+                'dependency-cannot-compute-value',
                 f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
             )
         for path in paths:
@@ -454,7 +453,7 @@ class GraphBuilder:
     def _mutate_path_lookup(self, change: SysPathChange):
         if isinstance(change, UnresolvedPath):
             yield DependencyProblem(
-                'sys-path-cannot-compute',
+                'sys-path-cannot-compute-value',
                 f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
             )
             return
