@@ -21,15 +21,15 @@ from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, T
 
 logger = logging.getLogger(__name__)
 
-P = TypeVar("P")
-ProblemFactory = Callable[[str, str, NodeNG], P]
+T = TypeVar("T")
+ProblemFactory = Callable[[str, str, NodeNG], T]
 
 
 class ImportSource(NodeBase):
 
     @classmethod
-    def extract_from_tree(cls, tree: Tree, problem_factory: ProblemFactory) -> tuple[list[ImportSource], list[P]]:
-        problems: list[P] = []
+    def extract_from_tree(cls, tree: Tree, problem_factory: ProblemFactory) -> tuple[list[ImportSource], list[T]]:
+        problems: list[T] = []
         sources: list[ImportSource] = []
         try:  # pylint: disable=too-many-try-statements
             nodes = tree.locate(Import, [])
@@ -61,7 +61,7 @@ class ImportSource(NodeBase):
             yield ImportSource(node, node.modname)
 
     @classmethod
-    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[P]):
+    def _make_sources_for_import_call_nodes(cls, nodes: list[Call], problem_factory: ProblemFactory, problems: list[T]):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
@@ -116,7 +116,7 @@ class DbutilsLinter(Linter):
         self._session_state = session_state
 
     def lint(self, code: str) -> Iterable[Advice]:
-        tree = Tree.parse(code)
+        tree = Tree.normalize_and_parse(code)
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:
             yield from self._raise_advice_if_unresolved(node.node, self._session_state)
@@ -129,7 +129,7 @@ class DbutilsLinter(Linter):
         if has_unresolved:
             yield from [
                 Advisory.from_node(
-                    'dbutils-notebook-run-dynamic',
+                    'notebook-run-cannot-compute-value',
                     "Path for 'dbutils.notebook.run' cannot be computed and requires adjusting the notebook path(s)",
                     node=node,
                 )
