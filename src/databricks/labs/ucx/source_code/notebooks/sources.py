@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import locale
 from collections.abc import Iterable
 from functools import cached_property
@@ -167,8 +168,22 @@ class FileLinter:
 
     @cached_property
     def _source_code(self) -> str:
-        encoding = locale.getpreferredencoding(False)
-        return self._path.read_text(encoding) if self._content is None else self._content
+        if self._content is None:
+            self._content = self._path.read_text(self._guess_encoding())
+        return self._content
+
+    def _guess_encoding(self):
+        # some files encode a unicode BOM (byte-order-mark), so let's use that if available
+        with self._path.open('rb') as _file:
+            raw = _file.read(4)
+            if raw.startswith(codecs.BOM_UTF32_LE) or raw.startswith(codecs.BOM_UTF32_BE):
+                return 'utf-32'
+            if raw.startswith(codecs.BOM_UTF16_LE) or raw.startswith(codecs.BOM_UTF16_BE):
+                return 'utf-16'
+            if raw.startswith(codecs.BOM_UTF8):
+                return 'utf-8-sig'
+            # no BOM, let's use default encoding
+            return locale.getpreferredencoding(False)
 
     def _file_language(self):
         return SUPPORTED_EXTENSION_LANGUAGES.get(self._path.suffix.lower())
@@ -183,9 +198,17 @@ class FileLinter:
         encoding = locale.getpreferredencoding(False)
         try:
             is_notebook = self._is_notebook()
+        except FileNotFoundError:
+            failure_message = f"File not found: {self._path}"
+            yield Failure("file-not-found", failure_message, 0, 0, 1, 1)
+            return
         except UnicodeDecodeError:
             failure_message = f"File without {encoding} encoding is not supported {self._path}"
             yield Failure("unsupported-file-encoding", failure_message, 0, 0, 1, 1)
+            return
+        except PermissionError:
+            failure_message = f"Missing read permission for {self._path}"
+            yield Failure("file-permission", failure_message, 0, 0, 1, 1)
             return
 
         if is_notebook:
@@ -208,9 +231,8 @@ class FileLinter:
                 linter = self._ctx.linter(language)
                 yield from linter.lint(self._source_code)
             except ValueError as err:
-                yield Failure(
-                    "unsupported-content", f"Error while parsing content of {self._path.as_posix()}: {err}", 0, 0, 1, 1
-                )
+                failure_message = f"Error while parsing content of {self._path.as_posix()}: {err}"
+                yield Failure("unsupported-content", failure_message, 0, 0, 1, 1)
 
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
