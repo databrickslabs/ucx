@@ -14,8 +14,14 @@ from databricks.labs.ucx.source_code.base import Advice, Failure, Linter, Python
 
 from databricks.labs.ucx.source_code.graph import SourceContainer, DependencyGraph, DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext
-from databricks.labs.ucx.source_code.notebooks.cells import CellLanguage, Cell, CELL_SEPARATOR, NOTEBOOK_HEADER, \
-    RunCell, PythonCell
+from databricks.labs.ucx.source_code.notebooks.cells import (
+    CellLanguage,
+    Cell,
+    CELL_SEPARATOR,
+    NOTEBOOK_HEADER,
+    RunCell,
+    PythonCell,
+)
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 
@@ -95,7 +101,9 @@ class NotebookLinter:
         self._python_linter: PythonSequentialLinter = cast(PythonSequentialLinter, context.linter(Language.PYTHON))
 
     @classmethod
-    def from_source(cls, index: MigrationIndex, source: str, default_language: Language, path_lookup: PathLookup) -> NotebookLinter:
+    def from_source(
+        cls, index: MigrationIndex, path_lookup: PathLookup, source: str, default_language: Language
+    ) -> NotebookLinter:
         ctx = LinterContext(index)
         notebook = Notebook.parse(Path(""), source, default_language)
         assert notebook is not None
@@ -104,7 +112,7 @@ class NotebookLinter:
     def lint(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
             if isinstance(cell, RunCell):
-                self._process_run_cell(cell)
+                self._load_source_from_run_cell(cell)
             if not self._context.is_supported(cell.language.language):
                 continue
             linter = self._linter(cell.language.language)
@@ -114,8 +122,8 @@ class NotebookLinter:
                     end_line=advice.end_line + cell.original_offset,
                 )
 
-    def _process_run_cell(self, cell: RunCell):
-        path, _ = cell.read_notebook_path()
+    def _load_source_from_run_cell(self, run_cell: RunCell):
+        path, _, _ = run_cell.read_notebook_path()
         if path is None:
             return  # malformed run cell already reported
         resolved = self._path_lookup.resolve(path)
@@ -130,7 +138,7 @@ class NotebookLinter:
         notebook = Notebook.parse(path, source, language)
         for cell in notebook.cells:
             if isinstance(cell, RunCell):
-                self._process_run_cell(cell)
+                self._load_source_from_run_cell(cell)
                 continue
             if not isinstance(cell, PythonCell):
                 continue
@@ -152,7 +160,7 @@ SUPPORTED_EXTENSION_LANGUAGES = {
 }
 
 
-def _guess_encoding(path:Path):
+def _guess_encoding(path: Path):
     # some files encode a unicode BOM (byte-order-mark), so let's use that if available
     with path.open('rb') as _file:
         raw = _file.read(4)
@@ -210,8 +218,9 @@ class FileLinter:
         'zip-safe',
     }
 
-    def __init__(self, ctx: LinterContext, path: Path, content: str | None = None):
+    def __init__(self, ctx: LinterContext, path_lookup: PathLookup, path: Path, content: str | None = None):
         self._ctx: LinterContext = ctx
+        self._path_lookup = path_lookup
         self._path: Path = path
         self._content = content
 
@@ -272,5 +281,5 @@ class FileLinter:
 
     def _lint_notebook(self):
         notebook = Notebook.parse(self._path, self._source_code, self._file_language())
-        notebook_linter = NotebookLinter(self._ctx, notebook)
+        notebook_linter = NotebookLinter(self._ctx, self._path_lookup, notebook)
         yield from notebook_linter.lint()

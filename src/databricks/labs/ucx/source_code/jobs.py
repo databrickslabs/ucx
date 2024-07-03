@@ -377,7 +377,7 @@ class WorkflowLinter:
                 yield from self._lint_file(container, ctx)
 
     def _lint_file(self, file: LocalFile, ctx: LinterContext):
-        linter = FileLinter(ctx, file.path)
+        linter = FileLinter(ctx, self._path_lookup, file.path)
         for advice in linter.lint():
             yield file.path, advice
 

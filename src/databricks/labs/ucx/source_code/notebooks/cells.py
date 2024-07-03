@@ -168,7 +168,7 @@ class RunCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        path, idx = self.read_notebook_path()
+        path, idx, line = self.read_notebook_path()
         if path is not None:
             start_line = self._original_offset + idx
             problems = parent.register_notebook(path)
@@ -197,8 +197,8 @@ class RunCell(Cell):
                 path = path.strip().strip("'").strip('"')
                 if len(path) == 0:
                     continue
-                return Path(path), idx
-        return None, 0
+                return Path(path), idx, line
+        return None, 0, ""
 
     def migrate_notebook_path(self):
         pass
