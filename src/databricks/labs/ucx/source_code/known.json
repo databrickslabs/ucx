@@ -2762,12 +2762,7 @@
     "fugue_dask._io": [],
     "fugue_dask._utils": [],
     "fugue_dask.dataframe": [],
-    "fugue_dask.execution_engine": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'ctx.sql(sql, dataframes=_dfs, config_options={'sql.identifier.case_sensitive': True})' because its value cannot be computed"
-      }
-    ],
+    "fugue_dask.execution_engine": [],
     "fugue_dask.registry": [],
     "fugue_dask.tester": [],
     "fugue_duckdb": [],
@@ -2776,10 +2771,6 @@
     "fugue_duckdb.dask": [],
     "fugue_duckdb.dataframe": [],
     "fugue_duckdb.execution_engine": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'self.execution_engine.connection.table(table)' because its table name argument cannot be computed"
-      },
       {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
@@ -2792,14 +2783,6 @@
     "fugue_ibis._utils": [],
     "fugue_ibis.dataframe": [],
     "fugue_ibis.execution_engine": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate 'self.backend.table(table)' because its table name argument cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self.backend.sql(sql)' because its value cannot be computed"
-      },
       {
         "code": "table-migrate",
         "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
@@ -2860,24 +2843,12 @@
       {
         "code": "rdd-in-shared-clusters",
         "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self.execution_engine.spark_session.sql(_sql)' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'self.spark_session.sql(f'SELECT * FROM {temp_name} TABLESAMPLE({n} ROWS)')' because its value cannot be computed"
       }
     ],
     "fugue_spark.registry": [
       {
         "code": "rdd-in-shared-clusters",
         "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'spark.sql(sql[1])' because its value cannot be computed"
       }
     ],
     "fugue_spark.tester": [],
