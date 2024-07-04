@@ -1394,6 +1394,23 @@
   "databricks-sdk": {
     "databricks.sdk": []
   },
+  "datasetsforecast": {
+    "action_files": [],
+    "action_files.test_dask": [],
+    "action_files.test_ray": [],
+    "action_files.utils": [],
+    "datasetsforecast": [],
+    "datasetsforecast._modidx": [],
+    "datasetsforecast._nbdev": [],
+    "datasetsforecast.evaluation": [],
+    "datasetsforecast.hierarchical": [],
+    "datasetsforecast.long_horizon": [],
+    "datasetsforecast.losses": [],
+    "datasetsforecast.m3": [],
+    "datasetsforecast.m4": [],
+    "datasetsforecast.m5": [],
+    "datasetsforecast.utils": []
+  },
   "dbldatagen": {
     "dbldatagen": [],
     "dbldatagen._version": [],
