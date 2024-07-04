@@ -5,15 +5,28 @@ import re
 import shlex
 from abc import ABC, abstractmethod
 from ast import parse as parse_python
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
+
+from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
 
 from databricks.sdk.service.workspace import Language
-from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem
+
+from databricks.labs.ucx.source_code.graph import DependencyGraph, DependencyProblem, GraphBuilderContext
+from databricks.labs.ucx.source_code.linters.imports import (
+    SysPathChange,
+    DbutilsLinter,
+    ImportSource,
+    NotebookRunCall,
+    UnresolvedPath,
+)
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
 
 # use a specific logger for sqlglot warnings so we can disable them selectively
 sqlglot_logger = logging.getLogger(f"{__name__}.sqlglot")
+logger = logging.getLogger(__name__)
 
 NOTEBOOK_HEADER = "Databricks notebook source"
 CELL_SEPARATOR = "COMMAND ----------"
@@ -88,7 +101,9 @@ class PythonCell(Cell):
             return True
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        python_dependency_problems = parent.build_graph_from_python_source(self._original_code)
+        context = parent.new_graph_builder_context()
+        builder = GraphBuilder(context)
+        python_dependency_problems = builder.build_graph_from_python_source(self._original_code)
         # Position information for the Python code is within the code and needs to be mapped to the location within the parent nodebook.
         return [
             problem.replace(
@@ -203,32 +218,8 @@ class PipCell(Cell):
     def is_runnable(self) -> bool:
         return True  # TODO
 
-    @staticmethod
-    def _split(code) -> list[str]:
-        """Split pip cell code into multiple arguments
-
-        Note:
-            PipCell should be a pip command, i.e. single line possible spanning multilines escaped with backslashes.
-
-        Sources:
-            https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
-        """
-        match = re.search(r"(?<!\\)\n", code)
-        if match:
-            code = code[: match.start()]  # Remove code after non-escaped newline
-        code = code.replace("\\\n", " ")
-        lexer = shlex.split(code, posix=True)
-        return list(lexer)
-
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        argv = self._split(self.original_code)
-        if len(argv) == 1:
-            return [DependencyProblem("library-install-failed", "Missing command after '%pip'")]
-        if argv[1] != "install":
-            return [DependencyProblem("library-install-failed", f"Unsupported %pip command: {argv[1]}")]
-        if len(argv) == 2:
-            return [DependencyProblem("library-install-failed", "Missing arguments after '%pip install'")]
-        return graph.register_library(*argv[2:])  # Skipping %pip install
+        return PipMagic(self.original_code).build_dependency_graph(graph)
 
 
 class CellLanguage(Enum):
@@ -387,3 +378,159 @@ class CellLanguage(Enum):
         if code.endswith('./'):
             lines.append('\n')
         return "\n".join(lines)
+
+
+class GraphBuilder:
+
+    def __init__(self, context: GraphBuilderContext):
+        self._context = context
+
+    def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
+        """Check python code for dependency-related problems.
+
+        Returns:
+            A list of dependency problems; position information is relative to the python code itself.
+        """
+        problems: list[DependencyProblem] = []
+        try:
+            tree = Tree.normalize_and_parse(python_code)
+        except Exception as e:  # pylint: disable=broad-except
+            problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
+            return problems
+        syspath_changes = SysPathChange.extract_from_tree(self._context.session_state, tree)
+        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
+        import_sources: list[ImportSource]
+        import_problems: list[DependencyProblem]
+        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(import_problems)
+        magic_commands, command_problems = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+        problems.extend(command_problems)
+        nodes = syspath_changes + run_calls + import_sources + magic_commands
+        # need to execute things in intertwined sequence so concat and sort
+        for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
+            for problem in self._process_node(base_node):
+                # Astroid line numbers are 1-based.
+                problem = problem.replace(
+                    start_line=base_node.node.lineno - 1,
+                    start_col=base_node.node.col_offset,
+                    end_line=(base_node.node.end_lineno or 1) - 1,
+                    end_col=base_node.node.end_col_offset or 0,
+                )
+                problems.append(problem)
+        return problems
+
+    def _process_node(self, base_node: NodeBase):
+        if isinstance(base_node, SysPathChange):
+            yield from self._mutate_path_lookup(base_node)
+        elif isinstance(base_node, NotebookRunCall):
+            yield from self._register_notebook(base_node)
+        elif isinstance(base_node, ImportSource):
+            yield from self._register_import(base_node)
+        elif isinstance(base_node, MagicCommand):
+            yield from base_node.build_dependency_graph(self._context.parent)
+        else:
+            logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
+
+    def _register_import(self, base_node: ImportSource):
+        prefix = ""
+        if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
+            prefix = "." * base_node.node.level
+        name = base_node.name or ""
+        yield from self._context.parent.register_import(prefix + name)
+
+    def _register_notebook(self, base_node: NotebookRunCall):
+        has_unresolved, paths = base_node.get_notebook_paths(self._context.session_state)
+        if has_unresolved:
+            yield DependencyProblem(
+                'dependency-cannot-compute-value',
+                f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
+            )
+        for path in paths:
+            yield from self._context.parent.register_notebook(Path(path))
+
+    def _mutate_path_lookup(self, change: SysPathChange):
+        if isinstance(change, UnresolvedPath):
+            yield DependencyProblem(
+                'sys-path-cannot-compute-value',
+                f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
+            )
+            return
+        path = Path(change.path)
+        if not path.is_absolute():
+            path = self._context.path_lookup.cwd / path
+        if change.is_append:
+            self._context.path_lookup.append_path(path)
+            return
+        self._context.path_lookup.prepend_path(path)
+
+
+class MagicCommand(NodeBase):
+
+    @classmethod
+    def extract_from_tree(
+        cls, tree: Tree, problem_factory: Callable[[str, str, NodeNG], DependencyProblem]
+    ) -> tuple[list[MagicCommand], list[DependencyProblem]]:
+        problems: list[DependencyProblem] = []
+        commands: list[MagicCommand] = []
+        try:
+            nodes = tree.locate(Call, [("magic_command", Name)])
+            for command in cls._make_commands_for_magic_command_call_nodes(nodes):
+                commands.append(command)
+            return commands, problems
+        except Exception as e:  # pylint: disable=broad-except
+            problem = problem_factory('internal-error', f"While checking magic commands: {e}", tree.root)
+            problems.append(problem)
+            return [], problems
+
+    @classmethod
+    def _make_commands_for_magic_command_call_nodes(cls, nodes: list[Call]):
+        for node in nodes:
+            arg = node.args[0]
+            if isinstance(arg, Const):
+                yield MagicCommand(node, arg.value)
+
+    def __init__(self, node: NodeNG, command: bytes):
+        super().__init__(node)
+        self._command = command.decode()
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        if self._command.startswith("%pip") or self._command.startswith("!pip"):
+            cmd = PipMagic(self._command)
+            return cmd.build_dependency_graph(graph)
+        problem = DependencyProblem.from_node(
+            code='unsupported-magic-line', message=f"magic line '{self._command}' is not supported yet", node=self.node
+        )
+        return [problem]
+
+
+class PipMagic:
+
+    def __init__(self, code: str):
+        self._code = code
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        argv = self._split(self._code)
+        if len(argv) == 1:
+            return [DependencyProblem("library-install-failed", "Missing command after 'pip'")]
+        if argv[1] != "install":
+            return [DependencyProblem("library-install-failed", f"Unsupported 'pip' command: {argv[1]}")]
+        if len(argv) == 2:
+            return [DependencyProblem("library-install-failed", "Missing arguments after 'pip install'")]
+        return graph.register_library(*argv[2:])  # Skipping %pip install
+
+    @staticmethod
+    def _split(code) -> list[str]:
+        """Split pip cell code into multiple arguments
+
+        Note:
+            PipCell should be a pip command, i.e. single line possible spanning multilines escaped with backslashes.
+
+        Sources:
+            https://docs.databricks.com/en/libraries/notebooks-python-libraries.html#manage-libraries-with-pip-commands
+        """
+        match = re.search(r"(?<!\\)\n", code)
+        if match:
+            code = code[: match.start()]  # Remove code after non-escaped newline
+        code = code.replace("\\\n", " ")
+        lexer = shlex.split(code, posix=True)
+        return list(lexer)

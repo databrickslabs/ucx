@@ -1,5 +1,5 @@
 import pytest
-from astroid import Assign, Attribute, Call, Const, Expr  # type: ignore
+from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr  # type: ignore
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
@@ -254,3 +254,40 @@ value = values[name]
     values = list(tree.infer_values(state))
     strings = list(value.as_string() for value in values)
     assert strings == ["my-value"]
+
+
+def test_parses_incorrectly_indented_code():
+    source = """# DBTITLE 1,Get Sales Data for Analysis
+ sales = (
+   spark
+      .table('retail_sales')
+      .join( # limit data to CY 2021 and 2022
+        spark.table('date').select('dateKey','date','year').filter('year between 2021 and 2022'),
+        on='dateKey'
+        )
+      .join( # get product fields needed for analysis
+        spark.table('product').select('productKey','brandValue','packSizeValueUS'),
+        on='productKey'
+        )
+      .join( # get brand fields needed for analysis
+        spark.table('brand_name_mapping').select('brandValue','brandName'),
+        on='brandValue'
+        )
+  )
+"""
+    # ensure it would fail if not normalized
+    with pytest.raises(AstroidSyntaxError):
+        Tree.parse(source)
+    Tree.normalize_and_parse(source)
+    assert True
+
+
+def test_ignores_magic_marker_in_multiline_comment():
+    source = """message_unformatted = u\"""
+%s is only supported in Python %s and above.\"""
+name="name"
+version="version"
+formatted=message_unformatted % (name, version)
+"""
+    Tree.normalize_and_parse(source)
+    assert True

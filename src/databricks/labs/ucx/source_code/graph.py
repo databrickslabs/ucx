@@ -6,17 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 
-from astroid import ImportFrom, NodeNG  # type: ignore
-
-from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
-from databricks.labs.ucx.source_code.linters.imports import (
-    DbutilsLinter,
-    ImportSource,
-    NotebookRunCall,
-    SysPathChange,
-    UnresolvedPath,
+from astroid import (  # type: ignore
+    NodeNG,
 )
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase
+from databricks.labs.ucx.source_code.base import Advisory, CurrentSessionState
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.Logger(__name__)
@@ -138,7 +131,7 @@ class DependencyGraph:
     def all_paths(self) -> set[Path]:
         # TODO: remove this public method, as it'll throw false positives
         # for package imports, like certifi. a WorkflowTask is also a dependency,
-        # but it does not exist on a filesyste
+        # but it does not exist on a filesystem
         return {d.path for d in self.all_dependencies}
 
     def all_relative_names(self) -> set[str]:
@@ -167,82 +160,18 @@ class DependencyGraph:
                 return True
         return False
 
-    def build_graph_from_python_source(self, python_code: str) -> list[DependencyProblem]:
-        """Check python code for dependency-related problems.
-
-        Returns:
-            A list of dependency problems; position information is relative to the python code itself.
-        """
-        problems: list[DependencyProblem] = []
-        try:
-            tree = Tree.parse(python_code)
-        except Exception as e:  # pylint: disable=broad-except
-            problems.append(DependencyProblem('parse-error', f"Could not parse Python code: {e}"))
-            return problems
-        syspath_changes = SysPathChange.extract_from_tree(self._session_state, tree)
-        run_calls = DbutilsLinter.list_dbutils_notebook_run_calls(tree)
-        import_sources: list[ImportSource]
-        import_problems: list[DependencyProblem]
-        import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
-        problems.extend(import_problems)
-        nodes = syspath_changes + run_calls + import_sources
-        # need to execute things in intertwined sequence so concat and sort
-        for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
-            for problem in self._process_node(base_node):
-                # Astroid line numbers are 1-based.
-                problem = problem.replace(
-                    start_line=base_node.node.lineno - 1,
-                    start_col=base_node.node.col_offset,
-                    end_line=(base_node.node.end_lineno or 1) - 1,
-                    end_col=base_node.node.end_col_offset or 0,
-                )
-                problems.append(problem)
-        return problems
-
-    def _process_node(self, base_node: NodeBase):
-        if isinstance(base_node, SysPathChange):
-            yield from self._mutate_path_lookup(base_node)
-        elif isinstance(base_node, NotebookRunCall):
-            yield from self._register_notebook(base_node)
-        elif isinstance(base_node, ImportSource):
-            yield from self._register_import(base_node)
-        else:
-            logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
-
-    def _register_import(self, base_node: ImportSource):
-        prefix = ""
-        if isinstance(base_node.node, ImportFrom) and base_node.node.level is not None:
-            prefix = "." * base_node.node.level
-        name = base_node.name or ""
-        yield from self.register_import(prefix + name)
-
-    def _register_notebook(self, base_node: NotebookRunCall):
-        has_unresolved, paths = base_node.get_notebook_paths(self._session_state)
-        if has_unresolved:
-            yield DependencyProblem(
-                'dependency-cannot-compute',
-                f"Can't check dependency from {base_node.node.as_string()} because the expression cannot be computed",
-            )
-        for path in paths:
-            yield from self.register_notebook(Path(path))
-
-    def _mutate_path_lookup(self, change: SysPathChange):
-        if isinstance(change, UnresolvedPath):
-            yield DependencyProblem(
-                'sys-path-cannot-compute',
-                f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
-            )
-            return
-        path = Path(change.path)
-        if not path.is_absolute():
-            path = self._path_lookup.cwd / path
-        if change.is_append:
-            self._path_lookup.append_path(path)
-            return
-        self._path_lookup.prepend_path(path)
+    def new_graph_builder_context(self):
+        return GraphBuilderContext(parent=self, path_lookup=self._path_lookup, session_state=self._session_state)
 
     def __repr__(self):
         return f"<DependencyGraph {self.path}>"
+
+
+@dataclass
+class GraphBuilderContext:
+    parent: DependencyGraph
+    path_lookup: PathLookup
+    session_state: CurrentSessionState
 
 
 class Dependency(abc.ABC):
@@ -422,7 +351,7 @@ class DependencyProblem:
     code: str
     message: str
     source_path: Path = Path(MISSING_SOURCE_PATH)
-    # Lines and colums are both 0-based: the first line is line 0.
+    # Lines and columns are both 0-based: the first line is line 0.
     start_line: int = -1
     start_col: int = -1
     end_line: int = -1
@@ -470,7 +399,7 @@ class DependencyProblem:
             start_line=(node.lineno or 1) - 1,
             start_col=node.col_offset,
             end_line=(node.end_lineno or 1) - 1,
-            end_col=(node.end_col_offset),
+            end_col=(node.end_col_offset or 0),
         )
 
 
