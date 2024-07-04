@@ -221,6 +221,13 @@ class NotebookLinter:
                 )
             for path in paths:
                 notebook = self._load_source_from_path(Path(path))
+                if notebook is None:
+                    yield Advisory.from_node(
+                        'dependency-not-found',
+                        f"Can't locate dependency: {path}",
+                        base_node.node,
+                    )
+                    continue
                 yield from self._load_tree_from_notebook(notebook, False)
             return
 
