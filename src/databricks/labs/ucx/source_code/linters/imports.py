@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import TypeVar, cast
 
 from astroid import (  # type: ignore
@@ -19,6 +20,7 @@ from astroid import (  # type: ignore
 from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState, PythonLinter
 from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
+from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
 
@@ -162,16 +164,17 @@ class SysPathChange(NodeBase, abc.ABC):
         self._is_append = is_append
 
     @property
-    def node(self):
-        return self._node
-
-    @property
     def path(self):
         return self._path
 
-    @property
-    def is_append(self):
-        return self._is_append
+    def mutate_path_lookup(self, path_lookup: PathLookup):
+        path = Path(self._path)
+        if not path.is_absolute():
+            path = path_lookup.cwd / path
+        if self._is_append:
+            path_lookup.append_path(path)
+            return
+        path_lookup.prepend_path(path)
 
 
 class AbsolutePath(SysPathChange):

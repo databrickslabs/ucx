@@ -106,7 +106,7 @@ class Functional:
         session_state = CurrentSessionState()
         session_state.named_parameters = {"my-widget": "my-path.py"}
         ctx = LinterContext(migration_index, session_state)
-        linter = FileLinter(ctx, path_lookup, self.path)
+        linter = FileLinter(ctx, path_lookup, session_state, self.path)
         return linter.lint()
 
     def _expected_problems(self) -> Generator[Expectation, None, None]:

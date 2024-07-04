@@ -14,6 +14,7 @@ from pathlib import Path
 from databricks.labs.blueprint.entrypoint import get_logger
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
+from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.graph import DependencyProblem
 from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
@@ -150,8 +151,9 @@ class Whitelist:
             if module_ref.endswith(suffix):
                 module_ref = module_ref[: -len(suffix)]
         logger.info(f"Processing module: {module_ref}")
-        ctx = LinterContext(empty_index)
-        linter = FileLinter(ctx, PathLookup.from_sys_path(module_path.parent), module_path)
+        session_state = CurrentSessionState()
+        ctx = LinterContext(empty_index, session_state)
+        linter = FileLinter(ctx, PathLookup.from_sys_path(module_path.parent), session_state, module_path)
         known_problems = set()
         for problem in linter.lint():
             known_problems.add(KnownProblem(problem.code, problem.message))

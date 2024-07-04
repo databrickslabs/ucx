@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from astroid import AstroidSyntaxError, NodeNG  # type: ignore
+from astroid import AstroidSyntaxError, Module, NodeNG  # type: ignore
 
 from databricks.sdk.service import compute
 
@@ -191,23 +191,31 @@ class PythonSequentialLinter(Linter):
 
     def lint(self, code: str) -> Iterable[Advice]:
         try:
-            tree = Tree.normalize_and_parse(code)
-            if self._tree is None:
-                self._tree = tree
-            else:
-                tree = self._tree.append_statements(tree)
-            for linter in self._linters:
-                yield from linter.lint_tree(tree)
+            tree = self._parse_and_append(code)
+            yield from self.lint_tree(tree)
         except AstroidSyntaxError as e:
             yield Failure('syntax-error', str(e), 0, 0, 0, 0)
 
-    def process_child_cell(self, code: str):
-        try:
-            tree = Tree.normalize_and_parse(code)
-            if self._tree is None:
-                self._tree = tree
-            else:
-                self._tree.append_statements(tree)
-        except AstroidSyntaxError as e:
-            # error already reported when linting enclosing notebook
-            logger.warning(f"Failed to parse Python cell: {code}", exc_info=e)
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
+        for linter in self._linters:
+            yield from linter.lint_tree(tree)
+
+    def _parse_and_append(self, code: str) -> Tree:
+        tree = Tree.normalize_and_parse(code)
+        self.append_tree(tree)
+        return tree
+
+    def append_tree(self, tree):
+        if self._tree is None:
+            self._tree = Tree(Module("root"))
+        self._tree.append_tree(tree)
+
+    def append_nodes(self, nodes: list[NodeNG]):
+        if self._tree is None:
+            self._tree = Tree(Module("root"))
+        self._tree.append_nodes(nodes)
+
+    def append_globals(self, globs: dict):
+        if self._tree is None:
+            self._tree = Tree(Module("root"))
+        self._tree.append_globals(globs)

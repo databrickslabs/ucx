@@ -411,7 +411,7 @@ class GraphBuilder:
         magic_commands, command_problems = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(command_problems)
         nodes = syspath_changes + run_calls + import_sources + magic_commands
-        # need to execute things in intertwined sequence so concat and sort
+        # need to execute things in intertwined sequence so concat and sort them
         for base_node in sorted(nodes, key=lambda node: (node.node.lineno, node.node.col_offset)):
             for problem in self._process_node(base_node):
                 # Astroid line numbers are 1-based.
@@ -460,13 +460,7 @@ class GraphBuilder:
                 f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
             )
             return
-        path = Path(change.path)
-        if not path.is_absolute():
-            path = self._context.path_lookup.cwd / path
-        if change.is_append:
-            self._context.path_lookup.append_path(path)
-            return
-        self._context.path_lookup.prepend_path(path)
+        change.mutate_path_lookup(self._context.path_lookup)
 
 
 class MagicCommand(NodeBase):

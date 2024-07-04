@@ -141,7 +141,7 @@ def test_appends_statements():
     tree_1 = Tree.normalize_and_parse(source_1)
     source_2 = 'b = f"Hello {a}!"'
     tree_2 = Tree.normalize_and_parse(source_2)
-    tree_3 = tree_1.append_statements(tree_2)
+    tree_3 = tree_1.append_tree(tree_2)
     nodes = tree_3.locate(Assign, [])
     tree = Tree(nodes[0].value)  # tree_3 only contains tree_2 statements
     values = list(InferredValue.infer_from_node(tree.node))
