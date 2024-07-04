@@ -110,9 +110,11 @@ class NotebookLinter:
         return cls(ctx, path_lookup, notebook)
 
     def lint(self) -> Iterable[Advice]:
+        yield from self._lint_python()
+        yield from self._lint_other()
+
+    def _lint_other(self) -> Iterable[Advice]:
         for cell in self._notebook.cells:
-            if isinstance(cell, RunCell):
-                self._load_source_from_run_cell(cell)
             if not self._context.is_supported(cell.language.language):
                 continue
             linter = self._linter(cell.language.language)
@@ -121,6 +123,16 @@ class NotebookLinter:
                     start_line=advice.start_line + cell.original_offset,
                     end_line=advice.end_line + cell.original_offset,
                 )
+
+    def _lint_python(self) -> Iterable[Advice]:
+        for cell in self._notebook.cells:
+            if isinstance(cell, RunCell):
+                self._load_source_from_run_cell(cell)
+                continue
+            if isinstance(cell, PythonCell):
+                self._load_source_from_python_cell(cell)
+                yield
+                continue
 
     def _load_source_from_run_cell(self, run_cell: RunCell):
         path, _, _ = run_cell.read_notebook_path()
@@ -131,7 +143,7 @@ class NotebookLinter:
             return  # already reported during dependency building
         # TODO deal with workspace notebooks
         language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
-        # we only support Python for now
+        # we only support Python notebooks for now
         if language is not Language.PYTHON:
             return
         source = resolved.read_text(_guess_encoding(resolved))
