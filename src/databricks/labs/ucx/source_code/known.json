@@ -1437,20 +1437,7 @@
     "dbldatagen.function_builder": [],
     "dbldatagen.html_utils": [],
     "dbldatagen.nrange": [],
-    "dbldatagen.schema_parser": [
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'sparkSession.sql(f'create temporary table {table_name}{table_body}using csv')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'sparkSession.sql(f'drop table {table_name}')' because its value cannot be computed"
-      },
-      {
-        "code": "table-migrate",
-        "message": "Can't migrate table_name argument in 'sparkSession.sql(f'select * from {table_name}')' because its value cannot be computed"
-      }
-    ],
+    "dbldatagen.schema_parser": [],
     "dbldatagen.spark_singleton": [],
     "dbldatagen.text_generator_plugins": [],
     "dbldatagen.text_generators": [],
