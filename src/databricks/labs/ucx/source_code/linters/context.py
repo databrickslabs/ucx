@@ -1,3 +1,5 @@
+from typing import cast
+
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
@@ -45,9 +47,9 @@ class LinterContext:
         ]
         sql_linters.append(FromDbfsFolder())
 
-        self._linters = {
-            Language.PYTHON: PythonSequentialLinter(python_linters),
-            Language.SQL: SequentialLinter(sql_linters),
+        self._linters: dict[Language, list[Linter] | list[PythonLinter]] = {
+            Language.PYTHON: python_linters,
+            Language.SQL: sql_linters,
         }
         self._fixers: dict[Language, list[Fixer]] = {
             Language.PYTHON: python_fixers,
@@ -60,7 +62,9 @@ class LinterContext:
     def linter(self, language: Language) -> Linter:
         if language not in self._linters:
             raise ValueError(f"Unsupported language: {language}")
-        return self._linters[language]
+        if language is Language.PYTHON:
+            return PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]))
+        return SequentialLinter(cast(list[Linter], self._linters[language]))
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
         if language not in self._fixers:
