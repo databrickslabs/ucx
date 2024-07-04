@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-import abc
 import fnmatch
-import locale
 import logging
 import os
-import pathlib
 import posixpath
 import re
-import sys
-from functools import cached_property
 
 from pathlib import Path, PurePath
 from typing import NoReturn
-from urllib.parse import quote_from_bytes as urlquote_from_bytes
-from io import BytesIO, StringIO
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, DatabricksError
-from databricks.sdk.service.workspace import ObjectInfo, ObjectType, ExportFormat, ImportFormat, Language
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +46,12 @@ class DbfsPath(Path):
         # For python <=3.11 this supersedes _parts
         # For python 3.12+ this supersedes _raw_paths
         '_path_parts',
-
         # The cached str() representation of the instance. Consistent with the superclass attribute for Python 3.10-3.13b.
         '_str',
         # The cached hash() value for the instance. Consistent with the superclass attribute for Python 3.10-3.13b.
         '_hash',
-
         # The workspace client that we use to perform I/O operations on the path.
-        '_ws'
+        '_ws',
     )
 
     # Path semantics are posix-like.
@@ -77,7 +66,7 @@ class DbfsPath(Path):
         return object.__new__(cls)
 
     def __init__(self, *args, ws: WorkspaceClient) -> None:
-        raw_paths = []
+        raw_paths: list[str] = []
         for arg in args:
             if isinstance(arg, PurePath):
                 raw_paths.extend(arg.parts)
@@ -87,8 +76,10 @@ class DbfsPath(Path):
                 except TypeError:
                     path = arg
                 if not isinstance(path, str):
-                    msg = (f"argument should be a str or an os.PathLib object where __fspath__ returns a str, "
-                           f"not {type(path).__name__!r}")
+                    msg = (
+                        f"argument should be a str or an os.PathLib object where __fspath__ returns a str, "
+                        f"not {type(path).__name__!r}"
+                    )
                     raise TypeError(msg)
                 raw_paths.append(path)
 
@@ -101,7 +92,7 @@ class DbfsPath(Path):
         self._ws = ws
 
     @classmethod
-    def _parse_and_normalize(cls, parts: list[str]) -> (str, list[str]):
+    def _parse_and_normalize(cls, parts: list[str]) -> tuple[str, tuple[str, ...]]:
         """Parse and normalize a list of path components.
 
         Args:
@@ -128,7 +119,7 @@ class DbfsPath(Path):
         return root, parsed
 
     @classmethod
-    def _splitroot(cls, part: str, sep: str) -> tuple[str, tuple[str, ...]]:
+    def _splitroot(cls, part: str, sep: str) -> tuple[str, str]:
         # Based on the upstream implementation, with the '//'-specific bit elided because we don't need to
         # bother with Posix semantics.
         if part and part[0] == sep:
@@ -181,7 +172,7 @@ class DbfsPath(Path):
             self._hash = hash(str(self))
             return self._hash
 
-    def _parts(self) -> tuple[str]:
+    def _parts(self) -> tuple[str, ...]:
         """Return a tuple that has the same natural ordering as paths of this type."""
         return (self._root, *self._path_parts)
 
@@ -232,7 +223,7 @@ class DbfsPath(Path):
 
     @property
     def parts(self):
-        if (self.drive or self.root):
+        if self.drive or self.root:
             parts = (self.drive + self.root, *self._path_parts)
         else:
             parts = self._path_parts
@@ -283,7 +274,7 @@ class DbfsPath(Path):
     def _stack(self):
         return self.anchor, list(reversed(self._path_parts))
 
-    def relative_to(self, other, *more_other, walk_up = False):
+    def relative_to(self, other, *more_other, walk_up=False):
         other = self.with_segments(other, *more_other)
         anchor0, parts0 = self._stack
         anchor1, parts1 = other._stack
@@ -362,8 +353,7 @@ class DbfsPath(Path):
         if not pattern_parts:
             raise ValueError("empty pattern")
         # Impossible matches.
-        if (len(path_parts) < len(pattern_parts) or
-                len(path_parts) > len(pattern_parts) and path_pattern.anchor):
+        if len(path_parts) < len(pattern_parts) or len(path_parts) > len(pattern_parts) and path_pattern.anchor:
             return False
         # Check each part.
         for path_part, pattern_part in zip(reversed(path_parts), reversed(pattern_parts)):

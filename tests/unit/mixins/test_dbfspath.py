@@ -17,7 +17,8 @@ def test_empty_init() -> None:
 
 
 @pytest.mark.parametrize(
-    ("args", "expected"), [
+    ("args", "expected"),
+    [
         # Some absolute paths.
         (["/foo/bar"], ("/", ("/", "foo", "bar"))),
         (["/", "foo", "bar"], ("/", ("/", "foo", "bar"))),
@@ -38,7 +39,7 @@ def test_empty_init() -> None:
         # Intermediate '.' are supposed to be dropped during normalization.
         (["/foo/./bar"], ("/", ("/", "foo", "bar"))),
     ],
-    ids=lambda param: f"DbfsPath({param!r})" if isinstance(param, list) else repr(param)
+    ids=lambda param: f"DbfsPath({param!r})" if isinstance(param, list) else repr(param),
 )
 def test_init(args: list[str | PurePath], expected: tuple[str, list[str]]) -> None:
     """Ensure that initialization with various combinations of segments works as expected."""
@@ -55,7 +56,7 @@ def test_init_error() -> None:
     """Ensure that we detect initialisation with non-string or path-like path components."""
     ws = mock_workspace_client()
 
-    expected_msg = f"argument should be a str or an os.PathLib object where __fspath__ returns a str, not 'int'"
+    expected_msg = "argument should be a str or an os.PathLib object where __fspath__ returns a str, not 'int'"
     with pytest.raises(TypeError, match=expected_msg):
         DbfsPath("foo", "bar", 12, ws=ws)
 
@@ -81,10 +82,11 @@ def test_hash() -> None:
 
 
 @pytest.mark.parametrize(
-    "increasing_paths", [
+    "increasing_paths",
+    [
         ("/foo", "/foo/bar", "/foo/baz"),
         ("foo", "foo/bar", "foo/baz"),
-    ]
+    ],
 )
 def test_comparison(increasing_paths: tuple[str | list[str], str | list[str], str | list[str]]) -> None:
     """Test that comparing paths works as expected."""
@@ -205,19 +207,24 @@ def test_with_name() -> None:
     """Test that the name in a path can be replaced."""
     ws = mock_workspace_client()
 
-    assert DbfsPath("/path/to/notebook.py", ws=ws).with_name("requirements.txt") == DbfsPath("/path/to/requirements.txt", ws=ws)
-    assert DbfsPath("relative/notebook.py", ws=ws).with_name("requirements.txt") == DbfsPath("relative/requirements.txt", ws=ws)
+    assert DbfsPath("/path/to/notebook.py", ws=ws).with_name("requirements.txt") == DbfsPath(
+        "/path/to/requirements.txt", ws=ws
+    )
+    assert DbfsPath("relative/notebook.py", ws=ws).with_name("requirements.txt") == DbfsPath(
+        "relative/requirements.txt", ws=ws
+    )
 
 
 @pytest.mark.parametrize(
-    ("path", "name"), [
+    ("path", "name"),
+    [
         # Invalid names.
         ("/a/path", "invalid/replacement"),
         ("/a/path", ""),
         ("/a/path", "."),
         # Invalid paths for using with_name()
         ("/", "file.txt"),
-        ("", "file.txt")
+        ("", "file.txt"),
     ],
 )
 def test_with_name_errors(path, name) -> None:
@@ -263,21 +270,22 @@ def test_relative_to() -> None:
 
     # Check some errors.
     with pytest.raises(ValueError, match="different anchors"):
-      _ = DbfsPath("/home/bob", ws=ws).relative_to("home")
+        _ = DbfsPath("/home/bob", ws=ws).relative_to("home")
     with pytest.raises(ValueError, match="not in the subpath"):
-      _ = DbfsPath("/home/bob", ws=ws).relative_to("/usr")
+        _ = DbfsPath("/home/bob", ws=ws).relative_to("/usr")
     with pytest.raises(ValueError, match="cannot be walked"):
-      _ = DbfsPath("/home/bob", ws=ws).relative_to("/home/../usr", walk_up=True)
+        _ = DbfsPath("/home/bob", ws=ws).relative_to("/home/../usr", walk_up=True)
 
 
 @pytest.mark.parametrize(
-    ("path", "parent"), [
+    ("path", "parent"),
+    [
         ("/foo/bar/baz", "/foo/bar"),
         ("/", "/"),
         (".", "."),
         ("foo/bar", "foo"),
-        ("foo", ".")
-    ]
+        ("foo", "."),
+    ],
 )
 def test_parent(path, parent) -> None:
     """Test that the parent of a path is properly calculated."""
@@ -287,13 +295,14 @@ def test_parent(path, parent) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path", "parents"), [
+    ("path", "parents"),
+    [
         ("/foo/bar/baz", ("/foo/bar", "/foo", "/")),
         ("/", ()),
         (".", ()),
         ("foo/bar", ("foo", ".")),
         ("foo", (".",)),
-    ]
+    ],
 )
 def test_parents(path, parents) -> None:
     """Test that each of the parents of a path is returned."""
