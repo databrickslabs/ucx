@@ -15,16 +15,16 @@ Workspace Group Migration
 * [Troubleshooting](#troubleshooting)
 <!-- TOC -->
 
-This feature introduces the ability to migrate groups from workspace level to account level in 
+This feature introduces the ability to migrate groups from workspace level to account level in
 the [group migration workflow](../README.md#group-migration-workflow). It helps you to upgrade all Databricks workspace assets:
-Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools, 
+Legacy Table ACLs, Entitlements, AWS instance profiles, Clusters, Cluster policies, Instance Pools,
 Databricks SQL warehouses, Delta Live Tables, Jobs, MLflow experiments, MLflow registry, SQL Dashboards & Queries,
 SQL Alerts, Token and Password usage permissions that are set on the workspace level, Secret scopes, Notebooks,
-Directories, Repos, and Files. 
+Directories, Repos, and Files.
 
-It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions. 
-The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration. 
-The output of each task is stored in Delta tables in the `$inventory_database` schema. 
+It ensures that all the necessary groups are available in the workspace with the correct permissions, and removes any unnecessary groups and permissions.
+The tasks in the group migration workflow depend on the output of the assessment workflow and can be executed in sequence to ensure a successful migration.
+The output of each task is stored in Delta tables in the `$inventory_database` schema.
 
 The group migration workflow can be executed multiple times to ensure that all the groups are migrated successfully and that all the necessary permissions are assigned.
 
@@ -39,45 +39,45 @@ The group migration workflow can be executed multiple times to ensure that all t
 
 # Design
 
-`MigratedGroup` class represents a group that has been migrated from one name to another and stores information about 
-the original and new names, as well as the group's members, external ID, and roles. The `MigrationState` class holds 
-the state of the migration process and provides methods for getting the target principal and temporary name for a given 
+`MigratedGroup` class represents a group that has been migrated from one name to another and stores information about
+the original and new names, as well as the group's members, external ID, and roles. The `MigrationState` class holds
+the state of the migration process and provides methods for getting the target principal and temporary name for a given
 group name.
 
 [[back to top](#workspace-group-migration)]
 
 ## Group Manager
 
-The `GroupManager` class is a `CrawlerBase` subclass that manages groups in a Databricks workspace. It provides methods 
-for renaming groups, reflecting account groups on the workspace, deleting original workspace groups, and validating 
-group membership. The class also provides methods for listing workspace and account groups, getting group details, and 
+The `GroupManager` class is a `CrawlerBase` subclass that manages groups in a Databricks workspace. It provides methods
+for renaming groups, reflecting account groups on the workspace, deleting original workspace groups, and validating
+group membership. The class also provides methods for listing workspace and account groups, getting group details, and
 deleting groups.
 
-The `GroupMigrationStrategy` abstract base class defines the interface for a strategy that generates a list 
-of `MigratedGroup` objects based on a mapping between workspace and account groups. 
-The `MatchingNamesStrategy`, `MatchByExternalIdStrategy`, `RegexSubStrategy`, and `RegexMatchStrategy` classes are 
+The `GroupMigrationStrategy` abstract base class defines the interface for a strategy that generates a list
+of `MigratedGroup` objects based on a mapping between workspace and account groups.
+The `MatchingNamesStrategy`, `MatchByExternalIdStrategy`, `RegexSubStrategy`, and `RegexMatchStrategy` classes are
 concrete implementations of this interface. See [group name conflicts](group_name_conflict.md) for more details.
 
-The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](../README.md#installation). 
-It prompts the user to enter information about the group migration strategy, such as the renamed group prefix, regular expressions 
-for matching and substitution, and a list of groups to migrate. The class also provides methods for validating user input 
+The `ConfigureGroups` class provides a command-line interface for configuring the group migration process during [installation](../README.md#installation).
+It prompts the user to enter information about the group migration strategy, such as the renamed group prefix, regular expressions
+for matching and substitution, and a list of groups to migrate. The class also provides methods for validating user input
 and setting class variables based on the user's responses.
 
 [[back to top](#workspace-group-migration)]
 
 ## Permission Manager
 
-It enables to crawl, save, and apply permissions for [clusters](#generic-permissions), 
-[tables and UDFs (User-Defined Functions)](#legacy-table-access-controls), [secret scopes](#secret-scope-permissions), 
+It enables to crawl, save, and apply permissions for [clusters](#generic-permissions),
+[tables and UDFs (User-Defined Functions)](#legacy-table-access-controls), [secret scopes](#secret-scope-permissions),
 [entitlements](#entitlements-and-roles), and [dashboards](#dashboard-permissions).
 
-To use the module, you can create a `PermissionManager` instance by calling the `factory` method, which sets up 
-the necessary [`AclSupport` objects](#acl-support) for different types of objects in the workspace. Once the instance 
-is created, you can call the `inventorize_permissions` method to crawl and save the permissions for all objects to 
+To use the module, you can create a `PermissionManager` instance by calling the `factory` method, which sets up
+the necessary [`AclSupport` objects](#acl-support) for different types of objects in the workspace. Once the instance
+is created, you can call the `inventorize_permissions` method to crawl and save the permissions for all objects to
 the inventory database in the `permissions` table.
 
-The `apply_group_permissions` method allows you to apply the permissions to a list of account groups, while 
-the [`verify_group_permissions` method](../README.md#validate-groups-membership-command) verifies that the permissions are valid. 
+The `apply_group_permissions` method allows you to apply the permissions to a list of account groups, while
+the [`verify_group_permissions` method](../README.md#validate-groups-membership-command) verifies that the permissions are valid.
 
 [[back to top](#workspace-group-migration)]
 
@@ -90,15 +90,15 @@ The `AclSupport` objects define how to crawl, save, and apply permissions for sp
 * `get_verify_task`: A method that returns a callable that verifies that the permissions for a given `Permissions` object are applied correctly to the destination group. This method can be used to ensure that permissions are applied as expected, helping to improve the reliability and security of your Databricks workspace.
 * `object_types`: An abstract method that returns a set of strings representing the object types that the `AclSupport` instance supports. This method should be implemented to provide the necessary information about the object types supported by the `AclSupport` class.
 
-The `Permissions` dataclass is used to represent the permissions for a specific object type and ID. The dataclass includes a `raw` attribute 
+The `Permissions` dataclass is used to represent the permissions for a specific object type and ID. The dataclass includes a `raw` attribute
 that contains the raw permission data as a string, providing a convenient way to work with the underlying permission data.
 
 [[back to top](#workspace-group-migration)]
 
 ### Generic Permissions
 
-The `GenericPermissionsSupport` class is a concrete implementation of the [`AclSupport` interface](#acl-support) for 
-migrating permissions on various objects in a Databricks workspace. It is designed to be flexible and support almost any 
+The `GenericPermissionsSupport` class is a concrete implementation of the [`AclSupport` interface](#acl-support) for
+migrating permissions on various objects in a Databricks workspace. It is designed to be flexible and support almost any
 object type in the workspace:
 
 - clusters
@@ -116,18 +116,18 @@ object type in the workspace:
 - notebooks
 - workspace folders
 
-It takes in an instance of the `WorkspaceClient` class, a list of `Listing` objects, and a `verify_timeout` parameter in 
-its constructor. The `Listing` objects are responsible for listing the objects in the workspace, and 
+It takes in an instance of the `WorkspaceClient` class, a list of `Listing` objects, and a `verify_timeout` parameter in
+its constructor. The `Listing` objects are responsible for listing the objects in the workspace, and
 the `GenericPermissionsSupport` class uses these listings to crawl the ACL permissions for each object.
 
-The `_apply_grant` method applies the ACL permission to the target principal in the database, and the `_verify` method 
-checks if the ACL permission in the `Grant` object matches the ACL permission for that object and principal in the database. 
-If the ACL permission does not match, the method raises a `ValueError` with an error message. The `get_verify_task` method 
-takes in a `Permissions` object and returns a callable object that calls the `_verify` method with the object type, 
+The `_apply_grant` method applies the ACL permission to the target principal in the database, and the `_verify` method
+checks if the ACL permission in the `Grant` object matches the ACL permission for that object and principal in the database.
+If the ACL permission does not match, the method raises a `ValueError` with an error message. The `get_verify_task` method
+takes in a `Permissions` object and returns a callable object that calls the `_verify` method with the object type,
 object ID, and `Grant` object from the `Permissions` object.
 
-he `_safe_get_permissions` and `_safe_updatepermissions` methods are used to safely get and update the permissions for 
-a given object type and ID, respectively. These methods handle exceptions that may occur during the API calls and log 
+he `_safe_get_permissions` and `_safe_updatepermissions` methods are used to safely get and update the permissions for
+a given object type and ID, respectively. These methods handle exceptions that may occur during the API calls and log
 appropriate warning messages.
 
 [[back to top](#workspace-group-migration)]
@@ -140,8 +140,8 @@ Reflected in [RedashPermissionsSupport](../src/databricks/labs/ucx/workspace_acc
 
 ### Entitlements and Roles
 
-The `ScimSupport` is [`AclSupport`](#acl-support) that creates a snapshot of all the groups in the workspace, including their display name, id, meta, roles, and entitlements. 
-The `_is_item_relevant` method checks if a permission item is relevant to the current migration state. The `get_crawler_tasks` method returns an iterator of partial functions 
+The `ScimSupport` is [`AclSupport`](#acl-support) that creates a snapshot of all the groups in the workspace, including their display name, id, meta, roles, and entitlements.
+The `_is_item_relevant` method checks if a permission item is relevant to the current migration state. The `get_crawler_tasks` method returns an iterator of partial functions
 for crawling the permissions of each group in the snapshot. It checks if the group has any roles or entitlements and returns a partial function to crawl the corresponding property.
 
 See [examples](../tests/integration/workspace_access/test_scim.py) for more details on how to use it as a library.
@@ -150,9 +150,9 @@ See [examples](../tests/integration/workspace_access/test_scim.py) for more deta
 
 ### Secret Scope Permissions
 
-`SecretScopesSupport` is a concrete implementation of the [`AclSupport` interface](#acl-support) for crawling ACLs of 
-all secret scopes, applying and verifying ACLs, and checking if a `Permissions` object is relevant to the current 
-migration state. It simplifies the process of managing permissions on secret scopes by checking if the ACLs have been 
+`SecretScopesSupport` is a concrete implementation of the [`AclSupport` interface](#acl-support) for crawling ACLs of
+all secret scopes, applying and verifying ACLs, and checking if a `Permissions` object is relevant to the current
+migration state. It simplifies the process of managing permissions on secret scopes by checking if the ACLs have been
 applied correctly, and if not, automatically reapplying them.
 
 [[back to top](#workspace-group-migration)]
@@ -160,11 +160,11 @@ applied correctly, and if not, automatically reapplying them.
 ### Legacy Table Access Controls
 
 The `TableAclSupport` class is initialized with an instance of `GrantsCrawler` and `SqlBackend` classes, along with a `verify_timeout` parameter.
-The class offers methods for crawling table ACL permissions, applying and verifying ACL permissions, and checking if a `Permissions` object is relevant to the current migration state. 
-The `get_crawler_tasks` method returns an iterator of callable objects, each of which returns a `Permissions` object for a specific table ACL permission. 
+The class offers methods for crawling table ACL permissions, applying and verifying ACL permissions, and checking if a `Permissions` object is relevant to the current migration state.
+The `get_crawler_tasks` method returns an iterator of callable objects, each of which returns a `Permissions` object for a specific table ACL permission.
 The `_from_reduced` method creates a `Grant` object for each set of folded actions, and the `get_apply_task` method applies the ACL permission in the `Permissions` object to the target principal in the `MigrationState` object.
-Furthermore, the `_apply_grant` method applies the ACL permission to the target principal in the database, while the `_verify` method checks if the ACL permission in 
-the `Grant` object matches the ACL permission for that object and principal in the database. The `get_verify_task` method calls the `_verify` method with the object type, 
+Furthermore, the `_apply_grant` method applies the ACL permission to the target principal in the database, while the `_verify` method checks if the ACL permission in
+the `Grant` object matches the ACL permission for that object and principal in the database. The `get_verify_task` method calls the `_verify` method with the object type,
 object ID, and `Grant` object from the `Permissions` object.
 
 [[back to top](#workspace-group-migration)]
