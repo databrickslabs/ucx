@@ -3,7 +3,7 @@ contact_links:
   - name: General Databricks questions
     url: https://help.databricks.com/
     about: Issues related to Databricks and not related to UCX
-  
+
   - name: UCX Documentation
     url: https://github.com/databrickslabs/ucx/tree/main/docs
     about: Documentation about UCX
