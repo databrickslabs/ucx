@@ -37,14 +37,14 @@ class DatabricksTableMetadataRetriever(TableMetadataRetriever):
             return f"DESCRIBE TABLE {entity.fqn_escaped}"
 
         query = f"""
-            SELECT 
-                LOWER(column_name) AS col_name, 
+            SELECT
+                LOWER(column_name) AS col_name,
                 full_data_type AS data_type
-            FROM 
+            FROM
                 {entity.catalog_escaped}.information_schema.columns
             WHERE
-                LOWER(table_catalog)='{entity.catalog}' AND 
-                LOWER(table_schema)='{entity.schema}' AND 
+                LOWER(table_catalog)='{entity.catalog}' AND
+                LOWER(table_schema)='{entity.schema}' AND
                 LOWER(table_name) ='{entity.table}'
             ORDER BY col_name"""
 
