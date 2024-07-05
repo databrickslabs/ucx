@@ -8,6 +8,7 @@ from importlib import metadata
 from pathlib import Path
 
 from databricks.labs.blueprint.parallel import ManyError, Threads
+from databricks.labs.blueprint.paths import WorkspacePath
 from databricks.labs.lsql.backends import SqlBackend
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
@@ -16,7 +17,6 @@ from databricks.sdk.service.workspace import ExportFormat
 
 from databricks.labs.ucx.assessment.crawlers import runtime_version_tuple
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.mixins.wspath import WorkspacePath
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.linters.files import LocalFile
 from databricks.labs.ucx.source_code.graph import (
