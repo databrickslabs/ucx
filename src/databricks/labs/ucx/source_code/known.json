@@ -5653,6 +5653,17 @@
     "lifelines.utils.safe_exp": [],
     "lifelines.version": []
   },
+  "lightgbm": {
+    "lightgbm": [],
+    "lightgbm.basic": [],
+    "lightgbm.callback": [],
+    "lightgbm.compat": [],
+    "lightgbm.dask": [],
+    "lightgbm.engine": [],
+    "lightgbm.libpath": [],
+    "lightgbm.plotting": [],
+    "lightgbm.sklearn": []
+  },
   "lxml": {
     "lxml": []
   },
