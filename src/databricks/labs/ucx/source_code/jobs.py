@@ -298,8 +298,8 @@ class WorkflowLinter:
             tasks.append(functools.partial(self.lint_job, job.job_id))
         logger.info(f"Running {tasks} linting tasks in parallel...")
         job_problems, errors = Threads.gather('linting workflows', tasks)
-        logger.info(f"Saving {len(job_problems)} linting problems...")
         job_problems_flattened = list(itertools.chain(*job_problems))
+        logger.info(f"Saving {len(job_problems_flattened)} linting problems...")
         sql_backend.save_table(
             f'{inventory_database}.workflow_problems',
             job_problems_flattened,

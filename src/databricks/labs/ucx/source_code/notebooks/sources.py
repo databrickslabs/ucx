@@ -122,6 +122,11 @@ class NotebookLinter:
                     end_line=advice.end_line + cell.original_offset,
                 )
 
+    def _linter(self, language: Language) -> Linter:
+        if language is Language.PYTHON:
+            return self._python_linter
+        return self._context.linter(language)
+
     def _load_source_from_run_cell(self, run_cell: RunCell):
         path, _, _ = run_cell.read_notebook_path()
         if path is None:
@@ -143,11 +148,6 @@ class NotebookLinter:
             if not isinstance(cell, PythonCell):
                 continue
             self._python_linter.process_child_cell(cell.original_code)
-
-    def _linter(self, language: Language) -> Linter:
-        if language is Language.PYTHON:
-            return self._python_linter
-        return self._context.linter(language)
 
     @staticmethod
     def name() -> str:
