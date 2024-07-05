@@ -8,6 +8,7 @@ from ast import parse as parse_python
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
+from typing import TypeVar
 
 from astroid import Call, Const, ImportFrom, Name, NodeNG  # type: ignore
 from sqlglot import parse as parse_sql, ParseError as SQLParseError
@@ -529,7 +530,7 @@ class RunCommand(MagicCommand):
 
     @property
     def notebook_path(self) -> Path | None:
-        for quote in ['"', "'"]:
+        for quote in ('"', "'"):
             start = self._code.find(quote)
             if start >= 0:
                 end = self._code.find(quote, start + 1)

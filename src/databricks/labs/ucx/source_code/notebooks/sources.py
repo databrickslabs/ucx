@@ -270,7 +270,9 @@ class NotebookLinter:
         if notebook is not None:
             yield from self._load_tree_from_notebook(notebook, False)
 
-    def _load_source_from_path(self, path: Path):
+    def _load_source_from_path(self, path: Path | None):
+        if path is None:
+            return None  # already reported during dependency building
         resolved = self._path_lookup.resolve(path)
         if resolved is None:
             return None  # already reported during dependency building
