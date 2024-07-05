@@ -16,8 +16,9 @@ from astroid import (  # type: ignore
     NodeNG,
 )
 
-from databricks.labs.ucx.source_code.base import Linter, Advice, Advisory, CurrentSessionState
-from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor, InferredValue
+from databricks.labs.ucx.source_code.base import Advice, Advisory, CurrentSessionState, PythonLinter
+from databricks.labs.ucx.source_code.linters.python_ast import Tree, NodeBase, TreeVisitor
+from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ class NotebookRunCall(NodeBase):
         """
         arg = DbutilsLinter.get_dbutils_notebook_run_path_arg(self.node)
         try:
-            all_inferred = Tree(arg).infer_values(session_state)
+            all_inferred = InferredValue.infer_from_node(arg, session_state)
             return self._get_notebook_paths(all_inferred)
         except InferenceError:
             logger.debug(f"Can't infer value(s) of {arg.as_string()}")
@@ -110,13 +111,12 @@ class NotebookRunCall(NodeBase):
         return has_unresolved, paths
 
 
-class DbutilsLinter(Linter):
+class DbutilsLinter(PythonLinter):
 
     def __init__(self, session_state: CurrentSessionState):
         self._session_state = session_state
 
-    def lint(self, code: str) -> Iterable[Advice]:
-        tree = Tree.normalize_and_parse(code)
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         nodes = self.list_dbutils_notebook_run_calls(tree)
         for node in nodes:
             yield from self._raise_advice_if_unresolved(node.node, self._session_state)
@@ -229,7 +229,7 @@ class SysPathChangesVisitor(TreeVisitor):
             relative = True
             changed = changed.args[0]
         try:
-            for inferred in Tree(changed).infer_values(self._session_state):
+            for inferred in InferredValue.infer_from_node(changed, self._session_state):
                 self._visit_inferred(changed, inferred, relative, is_append)
         except InferenceError:
             self.sys_path_changes.append(UnresolvedPath(changed, changed.as_string(), is_append))

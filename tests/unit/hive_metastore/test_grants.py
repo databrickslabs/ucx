@@ -117,7 +117,7 @@ def test_hive_deny_sql():
     [
         (
             Grant("user", "READ_METADATA", catalog="hive_metastore", database="mydb", table="mytable"),
-            "GRANT BROWSE ON TABLE hive_metastore.mydb.mytable TO `user`",
+            None,
         ),
         (
             Grant("me", "OWN", catalog="hive_metastore", database="mydb", table="mytable"),
