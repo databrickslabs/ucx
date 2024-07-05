@@ -97,7 +97,7 @@ logs
 ```
 
 ### Reading log files
-Open the downloaded log files in a text editor or viewer. 
+Open the downloaded log files in a text editor or viewer.
 
 VSCode is an excellent example as it will allow you to search the entire folder for `ERROR`
 
@@ -132,7 +132,7 @@ If Azure CLI has already been installed and authenticated, but you see the follo
 
 `14:50:33 ERROR [d.labs.ucx] In order to obtain AAD token, Please run azure cli to authenticate.`
 
-Resolve this in macOS by running the command with an explicit auth type set: `DATABRICKS_AUTH_TYPE=azure-cli databricks labs ucx ...`. 
+Resolve this in macOS by running the command with an explicit auth type set: `DATABRICKS_AUTH_TYPE=azure-cli databricks labs ucx ...`.
 To resolve this issue in Windows, proceed with the following steps:
 
 1. Open `%userprofile%` (the path like `C:\Users\<username>`)
@@ -143,7 +143,7 @@ To resolve this issue in Windows, proceed with the following steps:
 ### Resolving common errors on UCX install
 
 #### Error on installing the ucx inventory database
-Your platform administrators may have implemented policies in one manner or another to prevent arbitrary database creation. 
+Your platform administrators may have implemented policies in one manner or another to prevent arbitrary database creation.
 
 -  You may be prohibited from creating a database with a default location to `dbfs:/`.
 -  You may be required to create a database on an external Hive Metastore (HMS) and need compute configured to do so.

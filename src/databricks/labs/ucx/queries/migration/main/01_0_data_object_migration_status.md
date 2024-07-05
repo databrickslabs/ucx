@@ -2,11 +2,11 @@
 
 ## Table migration status
 
-The two widgets on the right show high-level summary of the table migration. The first widget shows the migration 
+The two widgets on the right show high-level summary of the table migration. The first widget shows the migration
 progress, and the second widget shows the data reconciliation results.
 
 
-The table below assists with verifying if, how the tables are migrated and their correctness. It can be filtered on the 
+The table below assists with verifying if, how the tables are migrated and their correctness. It can be filtered on the
 table name and migration status. Next to table metadata, the table shows:
 - The table name before migrating
 - The migration status

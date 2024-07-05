@@ -8,6 +8,7 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import DatabricksError
 from databricks.sdk.service import iam
 
+from databricks.labs.blueprint.parallel import ManyError
 from databricks.labs.ucx.workspace_access.base import AclSupport
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup, MigrationState
 from databricks.labs.ucx.workspace_access.manager import PermissionManager, Permissions
@@ -105,6 +106,25 @@ def test_manager_inventorize_ignore_error(mock_backend, mocker):
     assert [Row(object_id="a", object_type="b", raw="c")] == mock_backend.rows_written_for(
         "hive_metastore.test_database.permissions", "append"
     )
+
+
+def test_manager_inventorize_fail_with_error(mock_backend, mocker):
+    def raise_error():
+        raise DatabricksError(
+            "Fail the job",
+            error_code="NO_SKIP",
+        )
+
+    def raise_error_no_code():
+        raise TimeoutError
+
+    some_crawler = mocker.Mock()
+    some_crawler.get_crawler_tasks = lambda: [lambda: Permissions("a", "b", "c"), raise_error, raise_error_no_code]
+    permission_manager = PermissionManager(mock_backend, "test_database", [some_crawler])
+
+    with pytest.raises(ManyError) as expected_err:
+        permission_manager.inventorize_permissions()
+    assert len(expected_err.value.errs) == 2
 
 
 def test_manager_apply(mocker):
