@@ -24623,6 +24623,183 @@
   "spark-ocr": {
     "sparkocr": []
   },
+  "spark-price-transparency": {
+    "spark_price_transparency": [],
+    "spark_price_transparency.allowed_amounts": [],
+    "spark_price_transparency.allowed_amounts.aa_header": [],
+    "spark_price_transparency.allowed_amounts.aa_network": [],
+    "spark_price_transparency.allowed_amounts.curate_viz": [],
+    "spark_price_transparency.allowed_amounts.files": [],
+    "spark_price_transparency.allowed_amounts.out_amount": [],
+    "spark_price_transparency.allowed_amounts.out_code": [],
+    "spark_price_transparency.allowed_amounts.schema": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/user/hive/warehouse/pt_raw.db/_raw/mth="
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.curate_viz": [],
+    "spark_price_transparency.end2end_job_viz": [],
+    "spark_price_transparency.end2end_viz": [],
+    "spark_price_transparency.entity_viz": [],
+    "spark_price_transparency.guide": [],
+    "spark_price_transparency.in_network": [],
+    "spark_price_transparency.in_network.inr_header": [],
+    "spark_price_transparency.in_network.inr_network": [],
+    "spark_price_transparency.in_network.inr_provider": [],
+    "spark_price_transparency.in_network_rates": [],
+    "spark_price_transparency.in_network_rates.curate_viz": [],
+    "spark_price_transparency.in_network_rates.files": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.in_network_rates.in_coverage": [],
+    "spark_price_transparency.in_network_rates.in_pr_loc": [],
+    "spark_price_transparency.in_network_rates.in_provider": [],
+    "spark_price_transparency.in_network_rates.in_rate": [],
+    "spark_price_transparency.in_network_rates.inr_header": [],
+    "spark_price_transparency.in_network_rates.inr_network": [],
+    "spark_price_transparency.in_network_rates.inr_provider": [],
+    "spark_price_transparency.in_network_rates.schema": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/user/hive/warehouse/pt_raw.db/_raw/mth="
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.methods_viz": [],
+    "spark_price_transparency.provider_reference": [],
+    "spark_price_transparency.provider_reference.curate_viz": [],
+    "spark_price_transparency.provider_reference.files": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.provider_reference.in_provider": [],
+    "spark_price_transparency.provider_reference.in_rate": [],
+    "spark_price_transparency.provider_reference.pr_provider": [],
+    "spark_price_transparency.provider_reference.schema": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/user/hive/warehouse/pt_raw.db/_raw/mth="
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.pt_analytic_table": [],
+    "spark_price_transparency.pt_files": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/user/hive/warehouse/pt_raw.db/_raw/mth="
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.pt_functions": [],
+    "spark_price_transparency.pt_ingest_table": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      }
+    ],
+    "spark_price_transparency.pt_raw": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/user/hive/warehouse/pt_raw.db"
+      }
+    ],
+    "spark_price_transparency.pt_schema": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/tmp/pt/_checkpoint"
+      }
+    ],
+    "spark_price_transparency.pt_stage": [],
+    "spark_price_transparency.pt_table": [
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.pt_types": [],
+    "spark_price_transparency.table": [
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.table_analytic": [
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.table_of_contents": [],
+    "spark_price_transparency.table_of_contents.curate_viz": [],
+    "spark_price_transparency.table_of_contents.files": [],
+    "spark_price_transparency.table_of_contents.index_reports": [],
+    "spark_price_transparency.table_of_contents.schema": [
+      {
+        "code": "dbfs-usage",
+        "message": "Deprecated file system path: dbfs:/user/hive/warehouse/pt_raw.db/_raw/mth="
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sparkContext is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.table_of_contents.toc_header": [],
+    "spark_price_transparency.table_of_contents.toc_reporting": [],
+    "spark_price_transparency.table_stream_tgt": [
+      {
+        "code": "table-migrate",
+        "message": "The default format changed in Databricks Runtime 8.0, from Parquet to Delta"
+      }
+    ],
+    "spark_price_transparency.unified_viz": []
+  },
   "sqlalchemy": {
     "sqlalchemy": []
   },
