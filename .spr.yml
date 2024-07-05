@@ -1,0 +1,12 @@
+githubRepoOwner: databrickslabs
+githubRepoName: ucx
+githubHost: github.com
+githubRemote: origin
+githubBranch: main
+requireChecks: true
+requireApproval: true
+mergeMethod: rebase
+mergeQueue: true
+forceFetchTags: false
+showPrTitlesInStack: true
+branchPushIndividually: true
