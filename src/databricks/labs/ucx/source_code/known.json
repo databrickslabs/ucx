@@ -20947,6 +20947,28 @@
   "prompt_toolkit": {
     "prompt_toolkit": []
   },
+  "prophet": {
+    "prophet": [],
+    "prophet.diagnostics": [],
+    "prophet.forecaster": [],
+    "prophet.make_holidays": [],
+    "prophet.models": [],
+    "prophet.plot": [],
+    "prophet.serialize": [],
+    "prophet.stan_model.cmdstan-2.33.1.stan.lib.stan_math.lib.tbb_2020.3.build.build": [],
+    "prophet.stan_model.cmdstan-2.33.1.stan.lib.stan_math.lib.tbb_2020.3.python.TBB": [],
+    "prophet.stan_model.cmdstan-2.33.1.stan.lib.stan_math.lib.tbb_2020.3.python.setup": [],
+    "prophet.stan_model.cmdstan-2.33.1.stan.lib.stan_math.lib.tbb_2020.3.python.tbb": [],
+    "prophet.stan_model.cmdstan-2.33.1.stan.lib.stan_math.lib.tbb_2020.3.python.tbb.pool": [],
+    "prophet.stan_model.cmdstan-2.33.1.stan.lib.stan_math.lib.tbb_2020.3.python.tbb.test": [],
+    "prophet.tests": [],
+    "prophet.tests.conftest": [],
+    "prophet.tests.test_diagnostics": [],
+    "prophet.tests.test_prophet": [],
+    "prophet.tests.test_serialize": [],
+    "prophet.tests.test_utilities": [],
+    "prophet.utilities": []
+  },
   "protobuf": {
     "google.protobuf": [],
     "google.protobuf.any_pb2": [],
