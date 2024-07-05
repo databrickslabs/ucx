@@ -24958,7 +24958,7 @@
         "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
       }
     ],
-    "sparkdl.utils.keras_model": [],
+    "sparkdl.utils.keras_model": []
   },
   "spark-price-transparency": {
     "spark_price_transparency": [],
