@@ -20666,7 +20666,7 @@
     "rpy2.robjects.pandas2ri": [],
     "rpy2.robjects.robject": [],
     "rpy2.robjects.vectors": [],
-    "rpy2.situation": [],
+    "rpy2.situation": []
   },
   "rsa": {
     "rsa": []
