@@ -32,11 +32,11 @@ class PermissionManager(CrawlerBase[Permissions]):
         items, errors = Threads.gather("crawl permissions", crawler_tasks)
         acute_errors = []
         for error in errors:
-            if error.error_code not in self.ERRORS_TO_IGNORE:
-                logger.error(f"Error while crawling permissions: {error}")
-                acute_errors.append(error)
+            if hasattr(error, 'error_code') and error.error_code in self.ERRORS_TO_IGNORE:
+                logger.info(f"Error while crawling permissions: {error}. Skipping")
                 continue
-            logger.info(f"Error while crawling permissions: {error}. Skipping")
+            logger.error(f"Error while crawling permissions: {error}")
+            acute_errors.append(error)
         if len(acute_errors) > 0:
             raise ManyError(acute_errors)
         logger.info(f"Total crawled permissions: {len(items)}")
