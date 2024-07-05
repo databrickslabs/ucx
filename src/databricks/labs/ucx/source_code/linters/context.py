@@ -21,7 +21,13 @@ from databricks.labs.ucx.source_code.queries import FromTable
 
 
 class LinterContext:
-    def __init__(self, index: MigrationIndex | None = None, session_state: CurrentSessionState | None = None):
+    def __init__(
+        self,
+        index: MigrationIndex | None = None,
+        session_state: CurrentSessionState | None = None,
+        dbr_version: tuple[int, int] | None = None,
+        is_serverless: bool = False,
+    ):
         self._index = index
         session_state = CurrentSessionState() if not session_state else session_state
 
@@ -41,8 +47,8 @@ class LinterContext:
 
         python_linters += [
             DBFSUsageLinter(session_state),
-            DBRv8d0Linter(dbr_version=None),
-            SparkConnectLinter(is_serverless=False),
+            DBRv8d0Linter(dbr_version=dbr_version),
+            SparkConnectLinter(dbr_version=dbr_version, is_serverless=is_serverless),
             DbutilsLinter(session_state),
         ]
         sql_linters.append(FromDbfsFolder())

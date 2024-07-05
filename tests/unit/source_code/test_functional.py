@@ -62,6 +62,13 @@ class Functional:
     )
     _location = Path(__file__).parent / 'samples/functional'
 
+    TEST_DBR_VERSION = {
+        'python-udfs_13_3.py': (13, 3),
+        'catalog-api_13_3.py': (13, 3),
+        'python-udfs_14_3.py': (14, 3),
+        'catalog-api_14_3.py': (14, 3),
+    }
+
     @classmethod
     def all(cls) -> list['Functional']:
         return [Functional(_) for _ in cls._location.glob('**/*.py')]
@@ -104,7 +111,9 @@ class Functional:
         )
         session_state = CurrentSessionState()
         session_state.named_parameters = {"my-widget": "my-path.py"}
-        ctx = LinterContext(migration_index, session_state)
+        ctx = LinterContext(
+            migration_index, session_state, dbr_version=Functional.TEST_DBR_VERSION.get(self.path.name, None)
+        )
         linter = FileLinter(ctx, self.path)
         return linter.lint()
 
