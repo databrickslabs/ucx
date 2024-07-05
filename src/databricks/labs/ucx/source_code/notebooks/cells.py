@@ -224,7 +224,7 @@ class PipCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
-        return PipMagic(self.original_code).build_dependency_graph(graph)
+        return PipCommand(self.original_code).build_dependency_graph(graph)
 
 
 class CellLanguage(Enum):
@@ -408,7 +408,7 @@ class GraphBuilder:
         import_problems: list[DependencyProblem]
         import_sources, import_problems = ImportSource.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(import_problems)
-        magic_commands, command_problems = MagicCommand.extract_from_tree(tree, DependencyProblem.from_node)
+        magic_commands, command_problems = MagicLine.extract_from_tree(tree, DependencyProblem.from_node)
         problems.extend(command_problems)
         nodes = syspath_changes + run_calls + import_sources + magic_commands
         # need to execute things in intertwined sequence so concat and sort them
@@ -431,7 +431,7 @@ class GraphBuilder:
             yield from self._register_notebook(base_node)
         elif isinstance(base_node, ImportSource):
             yield from self._register_import(base_node)
-        elif isinstance(base_node, MagicCommand):
+        elif isinstance(base_node, MagicLine):
             yield from base_node.build_dependency_graph(self._context.parent)
         else:
             logger.warning(f"Can't process {NodeBase.__name__} of type {type(base_node).__name__}")
@@ -463,14 +463,17 @@ class GraphBuilder:
         change.mutate_path_lookup(self._context.path_lookup)
 
 
-class MagicCommand(NodeBase):
+T = TypeVar("T")
+
+
+class MagicLine(NodeBase):
 
     @classmethod
     def extract_from_tree(
-        cls, tree: Tree, problem_factory: Callable[[str, str, NodeNG], DependencyProblem]
-    ) -> tuple[list[MagicCommand], list[DependencyProblem]]:
-        problems: list[DependencyProblem] = []
-        commands: list[MagicCommand] = []
+        cls, tree: Tree, problem_factory: Callable[[str, str, NodeNG], T]
+    ) -> tuple[list[MagicLine], list[T]]:
+        problems: list[T] = []
+        commands: list[MagicLine] = []
         try:
             nodes = tree.locate(Call, [("magic_command", Name)])
             for command in cls._make_commands_for_magic_command_call_nodes(nodes):
@@ -486,26 +489,56 @@ class MagicCommand(NodeBase):
         for node in nodes:
             arg = node.args[0]
             if isinstance(arg, Const):
-                yield MagicCommand(node, arg.value)
+                yield MagicLine(node, arg.value)
 
     def __init__(self, node: NodeNG, command: bytes):
         super().__init__(node)
         self._command = command.decode()
 
-    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+    def as_magic(self) -> MagicCommand | None:
         if self._command.startswith("%pip") or self._command.startswith("!pip"):
-            cmd = PipMagic(self._command)
-            return cmd.build_dependency_graph(graph)
+            return PipCommand(self._command)
+        if self._command.startswith("%run"):
+            return RunCommand(self._command)
+        return None
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        magic = self.as_magic()
+        if magic is not None:
+            return magic.build_dependency_graph(graph)
         problem = DependencyProblem.from_node(
             code='unsupported-magic-line', message=f"magic line '{self._command}' is not supported yet", node=self.node
         )
         return [problem]
 
 
-class PipMagic:
+class MagicCommand(ABC):
 
     def __init__(self, code: str):
         self._code = code
+
+    @abstractmethod
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]: ...
+
+
+class RunCommand(MagicCommand):
+
+    def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
+        # TODO
+        return []
+
+    @property
+    def notebook_path(self) -> Path | None:
+        for quote in ['"', "'"]:
+            start = self._code.find(quote)
+            if start >= 0:
+                end = self._code.find(quote, start + 1)
+                if end >= 0:
+                    return Path(self._code[start + 1 : end])
+        return None
+
+
+class PipCommand(MagicCommand):
 
     def build_dependency_graph(self, graph: DependencyGraph) -> list[DependencyProblem]:
         argv = self._split(self._code)

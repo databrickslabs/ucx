@@ -609,3 +609,23 @@ def test_computes_values_across_notebooks_using_dbutils_notebook_run(extended_te
         )
     ]
     assert advices == expected
+
+
+def test_computes_values_across_notebooks_using_magic_line(extended_test_index, mock_path_lookup):
+    path = mock_path_lookup.resolve(Path("values_across_notebooks_magic_line.py"))
+    source = path.read_text()
+    linter = NotebookLinter.from_source(
+        extended_test_index, mock_path_lookup, CurrentSessionState(), source, Language.PYTHON
+    )
+    advices = list(linter.lint())
+    expected = [
+        Advice(
+            code='table-migrate',
+            message='The default format changed in Databricks Runtime 8.0, from Parquet to Delta',
+            start_line=3,
+            start_col=0,
+            end_line=3,
+            end_col=19,
+        )
+    ]
+    assert advices == expected

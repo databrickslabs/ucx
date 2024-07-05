@@ -38,6 +38,8 @@ from databricks.labs.ucx.source_code.notebooks.cells import (
     NOTEBOOK_HEADER,
     RunCell,
     PythonCell,
+    MagicLine,
+    RunCommand,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
@@ -177,11 +179,8 @@ class NotebookLinter:
         # look for child notebooks (and sys.path changes that might affect their loading)
         base_nodes: list[NodeBase] = []
         base_nodes.extend(DbutilsLinter.list_dbutils_notebook_run_calls(tree))
+        base_nodes.extend(self._list_run_magic_lines(tree))
         base_nodes.extend(SysPathChange.extract_from_tree(self._session_state, tree))
-        _ = """ run_magics = self._list_run_magics(tree)
-        # magic_commands, _ = MagicCommand.extract_from_tree(tree, self._report_problem)
-        base_nodes.extend(magic_commands)
-        """
         if len(base_nodes) == 0:
             self._python_linter.append_tree(tree)
             return
@@ -194,6 +193,15 @@ class NotebookLinter:
         yield from self._load_children_with_base_nodes(nodes, base_nodes)
         # append remaining nodes
         self._python_linter.append_nodes(nodes)
+
+    @staticmethod
+    def _list_run_magic_lines(tree: Tree) -> list[MagicLine]:
+
+        def _ignore_problem(_code: str, _message: str, _node: NodeNG) -> None:
+            return None
+
+        commands, _ = MagicLine.extract_from_tree(tree, _ignore_problem)
+        return list(filter(lambda cmd: isinstance(cmd.as_magic(), RunCommand), commands))
 
     def _load_children_with_base_nodes(self, nodes: list[NodeNG], base_nodes: list[NodeBase]):
         for base_node in base_nodes:
@@ -210,6 +218,19 @@ class NotebookLinter:
     def _load_children_from_base_node(self, base_node: NodeBase):
         if isinstance(base_node, SysPathChange):
             yield from self._mutate_path_lookup(base_node)
+            return
+        if isinstance(base_node, MagicLine):
+            magic = base_node.as_magic()
+            assert isinstance(magic, RunCommand)
+            notebook = self._load_source_from_path(magic.notebook_path)
+            if notebook is None:
+                yield Advisory.from_node(
+                    'dependency-not-found',
+                    f"Can't locate dependency: {magic.notebook_path}",
+                    base_node.node,
+                )
+                return
+            yield from self._load_tree_from_notebook(notebook, False)
             return
         if isinstance(base_node, NotebookRunCall):
             has_unresolved, paths = base_node.get_notebook_paths(self._session_state)
