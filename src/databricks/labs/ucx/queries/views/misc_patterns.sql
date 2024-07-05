@@ -1,6 +1,6 @@
-SELECT 
+SELECT
     col1 AS commandLanguage,        -- r, scala, python, sql
-    col2 as dbr_version_major,      -- INT 
+    col2 as dbr_version_major,      -- INT
     col3 as dbr_version_minor,      -- INT
     col4 as dbr_type,               -- STRING
     col5 AS pattern,                -- expansion / compatibility with code patterns
