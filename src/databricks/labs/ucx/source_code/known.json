@@ -24089,6 +24089,95 @@
   "spark-ocr": {
     "sparkocr": []
   },
+  "sparkdl": {
+    "sparkdl": [],
+    "sparkdl.estimators": [],
+    "sparkdl.estimators.keras_image_file_estimator": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "sparkdl.estimators.msg_queue": [],
+    "sparkdl.estimators.text_estimator": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc and _conf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "sparkdl.exmaples.TFoSExample": [],
+    "sparkdl.exmaples": [],
+    "sparkdl.exmaples.sk_learn_example": [],
+    "sparkdl.graph": [],
+    "sparkdl.graph.builder": [],
+    "sparkdl.graph.pieces": [],
+    "sparkdl.graph.tensorframes_udf": [],
+    "sparkdl.graph.utils": [],
+    "sparkdl.image": [],
+    "sparkdl.image.imageIO": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "sparkdl.nlp": [],
+    "sparkdl.nlp.model": [],
+    "sparkdl.nlp.model.text_cnn": [],
+    "sparkdl.nlp.text_analysis": [],
+    "sparkdl.param": [],
+    "sparkdl.param.image_params": [],
+    "sparkdl.param.shared_params": [],
+    "sparkdl.tf": [],
+    "sparkdl.tf.focal_loss": [],
+    "sparkdl.transformers": [],
+    "sparkdl.transformers.easy_feature": [],
+    "sparkdl.transformers.keras_applications": [],
+    "sparkdl.transformers.keras_image": [],
+    "sparkdl.transformers.keras_utils": [],
+    "sparkdl.transformers.named_image": [],
+    "sparkdl.transformers.tf_image": [],
+    "sparkdl.transformers.tf_text": [
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc and _conf are not supported on UC Shared Clusters. Rewrite it using spark.conf"
+      },
+      {
+        "code": "legacy-context-in-shared-clusters",
+        "message": "sc is not supported on UC Shared Clusters. Rewrite it using spark"
+      },
+      {
+        "code": "rdd-in-shared-clusters",
+        "message": "RDD APIs are not supported on UC Shared Clusters. Rewrite it using DataFrame API"
+      }
+    ],
+    "sparkdl.transformers.utils": [],
+    "sparkdl.udf": [],
+    "sparkdl.udf.keras_image_model": [],
+    "sparkdl.utils": [],
+    "sparkdl.utils.jvmapi": [
+      {
+        "code": "jvm-access-in-shared-clusters",
+        "message": "Cannot access Spark Driver JVM on UC Shared Clusters"
+      }
+    ],
+    "sparkdl.utils.keras_model": [],
+  },
   "sqlalchemy": {
     "sqlalchemy": []
   },
