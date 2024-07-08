@@ -6095,6 +6095,28 @@
       }
     ]
   },
+  "momentfm": {
+    "momentfm": [],
+    "momentfm.common": [],
+    "momentfm.data": [],
+    "momentfm.data.anomaly_detection_dataset": [],
+    "momentfm.data.base": [],
+    "momentfm.data.classification_dataset": [],
+    "momentfm.data.informer_dataset": [],
+    "momentfm.data.synthetic_data": [],
+    "momentfm.models": [],
+    "momentfm.models.layers": [],
+    "momentfm.models.layers.embed": [],
+    "momentfm.models.layers.revin": [],
+    "momentfm.models.moment": [],
+    "momentfm.models.statistical_classifiers": [],
+    "momentfm.utils": [],
+    "momentfm.utils.anomaly_detection_metrics": [],
+    "momentfm.utils.data": [],
+    "momentfm.utils.forecasting_metrics": [],
+    "momentfm.utils.masking": [],
+    "momentfm.utils.utils": []
+  },
   "mpmath": {
     "mpmath": []
   },
