@@ -11,10 +11,13 @@ def catalog():
 
 catalog()
 
+
 class Fatalog:
-   def tableExists(self, x): ...
+    def tableExists(self, x): ...
 class Foo:
-   def catalog(self): Fatalog()
+    def catalog(self):
+        Fatalog()
+
 
 x = Foo()
 x.catalog.tableExists("...")
