@@ -5,18 +5,18 @@ from databricks.labs.ucx.source_code.linters.files import FileLoader, ImportFile
 from databricks.labs.ucx.source_code.graph import Dependency, DependencyGraph, DependencyResolver
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import AllowList
 
 
 def test_dependency_graph_registers_library(mock_path_lookup):
     dependency = Dependency(FileLoader(), Path("test"))
     file_loader = FileLoader()
-    whitelist = Whitelist()
+    allow_list = AllowList()
     session_state = CurrentSessionState()
     dependency_resolver = DependencyResolver(
-        PythonLibraryResolver(whitelist),
+        PythonLibraryResolver(allow_list),
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, whitelist),
+        ImportFileResolver(file_loader, allow_list),
         mock_path_lookup,
     )
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, session_state)
@@ -30,12 +30,12 @@ def test_dependency_graph_registers_library(mock_path_lookup):
 def test_folder_loads_content(mock_path_lookup):
     path = Path(Path(__file__).parent, "samples")
     file_loader = FileLoader()
-    whitelist = Whitelist()
+    allow_list = AllowList()
     session_state = CurrentSessionState()
     dependency_resolver = DependencyResolver(
-        PythonLibraryResolver(whitelist),
+        PythonLibraryResolver(allow_list),
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, whitelist),
+        ImportFileResolver(file_loader, allow_list),
         mock_path_lookup,
     )
     dependency = Dependency(FolderLoader(file_loader), path)

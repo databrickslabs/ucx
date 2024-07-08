@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import AllowList
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +25,18 @@ logger = logging.getLogger(__name__)
 class PythonLibraryResolver(LibraryResolver):
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(self, whitelist: Whitelist, runner: Callable[[str], tuple[int, str, str]] = run_command) -> None:
-        self._whitelist = whitelist
+    def __init__(self, allow_list: AllowList, runner: Callable[[str], tuple[int, str, str]] = run_command) -> None:
+        self._allow_list = allow_list
         self._runner = runner
 
     def register_library(self, path_lookup: PathLookup, *libraries: str) -> list[DependencyProblem]:
         """We delegate to pip to install the library and augment the path look-up to resolve the library at import.
-        This gives us the flexibility to install any library that is not in the whitelist, and we don't have to
+        This gives us the flexibility to install any library that is not in the allow-list, and we don't have to
         bother about parsing cross-version dependencies in our code."""
         if len(libraries) == 0:
             return []
         if len(libraries) == 1:  # Multiple libraries might be installation flags
-            compatibility = self._whitelist.distribution_compatibility(libraries[0])
+            compatibility = self._allow_list.distribution_compatibility(libraries[0])
             if compatibility.known:
                 return compatibility.problems
         return self._install_library(path_lookup, *libraries)
@@ -133,4 +133,4 @@ class PythonLibraryResolver(LibraryResolver):
         return setup
 
     def __str__(self) -> str:
-        return f"PythonLibraryResolver(whitelist={self._whitelist})"
+        return f"PythonLibraryResolver(allow_list={self._allow_list})"

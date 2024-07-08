@@ -5,7 +5,7 @@ from databricks.labs.ucx.hive_metastore.migration_status import (
 )
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.graph import DependencyResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import AllowList
 from databricks.labs.ucx.source_code.linters.files import ImportFileResolver, FileLoader
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookLoader, NotebookResolver
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
@@ -49,8 +49,8 @@ def extended_test_index():
 
 @pytest.fixture
 def simple_dependency_resolver(mock_path_lookup):
-    whitelist = Whitelist()
-    library_resolver = PythonLibraryResolver(whitelist)
+    allow_list = AllowList()
+    library_resolver = PythonLibraryResolver(allow_list)
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(FileLoader(), whitelist)
+    import_resolver = ImportFileResolver(FileLoader(), allow_list)
     return DependencyResolver(library_resolver, notebook_resolver, import_resolver, mock_path_lookup)

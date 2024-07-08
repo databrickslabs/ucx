@@ -15,7 +15,7 @@ from databricks.labs.ucx.source_code.notebooks.loaders import (
     NotebookLoader,
 )
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import AllowList
 
 
 def test_basic_cell_extraction() -> None:
@@ -119,7 +119,7 @@ def test_pip_cell_build_dependency_graph_reports_unknown_library(mock_path_looku
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    pip_resolver = PythonLibraryResolver(Whitelist())
+    pip_resolver = PythonLibraryResolver(AllowList())
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, [], mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
@@ -137,10 +137,10 @@ def test_pip_cell_build_dependency_graph_resolves_installed_library(mock_path_lo
     dependency = Dependency(FileLoader(), Path("test"))
     notebook_loader = NotebookLoader()
     notebook_resolver = NotebookResolver(notebook_loader)
-    whitelist = Whitelist()
+    allow_list = AllowList()
     file_loader = FileLoader()
-    pip_resolver = PythonLibraryResolver(whitelist)
-    import_resolver = ImportFileResolver(file_loader, whitelist)
+    pip_resolver = PythonLibraryResolver(allow_list)
+    import_resolver = ImportFileResolver(file_loader, allow_list)
     dependency_resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, mock_path_lookup)
     graph = DependencyGraph(dependency, None, dependency_resolver, mock_path_lookup, CurrentSessionState())
 
