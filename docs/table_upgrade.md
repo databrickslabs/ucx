@@ -162,16 +162,16 @@ upgrade. This feedback is presented in the migration dashboard:
 
 ## Data Access Permissions
 
-The code provided is a Python module that defines a `Grant` dataclass and a `GrantsCrawler` class. The `Grant` dataclass 
-represents a grant of privileges in a database system, with attributes for the principal, action type, catalog, database, 
-table, view, UDF, and flags for any file and anonymous function. The `GrantsCrawler` class is a crawler that fetches grants 
-for databases, tables, views, UDFs, and anonymous functions in a Hive metastore. 
+The code provided is a Python module that defines a `Grant` dataclass and a `GrantsCrawler` class. The `Grant` dataclass
+represents a grant of privileges in a database system, with attributes for the principal, action type, catalog, database,
+table, view, UDF, and flags for any file and anonymous function. The `GrantsCrawler` class is a crawler that fetches grants
+for databases, tables, views, UDFs, and anonymous functions in a Hive metastore.
 
-It uses a `TablesCrawler` and `UdfsCrawler` to fetch table and UDF information, respectively. The `GrantsCrawler` class 
-provides methods for fetching grants based on different parameters and returning them as an iterable of `Grant` objects. 
-It also provides methods for getting grants for a specific table or schema. The code includes a `_type_and_key` method 
-that normalizes the input parameters and returns a tuple of the object type and key, which is used to fetch grants for 
-the specified object. The code also includes methods for generating SQL statements to grant and revoke privileges in 
+It uses a `TablesCrawler` and `UdfsCrawler` to fetch table and UDF information, respectively. The `GrantsCrawler` class
+provides methods for fetching grants based on different parameters and returning them as an iterable of `Grant` objects.
+It also provides methods for getting grants for a specific table or schema. The code includes a `_type_and_key` method
+that normalizes the input parameters and returns a tuple of the object type and key, which is used to fetch grants for
+the specified object. The code also includes methods for generating SQL statements to grant and revoke privileges in
 Hive and Unity Catalog (UC) systems.
 
 [[back to top](#table-upgrade)]
@@ -180,86 +180,86 @@ Hive and Unity Catalog (UC) systems.
 
 The module includes two classes, `ExternalLocations` and `Mounts`, which inherit from `CrawlerBase`.
 
-`ExternalLocations` is a class for crawling and managing external locations used by tables in a Databricks workspace. 
-It has methods for creating a list of external locations based on tables in a given schema and a method for generating 
+`ExternalLocations` is a class for crawling and managing external locations used by tables in a Databricks workspace.
+It has methods for creating a list of external locations based on tables in a given schema and a method for generating
 Terraform definitions for any missing external locations. The class has a `_external_locations` method that filters and p
 rocesses the external locations based on certain conditions.
 
-`Mounts` is a class for managing mounts in a Databricks workspace. It has methods for listing and deduplicating mounts, 
-as well as a method for creating a snapshot of the current mounts. The `_deduplicate_mounts` method removes any duplicate 
+`Mounts` is a class for managing mounts in a Databricks workspace. It has methods for listing and deduplicating mounts,
+as well as a method for creating a snapshot of the current mounts. The `_deduplicate_mounts` method removes any duplicate
 mounts based on their name and source.
 
 [[back to top](#table-upgrade)]
 
 ## Table Mapping
 
-The module includes two dataclasses, `Rule` and `TableToMigrate`, which encapsulate information about the source and target tables for migration. 
-The `Rule` dataclass includes information about the source and target catalog, schema, and table names, as well as a method for generating 
-the unique key for the target table in the Unity Catalog (UC) and the Hive Metastore (HMS). The `TableToMigrate` dataclass includes 
+The module includes two dataclasses, `Rule` and `TableToMigrate`, which encapsulate information about the source and target tables for migration.
+The `Rule` dataclass includes information about the source and target catalog, schema, and table names, as well as a method for generating
+the unique key for the target table in the Unity Catalog (UC) and the Hive Metastore (HMS). The `TableToMigrate` dataclass includes
 a `Table` object representing the source table and a `Rule` object representing the migration rule for that table.
 
-At the heart of the module is the `TableMapping` class, which is the main class for managing table mappings. 
-The `TableMapping` class includes several methods for managing the table mappings, such as loading and saving 
-the mappings to a file, skipping tables and schemas, and checking if a table is already migrated or marked to be skipped. 
-The `TableMapping` class is initialized with an `Installation` object, a `WorkspaceClient` object, and a `SqlBackend` object, 
+At the heart of the module is the `TableMapping` class, which is the main class for managing table mappings.
+The `TableMapping` class includes several methods for managing the table mappings, such as loading and saving
+the mappings to a file, skipping tables and schemas, and checking if a table is already migrated or marked to be skipped.
+The `TableMapping` class is initialized with an `Installation` object, a `WorkspaceClient` object, and a `SqlBackend` object,
 which are used to interact with the Unity Catalog, the workspace, and to execute SQL queries.
 
 [[back to top](#table-upgrade)]
 
 ## Migrating Tables
 
-The `TablesMigrate` class is designed for migrating tables from one schema to another within a Databricks workspace. 
-This class requires instances of `TablesCrawler`, `WorkspaceClient`, `SqlBackend`, and `TableMapping` as inputs. 
-The `migrate_tables` method is responsible for migrating tables and takes an optional argument `what` to filter tables 
-based on their type. This method internally calls the `_migrate_table` method which is responsible for migrating 
+The `TablesMigrate` class is designed for migrating tables from one schema to another within a Databricks workspace.
+This class requires instances of `TablesCrawler`, `WorkspaceClient`, `SqlBackend`, and `TableMapping` as inputs.
+The `migrate_tables` method is responsible for migrating tables and takes an optional argument `what` to filter tables
+based on their type. This method internally calls the `_migrate_table` method which is responsible for migrating
 the actual table and determining the appropriate migration method based on the table's type.
 
-The `_migrate_external_table`, `_migrate_dbfs_root_table`, and `_migrate_view` methods are used to migrate external 
-tables, DBFS root tables, and views, respectively. The `_init_seen_tables`, `_table_already_upgraded`, `_get_tables_to_revert`, 
-and `_revert_migrated_table` methods are used for managing the state of the migration process. The `_init_seen_tables` method 
-initializes the list of tables that have been seen during the migration process. The `_table_already_upgraded` method checks 
+The `_migrate_external_table`, `_migrate_dbfs_root_table`, and `_migrate_view` methods are used to migrate external
+tables, DBFS root tables, and views, respectively. The `_init_seen_tables`, `_table_already_upgraded`, `_get_tables_to_revert`,
+and `_revert_migrated_table` methods are used for managing the state of the migration process. The `_init_seen_tables` method
+initializes the list of tables that have been seen during the migration process. The `_table_already_upgraded` method checks
 if a table has already been upgraded. The `_get_tables_to_revert` method retrieves the list of tables that can be reverted.
 The `_revert_migrated_table` method is responsible for reverting the migration of a table.
 
-The `is_upgraded` method checks if a table has been upgraded or not. The `print_revert_report` method generates a report 
+The `is_upgraded` method checks if a table has been upgraded or not. The `print_revert_report` method generates a report
 of the tables that can be reverted.
 
 [[back to top](#table-upgrade)]
 
 ## Moving tables
 
-The `TableMove` class is a newly developed feature that enables the movement or aliasing of tables and views from one 
-schema to another within UC. This class requires an instance of `WorkspaceClient` and `SqlBackend` as inputs and provides 
-two primary methods: `move_tables` and `alias_tables`. The `move_tables` method moves tables to a new schema, while 
+The `TableMove` class is a newly developed feature that enables the movement or aliasing of tables and views from one
+schema to another within UC. This class requires an instance of `WorkspaceClient` and `SqlBackend` as inputs and provides
+two primary methods: `move_tables` and `alias_tables`. The `move_tables` method moves tables to a new schema, while
 the `alias_tables` method creates aliases of tables and views in a different schema.
 
 The `_move_table`, `_alias_table`, and `_move_view` methods are responsible for performing the actual movement, aliasing,
-and recreating of the table or view in the destination schema, taking into account any dependencies or permissions 
-associated with the object. The `_reapply_grants` method reapplies the grants on the migrated table or view, ensuring 
-that the necessary permissions are maintained. The `_recreate_table` and `_recreate_view` methods recreate the table or 
+and recreating of the table or view in the destination schema, taking into account any dependencies or permissions
+associated with the object. The `_reapply_grants` method reapplies the grants on the migrated table or view, ensuring
+that the necessary permissions are maintained. The `_recreate_table` and `_recreate_view` methods recreate the table or
 view in the destination schema, including any dependencies or permissions associated with the object.
 
 [[back to top](#table-upgrade)]
 
 ## Table Size Estimation
 
-The Table Size Crawler is a new feature of the data crawler system that calculates the size of tables in a Hive Metastore. 
-The `TableSizeCrawler` class is developed to inherit from `CrawlerBase` and is initialized with a SQL Execution Backend 
-and a schema name. This class uses the `TablesCrawler` class to obtain a snapshot of tables and then iterates over them 
+The Table Size Crawler is a new feature of the data crawler system that calculates the size of tables in a Hive Metastore.
+The `TableSizeCrawler` class is developed to inherit from `CrawlerBase` and is initialized with a SQL Execution Backend
+and a schema name. This class uses the `TablesCrawler` class to obtain a snapshot of tables and then iterates over them
 to calculate the size of each table using the `_safe_get_table_size` method which queries the Spark SQL engine.
 
-The `TableSizeCrawler` class has several methods, including `snapshot`, `_try_load`, and `_crawl`. The `snapshot` method 
+The `TableSizeCrawler` class has several methods, including `snapshot`, `_try_load`, and `_crawl`. The `snapshot` method
 returns a list of `TableSize` objects representing the snapshot of tables, filtered to include only those with a non-null
-size. The `_try_load` method tries to load table information from the database and raises a `TABLE_OR_VIEW_NOT_FOUND` 
-error if the table cannot be found. The `_crawl` method crawls and lists tables using the `tables_crawler` object and 
+size. The `_try_load` method tries to load table information from the database and raises a `TABLE_OR_VIEW_NOT_FOUND`
+error if the table cannot be found. The `_crawl` method crawls and lists tables using the `tables_crawler` object and
 calculates the size of DBFS root tables, skipping tables that are not of type `TABLE` or are not DBFS root tables.
 
 [[back to top](#table-upgrade)]
 
 ## Table Crawler
 
-The `TablesCrawler` is designed for crawling and listing tables within Hive Metastore. It can fetch detailed information 
-about each table, including the table's name, external location, and storage format. This information can be used to 
+The `TablesCrawler` is designed for crawling and listing tables within Hive Metastore. It can fetch detailed information
+about each table, including the table's name, external location, and storage format. This information can be used to
 better understand the structure and contents of the tables in the Databricks workspace.
 
 [[back to top](#table-upgrade)]

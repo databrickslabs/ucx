@@ -22,6 +22,28 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 
 logger = logging.getLogger(__name__)
 
+"""
+Known libraries that are not in known.json
+
+1) libraries with Python syntax that astroid cannot parse
+tempo (error -> multiple exception types must be parenthesized)
+chromadb (error -> 'Module' object has no attribute 'doc_node')
+
+2) code that cannot be installed locally
+dbruntime (error -> no pypi package)
+horovod (error -> Failed to install temporary CMake. Please update your CMake to 3.13+ or set HOROVOD_CMAKE appropriately)
+mediamix (requires a workspace, see https://d1r5llqwmkrl74.cloudfront.net/notebooks/CME/media-mix-modeling/index.html#media-mix-modeling_1.html)
+mosaic (error -> print without parenthesis not supported by pip)
+sat (requires a workspace, see https://github.com/databricks-industry-solutions/security-analysis-tool/blob/main/docs/setup.md)
+
+3) code that cannot be located
+utils
+util
+chedispy
+
+4) code that's imported only once
+"""
+
 
 @dataclass
 class Compatibility:
