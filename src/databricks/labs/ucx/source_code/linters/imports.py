@@ -167,7 +167,7 @@ class SysPathChange(NodeBase, abc.ABC):
     def path(self):
         return self._path
 
-    def mutate_path_lookup(self, path_lookup: PathLookup):
+    def apply_to(self, path_lookup: PathLookup):
         path = Path(self._path)
         if not path.is_absolute():
             path = path_lookup.cwd / path

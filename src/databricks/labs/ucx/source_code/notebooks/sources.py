@@ -239,7 +239,7 @@ class NotebookLinter:
                 change.node,
             )
             return
-        change.mutate_path_lookup(self._path_lookup)
+        change.apply_to(self._path_lookup)
 
     def _load_tree_from_run_cell(self, run_cell: RunCell) -> Iterable[Advice]:
         path, _, _ = run_cell.read_notebook_path()

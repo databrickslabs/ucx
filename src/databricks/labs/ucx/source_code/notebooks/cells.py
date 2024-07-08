@@ -460,7 +460,7 @@ class GraphBuilder:
                 f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
             )
             return
-        change.mutate_path_lookup(self._context.path_lookup)
+        change.apply_to(self._context.path_lookup)
 
 
 class MagicCommand(NodeBase):
