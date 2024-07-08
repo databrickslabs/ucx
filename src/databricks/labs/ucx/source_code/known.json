@@ -25573,6 +25573,10 @@
     "isympy": [],
     "sympy": []
   },
+  "tabulate": {
+    "tabulate": [],
+    "tabulate.version": []
+  },
   "tenacity": {
     "tenacity": [],
     "tenacity._utils": [],
