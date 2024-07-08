@@ -3075,24 +3075,7 @@
     "hailtop.hailctl.dataproc": [],
     "hailtop.hailctl.dataproc.cli": [],
     "hailtop.hailctl.dataproc.cluster_config": [],
-    "hailtop.hailctl.dataproc.connect": [
-      {
-        "code": "dbfs-usage",
-        "message": "Deprecated file system path: /mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe"
-      },
-      {
-        "code": "dbfs-usage",
-        "message": "Deprecated file system path: /mnt/c/Program Files(x86)/Google/Chrome/Application/chrome.exe"
-      },
-      {
-        "code": "dbfs-usage",
-        "message": "Deprecated file system path: /mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
-      },
-      {
-        "code": "dbfs-usage",
-        "message": "Deprecated file system path: /mnt/c/ProgramFiles(x86)/Google/Chrome/Application/chrome.exe"
-      }
-    ],
+    "hailtop.hailctl.dataproc.connect": [],
     "hailtop.hailctl.dataproc.deploy_metadata": [],
     "hailtop.hailctl.dataproc.diagnose": [],
     "hailtop.hailctl.dataproc.gcloud": [],
