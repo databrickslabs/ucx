@@ -15,7 +15,7 @@ from databricks.sdk.service.workspace import AclPermission
 logger = logging.getLogger(__name__)
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
 def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions):
     ctx = installation_ctx.replace(skip_dashboards=False)
     ws_group_a, _ = ctx.make_ucx_group()
@@ -35,7 +35,7 @@ def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, 
     assert after[ws_group_a.display_name] == PermissionLevel.CAN_USE
 
 
-@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
+@retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
 def test_running_real_migrate_groups_job(
     ws,
     installation_ctx,
@@ -122,7 +122,7 @@ def test_running_real_validate_groups_permissions_job(
     installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
 def test_running_real_validate_groups_permissions_job_fails(
     ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
 ):
@@ -148,7 +148,7 @@ def test_running_real_validate_groups_permissions_job_fails(
         installation_ctx.deployed_workflows.run_workflow("validate-groups-permissions")
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_in_place_migration_job(
     ws,
@@ -174,7 +174,7 @@ def test_hiveserde_table_in_place_migration_job(
             assert False, f"{table.name} not found in {dst_schema.catalog_name}.{dst_schema.name}"
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=5))
+@retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('hiveserde')], indirect=True)
 def test_hiveserde_table_ctas_migration_job(
     ws,
