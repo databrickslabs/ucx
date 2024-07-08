@@ -1,3 +1,4 @@
+# ucx[session-state] {"dbr_version": [14, 3]}
 from pyspark.sql.functions import udf, udtf, lit
 import pandas as pd
 

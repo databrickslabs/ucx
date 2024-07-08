@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
 import tokenize
 from collections.abc import Iterable, Generator
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -60,14 +62,9 @@ class Functional:
     _re = re.compile(
         r"# ucx\[(?P<code>[\w-]+):(?P<start_line>[\d+]+):(?P<start_col>[\d]+):(?P<end_line>[\d+]+):(?P<end_col>[\d]+)] (?P<message>.*)"
     )
-    _location = Path(__file__).parent / 'samples/functional'
+    _re_session_state = re.compile(r'# ucx\[session-state] (?P<session_state_json>\{.*})')
 
-    TEST_DBR_VERSION = {
-        'python-udfs_13_3.py': (13, 3),
-        'catalog-api_13_3.py': (13, 3),
-        'python-udfs_14_3.py': (14, 3),
-        'catalog-api_14_3.py': (14, 3),
-    }
+    _location = Path(__file__).parent / 'samples/functional'
 
     @classmethod
     def all(cls) -> list['Functional']:
@@ -109,41 +106,54 @@ class Functional:
                 MigrationStatus('other', 'matters', dst_catalog='some', dst_schema='certain', dst_table='issues'),
             ]
         )
-        session_state = CurrentSessionState()
+        session_state = self._test_session_state()
+        print(str(session_state))
         session_state.named_parameters = {"my-widget": "my-path.py"}
-        ctx = LinterContext(
-            migration_index, session_state, dbr_version=Functional.TEST_DBR_VERSION.get(self.path.name, None)
-        )
+        ctx = LinterContext(migration_index, session_state)
         linter = FileLinter(ctx, self.path)
         return linter.lint()
 
-    def _expected_problems(self) -> Generator[Expectation, None, None]:
+    def _regex_match(self, regex: re.Pattern[str]) -> Generator[tuple[Comment, dict[str, Any]], None, None]:
         with self.path.open('rb') as f:
             for comment in self._comments(f):
                 if not comment.text.startswith('# ucx['):
                     continue
-                match = self._re.match(comment.text)
+                match = regex.match(comment.text)
                 if not match:
                     continue
                 groups = match.groupdict()
-                reported_start_line = groups['start_line']
-                if '+' in reported_start_line:
-                    start_line = int(reported_start_line[1:]) + comment.start_line
-                else:
-                    start_line = int(reported_start_line)
-                reported_end_line = groups['end_line']
-                if '+' in reported_end_line:
-                    end_line = int(reported_end_line[1:]) + comment.start_line
-                else:
-                    end_line = int(reported_end_line)
-                yield Expectation(
-                    code=groups['code'],
-                    message=groups['message'],
-                    start_line=start_line,
-                    start_col=int(groups['start_col']),
-                    end_line=end_line,
-                    end_col=int(groups['end_col']),
-                )
+                yield comment, groups
+
+    def _expected_problems(self) -> Generator[Expectation, None, None]:
+        for comment, groups in self._regex_match(self._re):
+            reported_start_line = groups['start_line']
+            if '+' in reported_start_line:
+                start_line = int(reported_start_line[1:]) + comment.start_line
+            else:
+                start_line = int(reported_start_line)
+            reported_end_line = groups['end_line']
+            if '+' in reported_end_line:
+                end_line = int(reported_end_line[1:]) + comment.start_line
+            else:
+                end_line = int(reported_end_line)
+            yield Expectation(
+                code=groups['code'],
+                message=groups['message'],
+                start_line=start_line,
+                start_col=int(groups['start_col']),
+                end_line=end_line,
+                end_col=int(groups['end_col']),
+            )
+
+    def _test_session_state(self) -> CurrentSessionState:
+        matches = list(self._regex_match(self._re_session_state))
+        if len(matches) > 1:
+            raise ValueError("A test should have no more than one session state definition")
+        if len(matches) == 0:
+            return CurrentSessionState()
+        groups = matches[0][1]
+        json_str = groups['session_state_json']
+        return CurrentSessionState.from_json(json.loads(json_str))
 
     @staticmethod
     def _comments(f) -> Generator[Comment, None, None]:

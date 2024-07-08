@@ -7,16 +7,17 @@ from databricks.labs.ucx.source_code.base import (
     Advice,
     Failure,
     PythonLinter,
+    CurrentSessionState,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
 
 @dataclass
 class SharedClusterMatcher:
-    is_serverless: bool
+    session_state: CurrentSessionState
 
     def _cluster_type_str(self) -> str:
-        return 'UC Shared Clusters' if not self.is_serverless else 'Serverless Compute'
+        return 'UC Shared Clusters' if not self.session_state.is_serverless else 'Serverless Compute'
 
     @abstractmethod
     def lint(self, node: NodeNG) -> Iterator[Advice]:
@@ -172,11 +173,8 @@ class LoggingMatcher(SharedClusterMatcher):
             )
 
 
-@dataclass
 class UDFMatcher(SharedClusterMatcher):
     _DBR_14_2_BELOW_NOT_SUPPORTED = ["applyInPandas", "mapInPandas", "applyInPandasWithState", "udtf", "pandas_udf"]
-
-    dbr_version: tuple[int, int] | None
 
     def lint(self, node: NodeNG) -> Iterator[Advice]:
         if not isinstance(node, Call):
@@ -193,8 +191,8 @@ class UDFMatcher(SharedClusterMatcher):
 
         if (
             function_name in UDFMatcher._DBR_14_2_BELOW_NOT_SUPPORTED
-            and self.dbr_version
-            and self.dbr_version < (14, 3)
+            and self.session_state.dbr_version
+            and self.session_state.dbr_version < (14, 3)
         ):
             yield Failure.from_node(
                 code='python-udf-in-shared-clusters',
@@ -202,7 +200,7 @@ class UDFMatcher(SharedClusterMatcher):
                 node=node,
             )
 
-        if function_name == 'udf' and self.dbr_version and self.dbr_version < (14, 3):
+        if function_name == 'udf' and self.session_state.dbr_version and self.session_state.dbr_version < (14, 3):
             for keyword in node.keywords:
                 if keyword.arg == 'useArrow' and isinstance(keyword.value, Const) and keyword.value.value:
                     yield Failure.from_node(
@@ -231,7 +229,7 @@ class CommandContextMatcher(SharedClusterMatcher):
         function_name = Tree.get_full_function_name(node)
         if function_name and function_name.endswith('getContext.toJson'):
             yield Failure.from_node(
-                code='toJson-in-shared-clusters',
+                code='to-json-in-shared-clusters',
                 message=f'toJson() is not available on {self._cluster_type_str()}. '
                 f'Use toSafeJson() on DBR 13.3 LTS or above to get a subset of command context information.',
                 node=node,
@@ -239,17 +237,17 @@ class CommandContextMatcher(SharedClusterMatcher):
 
 
 class SparkConnectLinter(PythonLinter):
-    def __init__(self, dbr_version: tuple[int, int] | None = None, is_serverless: bool = False):
+    def __init__(self, session_state: CurrentSessionState):
         self._matchers = [
-            JvmAccessMatcher(is_serverless=is_serverless),
-            RDDApiMatcher(is_serverless=is_serverless),
-            SparkSqlContextMatcher(is_serverless=is_serverless),
-            LoggingMatcher(is_serverless=is_serverless),
-            UDFMatcher(is_serverless=is_serverless, dbr_version=dbr_version),
-            CommandContextMatcher(is_serverless=is_serverless),
+            JvmAccessMatcher(session_state=session_state),
+            RDDApiMatcher(session_state=session_state),
+            SparkSqlContextMatcher(session_state=session_state),
+            LoggingMatcher(session_state=session_state),
+            UDFMatcher(session_state=session_state),
+            CommandContextMatcher(session_state=session_state),
         ]
-        if dbr_version and dbr_version < (14, 3):
-            self._matchers.append(CatalogApiMatcher(is_serverless=is_serverless))
+        if session_state.dbr_version and session_state.dbr_version < (14, 3):
+            self._matchers.append(CatalogApiMatcher(session_state=session_state))
 
     def lint_tree(self, tree: Tree) -> Iterator[Advice]:
         for matcher in self._matchers:
