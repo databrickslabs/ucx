@@ -76,6 +76,7 @@ class WorkflowTaskContainer(SourceContainer):
         self._spark_conf: dict[str, str] | None = {}
         self._spark_version: str | None = None
         self._data_security_mode = None
+        self._is_serverless = False
 
     @property
     def named_parameters(self) -> dict[str, str]:
@@ -268,6 +269,8 @@ class WorkflowTaskContainer(SourceContainer):
                 if job_cluster.job_cluster_key != self._task.job_cluster_key:
                     continue
                 return self._new_job_cluster_metadata(job_cluster.new_cluster)
+        self._data_security_mode = compute.DataSecurityMode.USER_ISOLATION
+        self._is_serverless = True
         return []
 
     def _new_job_cluster_metadata(self, new_cluster):
@@ -357,6 +360,7 @@ class WorkflowLinter:
             data_security_mode=container.data_security_mode,
             named_parameters=container.named_parameters,
             spark_conf=container.spark_conf,
+            dbr_version=container.runtime_version,
         )
         graph = DependencyGraph(dependency, None, self._resolver, self._path_lookup, session_state)
         problems = container.build_dependency_graph(graph)

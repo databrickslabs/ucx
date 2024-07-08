@@ -172,6 +172,20 @@ class CurrentSessionState:
     spark_conf: dict[str, str] | None = None
     named_parameters: dict[str, str] | None = None
     data_security_mode: compute.DataSecurityMode | None = None
+    is_serverless: bool = False
+    dbr_version: tuple[int, int] | None = None
+
+    @classmethod
+    def from_json(cls, json: dict) -> CurrentSessionState:
+        return cls(
+            schema=json.get('schema', DEFAULT_SCHEMA),
+            catalog=json.get('catalog', DEFAULT_CATALOG),
+            spark_conf=json.get('spark_conf', None),
+            named_parameters=json.get('named_parameters', None),
+            data_security_mode=json.get('data_security_mode', None),
+            is_serverless=json.get('is_serverless', False),
+            dbr_version=tuple(json['dbr_version']) if 'dbr_version' in json else None,
+        )
 
 
 class SequentialLinter(Linter):
