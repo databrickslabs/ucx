@@ -22,6 +22,8 @@ from databricks.sdk.service.jobs import (
     SqlTask,
 )
 
+
+
 from databricks.labs.ucx.assessment.clusters import CheckClusterMixin
 from databricks.labs.ucx.assessment.crawlers import spark_version_compatibility
 from databricks.labs.ucx.framework.crawlers import CrawlerBase
