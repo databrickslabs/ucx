@@ -208,6 +208,10 @@
     "audioread.rawread": [],
     "audioread.version": []
   },
+  "azure": {
+    "azure.digitaltwins": [],
+    "azure.digitaltwins.core": []
+  },
   "azure-common": {
     "azure.common": [],
     "azure.common._version": [],
@@ -1281,7 +1285,7 @@
       }
     ],
     "arc.utils": [],
-    "arc.utils.utils": [],
+    "arc.utils.utils": []
   },
   "databricks-feature-engineering": {
     "databricks": [],
