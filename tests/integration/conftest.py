@@ -7,8 +7,10 @@ from dataclasses import replace
 from functools import partial, cached_property
 from datetime import timedelta
 import shutil
+import subprocess
 import databricks.sdk.core
 import pytest  # pylint: disable=wrong-import-order
+from databricks.labs.blueprint.entrypoint import is_in_debug
 from databricks.labs.blueprint.installation import Installation, MockInstallation
 from databricks.labs.blueprint.parallel import Threads
 from databricks.labs.blueprint.tui import MockPrompts
@@ -411,6 +413,11 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
     @cached_property
     def created_databases(self) -> list[str]:
         created_databases: set[str] = set()
+        for udf_info in self._udfs:
+            if udf_info.catalog_name != "hive_metastore":
+                continue
+            assert udf_info.schema_name is not None
+            created_databases.add(udf_info.schema_name)
         for schema_info in self._schemas:
             if schema_info.catalog_name != "hive_metastore":
                 continue
@@ -477,7 +484,7 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestWorkspaceContext(CommonUtils, WorkspaceContext):
+class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
         make_schema_fixture,
@@ -509,7 +516,7 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         )
 
 
-class LocalAzureCliTest(TestWorkspaceContext):
+class MockLocalAzureCli(MockWorkspaceContext):
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -525,11 +532,11 @@ class LocalAzureCliTest(TestWorkspaceContext):
 
 @pytest.fixture
 def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = LocalAzureCliTest(make_schema, env_or_skip, ws)
+    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
     return ctx.replace(sql_backend=sql_backend)
 
 
-class LocalAwsCliTest(TestWorkspaceContext):
+class MockLocalAwsCli(MockWorkspaceContext):
     @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
@@ -545,7 +552,7 @@ class LocalAwsCliTest(TestWorkspaceContext):
 
 @pytest.fixture
 def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = LocalAwsCliTest(make_schema, env_or_skip, ws)
+    ctx = MockLocalAwsCli(make_schema, env_or_skip, ws)
     return ctx.replace(sql_backend=sql_backend)
 
 
@@ -880,3 +887,42 @@ def prepared_principal_acl(runtime_ctx, env_or_skip, make_mounted_location, make
         f"{dst_catalog.name}.{dst_schema.name}",
         dst_catalog.name,
     )
+
+
+def modified_or_skip(package: str):
+    info = ProductInfo.from_class(WorkspaceConfig)
+    checkout_root = info.checkout_root()
+
+    def _run(command: str) -> str:
+        with subprocess.Popen(
+            command.split(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=checkout_root,
+        ) as process:
+            output, error = process.communicate()
+            if process.returncode != 0:
+                pytest.fail(f"Command failed: {command}\n{error.decode('utf-8')}", pytrace=False)
+            return output.decode("utf-8").strip()
+
+    def check():
+        if is_in_debug():
+            return True  # not skipping, as we're debugging
+        if 'TEST_NIGHTLY' in os.environ:
+            return True  # or during nightly runs
+        current_branch = _run("git branch --show-current")
+        changed_files = _run(f"git diff origin/main..{current_branch} --name-only")
+        if package in changed_files:
+            return True
+        return False
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if not check():
+                pytest.skip(f"Skipping long test as {package} was not modified")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

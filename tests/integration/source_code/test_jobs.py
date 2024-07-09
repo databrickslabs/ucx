@@ -22,8 +22,11 @@ from databricks.labs.ucx.source_code.linters.context import LinterContext
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
 
+from tests.integration.conftest import modified_or_skip
 
-@retried(on=[NotFound], timeout=timedelta(minutes=10))
+
+@modified_or_skip("source_code")
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
 def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job):
     # Deprecated file system path in call to: /mnt/things/e/f/g
     lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
