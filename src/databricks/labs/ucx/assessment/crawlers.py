@@ -3,6 +3,8 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
+
 INCOMPATIBLE_SPARK_CONFIG_KEYS = {
     "spark.databricks.passthrough.enabled": "Uses passthrough config",
     "spark.hadoop.javax.jdo.option.ConnectionURL": "Uses external Hive metastore config",
