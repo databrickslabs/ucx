@@ -3707,6 +3707,12 @@
   "fastcluster": {
     "fastcluster": []
   },
+  "fasttext": {
+    "fasttext.FastText": [],
+    "fasttext": [],
+    "fasttext.util": [],
+    "fasttext.util.util": []
+  },
   "filelock": {
     "filelock": [],
     "filelock._api": [],
