@@ -44,11 +44,11 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-dependencies = ["databricks-sdk>=0.27,<0.30",
-                "databricks-labs-lsql>=0.4,<0.6",
-                "databricks-labs-blueprint>=0.6.0",
+dependencies = ["databricks-sdk~=0.29.0",
+                "databricks-labs-lsql~=0.5.0",
+                "databricks-labs-blueprint~=0.7.0",
                 "PyYAML>=6.0.0,<7.0.0",
-                "sqlglot>=25.4.1,<25.5",
+                "sqlglot>=25.5.0,<25.6",
                 "astroid>=3.2.2"]
 
 [project.optional-dependencies]

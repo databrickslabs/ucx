@@ -169,7 +169,7 @@ class RunCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        path, idx, line = self.read_notebook_path()
+        path, idx, line = self._read_notebook_path()
         if path is not None:
             start_line = self._original_offset + idx
             problems = parent.register_notebook(path)
@@ -188,11 +188,15 @@ class RunCell(Cell):
         )
         return [problem]
 
-    def read_notebook_path(self):
+    def maybe_notebook_path(self) -> Path | None:
+        path, _, _ = self._read_notebook_path()
+        return path
+
+    def _read_notebook_path(self):
         command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
         lines = self._original_code.split('\n')
         for idx, line in enumerate(lines):
-            start = line.find(command)
+            start = line.index(command)
             if start >= 0:
                 path = line[start + len(command) :]
                 path = path.strip().strip("'").strip('"')
@@ -461,7 +465,7 @@ class GraphBuilder:
                 f"Can't update sys.path from {change.node.as_string()} because the expression cannot be computed",
             )
             return
-        change.mutate_path_lookup(self._context.path_lookup)
+        change.apply_to(self._context.path_lookup)
 
 
 T = TypeVar("T")
