@@ -950,14 +950,18 @@ def pytest_ignore_collect(path):
         ) as process:
             output, error = process.communicate()
             if process.returncode != 0:
-                pytest.fail(f"Command failed: {command}\n{error.decode('utf-8')}", pytrace=False)
+                raise ValueError(f"Command failed: {command}\n{error.decode('utf-8')}")
             return output.decode("utf-8").strip()
 
-    target_branch = os.environ.get('GITHUB_BASE_REF', 'main')
-    current_branch = os.environ.get('GITHUB_HEAD_REF', _run("git branch --show-current"))
-    changed_files = _run(f"git diff {target_branch}..{current_branch} --name-only")
-    if path.basename in changed_files:
-        logger.debug(f"pytest_ignore_collect: in changed files: {path} - {changed_files}")
+    try:
+        target_branch = os.environ.get('GITHUB_BASE_REF', 'main')
+        current_branch = os.environ.get('GITHUB_HEAD_REF', _run("git branch --show-current"))
+        changed_files = _run(f"git diff {target_branch}..{current_branch} --name-only")
+        if path.basename in changed_files:
+            logger.debug(f"pytest_ignore_collect: in changed files: {path} - {changed_files}")
+            return False
+        logger.debug(f"pytest_ignore_collect: skip: {path}")
+        return True
+    except ValueError as err:
+        logger.debug(f"pytest_ignore_collect: error: {err}")
         return False
-    logger.debug(f"pytest_ignore_collect: skip: {path}")
-    return True
