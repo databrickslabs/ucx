@@ -1,5 +1,5 @@
 import pytest
-from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr  # type: ignore
+from astroid import Assign, AstroidSyntaxError, Attribute, Call, Const, Expr, Name  # type: ignore
 
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 from databricks.labs.ucx.source_code.linters.python_infer import InferredValue
@@ -147,3 +147,13 @@ def test_appends_statements():
     values = list(InferredValue.infer_from_node(tree.node))
     strings = list(value.as_string() for value in values)
     assert strings == ["Hello John!"]
+
+
+def test_is_from_module():
+    source = """
+df = spark.read.csv("hi")
+df.write.format("delta").saveAsTable("old.things")
+"""
+    tree = Tree.normalize_and_parse(source)
+    save_call = tree.locate(Call, [("saveAsTable", Attribute), ("format", Attribute), ("write", Attribute), ("df", Name)])[0]
+    assert Tree(save_call).is_from_module("spark")
