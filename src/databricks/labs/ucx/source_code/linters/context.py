@@ -1,7 +1,16 @@
+from typing import cast
+
 from databricks.sdk.service.workspace import Language
 
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
-from databricks.labs.ucx.source_code.base import Fixer, Linter, SequentialLinter, CurrentSessionState
+from databricks.labs.ucx.source_code.base import (
+    Fixer,
+    Linter,
+    SequentialLinter,
+    CurrentSessionState,
+    PythonSequentialLinter,
+    PythonLinter,
+)
 from databricks.labs.ucx.source_code.linters.dbfs import FromDbfsFolder, DBFSUsageLinter
 from databricks.labs.ucx.source_code.linters.imports import DbutilsLinter
 
@@ -16,7 +25,7 @@ class LinterContext:
         self._index = index
         session_state = CurrentSessionState() if not session_state else session_state
 
-        python_linters: list[Linter] = []
+        python_linters: list[PythonLinter] = []
         python_fixers: list[Fixer] = []
 
         sql_linters: list[Linter] = []
@@ -32,15 +41,15 @@ class LinterContext:
 
         python_linters += [
             DBFSUsageLinter(session_state),
-            DBRv8d0Linter(dbr_version=None),
-            SparkConnectLinter(is_serverless=False),
+            DBRv8d0Linter(dbr_version=session_state.dbr_version),
+            SparkConnectLinter(session_state),
             DbutilsLinter(session_state),
         ]
         sql_linters.append(FromDbfsFolder())
 
-        self._linters = {
-            Language.PYTHON: SequentialLinter(python_linters),
-            Language.SQL: SequentialLinter(sql_linters),
+        self._linters: dict[Language, list[Linter] | list[PythonLinter]] = {
+            Language.PYTHON: python_linters,
+            Language.SQL: sql_linters,
         }
         self._fixers: dict[Language, list[Fixer]] = {
             Language.PYTHON: python_fixers,
@@ -53,7 +62,9 @@ class LinterContext:
     def linter(self, language: Language) -> Linter:
         if language not in self._linters:
             raise ValueError(f"Unsupported language: {language}")
-        return self._linters[language]
+        if language is Language.PYTHON:
+            return PythonSequentialLinter(cast(list[PythonLinter], self._linters[language]))
+        return SequentialLinter(cast(list[Linter], self._linters[language]))
 
     def fixer(self, language: Language, diagnostic_code: str) -> Fixer | None:
         if language not in self._fixers:
