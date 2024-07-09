@@ -95,7 +95,8 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
+def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip, modified_or_skip):
+    modified_or_skip("hive_metastore")
     # this test spins up clusters using ext hms cluster policy, which will have a startup time of ~ 7-10m
     # skip this test if not in nightly test job or debug mode
     if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
@@ -143,13 +144,14 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job_ext_hms(
-    ws, installation_ctx, env_or_skip, make_cluster_policy, make_cluster_policy_permissions
+    ws,
+    installation_ctx,
+    env_or_skip,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+    modified_or_skip,
 ):
-    # this test spins up clusters using ext hms cluster policy, which will have a startup time of ~ 7-10m
-    # skip this test if not in nightly test job or debug mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        env_or_skip("TEST_NIGHTLY")
-
+    modified_or_skip("assessment")
     ext_hms_ctx = installation_ctx.replace(
         skip_dashboards=True,
         config_transform=lambda wc: dataclasses.replace(
