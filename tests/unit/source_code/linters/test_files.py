@@ -181,4 +181,6 @@ def test_known_issues(path: Path, migration_index):
         resolver,
         lambda: LinterContext(migration_index, session_state),
     )
-    linter.lint(MockPrompts({}), path)
+    advices = linter.lint(MockPrompts({}), path)
+    for advice in advices:
+        print(repr(advice))

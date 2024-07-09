@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, NodeNG  # type: ignore
+from astroid import Attribute, Call, Name, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -50,7 +50,11 @@ class NoFormatPythonMatcher:
         if call_args_count < self.min_args or call_args_count > self.max_args:
             return None
 
-        # Check 3: check presence of the format specifier:
+        # Check 3: ensure this is a spark call
+        if not Tree.is_child_call_of(node.func.expr, "spark"):
+            return None
+
+        # Check 4: check presence of the format specifier:
         #   Option A: format specifier may be given as a direct parameter to the table-creating call
         #   >>> df.saveToTable("c.db.table", format="csv")
         format_arg = Tree.get_arg(node, self.format_arg_index, self.format_arg_name)

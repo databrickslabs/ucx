@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
-from astroid import Attribute, Call, Const, InferenceError, NodeNG  # type: ignore
+from astroid import Attribute, Call, Const, InferenceError, Name, NodeNG  # type: ignore
 from databricks.labs.ucx.hive_metastore.migration_status import MigrationIndex
 from databricks.labs.ucx.source_code.base import (
     Advice,
@@ -28,7 +28,10 @@ class Matcher(ABC):
     session_state: CurrentSessionState | None = None
 
     def matches(self, node: NodeNG):
-        return isinstance(node, Call) and isinstance(node.func, Attribute) and self._get_table_arg(node) is not None
+        return isinstance(node, Call) and \
+            self._get_table_arg(node) is not None and \
+            isinstance(node.func, Attribute) and \
+            Tree.is_child_call_of(node.func.expr, "spark")
 
     @abstractmethod
     def lint(

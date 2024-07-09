@@ -13,6 +13,7 @@ from astroid import (  # type: ignore
     Const,
     Import,
     ImportFrom,
+    InferenceError,
     Module,
     Name,
     NodeNG,
@@ -81,6 +82,23 @@ class Tree:
             if len(matches) & 1:
                 in_multi_line_comment = not in_multi_line_comment
         return "\n".join(lines)
+
+    @classmethod
+    def is_child_call_of(cls, expr: NodeNG, module_name: str):
+        # if his is the call's root node, check it against the required module
+        if isinstance(expr, Name):
+            if expr.name == module_name:
+                return True
+            try:
+                for node in expr.inferred():
+                    if cls.is_child_call_of(node, module_name):
+                        return True
+            except InferenceError as e:
+                return False
+        # walk up intermediate calls such as spark.range(...)
+        if isinstance(expr, Call):
+            return isinstance(expr.func, Attribute) and cls.is_child_call_of(expr.func.expr, module_name)
+        return False
 
     def __init__(self, node: NodeNG):
         self._node: NodeNG = node
