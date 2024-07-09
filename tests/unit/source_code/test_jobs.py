@@ -9,7 +9,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, GetPipelineRespons
 
 from databricks.labs.ucx.source_code.base import CurrentSessionState
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import AllowList
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import compute, jobs, pipelines
 from databricks.sdk.service.workspace import ExportFormat
@@ -33,7 +33,7 @@ def test_job_problem_as_message():
 @pytest.fixture
 def dependency_resolver(mock_path_lookup) -> DependencyResolver:
     file_loader = FileLoader()
-    allow_list = AllowList()
+    allow_list = KnownList()
     resolver = DependencyResolver(
         PythonLibraryResolver(allow_list),
         NotebookResolver(NotebookLoader()),

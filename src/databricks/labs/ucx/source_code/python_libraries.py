@@ -17,7 +17,7 @@ from databricks.labs.ucx.source_code.graph import (
     DependencyProblem,
 )
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import AllowList
+from databricks.labs.ucx.source_code.known import KnownList
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class PythonLibraryResolver(LibraryResolver):
     # TODO: https://github.com/databrickslabs/ucx/issues/1640
 
-    def __init__(self, allow_list: AllowList, runner: Callable[[str], tuple[int, str, str]] = run_command) -> None:
+    def __init__(self, allow_list: KnownList, runner: Callable[[str], tuple[int, str, str]] = run_command) -> None:
         self._allow_list = allow_list
         self._runner = runner
 

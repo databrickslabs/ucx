@@ -3,11 +3,11 @@ from unittest import mock
 
 import pytest
 
-from databricks.labs.ucx.source_code.known import AllowList
+from databricks.labs.ucx.source_code.known import KnownList
 
 
 def test_checks_compatibility():
-    known = AllowList()
+    known = KnownList()
     spark_sql = known.module_compatibility("spark.sql")
     assert not spark_sql.known
 
@@ -23,7 +23,7 @@ def test_checks_compatibility():
 
 
 def test_checks_library_compatibility():
-    known = AllowList()
+    known = KnownList()
 
     sklearn = known.distribution_compatibility("scikit-learn")
     assert sklearn.known
@@ -35,7 +35,7 @@ def test_checks_library_compatibility():
 
 
 def test_loads_known_json():
-    known_json = AllowList._get_known()  # pylint: disable=protected-access
+    known_json = KnownList._get_known()  # pylint: disable=protected-access
     assert known_json is not None and len(known_json) > 0
 
 
@@ -44,10 +44,10 @@ def test_error_on_missing_known_json():
         mock.patch("pkgutil.get_data", side_effect=FileNotFoundError("simulate missing file")),
         pytest.raises(FileNotFoundError),
     ):
-        AllowList._get_known()  # pylint: disable=protected-access
+        KnownList._get_known()  # pylint: disable=protected-access
 
 
 def test_rebuild_trivial():
     # No-op: the known.json file is already up-to-date
     cwd = Path.cwd()
-    AllowList.rebuild(cwd)
+    KnownList.rebuild(cwd)

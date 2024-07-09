@@ -9,7 +9,7 @@ from typing import TextIO
 from databricks.labs.ucx.source_code.base import LocatedAdvice, CurrentSessionState
 from databricks.labs.ucx.source_code.notebooks.sources import FileLinter, SUPPORTED_EXTENSION_LANGUAGES
 from databricks.labs.ucx.source_code.path_lookup import PathLookup
-from databricks.labs.ucx.source_code.known import AllowList
+from databricks.labs.ucx.source_code.known import KnownList
 from databricks.sdk.service.workspace import Language
 from databricks.labs.blueprint.tui import Prompts
 
@@ -246,7 +246,7 @@ class FolderLoader(FileLoader):
 
 class ImportFileResolver(BaseImportResolver, BaseFileResolver):
 
-    def __init__(self, file_loader: FileLoader, allow_list: AllowList):
+    def __init__(self, file_loader: FileLoader, allow_list: KnownList):
         super().__init__()
         self._allow_list = allow_list
         self._file_loader = file_loader

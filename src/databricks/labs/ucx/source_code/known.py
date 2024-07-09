@@ -63,7 +63,7 @@ UNKNOWN = Compatibility(False, [])
 _DEFAULT_ENCODING = sys.getdefaultencoding()
 
 
-class AllowList:
+class KnownList:
     def __init__(self):
         self._module_problems = collections.OrderedDict()
         self._library_problems = collections.defaultdict(list)
@@ -237,4 +237,4 @@ class DistInfo:
 
 if __name__ == "__main__":
     logger = get_logger(__file__)  # this only works for __main__
-    AllowList.rebuild(Path.cwd())
+    KnownList.rebuild(Path.cwd())
