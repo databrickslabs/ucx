@@ -41,7 +41,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     uber_spn_id: str | None = None
     uber_instance_profile: str | None = None
 
-    is_terraform_used: bool = False  # Not used, keep for backwards compatability
+    is_terraform_used: bool = False  # Not used, keep for backwards compatibility
 
     # Whether the assessment should capture a specific list of databases, if not specified, it will list all databases.
     include_databases: list[str] | None = None
@@ -51,6 +51,9 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     include_mounts: list[str] | None = None
     exclude_paths_in_mount: list[str] | None = None
     include_paths_in_mount: list[str] | None = None
+
+    # Used for limiting the number of jobs to be analysed
+    include_job_ids: list[int] | None = None
 
     # Whether to trigger assessment job after installation
     trigger_job: bool = False

@@ -18,7 +18,11 @@ _SPARK_CONF = get_azure_spark_conf()
 
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_catalog_schema_with_principal_acl_azure(
-    ws, make_user, prepared_principal_acl, make_cluster_permissions, make_cluster
+    ws,
+    make_user,
+    prepared_principal_acl,
+    make_cluster_permissions,
+    make_cluster,
 ):
     if not ws.config.is_azure:
         pytest.skip("only works in azure test env")
