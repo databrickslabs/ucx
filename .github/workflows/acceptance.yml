@@ -39,12 +39,13 @@ jobs:
       - name: Install hatch
         run: pip install hatch==1.9.4
 
+      - run: git fetch origin
+
       - name: Run integration tests
-        # ...
         uses: databrickslabs/sandbox/acceptance@acceptance/v0.2.2
         with:
           vault_uri: ${{ secrets.VAULT_URI }}
-          timeout: 45m
+          timeout: 55m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
