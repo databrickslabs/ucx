@@ -208,6 +208,10 @@
     "audioread.rawread": [],
     "audioread.version": []
   },
+  "azure": {
+    "azure.digitaltwins": [],
+    "azure.digitaltwins.core": []
+  },
   "azure-common": {
     "azure.common": [],
     "azure.common._version": [],
