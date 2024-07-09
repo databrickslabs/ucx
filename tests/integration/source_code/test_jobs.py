@@ -23,8 +23,9 @@ from databricks.labs.ucx.source_code.path_lookup import PathLookup
 from databricks.sdk.service import jobs, compute, pipelines
 
 
-@retried(on=[NotFound], timeout=timedelta(minutes=10))
-def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job):
+@retried(on=[NotFound], timeout=timedelta(minutes=5))
+def test_running_real_workflow_linter_job(installation_ctx, make_notebook, make_directory, make_job, modified_or_skip):
+    modified_or_skip("source_code")
     # Deprecated file system path in call to: /mnt/things/e/f/g
     lint_problem = b"display(spark.read.csv('/mnt/things/e/f/g'))"
     notebook = make_notebook(path=f"{make_directory()}/notebook.ipynb", content=lint_problem)

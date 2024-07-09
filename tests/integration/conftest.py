@@ -411,6 +411,11 @@ class MockRuntimeContext(CommonUtils, RuntimeContext):
     @cached_property
     def created_databases(self) -> list[str]:
         created_databases: set[str] = set()
+        for udf_info in self._udfs:
+            if udf_info.catalog_name != "hive_metastore":
+                continue
+            assert udf_info.schema_name is not None
+            created_databases.add(udf_info.schema_name)
         for schema_info in self._schemas:
             if schema_info.catalog_name != "hive_metastore":
                 continue
@@ -477,7 +482,7 @@ def runtime_ctx(ws, sql_backend, make_table, make_schema, make_udf, make_group, 
     return ctx.replace(workspace_client=ws, sql_backend=sql_backend)
 
 
-class TestWorkspaceContext(CommonUtils, WorkspaceContext):
+class MockWorkspaceContext(CommonUtils, WorkspaceContext):
     def __init__(
         self,
         make_schema_fixture,
@@ -509,7 +514,7 @@ class TestWorkspaceContext(CommonUtils, WorkspaceContext):
         )
 
 
-class LocalAzureCliTest(TestWorkspaceContext):
+class MockLocalAzureCli(MockWorkspaceContext):
     @cached_property
     def azure_cli_authenticated(self):
         if not self.is_azure:
@@ -525,11 +530,11 @@ class LocalAzureCliTest(TestWorkspaceContext):
 
 @pytest.fixture
 def az_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = LocalAzureCliTest(make_schema, env_or_skip, ws)
+    ctx = MockLocalAzureCli(make_schema, env_or_skip, ws)
     return ctx.replace(sql_backend=sql_backend)
 
 
-class LocalAwsCliTest(TestWorkspaceContext):
+class MockLocalAwsCli(MockWorkspaceContext):
     @cached_property
     def aws_cli_run_command(self):
         if not self.is_aws:
@@ -545,7 +550,7 @@ class LocalAwsCliTest(TestWorkspaceContext):
 
 @pytest.fixture
 def aws_cli_ctx(ws, env_or_skip, make_schema, sql_backend):
-    ctx = LocalAwsCliTest(make_schema, env_or_skip, ws)
+    ctx = MockLocalAwsCli(make_schema, env_or_skip, ws)
     return ctx.replace(sql_backend=sql_backend)
 
 
