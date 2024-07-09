@@ -128,12 +128,12 @@ class LocalCodeLinter:
         graph = DependencyGraph(dependency, None, self._dependency_resolver, self._path_lookup, self._session_state)
         container = dependency.load(self._path_lookup)
         assert container is not None  # because we just created it
-        problems = container.build_dependency_graph(graph)
-        for problem in problems:
-            problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
-            yield problem.as_advisory().for_path(problem_path)
-        for child_path in graph.all_paths:
-            yield from self._lint_one(child_path)
+        # problems = container.build_dependency_graph(graph)
+        # for problem in problems:
+        #    problem_path = Path('UNKNOWN') if problem.is_path_missing() else problem.source_path.absolute()
+        #    yield problem.as_advisory().for_path(problem_path)
+        # for child_path in graph.all_paths:
+        yield from self._lint_one(path)
 
     def _lint_one(self, path: Path) -> Iterable[LocatedAdvice]:
         if path.is_dir():
