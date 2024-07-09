@@ -4,7 +4,6 @@ from datetime import timedelta
 import pytest
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import BadRequest, NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service import iam
 from databricks.sdk.service.iam import AccessControlRequest, PermissionLevel
 
@@ -22,6 +21,7 @@ from databricks.labs.ucx.workspace_access.generic import (
 )
 from databricks.labs.ucx.workspace_access.groups import MigrationState
 
+from ..retries import retried
 from . import apply_tasks
 
 

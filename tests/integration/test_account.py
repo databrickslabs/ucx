@@ -3,11 +3,12 @@ from datetime import timedelta
 import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import AccountClient
-from databricks.sdk.retries import retried
 from databricks.sdk.service.iam import Group
 
 from databricks.labs.ucx.account.workspaces import AccountWorkspaces
 from databricks.labs.ucx.mixins.fixtures import get_purge_suffix
+
+from .retries import retried
 
 
 @pytest.fixture

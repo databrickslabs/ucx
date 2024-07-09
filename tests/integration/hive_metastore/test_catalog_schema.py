@@ -5,12 +5,12 @@ import pytest
 from databricks.labs.blueprint.tui import MockPrompts
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
 from ..conftest import get_azure_spark_conf
+from ..retries import retried
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()

@@ -3,7 +3,6 @@ from datetime import timedelta
 
 import pytest
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, TableInfo, TableType
 from databricks.sdk.service.iam import PermissionLevel
@@ -13,6 +12,7 @@ from databricks.labs.ucx.hive_metastore.mapping import Rule, TableMapping
 from databricks.labs.ucx.hive_metastore.tables import AclMigrationWhat, Table, What
 
 from ..conftest import prepare_hiveserde_tables, get_azure_spark_conf
+from ..retries import retried
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()

@@ -2,9 +2,10 @@ import logging
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore.udfs import UdfsCrawler
+
+from ..retries import retried
 
 logger = logging.getLogger(__name__)
 

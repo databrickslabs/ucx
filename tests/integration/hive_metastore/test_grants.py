@@ -3,11 +3,11 @@ from collections import defaultdict
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
 from ..conftest import MockRuntimeContext
+from ..retries import retried
 
 logger = logging.getLogger(__name__)
 

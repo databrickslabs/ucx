@@ -2,11 +2,11 @@ import json
 from datetime import timedelta
 
 from databricks.sdk.errors import NotFound
-from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import DataSecurityMode
 
 from databricks.labs.ucx.assessment.clusters import ClustersCrawler, PoliciesCrawler
 
+from ..retries import retried
 from .test_assessment import _SPARK_CONF
 
 

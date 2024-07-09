@@ -9,7 +9,6 @@ from databricks.labs.blueprint.installation import MockInstallation
 from databricks.labs.blueprint.tui import MockPrompts
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import InternalError, NotFound
-from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.assessment.azure import AzureServicePrincipalInfo
 from databricks.labs.ucx.azure.access import AzureResourcePermissions
@@ -21,6 +20,8 @@ from databricks.labs.ucx.azure.credentials import (
 from databricks.labs.ucx.azure.resources import AccessConnector, AzureAPIClient, AzureResource, AzureResources
 from databricks.labs.ucx.hive_metastore.locations import ExternalLocation, ExternalLocations
 from tests.integration.conftest import StaticServicePrincipalCrawler
+
+from ..retries import retried
 
 
 @dataclass
