@@ -56,6 +56,8 @@ pylsp = [
     "python-lsp-server>=1.9.0"
 ]
 
+
+
 [project.entry-points.databricks]
 runtime = "databricks.labs.ucx.runtime:main"
 
