@@ -41,8 +41,8 @@ class LinterContext:
 
         python_linters += [
             DBFSUsageLinter(session_state),
-            DBRv8d0Linter(dbr_version=None),
-            SparkConnectLinter(is_serverless=False),
+            DBRv8d0Linter(dbr_version=session_state.dbr_version),
+            SparkConnectLinter(session_state),
             DbutilsLinter(session_state),
         ]
         sql_linters.append(FromDbfsFolder())

@@ -173,6 +173,16 @@ class Tree:
         return cls._get_attribute_value(node)
 
     @classmethod
+    def get_function_name(cls, node: Call) -> str | None:
+        if not isinstance(node, Call):
+            return None
+        if isinstance(node.func, Attribute):
+            return node.func.attrname
+        if isinstance(node.func, Name):
+            return node.func.name
+        return None
+
+    @classmethod
     def get_full_function_name(cls, node: Call) -> str | None:
         if not isinstance(node, Call):
             return None
