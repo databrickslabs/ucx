@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import BinaryIO
 
 import pytest
+from databricks.labs.blueprint.entrypoint import is_in_debug
+from databricks.labs.blueprint.wheels import ProductInfo
 from databricks.labs.lsql.backends import StatementExecutionBackend
 from databricks.labs.blueprint.commands import CommandExecutor
 from databricks.sdk import AccountClient, WorkspaceClient
@@ -51,6 +53,7 @@ from databricks.sdk.service.sql import (
 )
 from databricks.sdk.service.workspace import ImportFormat, Language
 
+from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
 
 # this file will get to databricks-labs-pytester project and be maintained/refactored there
@@ -543,7 +546,7 @@ for name, resource_type, levels, id_retriever in _redash_permissions_mapping():
 @pytest.fixture
 def make_secret_scope(ws, make_random):
     def create(**kwargs):
-        name = f"sdk-{make_random(4)}"
+        name = f"sdk-{make_random(4)}-{get_purge_suffix()}"
         ws.secrets.create_scope(name, **kwargs)
         return name
 
@@ -586,7 +589,7 @@ def make_notebook(ws, make_random):
 def make_directory(ws, make_random):
     def create(*, path: str | None = None):
         if path is None:
-            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}"
+            path = f"/Users/{ws.current_user.me().user_name}/sdk-{make_random(4)}-{get_purge_suffix()}"
         ws.workspace.mkdirs(path)
         return path
 
@@ -612,7 +615,7 @@ def make_user(ws, make_random):
 
     @retried(on=[ResourceConflict], timeout=timedelta(seconds=30))
     def create(**kwargs):
-        user = ws.users.create(user_name=f"sdk-{make_random(8)}@example.com".lower(), **kwargs)
+        user = ws.users.create(user_name=f"sdk-{make_random(4)}-{get_purge_suffix()}@example.com".lower(), **kwargs)
         return user
 
     yield from factory("workspace user", create, lambda item: ws.users.delete(item.id))
@@ -633,7 +636,7 @@ def _make_group(name, cfg, interface, make_random):
         wait_for_provisioning: bool = False,
         **kwargs,
     ):
-        kwargs["display_name"] = f"sdk-{make_random(4)}" if display_name is None else display_name
+        kwargs["display_name"] = f"sdk-{make_random(4)}-{get_purge_suffix()}" if display_name is None else display_name
         if members is not None:
             kwargs["members"] = _scim_values(members)
         if roles is not None:
@@ -1392,3 +1395,38 @@ def make_dashboard(ws: WorkspaceClient, make_random: Callable[[int], str], make_
 
 def get_test_purge_time() -> str:
     return (datetime.utcnow() + TEST_JOBS_PURGE_TIMEOUT).strftime("%Y%m%d%H")
+
+
+def get_purge_suffix() -> str:
+    """HEX-encoded purge time suffix for test objects."""
+    return f'ra{int(get_test_purge_time()):x}'
+
+
+@pytest.fixture
+def modified_or_skip():
+    product_info = ProductInfo.from_class(WorkspaceConfig)
+    checkout_root = product_info.checkout_root()
+
+    def run_command(command: str) -> str:
+        with subprocess.Popen(
+            command.split(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=checkout_root,
+        ) as process:
+            output, error = process.communicate()
+            if process.returncode != 0:
+                pytest.fail(f"Command failed: {command}\n{error.decode('utf-8')}", pytrace=False)
+            return output.decode("utf-8").strip()
+
+    def inner(package: str):
+        if is_in_debug():
+            return  # not skipping, as we're debugging
+        if 'TEST_NIGHTLY' in os.environ:
+            return  # or during nightly runs
+        current_branch = run_command("git branch --show-current")
+        changed_files = run_command(f"git diff origin/main..{current_branch} --name-only")
+        if package not in changed_files:
+            pytest.skip(f"Skipping long test as {package} was not modified in branch {current_branch}")
+
+    return inner
