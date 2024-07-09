@@ -955,7 +955,7 @@ def pytest_ignore_collect(path):
 
     target_branch = os.environ.get('GITHUB_BASE_REF', 'main')
     current_branch = os.environ.get('GITHUB_HEAD_REF', _run("git branch --show-current"))
-    changed_files = _run(f"git diff origin/{target_branch}..{current_branch} --name-only")
+    changed_files = _run(f"git diff {target_branch}..{current_branch} --name-only")
     if path.basename in changed_files:
         logger.debug(f"pytest_ignore_collect: in changed files: {path} - {changed_files}")
         return False
