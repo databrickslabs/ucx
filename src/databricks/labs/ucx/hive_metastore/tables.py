@@ -381,6 +381,29 @@ class TablesCrawler(CrawlerBase):
         for row in self._fetch(f"SELECT * FROM {escape_sql_identifier(self.full_name)}"):
             yield Table(*row)
 
+    def _show_tables_in_database(self, catalog: str, database: str) -> list[Table]:
+        table_rows: list[Table] = []
+        try:
+            logger.debug(f"[{catalog}.{database}] listing tables and views")
+            for row in self._fetch(
+                f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
+            ):
+                table_rows.append(
+                    Table(
+                        catalog=catalog,
+                        database=database,
+                        name=row[1],
+                        object_type='UNKNOWN',
+                        table_format='UNKNOWN',
+                    )
+                )
+        except NotFound:
+            # This make the integration test more robust as many test schemas are being created and deleted quickly.
+            # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend
+            # raises NotFound
+            logger.warning(f"Schema {catalog}.{database} no longer exists")
+        return table_rows
+
     def _crawl(self) -> Iterable[Table]:
         """Crawls and lists tables within the specified catalog and database.
 
@@ -397,21 +420,11 @@ class TablesCrawler(CrawlerBase):
         """
         tasks = []
         catalog = "hive_metastore"
-        for database in self._all_databases():
-            logger.debug(f"[{catalog}.{database}] listing tables")
-            try:
-                # Also returns views.
-                table_rows = self._fetch(
-                    f"SHOW TABLES FROM {escape_sql_identifier(catalog)}.{escape_sql_identifier(database)}"
-                )
-                for _, table, _is_tmp in table_rows:
-                    tasks.append(partial(self._describe, catalog, database, table))
-            except NotFound:
-                # This make the integration test more robust as many test schemas are being created and deleted quickly.
-                # In case a schema is deleted, StatementExecutionBackend returns empty result but RuntimeBackend raises NotFound
-                logger.warning(f"Schema {catalog}.{database} no longer existed")
-                continue
-        catalog_tables, errors = Threads.gather(f"listing tables in {catalog}", tasks)
+        table_names = [partial(self._show_tables_in_database, catalog, database) for database in self._all_databases()]
+        for batch in Threads.strict('listing tables', table_names):
+            for table in batch:
+                tasks.append(partial(self._describe, table.catalog, table.database, table.name))
+        catalog_tables, errors = Threads.gather(f"describing tables in {catalog}", tasks)
         if len(errors) > 0:
             logger.error(f"Detected {len(errors)} while scanning tables in {catalog}")
         return catalog_tables
