@@ -2886,6 +2886,26 @@
   "emmv": {
     "emmv": []
   },
+ "einops": {
+    "einops": [],
+    "einops._backends": [],
+    "einops._torch_specific": [],
+    "einops.array_api": [],
+    "einops.einops": [],
+    "einops.experimental": [],
+    "einops.experimental.indexing": [],
+    "einops.layers": [],
+    "einops.layers._einmix": [],
+    "einops.layers.chainer": [],
+    "einops.layers.flax": [],
+    "einops.layers.keras": [],
+    "einops.layers.oneflow": [],
+    "einops.layers.paddle": [],
+    "einops.layers.tensorflow": [],
+    "einops.layers.torch": [],
+    "einops.packing": [],
+    "einops.parsing": []
+  },
   "entrypoints": {
     "entrypoints": []
   },
