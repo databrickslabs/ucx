@@ -52,7 +52,7 @@ class WorkspaceConfig:  # pylint: disable=too-many-instance-attributes
     exclude_paths_in_mount: list[str] | None = None
     include_paths_in_mount: list[str] | None = None
 
-    # Not used, keep for backwards compatibility
+    # Used for limiting the number of jobs to be analysed
     include_job_ids: list[int] | None = None
 
     # Whether to trigger assessment job after installation
