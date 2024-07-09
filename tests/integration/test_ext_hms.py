@@ -1,7 +1,5 @@
 import dataclasses
 import logging
-import os
-import sys
 from collections.abc import Iterator, Sequence
 from datetime import timedelta
 from types import UnionType
@@ -20,6 +18,8 @@ from databricks.sdk.errors import (
 from databricks.sdk.retries import retried
 from databricks.sdk.service.compute import Language
 from databricks.sdk.service.iam import PermissionLevel
+
+from tests.integration.conftest import modified_or_skip
 
 logger = logging.getLogger(__name__)
 
@@ -93,15 +93,10 @@ def sql_backend(ws, env_or_skip) -> SqlBackend:
     return CommandContextBackend(ws, cluster_id)
 
 
+@modified_or_skip("hive_metastore")
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', ['regular'], indirect=True)
-def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip, modified_or_skip):
-    modified_or_skip("hive_metastore")
-    # this test spins up clusters using ext hms cluster policy, which will have a startup time of ~ 7-10m
-    # skip this test if not in nightly test job or debug mode
-    if os.path.basename(sys.argv[0]) not in {"_jb_pytest_runner.py", "testlauncher.py"}:
-        env_or_skip("TEST_NIGHTLY")
-
+def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):
     ext_hms_cluster_id = env_or_skip("TEST_EXT_HMS_CLUSTER_ID")
     tables, dst_schema = prepare_tables_for_migration
     ext_hms_ctx = installation_ctx.replace(
@@ -142,6 +137,7 @@ def test_migration_job_ext_hms(ws, installation_ctx, prepare_tables_for_migratio
             assert "spark.databricks.hive.metastore.glueCatalog.enabled" in job_cluster.new_cluster.spark_conf
 
 
+@modified_or_skip("assessment")
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_assessment_job_ext_hms(
     ws,
@@ -149,9 +145,7 @@ def test_running_real_assessment_job_ext_hms(
     env_or_skip,
     make_cluster_policy,
     make_cluster_policy_permissions,
-    modified_or_skip,
 ):
-    modified_or_skip("assessment")
     ext_hms_ctx = installation_ctx.replace(
         skip_dashboards=True,
         config_transform=lambda wc: dataclasses.replace(

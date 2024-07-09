@@ -6,6 +6,7 @@ from databricks.sdk.retries import retried
 
 from databricks.labs.ucx.hive_metastore import TablesCrawler
 from databricks.labs.ucx.hive_metastore.tables import What
+from tests.integration.conftest import modified_or_skip
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ def test_describe_all_tables_in_databases(ws, sql_backend, inventory_schema, mak
     assert all_tables[view.full_name].what == What.VIEW
 
 
+@modified_or_skip("hive_metastore")
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_partitioned_tables(ws, sql_backend, make_schema, make_table):
     schema = make_schema(catalog_name="hive_metastore")
