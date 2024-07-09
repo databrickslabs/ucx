@@ -953,7 +953,7 @@ def pytest_ignore_collect(path):
                 raise ValueError(f"Command failed: {command}\n{error.decode('utf-8')}")
             return output.decode("utf-8").strip()
 
-    try:
+    try:  # pylint: disable=too-many-try-statements
         target_branch = os.environ.get('GITHUB_BASE_REF', 'main')
         current_branch = os.environ.get('GITHUB_HEAD_REF', _run("git branch --show-current"))
         changed_files = _run(f"git diff {target_branch}..{current_branch} --name-only")
