@@ -128,13 +128,13 @@ class NotebookLinter:
         return self._context.linter(language)
 
     def _load_source_from_run_cell(self, run_cell: RunCell):
-        path, _, _ = run_cell.read_notebook_path()
+        path = run_cell.maybe_notebook_path()
         if path is None:
             return  # malformed run cell already reported
         resolved = self._path_lookup.resolve(path)
         if resolved is None:
             return  # already reported during dependency building
-        # TODO deal with workspace notebooks
+        # transient workspace notebook suffix is inferred from object info
         language = SUPPORTED_EXTENSION_LANGUAGES.get(resolved.suffix.lower(), None)
         # we only support Python for now
         if language is not Language.PYTHON:
