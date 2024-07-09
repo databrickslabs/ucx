@@ -29,7 +29,6 @@ import databricks
 from databricks.labs.ucx.config import WorkspaceConfig
 from databricks.labs.ucx.install import WorkspaceInstaller
 from databricks.labs.ucx.workspace_access.groups import MigratedGroup
-from tests.integration.conftest import modified_or_skip
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +89,6 @@ def new_installation(ws, env_or_skip, make_random):
         pending.remove()
 
 
-@modified_or_skip("workspace_access")
 @retried(on=[NotFound, ResourceConflict], timeout=timedelta(minutes=10))
 def test_experimental_permissions_migration_for_group_with_same_name(
     installation_ctx, make_cluster_policy, make_cluster_policy_permissions
@@ -171,7 +169,6 @@ def test_job_cluster_policy(ws, installation_ctx):
         assert policy_definition["aws_attributes.availability"]["value"] == compute.AwsAvailability.ON_DEMAND.value
 
 
-@modified_or_skip("workspace_access")
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=5))
 def test_running_real_remove_backup_groups_job(ws, installation_ctx):
     ws_group_a, _ = installation_ctx.make_ucx_group()
@@ -359,7 +356,6 @@ def test_check_inventory_database_exists(ws, installation_ctx):
         installation_ctx.workspace_installer.configure()
 
 
-@modified_or_skip("hive_metastore")
 @retried(on=[NotFound], timeout=timedelta(minutes=5))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job(ws, installation_ctx, env_or_skip, prepare_tables_for_migration):
@@ -398,7 +394,6 @@ def test_table_migration_job(ws, installation_ctx, env_or_skip, prepare_tables_f
         assert job_cluster.new_cluster.spark_conf["spark.sql.sources.parallelPartitionDiscovery.parallelism"] == "1000"
 
 
-@modified_or_skip("hive_metastore")
 @retried(on=[NotFound], timeout=timedelta(minutes=8))
 @pytest.mark.parametrize('prepare_tables_for_migration', [('regular')], indirect=True)
 def test_table_migration_job_cluster_override(ws, installation_ctx, prepare_tables_for_migration, env_or_skip):

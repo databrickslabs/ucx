@@ -10,13 +10,12 @@ from databricks.sdk.service.compute import DataSecurityMode, AwsAttributes
 from databricks.sdk.service.catalog import Privilege, SecurableType, PrivilegeAssignment
 from databricks.sdk.service.iam import PermissionLevel
 
-from ..conftest import get_azure_spark_conf, modified_or_skip
+from ..conftest import get_azure_spark_conf
 
 logger = logging.getLogger(__name__)
 _SPARK_CONF = get_azure_spark_conf()
 
 
-@modified_or_skip("hive_metastore")
 @retried(on=[NotFound], timeout=timedelta(minutes=2))
 def test_create_catalog_schema_with_principal_acl_azure(
     ws,

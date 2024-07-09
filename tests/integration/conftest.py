@@ -926,3 +926,33 @@ def modified_or_skip(package: str):
         return wrapper
 
     return decorator
+
+
+def pytest_ignore_collect(path):
+    if not os.path.isdir(path):
+        return False
+    if is_in_debug():
+        return False  # not skipping, as we're debugging
+    if 'TEST_NIGHTLY' in os.environ:
+        return False  # or during nightly runs
+
+    checkout_root = ProductInfo.from_class(WorkspaceConfig).checkout_root()
+
+    def _run(command: str) -> str:
+        with subprocess.Popen(
+            command.split(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=checkout_root,
+        ) as process:
+            output, error = process.communicate()
+            if process.returncode != 0:
+                pytest.fail(f"Command failed: {command}\n{error.decode('utf-8')}", pytrace=False)
+            return output.decode("utf-8").strip()
+
+    target_branch = os.environ.get('GITHUB_BASE_REF', 'main')
+    current_branch = os.environ.get('GITHUB_HEAD_REF', _run("git branch --show-current"))
+    changed_files = _run(f"git diff origin/{target_branch}..{current_branch} --name-only")
+    if path.basename in changed_files:
+        return False
+    return True
