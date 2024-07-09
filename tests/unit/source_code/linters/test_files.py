@@ -10,7 +10,7 @@ from databricks.labs.ucx.source_code.graph import DependencyResolver, SourceCont
 from databricks.labs.ucx.source_code.notebooks.loaders import NotebookResolver, NotebookLoader
 from databricks.labs.ucx.source_code.notebooks.migrator import NotebookMigrator
 from databricks.labs.ucx.source_code.python_libraries import PythonLibraryResolver
-from databricks.labs.ucx.source_code.known import Whitelist
+from databricks.labs.ucx.source_code.known import KnownList
 
 from databricks.sdk.service.workspace import Language
 
@@ -110,13 +110,13 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
     mock_path_lookup.append_path(Path(_samples_path(SourceContainer)))
     file_loader = FileLoader()
     folder_loader = FolderLoader(file_loader)
-    whitelist = Whitelist()
-    pip_resolver = PythonLibraryResolver(whitelist)
+    allow_list = KnownList()
+    pip_resolver = PythonLibraryResolver(allow_list)
     session_state = CurrentSessionState()
     resolver = DependencyResolver(
         pip_resolver,
         NotebookResolver(NotebookLoader()),
-        ImportFileResolver(file_loader, whitelist),
+        ImportFileResolver(file_loader, allow_list),
         mock_path_lookup,
     )
     path = Path(Path(__file__).parent, "../samples", "simulate-sys-path")
@@ -129,7 +129,7 @@ def test_linter_walks_directory(mock_path_lookup, migration_index):
 
 
 def test_triple_dot_import():
-    file_resolver = ImportFileResolver(FileLoader(), Whitelist())
+    file_resolver = ImportFileResolver(FileLoader(), KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/foo.py')
@@ -141,7 +141,7 @@ def test_triple_dot_import():
 
 
 def test_single_dot_import():
-    file_resolver = ImportFileResolver(FileLoader(), Whitelist())
+    file_resolver = ImportFileResolver(FileLoader(), KnownList())
     path_lookup = create_autospec(PathLookup)
     path_lookup.cwd.as_posix.return_value = '/some/path/to/folder'
     path_lookup.resolve.return_value = Path('/some/path/to/folder/foo.py')
@@ -170,10 +170,10 @@ def test_known_issues(path: Path, migration_index):
     folder_loader = FolderLoader(file_loader)
     path_lookup = PathLookup.from_sys_path(Path.cwd())
     session_state = CurrentSessionState()
-    whitelist = Whitelist()
+    allow_list = KnownList()
     notebook_resolver = NotebookResolver(NotebookLoader())
-    import_resolver = ImportFileResolver(file_loader, whitelist)
-    pip_resolver = PythonLibraryResolver(whitelist)
+    import_resolver = ImportFileResolver(file_loader, allow_list)
+    pip_resolver = PythonLibraryResolver(allow_list)
     resolver = DependencyResolver(pip_resolver, notebook_resolver, import_resolver, path_lookup)
     linter = LocalCodeLinter(
         file_loader,
