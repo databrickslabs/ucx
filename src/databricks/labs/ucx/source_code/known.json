@@ -1153,9 +1153,7 @@
   },
   "chronos": {
     "chronos": [],
-    "chronos.main": [],
-    "test": [],
-    "test.test_trigger": []
+    "chronos.main": []
   },
   "clang": {
     "clang": [],
