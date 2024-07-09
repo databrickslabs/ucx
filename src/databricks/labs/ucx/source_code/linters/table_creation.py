@@ -51,7 +51,7 @@ class NoFormatPythonMatcher:
             return None
 
         # Check 3: ensure this is a spark call
-        if not Tree.is_child_call_of(node.func.expr, "spark"):
+        if not Tree(node.func.expr).is_from_module("spark"):
             return None
 
         # Check 4: check presence of the format specifier:

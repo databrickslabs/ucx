@@ -32,7 +32,7 @@ class Matcher(ABC):
             isinstance(node, Call)
             and self._get_table_arg(node) is not None
             and isinstance(node.func, Attribute)
-            and Tree.is_child_call_of(node.func.expr, "spark")
+            and Tree(node.func.expr).is_from_module("spark")
         )
 
     @abstractmethod
