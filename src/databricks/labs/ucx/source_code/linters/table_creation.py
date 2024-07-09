@@ -7,7 +7,7 @@ from astroid import Attribute, Call, NodeNG  # type: ignore
 
 from databricks.labs.ucx.source_code.base import (
     Advice,
-    Linter,
+    PythonLinter,
 )
 from databricks.labs.ucx.source_code.linters.python_ast import Tree
 
@@ -92,7 +92,7 @@ class NoFormatPythonLinter:
                 )
 
 
-class DBRv8d0Linter(Linter):
+class DBRv8d0Linter(PythonLinter):
     """Performs Python linting for backwards incompatible changes in DBR version 8.0.
     Specifically, it yields advice for table-creation with implicit format.
     """
@@ -111,9 +111,8 @@ class DBRv8d0Linter(Linter):
             ]
         )
 
-    def lint(self, code: str) -> Iterable[Advice]:
+    def lint_tree(self, tree: Tree) -> Iterable[Advice]:
         if self._skip_dbr:
             return
-        tree = Tree.normalize_and_parse(code)
         for node in tree.walk():
             yield from self._linter.lint(node)
