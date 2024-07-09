@@ -168,22 +168,14 @@ class RunCell(Cell):
         return True  # TODO
 
     def build_dependency_graph(self, parent: DependencyGraph) -> list[DependencyProblem]:
-        command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
-        lines = self._original_code.split('\n')
-        for idx, line in enumerate(lines):
-            start = line.index(command)
-            if start >= 0:
-                path = line[start + len(command) :]
-                path = path.strip().strip("'").strip('"')
-                if len(path) == 0:
-                    continue
-                notebook_path = Path(path)
-                start_line = self._original_offset + idx
-                problems = parent.register_notebook(notebook_path)
-                return [
-                    problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
-                    for problem in problems
-                ]
+        path, idx, line = self._read_notebook_path()
+        if path is not None:
+            start_line = self._original_offset + idx
+            problems = parent.register_notebook(path)
+            return [
+                problem.replace(start_line=start_line, start_col=0, end_line=start_line, end_col=len(line))
+                for problem in problems
+            ]
         start_line = self._original_offset
         problem = DependencyProblem(
             'invalid-run-cell',
@@ -194,6 +186,23 @@ class RunCell(Cell):
             end_col=len(self._original_code),
         )
         return [problem]
+
+    def maybe_notebook_path(self) -> Path | None:
+        path, _, _ = self._read_notebook_path()
+        return path
+
+    def _read_notebook_path(self):
+        command = f'{LANGUAGE_PREFIX}{self.language.magic_name}'
+        lines = self._original_code.split('\n')
+        for idx, line in enumerate(lines):
+            start = line.index(command)
+            if start >= 0:
+                path = line[start + len(command) :]
+                path = path.strip().strip("'").strip('"')
+                if len(path) == 0:
+                    continue
+                return Path(path), idx, line
+        return None, 0, ""
 
     def migrate_notebook_path(self):
         pass
