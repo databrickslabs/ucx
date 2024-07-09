@@ -4,7 +4,10 @@ import pytest
 from databricks.sdk.errors import InvalidParameterValue, NotFound
 from databricks.sdk.retries import retried
 
+from tests.integration.conftest import modified_or_skip
 
+
+@modified_or_skip("hive_metastore")
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=10))
 @pytest.mark.parametrize(
     "prepare_tables_for_migration,workflow",
@@ -20,10 +23,8 @@ def test_table_migration_job_refreshes_migration_status(
     installation_ctx,
     prepare_tables_for_migration,
     workflow,
-    modified_or_skip,
 ):
     """The migration status should be refreshed after the migration job."""
-    modified_or_skip("hive_metastore")
     tables, _ = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
