@@ -6,8 +6,7 @@ from databricks.sdk.errors import NotFound
 from databricks.sdk.retries import retried
 
 from databricks.labs.lsql.backends import StatementExecutionBackend
-from databricks.labs.ucx.hive_metastore.grants import GrantsCrawler
-from ..conftest import TestRuntimeContext
+from ..conftest import MockRuntimeContext
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +35,8 @@ def test_all_grants_in_databases(runtime_ctx, sql_backend, make_group):
     sql_backend.execute(f"GRANT MODIFY ON VIEW {view_c.full_name} TO `{group_b.display_name}`")
     sql_backend.execute(f"DENY MODIFY ON TABLE {view_d.full_name} TO `{group_b.display_name}`")
 
-    # 20 seconds less than TablesCrawler(sql_backend, inventory_schema)
-    grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
-
     all_grants = {}
-    for grant in list(grants.snapshot()):
+    for grant in list(runtime_ctx.grants_crawler.snapshot()):
         logging.info(f"grant:\n{grant}\n  hive: {grant.hive_grant_sql()}\n  uc: {grant.uc_grant_sql()}")
         object_type, object_key = grant.this_type_and_key()
         all_grants[f"{grant.principal}.{object_type}.{object_key}"] = grant.action_type
@@ -71,9 +67,7 @@ def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
     sql_backend.execute(f"GRANT ALL PRIVILEGES ON FUNCTION {udf_b.full_name} TO `{group_a.display_name}`")
     sql_backend.execute(f"DENY READ_METADATA ON FUNCTION {udf_b.full_name} to `{group_b.display_name}`")
 
-    grants = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
-
-    crawler_snapshot = list(grants.snapshot())
+    crawler_snapshot = list(runtime_ctx.grants_crawler.snapshot())
     actual_grants = defaultdict(set)
     for grant in crawler_snapshot:
         object_type, object_key = grant.this_type_and_key()
@@ -86,7 +80,7 @@ def test_all_grants_for_udfs_in_databases(runtime_ctx, sql_backend, make_group):
 
 @retried(on=[NotFound], timeout=timedelta(minutes=3))
 def test_all_grants_for_other_objects(
-    runtime_ctx: TestRuntimeContext, sql_backend: StatementExecutionBackend, make_group
+    runtime_ctx: MockRuntimeContext, sql_backend: StatementExecutionBackend, make_group
 ) -> None:
     group_a = make_group()
     group_b = make_group()
@@ -99,8 +93,8 @@ def test_all_grants_for_other_objects(
     sql_backend.execute(f"GRANT SELECT ON ANONYMOUS FUNCTION TO `{group_c.display_name}`")
     sql_backend.execute(f"DENY SELECT ON ANONYMOUS FUNCTION TO `{group_d.display_name}`")
 
-    crawler = GrantsCrawler(runtime_ctx.tables_crawler, runtime_ctx.udfs_crawler)
-    all_found_grants = list(crawler.snapshot())
+    runtime_ctx.make_schema()  # optimization to avoid crawling all databases
+    all_found_grants = list(runtime_ctx.grants_crawler.snapshot())
 
     found_any_file_grants = defaultdict(set)
     found_anonymous_function_grants = defaultdict(set)

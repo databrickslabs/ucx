@@ -16,7 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 @retried(on=[NotFound, InvalidParameterValue], timeout=timedelta(minutes=8))
-def test_running_real_assessment_job(ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions):
+def test_running_real_assessment_job(
+    ws,
+    installation_ctx,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+    modified_or_skip,
+):
+    modified_or_skip("assessment")
     ctx = installation_ctx.replace(skip_dashboards=False)
     ws_group_a, _ = ctx.make_ucx_group()
 
@@ -43,7 +50,9 @@ def test_running_real_migrate_groups_job(
     make_cluster_policy_permissions,
     make_secret_scope,
     make_secret_scope_acl,
+    modified_or_skip,
 ):
+    modified_or_skip("workspace_access")
     ws_group_a, acc_group_a = installation_ctx.make_ucx_group()
 
     cluster_policy = make_cluster_policy()
@@ -85,7 +94,9 @@ def test_running_real_validate_groups_permissions_job(
     make_cluster_policy_permissions,
     make_secret_scope,
     make_secret_scope_acl,
+    modified_or_skip,
 ):
+    modified_or_skip("workspace_access")
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
     query = make_query()
@@ -124,8 +135,13 @@ def test_running_real_validate_groups_permissions_job(
 
 @retried(on=[NotFound], timeout=timedelta(minutes=8))
 def test_running_real_validate_groups_permissions_job_fails(
-    ws, installation_ctx, make_cluster_policy, make_cluster_policy_permissions
+    ws,
+    installation_ctx,
+    make_cluster_policy,
+    make_cluster_policy_permissions,
+    modified_or_skip,
 ):
+    modified_or_skip("workspace_access")
     ws_group_a, _ = installation_ctx.make_ucx_group()
 
     cluster_policy = make_cluster_policy()
@@ -135,7 +151,9 @@ def test_running_real_validate_groups_permissions_job_fails(
         group_name=ws_group_a.display_name,
     )
 
+    installation_ctx.make_schema()  # optimization to skip listing all schemas
     installation_ctx.__dict__['include_group_names'] = [ws_group_a.display_name]
+    installation_ctx.__dict__['include_object_permissions'] = [f'cluster-policies:{cluster_policy.policy_id}']
     installation_ctx.workspace_installation.run()
     installation_ctx.permission_manager.inventorize_permissions()
 
@@ -154,8 +172,9 @@ def test_hiveserde_table_in_place_migration_job(
     ws,
     installation_ctx,
     prepare_tables_for_migration,
-    env_or_skip,
+    modified_or_skip,
 ):
+    modified_or_skip("hive_metastore")
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
@@ -180,8 +199,9 @@ def test_hiveserde_table_ctas_migration_job(
     ws,
     installation_ctx,
     prepare_tables_for_migration,
-    env_or_skip,
+    modified_or_skip,
 ):
+    modified_or_skip("hive_metastore")
     tables, dst_schema = prepare_tables_for_migration
     ctx = installation_ctx.replace(
         extend_prompts={
