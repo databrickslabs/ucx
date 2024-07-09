@@ -10,15 +10,15 @@ from databricks.labs.ucx.source_code.notebooks.sources import FileLinter
 
 
 @pytest.mark.parametrize("path, content", [("xyz.py", "a = 3"), ("xyz.sql", "select * from dual")])
-def test_file_linter_lints_supported_language(path, content, migration_index):
-    linter = FileLinter(LinterContext(migration_index), Path(path), content)
+def test_file_linter_lints_supported_language(path, content, migration_index, mock_path_lookup):
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), content)
     advices = list(linter.lint())
     assert not advices
 
 
 @pytest.mark.parametrize("path", ["xyz.scala", "xyz.r", "xyz.sh"])
-def test_file_linter_lints_not_yet_supported_language(path, migration_index):
-    linter = FileLinter(LinterContext(migration_index), Path(path), "")
+def test_file_linter_lints_not_yet_supported_language(path, migration_index, mock_path_lookup):
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), "")
     advices = list(linter.lint())
     assert [advice.code for advice in advices] == ["unsupported-language"]
 
@@ -29,8 +29,8 @@ class FriendFileLinter(FileLinter):
         return self._source_code
 
 
-def test_checks_encoding_of_pseudo_file(migration_index):
-    linter = FriendFileLinter(LinterContext(migration_index), Path("whatever"), "a=b")
+def test_checks_encoding_of_pseudo_file(migration_index, mock_path_lookup):
+    linter = FriendFileLinter(LinterContext(migration_index), mock_path_lookup, Path("whatever"), "a=b")
     assert linter.source_code() == "a=b"
 
 
@@ -44,10 +44,10 @@ def test_checks_encoding_of_pseudo_file(migration_index):
         (codecs.BOM_UTF32_BE, "utf-32-be"),
     ],
 )
-def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_path):
+def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_path, mock_path_lookup):
     path = tmp_path / "file.py"
     path.write_bytes(bom + "a = 12".encode(encoding))
-    linter = FriendFileLinter(LinterContext(migration_index), path)
+    linter = FriendFileLinter(LinterContext(migration_index), mock_path_lookup, path)
     assert linter.source_code() == "a = 12"
 
 
@@ -70,16 +70,16 @@ def test_checks_encoding_of_file_with_bom(migration_index, bom, encoding, tmp_pa
         ".DS_Store",  # on MacOS
     ],
 )
-def test_file_linter_lints_ignorable_language(path, migration_index):
-    linter = FileLinter(LinterContext(migration_index), Path(path), "")
+def test_file_linter_lints_ignorable_language(path, migration_index, mock_path_lookup):
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, Path(path), "")
     advices = list(linter.lint())
     assert not advices
 
 
-def test_file_linter_lints_non_ascii_encoded_file(migration_index):
+def test_file_linter_lints_non_ascii_encoded_file(migration_index, mock_path_lookup):
     preferred_encoding = locale.getpreferredencoding(False)
     non_ascii_encoded_file = Path(__file__).parent.parent / "samples" / "nonascii.py"
-    linter = FileLinter(LinterContext(migration_index), non_ascii_encoded_file)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, non_ascii_encoded_file)
 
     advices = list(linter.lint())
 
@@ -88,11 +88,11 @@ def test_file_linter_lints_non_ascii_encoded_file(migration_index):
     assert advices[0].message == f"File without {preferred_encoding} encoding is not supported {non_ascii_encoded_file}"
 
 
-def test_file_linter_lints_file_with_missing_file(migration_index):
+def test_file_linter_lints_file_with_missing_file(migration_index, mock_path_lookup):
     path = create_autospec(Path)
     path.suffix = ".py"
     path.read_text.side_effect = FileNotFoundError("No such file or directory: 'test.py'")
-    linter = FileLinter(LinterContext(migration_index), path)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path)
 
     advices = list(linter.lint())
 
@@ -101,11 +101,11 @@ def test_file_linter_lints_file_with_missing_file(migration_index):
     assert advices[0].message == f"File not found: {path}"
 
 
-def test_file_linter_lints_file_with_missing_read_permission(migration_index):
+def test_file_linter_lints_file_with_missing_read_permission(migration_index, mock_path_lookup):
     path = create_autospec(Path)
     path.suffix = ".py"
     path.read_text.side_effect = PermissionError("Permission denied")
-    linter = FileLinter(LinterContext(migration_index), path)
+    linter = FileLinter(LinterContext(migration_index), mock_path_lookup, path)
 
     advices = list(linter.lint())
 
