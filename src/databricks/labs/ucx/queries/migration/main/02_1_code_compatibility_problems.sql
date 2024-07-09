@@ -1,7 +1,7 @@
 /*
 --title 'Workflow migration problems'
 --overrides '{"spec": {"encodings": {"columns": [
-    {"fieldName": "path", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "path"},
+    {"fieldName": "path", "booleanValues": ["false", "true"], "linkUrlTemplate": "/#workspace/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "path"},
     {"fieldName": "code", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "code"},
     {"fieldName": "message", "booleanValues": ["false", "true"], "type": "string", "displayAs": "string", "title": "message"},
     {"fieldName": "workflow_id", "booleanValues": ["false", "true"], "linkUrlTemplate": "/jobs/{{ @ }}", "linkTextTemplate": "{{ @ }}", "linkTitleTemplate": "{{ @ }}", "linkOpenInNewTab": true, "type": "string", "displayAs": "link", "title": "workflow_id"},
